@@ -44,3 +44,9 @@ next-env.d.ts
 /.cache
 /data
 /venv
+
+# database files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
