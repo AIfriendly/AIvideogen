@@ -2,6 +2,14 @@
   "name": "ai-video-generator",
   "version": "0.1.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AIfriendly/AIvideogen.git"
+  },
+  "homepage": "https://github.com/AIfriendly/AIvideogen#readme",
+  "bugs": {
+    "url": "https://github.com/AIfriendly/AIvideogen/issues"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,9 +17,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@radix-ui/react-scroll-area": "^1.2.10",
+    "@radix-ui/react-slot": "^1.2.3",
     "better-sqlite3": "^12.4.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
     "lucide-react": "^0.552.0",
     "next": "16.0.1",
     "ollama": "^0.6.2",

@@ -1,0 +1,181 @@
+/**
+ * ChatInterface Component
+ *
+ * Main chat UI component with message input, validation, and API integration.
+ * Implements all 5 critical requirements for Story 1.5.
+ *
+ * GitHub Repository: https://github.com/bmad-dev/BMAD-METHOD
+ */
+
+'use client';
+
+import { useState } from 'react';
+import { createConversationStore } from '@/lib/stores/conversation-store';
+import { generateMessageId, ERROR_MESSAGES } from '@/lib/utils/message-helpers';
+import { MessageList } from './MessageList';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Send } from 'lucide-react';
+
+interface ChatInterfaceProps {
+  projectId: string;
+}
+
+// Maximum message length (Critical Requirement #4)
+const MAX_MESSAGE_LENGTH = 5000;
+
+export function ChatInterface({ projectId }: ChatInterfaceProps) {
+  const [input, setInput] = useState('');
+  const [charCount, setCharCount] = useState(0);
+
+  // Create store instance for this project (Critical Requirement #1: Per-Project State Isolation)
+  const useConversationStore = createConversationStore(projectId);
+  const { messages, isLoading, error, addMessage, setLoading, setError, clearError } =
+    useConversationStore();
+
+  const handleSendMessage = async () => {
+    const trimmedMessage = input.trim();
+
+    if (!trimmedMessage) {
+      setError('Message cannot be empty');
+      return;
+    }
+
+    // Input length validation (Critical Requirement #4: 5000 Character Validation)
+    if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
+      setError(`Message too long (max ${MAX_MESSAGE_LENGTH} characters)`);
+      return;
+    }
+
+    // Clear input and errors
+    setInput('');
+    setCharCount(0);
+    clearError();
+
+    // Optimistic UI: Add user message immediately
+    const userMessage = {
+      id: generateMessageId(), // Critical Requirement #2: Browser-Safe UUID Generation
+      role: 'user' as const,
+      content: trimmedMessage,
+      timestamp: new Date().toISOString(),
+    };
+    addMessage(userMessage);
+
+    // AbortController with 30s timeout (Critical Requirement #3: 30s Timeout)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      setLoading(true);
+
+      // Call API endpoint with timeout
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, message: trimmedMessage }),
+        signal: controller.signal, // Attach abort signal
+      });
+
+      clearTimeout(timeoutId); // Clear timeout on success
+
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        // Extract error code and map to user-friendly message (Critical Requirement #5: Error Code Mapping)
+        const errorCode = errorData?.error?.code;
+        const errorMessage = ERROR_MESSAGES[errorCode] || errorData.error?.message || 'An unexpected error occurred';
+
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+
+      // Add assistant response
+      const assistantMessage = {
+        id: data.data.messageId,
+        role: 'assistant' as const,
+        content: data.data.response,
+        timestamp: data.data.timestamp,
+      };
+      addMessage(assistantMessage);
+
+    } catch (err) {
+      clearTimeout(timeoutId); // Clear timeout on error
+
+      // Handle timeout errors specifically (Critical Requirement #3: Timeout Error Handling)
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('Request timed out after 30 seconds. Please try again.');
+      } else {
+        setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInput(value);
+    setCharCount(value.length);
+    // Clear error when user starts typing
+    if (error) clearError();
+  };
+
+  // Character count display (Critical Requirement #4: Character Count with Visual Feedback)
+  const showCharCount = charCount > 4500;
+  const charCountColor = charCount > 4900 ? 'text-red-500' : charCount > 4500 ? 'text-yellow-500' : 'text-muted-foreground';
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Message Display Area */}
+      <div className="flex-1 overflow-hidden">
+        <MessageList messages={messages} isLoading={isLoading} />
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <Alert variant="destructive" className="mx-4 mb-2" role="alert">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Input Area */}
+      <div className="border-t p-4">
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <Input
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Describe your video idea..."
+              disabled={isLoading}
+              className="flex-1"
+              aria-label="Message input"
+              maxLength={MAX_MESSAGE_LENGTH}
+            />
+            {showCharCount && (
+              <p className={`text-xs mt-1 ${charCountColor}`}>
+                {charCount} / {MAX_MESSAGE_LENGTH} characters
+              </p>
+            )}
+          </div>
+          <Button
+            onClick={handleSendMessage}
+            disabled={isLoading || !input.trim()}
+            aria-label="Send message"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
