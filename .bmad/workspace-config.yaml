@@ -25,6 +25,11 @@ workflow_status_file: './docs/bmm-workflow-status.md'
 current_phase: 4
 current_workflow: Implementation
 
+# Git Configuration
+git_repository: https://github.com/AIfriendly/AIvideogen
+git_remote: origin
+git_branch: master
+
 # Notes
 # This file is workspace-specific and doesn't affect the global BMAD installation
 # To use this with BMAD agents, they should check for .bmad/workspace-config.yaml first
