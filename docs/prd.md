@@ -4,6 +4,7 @@
 
 **Last Updated:** 2025-11-01
 **Version:** 1.2
+**Repository:** https://github.com/AIfriendly/AIvideogen
 
 **Recent Changes:**
 - Expanded Feature 2.6: LLM Configuration to include System Prompts & Persona Configuration

@@ -3,6 +3,7 @@
 *This document organizes the PRD features into logical development epics for the AI Video Generator MVP.*
 
 **Project:** AI Video Generator (Level 2)
+**Repository:** https://github.com/AIfriendly/AIvideogen
 **Last Updated:** 2025-11-01
 
 ---

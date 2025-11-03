@@ -1,6 +1,7 @@
-ywy# AI Video Generator - System Architecture
+# AI Video Generator - System Architecture
 
 **Project:** AI Video Generator
+**Repository:** https://github.com/AIfriendly/AIvideogen
 **Type:** Level 2 Greenfield Software Project
 **Author:** Winston (BMAD Architect Agent)
 **Date:** 2025-11-01
