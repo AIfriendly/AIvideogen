@@ -1,0 +1,30 @@
+# Workspace-Specific BMAD Configuration
+# AI Video Generator Project
+# Created: 2025-11-02
+
+# Project Identity
+project_name: AI Video Generator
+project_type: software
+project_level: 2
+field_type: greenfield
+
+# Workspace Paths (relative to workspace root: d:\BMAD video generator)
+output_folder: './docs'
+tech_docs: './docs'
+dev_story_location: './docs/stories'
+implementation_root: './ai-video-generator'
+
+# User Preferences (can override global BMAD config)
+user_name: lichking
+communication_language: English
+document_output_language: English
+user_skill_level: intermediate
+
+# Workflow Configuration
+workflow_status_file: './docs/bmm-workflow-status.md'
+current_phase: 4
+current_workflow: Implementation
+
+# Notes
+# This file is workspace-specific and doesn't affect the global BMAD installation
+# To use this with BMAD agents, they should check for .bmad/workspace-config.yaml first

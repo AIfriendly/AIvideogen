@@ -1,0 +1,391 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.3</storyId>
+    <title>LLM Provider Abstraction</title>
+    <status>Ready</status>
+    <generatedAt>2025-11-03</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-1.3.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>implement an LLM provider abstraction layer with Ollama integration</iWant>
+    <soThat>the application can interact with language models through a clean, extensible interface that supports future provider additions</soThat>
+    <tasks>
+      <task id="1" ac="AC1">
+        <description>Create LLMProvider Interface</description>
+        <subtasks>
+          <subtask>Create lib/llm/ directory if it doesn't exist</subtask>
+          <subtask>Create lib/llm/provider.ts file</subtask>
+          <subtask>Define Message interface with role ('user' | 'assistant' | 'system') and content (string)</subtask>
+          <subtask>Define LLMProvider interface with chat() method signature</subtask>
+          <subtask>Export interface and types</subtask>
+          <subtask>Add JSDoc comments for interface documentation</subtask>
+        </subtasks>
+      </task>
+      <task id="2" ac="AC3">
+        <description>Implement Default System Prompt</description>
+        <subtasks>
+          <subtask>Create lib/llm/prompts/ directory</subtask>
+          <subtask>Create lib/llm/prompts/default-system-prompt.ts file</subtask>
+          <subtask>Write system prompt defining AI Video Generator assistant behavior</subtask>
+          <subtask>Include context about conversational flow (topic → script → voice → rendering)</subtask>
+          <subtask>Export DEFAULT_SYSTEM_PROMPT constant</subtask>
+          <subtask>Add comments explaining prompt structure</subtask>
+        </subtasks>
+      </task>
+      <task id="3" ac="AC2,AC5">
+        <description>Implement OllamaProvider</description>
+        <subtasks>
+          <subtask>Create lib/llm/ollama-provider.ts file</subtask>
+          <subtask>Import LLMProvider interface and ollama package</subtask>
+          <subtask>Implement OllamaProvider class with chat() method</subtask>
+          <subtask>Configure Ollama client with OLLAMA_BASE_URL and OLLAMA_MODEL from environment</subtask>
+          <subtask>Prepend system prompt to messages array in chat() method</subtask>
+          <subtask>Call Ollama API and extract response text</subtask>
+          <subtask>Implement error handling for connection failures (ECONNREFUSED), model not found errors, timeout errors, generic API errors</subtask>
+          <subtask>Add user-friendly error messages with actionable guidance</subtask>
+          <subtask>Export OllamaProvider class</subtask>
+        </subtasks>
+      </task>
+      <task id="4" ac="AC4">
+        <description>Create Provider Factory</description>
+        <subtasks>
+          <subtask>Create lib/llm/factory.ts file</subtask>
+          <subtask>Import OllamaProvider and LLMProvider interface</subtask>
+          <subtask>Implement createLLMProvider() factory function</subtask>
+          <subtask>Read LLM_PROVIDER from environment variables</subtask>
+          <subtask>Return OllamaProvider instance when provider is "ollama"</subtask>
+          <subtask>Throw descriptive error for unsupported provider types</subtask>
+          <subtask>Add JSDoc comments documenting factory behavior</subtask>
+          <subtask>Export factory function</subtask>
+        </subtasks>
+      </task>
+      <task id="5" ac="AC1-5">
+        <description>Testing and Validation</description>
+        <subtasks>
+          <subtask>Create test script to verify OllamaProvider connection</subtask>
+          <subtask>Test chat() method with sample messages</subtask>
+          <subtask>Verify system prompt is prepended correctly</subtask>
+          <subtask>Test error handling for Ollama service not running</subtask>
+          <subtask>Test error handling for invalid model name</subtask>
+          <subtask>Verify factory returns correct provider instance</subtask>
+          <subtask>Document test results in Dev Agent Record</subtask>
+        </subtasks>
+      </task>
+      <task id="6" ac="AC1-5">
+        <description>Integration and Documentation</description>
+        <subtasks>
+          <subtask>Verify all files compile without TypeScript errors</subtask>
+          <subtask>Update .env.example if new environment variables needed</subtask>
+          <subtask>Add usage examples in comments or README</subtask>
+          <subtask>Verify integration with existing project structure</subtask>
+          <subtask>Complete Dev Agent Record with implementation notes</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">
+      <title>LLMProvider Interface Defined</title>
+      <requirements>
+        <requirement>LLMProvider interface created in lib/llm/provider.ts</requirement>
+        <requirement>Interface defines chat(messages: Message[], systemPrompt?: string): Promise&lt;string&gt; method</requirement>
+        <requirement>TypeScript types for Message structure defined</requirement>
+        <requirement>Interface is exported for use by other modules</requirement>
+      </requirements>
+    </criterion>
+    <criterion id="AC2">
+      <title>OllamaProvider Implementation</title>
+      <requirements>
+        <requirement>OllamaProvider class created in lib/llm/ollama-provider.ts</requirement>
+        <requirement>Implements LLMProvider interface</requirement>
+        <requirement>Uses ollama npm package (v0.6.2) to call localhost:11434</requirement>
+        <requirement>Prepends system prompt to message array before API call</requirement>
+        <requirement>Returns assistant response as string</requirement>
+        <requirement>Handles Ollama connection failures gracefully</requirement>
+      </requirements>
+    </criterion>
+    <criterion id="AC3">
+      <title>System Prompt Management</title>
+      <requirements>
+        <requirement>DEFAULT_SYSTEM_PROMPT constant created in lib/llm/prompts/default-system-prompt.ts</requirement>
+        <requirement>System prompt provides context for AI Video Generator assistant role</requirement>
+        <requirement>System prompt prepended to all chat requests via OllamaProvider</requirement>
+        <requirement>Exported for use across the application</requirement>
+      </requirements>
+    </criterion>
+    <criterion id="AC4">
+      <title>Provider Factory Function</title>
+      <requirements>
+        <requirement>Factory function created in lib/llm/factory.ts</requirement>
+        <requirement>Returns OllamaProvider instance based on LLM_PROVIDER environment variable</requirement>
+        <requirement>Supports future provider extensions (OpenAI, Anthropic, etc.)</requirement>
+        <requirement>Throws descriptive error if provider type is unsupported</requirement>
+        <requirement>Uses environment variables: LLM_PROVIDER, OLLAMA_BASE_URL, OLLAMA_MODEL</requirement>
+      </requirements>
+    </criterion>
+    <criterion id="AC5">
+      <title>Error Handling</title>
+      <requirements>
+        <requirement>Ollama connection failures caught and wrapped in user-friendly error messages</requirement>
+        <requirement>Network errors handled with actionable guidance (e.g., "Start Ollama service")</requirement>
+        <requirement>Model not found errors provide clear instructions</requirement>
+        <requirement>Error messages logged for debugging</requirement>
+        <requirement>TypeScript error types defined for LLM provider failures</requirement>
+      </requirements>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>AI Video Generator - System Architecture</title>
+        <section>LLM Provider Abstraction (lines 384-504)</section>
+        <snippet>Defines the Strategy Pattern implementation for LLM provider abstraction. Shows complete interface definition with LLMProvider interface containing chat() and generateScript() methods. Includes OllamaProvider implementation example using ollama npm package, factory pattern for provider selection, and environment variable configuration. Demonstrates how system prompts are prepended to messages and how to handle Ollama API responses.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>AI Video Generator - System Architecture</title>
+        <section>System Prompts & LLM Persona Configuration (lines 507-870)</section>
+        <snippet>Details the default system prompt architecture and preset persona library. Defines DEFAULT_SYSTEM_PROMPT constant structure for "Creative Assistant" persona with personality, behavior, constraints, and goals. Includes implementation guidance for MVP (hardcoded default) vs Post-MVP (database-backed UI configuration). Shows how system prompts define LLM behavior without external restrictions due to local Ollama deployment.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>AI Video Generator - System Architecture</title>
+        <section>Technology Stack (lines 80-133)</section>
+        <snippet>Specifies ollama npm package v0.6.2 as the official JavaScript SDK for Ollama integration. Confirms Ollama server runs at http://localhost:11434 with Llama 3.2 (3B instruct model). Lists all FOSS-compliant dependencies and confirms Next.js 15.5 with TypeScript 5.x as the foundation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Technical Specification: Epic 1 - Conversational Topic Discovery</title>
+        <section>APIs and Interfaces (lines 129-140)</section>
+        <snippet>Defines the authoritative LLMProvider interface contract with chat() method signature accepting Message[] array and optional systemPrompt. Message interface specifies role field as union type 'user' | 'assistant' | 'system' and content as string. This is the core abstraction that all LLM providers must implement.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document (PRD): AI Video Generator</title>
+        <section>Feature 1.1: Conversational AI Agent (lines 28-56)</section>
+        <snippet>Describes the chat-based AI assistant that guides users from initial idea to concrete video topic. Specifies that the agent must understand natural language, maintain conversational context over multiple turns, and recognize explicit commands to trigger video creation. This context defines the purpose for the LLM provider abstraction.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document (PRD): AI Video Generator</title>
+        <section>NFR 1: Technology Stack (lines 18-22)</section>
+        <snippet>Mandates that the entire system must be implemented using technologies that are free and open-source (FOSS). This constraint ensures Ollama (FOSS) is the MVP LLM provider, while the abstraction layer enables future cloud provider integration for post-MVP scenarios.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>AI Video Generator - Development Epics</title>
+        <section>Story 1.3: LLM Provider Abstraction (lines 141-161)</section>
+        <snippet>Epic-level story definition specifying the goal to implement LLM provider abstraction layer with Ollama integration. Lists all acceptance criteria: LLMProvider interface with chat() method, OllamaProvider calling Ollama API at localhost:11434, system prompt prepending, factory pattern based on environment configuration, and graceful error handling with user-friendly messages.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>.env.local</path>
+        <kind>config</kind>
+        <symbol>Environment Variables</symbol>
+        <lines>1-11</lines>
+        <reason>Contains the required Ollama configuration: OLLAMA_BASE_URL (http://localhost:11434), OLLAMA_MODEL (llama3.2), and LLM_PROVIDER (ollama). These values are read by the provider factory to instantiate the correct LLM provider.</reason>
+      </artifact>
+      <artifact>
+        <path>package.json</path>
+        <kind>config</kind>
+        <symbol>dependencies.ollama</symbol>
+        <lines>17</lines>
+        <reason>Confirms ollama npm package v0.6.2 is already installed as specified in the architecture. This is the official JavaScript SDK that OllamaProvider will use to communicate with the Ollama server.</reason>
+      </artifact>
+      <artifact>
+        <path>src/app/layout.tsx</path>
+        <kind>component</kind>
+        <symbol>RootLayout</symbol>
+        <lines>N/A</lines>
+        <reason>Root layout component exists, confirming Next.js 16.0.1 project structure is initialized. The LLM provider will be called from API routes that integrate with this app structure.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <npm>
+        <package name="ollama" version="^0.6.2">Official Ollama JavaScript SDK for Node.js - required for OllamaProvider implementation</package>
+        <package name="next" version="16.0.1">Next.js framework - provides API routes where LLM provider will be called</package>
+        <package name="typescript" version="^5">TypeScript compiler - enables strict type checking for LLMProvider interface</package>
+        <package name="zustand" version="^5.0.8">State management - not directly used in Story 1.3 but part of Epic 1 conversation state</package>
+        <package name="better-sqlite3" version="^12.4.1">SQLite database - not directly used in Story 1.3 but stores conversation messages that are passed to LLM</package>
+      </npm>
+      <system>
+        <dependency name="Ollama Server">Must be running at http://localhost:11434 with llama3.2 model downloaded. Verify with: ollama list</dependency>
+        <dependency name="Node.js 18+">Required for Next.js and native better-sqlite3 compilation</dependency>
+      </system>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint id="C1">
+      <category>Architecture Pattern</category>
+      <rule>Use Strategy Pattern for LLM provider abstraction</rule>
+      <rationale>Enables runtime provider selection and future extensibility to OpenAI, Anthropic, or other LLM services without changing calling code</rationale>
+    </constraint>
+    <constraint id="C2">
+      <category>FOSS Compliance</category>
+      <rule>MVP must use only open-source technologies (Ollama + Llama 3.2)</rule>
+      <rationale>Per NFR 1 in PRD, entire system must be free and open-source to ensure accessibility and zero licensing costs</rationale>
+    </constraint>
+    <constraint id="C3">
+      <category>Naming Convention</category>
+      <rule>Files: kebab-case.ts, Interfaces: PascalCase, Classes: PascalCase, Constants: SCREAMING_SNAKE_CASE</rule>
+      <rationale>Maintains consistency with Next.js/React ecosystem conventions and existing project structure</rationale>
+    </constraint>
+    <constraint id="C4">
+      <category>Type Safety</category>
+      <rule>Use strict TypeScript types for all interfaces, avoid 'any' types, export all public types for reusability</rule>
+      <rationale>Prevents runtime errors, improves IDE autocomplete, and ensures contract compliance across the codebase</rationale>
+    </constraint>
+    <constraint id="C5">
+      <category>Error Handling</category>
+      <rule>Wrap third-party errors with application-specific error messages providing actionable guidance</rule>
+      <rationale>User-facing errors must guide users to resolution (e.g., "Run ollama serve to start Ollama") while technical errors are logged for debugging</rationale>
+    </constraint>
+    <constraint id="C6">
+      <category>Dependency Injection</category>
+      <rule>Provider instances created via factory function, configuration injected via environment variables</rule>
+      <rationale>Supports testing with mock providers and enables environment-specific configuration without code changes</rationale>
+    </constraint>
+    <constraint id="C7">
+      <category>System Prompt Architecture</category>
+      <rule>MVP: Hardcode DEFAULT_SYSTEM_PROMPT in lib/llm/prompts/default-system-prompt.ts. Post-MVP: Database-backed UI configuration</rule>
+      <rationale>Simplifies MVP implementation while maintaining clear migration path to user-configurable personas in future releases</rationale>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>LLMProvider</name>
+      <kind>TypeScript Interface</kind>
+      <signature>
+interface LLMProvider {
+  chat(messages: Message[], systemPrompt?: string): Promise&lt;string&gt;;
+}
+
+interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+      </signature>
+      <path>lib/llm/provider.ts</path>
+      <description>Core abstraction interface that all LLM providers must implement. Defines the chat() method contract accepting an array of messages and an optional system prompt, returning the assistant's response as a string Promise. Message interface uses TypeScript union type for role field to ensure type safety.</description>
+    </interface>
+    <interface>
+      <name>OllamaProvider</name>
+      <kind>TypeScript Class</kind>
+      <signature>
+class OllamaProvider implements LLMProvider {
+  private client: Ollama;
+  private model: string;
+
+  constructor(baseUrl?: string, model?: string);
+  async chat(messages: Message[], systemPrompt?: string): Promise&lt;string&gt;;
+}
+      </signature>
+      <path>lib/llm/ollama-provider.ts</path>
+      <description>Concrete implementation of LLMProvider interface for Ollama integration. Uses ollama npm package to communicate with local Ollama server. Prepends system prompt as first message with role='system'. Reads configuration from environment variables OLLAMA_BASE_URL and OLLAMA_MODEL.</description>
+    </interface>
+    <interface>
+      <name>createLLMProvider</name>
+      <kind>Factory Function</kind>
+      <signature>
+function createLLMProvider(): LLMProvider;
+      </signature>
+      <path>lib/llm/factory.ts</path>
+      <description>Factory function that returns the appropriate LLMProvider instance based on the LLM_PROVIDER environment variable. Currently supports 'ollama' provider type. Throws descriptive error for unsupported provider types. Enables future provider additions (OpenAI, Anthropic) without modifying calling code.</description>
+    </interface>
+    <interface>
+      <name>DEFAULT_SYSTEM_PROMPT</name>
+      <kind>TypeScript Constant</kind>
+      <signature>
+export const DEFAULT_SYSTEM_PROMPT: string = `...`;
+      </signature>
+      <path>lib/llm/prompts/default-system-prompt.ts</path>
+      <description>Hardcoded system prompt constant defining the "Creative Assistant" persona for MVP. Contains personality traits (enthusiastic, supportive), behavior guidelines (ask clarifying questions, no topic restrictions), and constraints (concise responses, maintain context). Prepended to all LLM conversations to ensure consistent assistant behavior.</description>
+    </interface>
+    <interface>
+      <name>Ollama API</name>
+      <kind>REST API</kind>
+      <signature>
+POST http://localhost:11434/api/chat
+{
+  model: string,
+  messages: Array&lt;{ role: string, content: string }&gt;
+}
+→ Response: { message: { content: string } }
+      </signature>
+      <path>External: Ollama Server</path>
+      <description>Local Ollama server REST API endpoint for chat completions. Called by OllamaProvider via the ollama npm SDK. Requires Ollama service to be running with llama3.2 model downloaded. Returns assistant response in structured format.</description>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests should mock the Ollama SDK to test OllamaProvider logic without requiring a running Ollama server. Integration tests should verify actual Ollama API calls with the service running. Test LLMProvider interface compliance by verifying that OllamaProvider correctly implements the chat() method contract. Use TypeScript strict mode in tests to catch type errors. Mock environment variables in tests to verify factory behavior with different configurations. Error handling tests should simulate connection failures, model not found errors, and timeout scenarios.
+    </standards>
+    <locations>
+      <location>lib/llm/__tests__/</location>
+      <location>lib/llm/provider.test.ts</location>
+      <location>lib/llm/ollama-provider.test.ts</location>
+      <location>lib/llm/factory.test.ts</location>
+    </locations>
+    <ideas>
+      <idea acRef="AC1">
+        <description>Test that LLMProvider interface is properly exported and can be imported by other modules</description>
+        <approach>Import interface in test file, verify TypeScript compilation succeeds, create mock implementation to verify contract</approach>
+      </idea>
+      <idea acRef="AC1">
+        <description>Test Message interface type constraints</description>
+        <approach>Attempt to create Message with invalid role value ('invalid'), verify TypeScript compiler error. Verify valid roles ('user', 'assistant', 'system') compile successfully</approach>
+      </idea>
+      <idea acRef="AC2">
+        <description>Test OllamaProvider successfully calls Ollama API with mock client</description>
+        <approach>Mock ollama.chat() method, call OllamaProvider.chat(), verify mock was called with correct model and messages array</approach>
+      </idea>
+      <idea acRef="AC2,AC3">
+        <description>Test system prompt is prepended to messages array</description>
+        <approach>Call OllamaProvider.chat() with 2 user messages and custom system prompt. Verify ollama.chat() receives 3 messages: [system, user1, user2] in that order</approach>
+      </idea>
+      <idea acRef="AC2">
+        <description>Test OllamaProvider extracts response content correctly</description>
+        <approach>Mock ollama.chat() to return { message: { content: 'test response' } }. Verify OllamaProvider.chat() returns 'test response' string</approach>
+      </idea>
+      <idea acRef="AC4">
+        <description>Test factory returns OllamaProvider when LLM_PROVIDER='ollama'</description>
+        <approach>Set process.env.LLM_PROVIDER='ollama', call createLLMProvider(), verify returned instance is instanceof OllamaProvider</approach>
+      </idea>
+      <idea acRef="AC4">
+        <description>Test factory throws error for unsupported provider type</description>
+        <approach>Set process.env.LLM_PROVIDER='openai', call createLLMProvider(), expect error with message "Unsupported LLM provider: openai"</approach>
+      </idea>
+      <idea acRef="AC5">
+        <description>Test Ollama connection failure error handling</description>
+        <approach>Mock ollama.chat() to throw ECONNREFUSED error. Verify OllamaProvider wraps error with user-friendly message: "Could not connect to Ollama service at http://localhost:11434. Please ensure Ollama is running..."</approach>
+      </idea>
+      <idea acRef="AC5">
+        <description>Test model not found error handling</description>
+        <approach>Mock ollama.chat() to throw "model 'llama3.2' not found" error. Verify OllamaProvider wraps error with instructions: "Model 'llama3.2' not found in Ollama. Please pull the model: ollama pull llama3.2"</approach>
+      </idea>
+      <idea acRef="AC5">
+        <description>Test timeout error handling</description>
+        <approach>Mock ollama.chat() to throw timeout error. Verify OllamaProvider wraps error with guidance: "Ollama request timed out after 30 seconds. The model may be loading..."</approach>
+      </idea>
+      <idea acRef="AC3">
+        <description>Test DEFAULT_SYSTEM_PROMPT is exported and non-empty</description>
+        <approach>Import DEFAULT_SYSTEM_PROMPT constant, verify it is a string, verify length > 100 characters, verify contains key phrases like "creative video brainstorming assistant"</approach>
+      </idea>
+      <idea acRef="AC2">
+        <description>Integration test: Test actual Ollama API call (requires Ollama running)</description>
+        <approach>Skip if Ollama not available. Call OllamaProvider.chat() with real Ollama server. Send simple message "Hello", verify response is non-empty string. Verify response time < 5 seconds</approach>
+      </idea>
+    </ideas>
+  </tests>
+</story-context>

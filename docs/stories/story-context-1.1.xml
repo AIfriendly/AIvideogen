@@ -1,0 +1,229 @@
+<story-context id="story-1.1-project-setup-dependencies" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.1</storyId>
+    <title>Project Setup & Dependencies</title>
+    <status>Done</status>
+    <generatedAt>2025-11-02</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-1.1.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>initialize the Next.js project with all required dependencies and project structure</iWant>
+    <soThat>I have a solid foundation to implement Epic 1 conversational features</soThat>
+    <tasks>
+      <task id="1" status="completed">Initialize Next.js Project with TypeScript, Tailwind CSS, ESLint, and App Router</task>
+      <task id="2" status="completed">Install Core Dependencies (zustand, better-sqlite3, ollama, shadcn/ui)</task>
+      <task id="3" status="completed">Create Project Structure (app/, components/, lib/, stores/, types/)</task>
+      <task id="4" status="completed">Configure Environment (.env.local with Ollama configuration)</task>
+      <task id="5" status="completed">Verify Ollama Integration (localhost:11434, llama3.2 model)</task>
+      <task id="6" status="completed">Documentation & Validation (README, verify ACs, commit setup)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">
+      <title>Next.js Project Initialized</title>
+      <details>
+        - Next.js 15.5+ project created with TypeScript, Tailwind CSS, ESLint, and App Router
+        - Development server runs successfully at localhost:3000
+        - Project follows architecture.md structure
+      </details>
+      <status>COMPLETE</status>
+    </criterion>
+    <criterion id="AC2">
+      <title>Dependencies Installed</title>
+      <details>
+        - Core dependencies: next@15.5+, react@19, zustand@5.0.8, better-sqlite3@12.4.1, ollama@0.6.2, typescript@5.x
+        - Tailwind CSS v4 configured and working
+        - shadcn/ui initialized (component library)
+        - All dependencies resolve without errors
+      </details>
+      <status>COMPLETE</status>
+    </criterion>
+    <criterion id="AC3">
+      <title>Project Structure Created</title>
+      <details>
+        - Directory structure: app/, components/, lib/, stores/, types/, public/
+        - .gitignore configured for Next.js, node_modules, .env.local
+      </details>
+      <status>COMPLETE</status>
+    </criterion>
+    <criterion id="AC4">
+      <title>Environment Configuration</title>
+      <details>
+        - .env.local file created with: OLLAMA_BASE_URL, OLLAMA_MODEL, LLM_PROVIDER, DATABASE_PATH
+        - .env.example created for documentation
+      </details>
+      <status>COMPLETE</status>
+    </criterion>
+    <criterion id="AC5">
+      <title>Ollama Connection Verified</title>
+      <details>
+        - Ollama service running at localhost:11434
+        - llama3.2 model installed and accessible
+        - Connection test confirms Ollama responds
+      </details>
+      <status>COMPLETE</status>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>Feature 1.1: Conversational AI Agent</section>
+        <snippet>Defines requirements for chat-based AI assistant guiding users from initial idea to concrete video topic. Includes brainstorming interaction, command triggers, and topic confirmation workflow.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Project Initialization (lines 42-78)</section>
+        <snippet>Commands for initializing Next.js 15.5 with TypeScript, Tailwind, ESLint. Specifies App Router, strict TypeScript mode, Tailwind v4 configuration.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Technology Stack (lines 80-133)</section>
+        <snippet>Complete tech stack specification: Next.js 15.5, React 19, Zustand 5.0.8, better-sqlite3 12.4.1, ollama 0.6.2, TypeScript 5.x, Tailwind CSS v4, shadcn/ui.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Project Structure (lines 136-251)</section>
+        <snippet>Directory layout: src/app/ (Next.js App Router), src/components/ (UI components), src/lib/ (utilities), src/stores/ (Zustand state), src/types/ (TypeScript definitions).</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Technical Specification: Epic 1</title>
+        <section>System Architecture Alignment (lines 37-57)</section>
+        <snippet>Architecture constraints: Local-first SQLite, Ollama at localhost:11434, FOSS compliance, single-user deployment, Next.js App Router pattern, TypeScript strict mode, Strategy Pattern for LLM providers.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Technical Specification: Epic 1</title>
+        <section>Dependencies and Integrations (lines 330-367)</section>
+        <snippet>Frontend deps: next@15.5, react@19, zustand@5.0.8, typescript@5.x. Backend deps: ollama@0.6.2, better-sqlite3@12.4.1. External services: Ollama Server at localhost:11434 with llama3.2 model. Environment variables specified.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>ai-video-generator/src/app/page.tsx</path>
+        <kind>component</kind>
+        <symbol>Home</symbol>
+        <lines>3-65</lines>
+        <reason>Default Next.js homepage component - placeholder for Epic 1 ChatInterface implementation</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/app/layout.tsx</path>
+        <kind>layout</kind>
+        <symbol>RootLayout</symbol>
+        <lines>all</lines>
+        <reason>Root layout component for Next.js App Router - defines HTML structure and global styles</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/utils.ts</path>
+        <kind>utility</kind>
+        <symbol>cn</symbol>
+        <lines>4-6</lines>
+        <reason>Utility function for merging Tailwind CSS classes - used throughout components for conditional styling</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <dependency name="next" version="16.0.1" />
+        <dependency name="react" version="19.2.0" />
+        <dependency name="react-dom" version="19.2.0" />
+        <dependency name="zustand" version="^5.0.8" />
+        <dependency name="better-sqlite3" version="^12.4.1" />
+        <dependency name="ollama" version="^0.6.2" />
+        <dependency name="class-variance-authority" version="^0.7.1" />
+        <dependency name="clsx" version="^2.1.1" />
+        <dependency name="lucide-react" version="^0.552.0" />
+        <dependency name="tailwind-merge" version="^3.3.1" />
+        <dependency name="plyr" version="^3.8.3" />
+      </node>
+      <node devDependencies="true">
+        <dependency name="@types/node" version="^20" />
+        <dependency name="@types/react" version="^19" />
+        <dependency name="@types/react-dom" version="^19" />
+        <dependency name="@types/better-sqlite3" version="^7.6.13" />
+        <dependency name="typescript" version="^5" />
+        <dependency name="tailwindcss" version="^4" />
+        <dependency name="@tailwindcss/postcss" version="^4" />
+        <dependency name="eslint" version="^9" />
+        <dependency name="eslint-config-next" version="16.0.1" />
+        <dependency name="babel-plugin-react-compiler" version="1.0.0" />
+        <dependency name="tw-animate-css" version="^1.4.0" />
+      </node>
+      <python>
+        <dependency name="yt-dlp" version=">=2025.10.22" />
+        <dependency name="kokoro-tts" version=">=0.1.0" />
+      </python>
+      <system>
+        <dependency name="Node.js" version="18+" />
+        <dependency name="Ollama" version="latest" />
+        <dependency name="FFmpeg" version="latest" />
+      </system>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Framework: Next.js 15.5+ App Router pattern with server components and API routes</constraint>
+    <constraint>Language: TypeScript with strict mode enabled for type safety</constraint>
+    <constraint>Styling: Tailwind CSS v4 with utility-first approach</constraint>
+    <constraint>Components: shadcn/ui for accessible, customizable UI primitives</constraint>
+    <constraint>State: Zustand for lightweight client-side state management</constraint>
+    <constraint>Database: SQLite via better-sqlite3 (embedded, serverless, local-first)</constraint>
+    <constraint>LLM Provider: Ollama running on localhost:11434 with llama3.2 model</constraint>
+    <constraint>FOSS Compliance: All components must use open-source technologies</constraint>
+    <constraint>Single-user deployment: No authentication or multi-tenancy in MVP</constraint>
+    <constraint>File naming: kebab-case.tsx for files, PascalCase for components, camelCase.ts for utilities</constraint>
+    <constraint>Project structure: Separate concerns into features/, utilities/, state/, types/</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Environment Variables</name>
+      <kind>configuration</kind>
+      <signature>
+        OLLAMA_BASE_URL=http://localhost:11434
+        OLLAMA_MODEL=llama3.2
+        LLM_PROVIDER=ollama
+        DATABASE_PATH=./ai-video-generator.db
+        NEXT_PUBLIC_APP_NAME=AI Video Generator
+      </signature>
+      <path>ai-video-generator/.env.local</path>
+    </interface>
+    <interface>
+      <name>Tailwind CSS Utility (cn)</name>
+      <kind>function</kind>
+      <signature>export function cn(...inputs: ClassValue[]): string</signature>
+      <path>ai-video-generator/src/lib/utils.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing framework: Vitest or Jest (TypeScript-friendly) for unit and integration tests.
+      Component testing: React Testing Library for UI components.
+      E2E testing: Playwright (Next.js compatible) for end-to-end user flows.
+      Coverage target: >80% for business logic (API routes, providers, queries), 100% for critical paths.
+    </standards>
+    <locations>
+      - ai-video-generator/__tests__/ (unit and integration tests)
+      - ai-video-generator/e2e/ (Playwright E2E tests)
+      - ai-video-generator/src/**/__tests__/ (co-located component tests)
+    </locations>
+    <ideas>
+      <idea ac="AC1">Verify Next.js development server starts and responds on localhost:3000</idea>
+      <idea ac="AC2">Check all package.json dependencies are installed and importable</idea>
+      <idea ac="AC3">Verify project directory structure matches architecture specification</idea>
+      <idea ac="AC4">Test .env.local file exists and contains required environment variables</idea>
+      <idea ac="AC5">Mock Ollama API call to verify connection handling (success and failure cases)</idea>
+    </ideas>
+  </tests>
+</story-context>

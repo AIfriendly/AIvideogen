@@ -1,0 +1,11 @@
+# AI Video Generator - Python Dependencies
+# Install with: uv pip install -r requirements.txt
+
+# YouTube video downloading
+yt-dlp>=2025.10.22
+
+# Text-to-Speech (KokoroTTS)
+kokoro-tts>=0.1.0
+
+# Note: FFmpeg must be installed separately as a system binary
+# Note: Ollama must be installed separately (already installed)

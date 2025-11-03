@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Video Generator - Design Direction Mockups</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+        }
+
+        .header {
+            background: #1a1a1a;
+            border-bottom: 2px solid #6366f1;
+            padding: 1.5rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: #a0a0a0;
+            font-size: 0.875rem;
+        }
+
+        .navigation {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            padding: 0.5rem 1rem;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.875rem;
+        }
+
+        .nav-btn:hover {
+            background: #3a3a3a;
+            border-color: #6366f1;
+        }
+
+        .nav-btn.active {
+            background: #6366f1;
+            border-color: #6366f1;
+        }
+
+        .nav-btn.selected-badge::after {
+            content: " ✓";
+            font-weight: 700;
+        }
+
+        .mockup-container {
+            display: none;
+            padding: 2rem;
+        }
+
+        .mockup-container.active {
+            display: block;
+        }
+
+        .mockup-info {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            max-width: 1200px;
+        }
+
+        .mockup-info h2 {
+            font-size: 1.5rem;
+            color: #6366f1;
+            margin-bottom: 0.5rem;
+        }
+
+        .mockup-info .philosophy {
+            color: #a0a0a0;
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+        }
+
+        .mockup-info .pros-cons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .pros-cons h4 {
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .pros-cons ul {
+            list-style: none;
+            font-size: 0.875rem;
+        }
+
+        .pros-cons li {
+            margin-bottom: 0.25rem;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .pros-cons .pros li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #10b981;
+        }
+
+        .pros-cons .cons li::before {
+            content: "−";
+            position: absolute;
+            left: 0;
+            color: #f59e0b;
+        }
+
+        .mockup-frame {
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        .mockup-topbar {
+            background: #1e293b;
+            border-bottom: 1px solid #334155;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .mockup-topbar h3 {
+            font-size: 1.125rem;
+            color: #f8fafc;
+        }
+
+        .mockup-topbar .progress {
+            color: #cbd5e1;
+            font-size: 0.875rem;
+        }
+
+        .btn-assemble {
+            background: #6366f1;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .mockup-content {
+            padding: 1.5rem;
+            min-height: 600px;
+        }
+
+        .scene-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .scene-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .scene-number {
+            background: #6366f1;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.875rem;
+        }
+
+        .scene-status {
+            background: #10b981;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        .scene-text {
+            color: #cbd5e1;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .clip-grid {
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .clip-thumbnail {
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 6px;
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .clip-thumbnail:hover {
+            border-color: #6366f1;
+            transform: scale(1.02);
+        }
+
+        .clip-thumbnail.selected {
+            border-color: #6366f1;
+            border-width: 3px;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .clip-thumbnail.selected::after {
+            content: "✓";
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: #6366f1;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .clip-placeholder {
+            color: #64748b;
+            font-size: 0.75rem;
+        }
+
+        .play-icon {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1e293b;
+            font-size: 1.25rem;
+        }
+
+        /* Direction-specific layouts */
+        .direction-1 .clip-grid { grid-template-columns: repeat(3, 1fr); }
+        .direction-2 .clip-grid { grid-template-columns: repeat(4, 1fr); }
+        .direction-3 .clip-grid { grid-template-columns: repeat(2, 1fr); }
+        .direction-4 .clip-grid { grid-template-columns: 1fr; }
+        .direction-5 .mockup-content { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .direction-6 .scene-card { display: inline-block; width: 500px; margin-right: 1rem; }
+        .direction-6 .mockup-content { display: flex; overflow-x: auto; padding-bottom: 2rem; }
+        .direction-7 .scene-card { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .direction-8 .scene-card { padding: 1rem; }
+        .direction-8 .clip-grid { grid-template-columns: repeat(2, 1fr); }
+
+        .sidebar {
+            background: #1e293b;
+            border-right: 1px solid #334155;
+            padding: 1.5rem;
+        }
+
+        .sidebar-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            color: #cbd5e1;
+        }
+
+        .sidebar-item:hover {
+            background: #0f172a;
+        }
+
+        .sidebar-item.active {
+            background: #6366f1;
+            color: white;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+            font-size: 0.875rem;
+        }
+
+        .responsive-toggle {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .toggle-btn {
+            padding: 0.5rem 1rem;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .toggle-btn.active {
+            background: #6366f1;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎬 Design Direction Exploration</h1>
+        <p>AI Video Generator - Visual Curation UI Mockups</p>
+
+        <div class="navigation">
+            <button class="nav-btn active selected-badge" onclick="showMockup(1)">1. Scene-Focused Timeline</button>
+            <button class="nav-btn" onclick="showMockup(2)">2. Dense Dashboard</button>
+            <button class="nav-btn" onclick="showMockup(3)">3. Spacious Explorer</button>
+            <button class="nav-btn" onclick="showMockup(4)">4. Minimalist Flow</button>
+            <button class="nav-btn" onclick="showMockup(5)">5. Split-Screen Director</button>
+            <button class="nav-btn" onclick="showMockup(6)">6. Card-Stack Carousel</button>
+            <button class="nav-btn" onclick="showMockup(7)">7. Magazine Layout</button>
+            <button class="nav-btn" onclick="showMockup(8)">8. Compact Mobile-First</button>
+        </div>
+
+        <div class="responsive-toggle">
+            <span style="color: #a0a0a0; font-size: 0.75rem; margin-right: 0.5rem;">View:</span>
+            <button class="toggle-btn active">Desktop</button>
+            <button class="toggle-btn">Tablet</button>
+            <button class="toggle-btn">Mobile</button>
+        </div>
+    </div>
+
+    <!-- Direction 1: Scene-Focused Timeline Dashboard (SELECTED) -->
+    <div id="mockup-1" class="mockup-container active direction-1">
+        <div class="mockup-info">
+            <h2>1. Scene-Focused Timeline Dashboard ✓ SELECTED</h2>
+            <p class="philosophy"><strong>Philosophy:</strong> Vertical timeline with balanced information density. Users see all scenes at once, can jump to any scene, and feel like they're reviewing a storyboard. Inspired by InVideo AI's timeline editor.</p>
+
+            <div class="pros-cons">
+                <div class="pros">
+                    <h4 style="color: #10b981;">Strengths</h4>
+                    <ul>
+                        <li>See full project scope at a glance</li>
+                        <li>Non-linear navigation (jump to any scene)</li>
+                        <li>Good balance of script and visual options</li>
+                        <li>3-column clip grid shows plenty of options</li>
+                        <li>Feels like professional video editing timeline</li>
+                    </ul>
+                </div>
+                <div class="cons">
+                    <h4 style="color: #f59e0b;">Trade-offs</h4>
+                    <ul>
+                        <li>Requires scrolling for long scripts</li>
+                        <li>Can feel overwhelming with many scenes</li>
+                        <li>3 columns might be tight on smaller screens</li>
+                    </ul>
+                </div>
+            </div>
+
+            <p style="margin-top: 1rem; color: #6366f1;"><strong>Why Chosen:</strong> Provides full control and visibility. Users can see progress, jump between scenes, and feel empowered as directors making the final cut. The vertical scroll keeps scenes in order like a timeline without forcing linear progression.</p>
+        </div>
+
+        <div class="mockup-frame">
+            <div class="mockup-topbar">
+                <h3>Select Your Clips</h3>
+                <div class="progress">2 / 5 scenes complete (40%)</div>
+                <button class="btn-assemble" disabled style="opacity: 0.5;">Assemble Video</button>
+            </div>
+            <div class="mockup-content">
+                <div class="scene-card">
+                    <div class="scene-header">
+                        <span class="scene-number">Scene 1</span>
+                        <span class="scene-status">✓ Complete</span>
+                    </div>
+                    <div class="scene-text">A majestic lion roams the savanna at sunset, its golden mane glowing in the warm light as it surveys its kingdom from atop a rocky outcrop.</div>
+                    <div class="clip-grid">
+                        <div class="clip-thumbnail selected">
+                            <div class="play-icon">▶</div>
+                            <div class="clip-placeholder">Lion on savanna</div>
+                        </div>
+                        <div class="clip-thumbnail">
+                            <div class="play-icon">▶</div>
+                            <div class="clip-placeholder">Safari sunset</div>
+                        </div>
+                        <div class="clip-thumbnail">
+                            <div class="play-icon">▶</div>
+                            <div class="clip-placeholder">Wildlife close-up</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="scene-card">
+                    <div class="scene-header">
+                        <span class="scene-number">Scene 2</span>
+                        <span class="scene-status">✓ Complete</span>
+                    </div>
+                    <div class="scene-text">The camera pans across the vast African plains, revealing herds of zebras and wildebeest grazing peacefully in the distance.</div>
+                    <div class="clip-grid">
+                        <div class="clip-thumbnail">
+                            <div class="play-icon">▶</div>
+                            <div class="clip-placeholder">Aerial savanna</div>
+                        </div>
+                        <div class="clip-thumbnail selected">
+                            <div class="play-icon">▶</div>
+                            <div class="clip-placeholder">Zebra herds</div>
+                        </div>
+                        <div class="clip-thumbnail">
+                            <div class="play-icon">▶</div>
+                            <div class="clip-placeholder">Plains panorama</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="scene-card">
+                    <div class="scene-header">
+                        <span class="scene-number">Scene 3</span>
+                        <span class="scene-status" style="background: #f59e0b;">Pending</span>
+                    </div>
+                    <div class="scene-text">As night falls, the stars emerge in breathtaking clarity above the African wilderness, creating a stunning celestial display.</div>
+                    <div class="clip-grid">
+                        <div class="clip-thumbnail">
+                            <div class="play-icon">▶</div>
+                            <div class="clip-placeholder">Night sky timelapse</div>
+                        </div>
+                        <div class="clip-thumbnail">
+                            <div class="play-icon">▶</div>
+                            <div class="clip-placeholder">Starry wilderness</div>
+                        </div>
+                        <div class="clip-thumbnail">
+                            <div class="play-icon">▶</div>
+                            <div class="clip-placeholder">Milky way overhead</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Direction 2: Dense Dashboard -->
+    <div id="mockup-2" class="mockup-container direction-2">
+        <div class="mockup-info">
+            <h2>2. Dense Dashboard</h2>
+            <p class="philosophy"><strong>Philosophy:</strong> Maximum information density. Shows more clip options (4 columns) per scene. For power users who want to see all options without scrolling clip grids.</p>
+
+            <div class="pros-cons">
+                <div class="pros">
+                    <h4 style="color: #10b981;">Strengths</h4>
+                    <ul>
+                        <li>See more clip options at once (4 columns)</li>
+                        <li>Efficient use of screen space</li>
+                        <li>Faster selection with more visible options</li>
+                        <li>Ideal for large screens and power users</li>
+                    </ul>
+                </div>
+                <div class="cons">
+                    <h4 style="color: #f59e0b;">Trade-offs</h4>
+                    <ul>
+                        <li>Can feel cramped and overwhelming</li>
+                        <li>Smaller thumbnails harder to preview</li>
+                        <li>Less breathing room between elements</li>
+                        <li>Not ideal for smaller screens</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="mockup-frame">
+            <div class="mockup-topbar">
+                <h3>Select Your Clips</h3>
+                <div class="progress">0 / 3 scenes complete (0%)</div>
+                <button class="btn-assemble" disabled style="opacity: 0.5;">Assemble Video</button>
+            </div>
+            <div class="mockup-content">
+                <div class="scene-card">
+                    <div class="scene-header">
+                        <span class="scene-number">Scene 1</span>
+                        <span class="scene-status" style="background: #f59e0b;">Pending</span>
+                    </div>
+                    <div class="scene-text">A majestic lion roams the savanna at sunset.</div>
+                    <div class="clip-grid">
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div><div class="clip-placeholder">Option 1</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div><div class="clip-placeholder">Option 2</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div><div class="clip-placeholder">Option 3</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div><div class="clip-placeholder">Option 4</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Direction 3: Spacious Explorer -->
+    <div id="mockup-3" class="mockup-container direction-3">
+        <div class="mockup-info">
+            <h2>3. Spacious Explorer</h2>
+            <p class="philosophy"><strong>Philosophy:</strong> Large thumbnails with generous whitespace. Emphasizes visual preview over quantity. Each clip is large enough to appreciate detail before clicking.</p>
+
+            <div class="pros-cons">
+                <div class="pros">
+                    <h4 style="color: #10b981;">Strengths</h4>
+                    <ul>
+                        <li>Large thumbnails easy to preview</li>
+                        <li>Generous whitespace reduces cognitive load</li>
+                        <li>Calm, focused curation experience</li>
+                        <li>Beautiful visual presentation</li>
+                    </ul>
+                </div>
+                <div class="cons">
+                    <h4 style="color: #f59e0b;">Trade-offs</h4>
+                    <ul>
+                        <li>Fewer clip options visible (2 columns)</li>
+                        <li>More scrolling required to see all options</li>
+                        <li>Less efficient use of screen space</li>
+                        <li>Takes longer to review all clips</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="mockup-frame">
+            <div class="mockup-topbar">
+                <h3>Select Your Clips</h3>
+                <div class="progress">1 / 3 scenes complete (33%)</div>
+                <button class="btn-assemble" disabled style="opacity: 0.5;">Assemble Video</button>
+            </div>
+            <div class="mockup-content">
+                <div class="scene-card">
+                    <div class="scene-header">
+                        <span class="scene-number">Scene 1</span>
+                        <span class="scene-status">✓ Complete</span>
+                    </div>
+                    <div class="scene-text">A majestic lion roams the savanna at sunset, its golden mane glowing in the warm light.</div>
+                    <div class="clip-grid">
+                        <div class="clip-thumbnail selected"><div class="play-icon">▶</div><div class="clip-placeholder">Lion sunset</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div><div class="clip-placeholder">Savanna wide</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Direction 4: Minimalist Flow -->
+    <div id="mockup-4" class="mockup-container direction-4">
+        <div class="mockup-info">
+            <h2>4. Minimalist Flow</h2>
+            <p class="philosophy"><strong>Philosophy:</strong> One scene at a time. Full focus on current scene with large, stacked clip previews. Step-by-step wizard approach.</p>
+
+            <div class="pros-cons">
+                <div class="pros">
+                    <h4 style="color: #10b981;">Strengths</h4>
+                    <ul>
+                        <li>Complete focus on one scene at a time</li>
+                        <li>No distractions from other scenes</li>
+                        <li>Simple, guided experience</li>
+                        <li>Large clip previews (full width)</li>
+                        <li>Works well on mobile</li>
+                    </ul>
+                </div>
+                <div class="cons">
+                    <h4 style="color: #f59e0b;">Trade-offs</h4>
+                    <ul>
+                        <li>Can't see full project scope</li>
+                        <li>Linear progression (can't jump scenes easily)</li>
+                        <li>Harder to compare scenes</li>
+                        <li>May feel restrictive to power users</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="mockup-frame">
+            <div class="mockup-topbar">
+                <h3>Scene 2 of 5</h3>
+                <div class="progress">1 complete, 4 remaining</div>
+                <button class="btn-assemble" disabled style="opacity: 0.5;">Continue</button>
+            </div>
+            <div class="mockup-content">
+                <div class="scene-card">
+                    <div class="scene-header">
+                        <span class="scene-number">Scene 2</span>
+                        <span class="scene-status" style="background: #f59e0b;">Select a clip</span>
+                    </div>
+                    <div class="scene-text">The camera pans across the vast African plains, revealing herds of zebras and wildebeest grazing peacefully in the distance.</div>
+                    <div class="clip-grid">
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div><div class="clip-placeholder">Aerial savanna panorama</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div><div class="clip-placeholder">Zebra herds migration</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div><div class="clip-placeholder">Plains wide angle</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Direction 5: Split-Screen Director -->
+    <div id="mockup-5" class="mockup-container direction-5">
+        <div class="mockup-info">
+            <h2>5. Split-Screen Director</h2>
+            <p class="philosophy"><strong>Philosophy:</strong> Script on left, clip selection on right. Mimics professional editing suites with dual-pane layouts. Scene list sidebar for navigation.</p>
+
+            <div class="pros-cons">
+                <div class="pros">
+                    <h4 style="color: #10b981;">Strengths</h4>
+                    <ul>
+                        <li>Professional editing suite feel</li>
+                        <li>Always see script while selecting clips</li>
+                        <li>Scene navigation sidebar for quick jumps</li>
+                        <li>Efficient screen real estate use</li>
+                        <li>Familiar to video editors</li>
+                    </ul>
+                </div>
+                <div class="cons">
+                    <h4 style="color: #f59e0b;">Trade-offs</h4>
+                    <ul>
+                        <li>Complex layout may intimidate beginners</li>
+                        <li>Requires wider screens (desktop-only)</li>
+                        <li>More cognitive load with split attention</li>
+                        <li>Sidebar adds navigation complexity</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="mockup-frame">
+            <div class="mockup-topbar">
+                <h3>Director View</h3>
+                <div class="progress">2 / 5 scenes complete</div>
+                <button class="btn-assemble" disabled style="opacity: 0.5;">Assemble Video</button>
+            </div>
+            <div class="mockup-content">
+                <div class="sidebar">
+                    <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; color: #64748b;">Scenes</div>
+                    <div class="sidebar-item" style="background: #6366f1; color: white;">Scene 1 ✓</div>
+                    <div class="sidebar-item">Scene 2 ✓</div>
+                    <div class="sidebar-item">Scene 3</div>
+                    <div class="sidebar-item">Scene 4</div>
+                    <div class="sidebar-item">Scene 5</div>
+                </div>
+                <div>
+                    <div class="scene-card" style="border: none;">
+                        <div class="scene-header">
+                            <span class="scene-number">Scene 1</span>
+                            <span class="scene-status">✓ Complete</span>
+                        </div>
+                        <div class="scene-text" style="margin-bottom: 1.5rem;">A majestic lion roams the savanna at sunset, its golden mane glowing in the warm light as it surveys its kingdom from atop a rocky outcrop.</div>
+                        <div class="clip-grid" style="grid-template-columns: repeat(2, 1fr);">
+                            <div class="clip-thumbnail selected"><div class="play-icon">▶</div><div class="clip-placeholder">Lion on savanna</div></div>
+                            <div class="clip-thumbnail"><div class="play-icon">▶</div><div class="clip-placeholder">Safari sunset</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Direction 6: Card-Stack Carousel -->
+    <div id="mockup-6" class="mockup-container direction-6">
+        <div class="mockup-info">
+            <h2>6. Card-Stack Carousel</h2>
+            <p class="philosophy"><strong>Philosophy:</strong> Horizontal scrolling card stack. Each scene is a self-contained card. Swipe through scenes like browsing a deck of cards.</p>
+
+            <div class="pros-cons">
+                <div class="pros">
+                    <h4 style="color: #10b981;">Strengths</h4>
+                    <ul>
+                        <li>Playful, engaging interaction</li>
+                        <li>Works great on touch devices</li>
+                        <li>Focus on one scene at a time</li>
+                        <li>Easy to browse back and forth</li>
+                        <li>Unique, memorable UX</li>
+                    </ul>
+                </div>
+                <div class="cons">
+                    <h4 style="color: #f59e0b;">Trade-offs</h4>
+                    <ul>
+                        <li>Hard to see full project scope</li>
+                        <li>Horizontal scroll can feel unnatural on desktop</li>
+                        <li>No clear progress indicator</li>
+                        <li>May feel gimmicky for professional tool</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="mockup-frame">
+            <div class="mockup-topbar">
+                <h3>Browse Scenes →</h3>
+                <div class="progress">Swipe to navigate</div>
+                <button class="btn-assemble" disabled style="opacity: 0.5;">Assemble Video</button>
+            </div>
+            <div class="mockup-content" style="padding-bottom: 2rem;">
+                <div class="scene-card" style="display: inline-block; width: 500px; margin-right: 1rem;">
+                    <div class="scene-header">
+                        <span class="scene-number">Scene 1</span>
+                        <span class="scene-status">✓ Complete</span>
+                    </div>
+                    <div class="scene-text">A majestic lion roams the savanna at sunset.</div>
+                    <div class="clip-grid" style="grid-template-columns: 1fr 1fr;">
+                        <div class="clip-thumbnail selected"><div class="play-icon">▶</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div></div>
+                    </div>
+                </div>
+
+                <div class="scene-card" style="display: inline-block; width: 500px; margin-right: 1rem;">
+                    <div class="scene-header">
+                        <span class="scene-number">Scene 2</span>
+                        <span class="scene-status" style="background: #f59e0b;">Pending</span>
+                    </div>
+                    <div class="scene-text">The camera pans across vast African plains.</div>
+                    <div class="clip-grid" style="grid-template-columns: 1fr 1fr;">
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div></div>
+                    </div>
+                </div>
+
+                <div class="scene-card" style="display: inline-block; width: 500px;">
+                    <div class="scene-header">
+                        <span class="scene-number">Scene 3</span>
+                        <span class="scene-status" style="background: #f59e0b;">Pending</span>
+                    </div>
+                    <div class="scene-text">As night falls, stars emerge in breathtaking clarity.</div>
+                    <div class="clip-grid" style="grid-template-columns: 1fr 1fr;">
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Direction 7: Magazine Layout -->
+    <div id="mockup-7" class="mockup-container direction-7">
+        <div class="mockup-info">
+            <h2>7. Magazine Layout</h2>
+            <p class="philosophy"><strong>Philosophy:</strong> Script and clips side-by-side within each scene card. Magazine-style two-column layout. Quick visual scanning.</p>
+
+            <div class="pros-cons">
+                <div class="pros">
+                    <h4 style="color: #10b981;">Strengths</h4>
+                    <ul>
+                        <li>Script and clips always visible together</li>
+                        <li>Clear visual association per scene</li>
+                        <li>Easy to scan and compare</li>
+                        <li>Efficient information layout</li>
+                    </ul>
+                </div>
+                <div class="cons">
+                    <h4 style="color: #f59e0b;">Trade-offs</h4>
+                    <ul>
+                        <li>Smaller clip thumbnails (horizontal split)</li>
+                        <li>Requires wider screens</li>
+                        <li>May feel cramped on smaller displays</li>
+                        <li>Less focus on visual preview</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="mockup-frame">
+            <div class="mockup-topbar">
+                <h3>Magazine View</h3>
+                <div class="progress">1 / 3 scenes complete</div>
+                <button class="btn-assemble" disabled style="opacity: 0.5;">Assemble Video</button>
+            </div>
+            <div class="mockup-content">
+                <div class="scene-card" style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 1.5rem;">
+                    <div>
+                        <div class="scene-header">
+                            <span class="scene-number">Scene 1</span>
+                            <span class="scene-status">✓ Complete</span>
+                        </div>
+                        <div class="scene-text">A majestic lion roams the savanna at sunset, its golden mane glowing in the warm light as it surveys its kingdom.</div>
+                    </div>
+                    <div class="clip-grid" style="grid-template-columns: 1fr 1fr;">
+                        <div class="clip-thumbnail selected"><div class="play-icon">▶</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Direction 8: Compact Mobile-First -->
+    <div id="mockup-8" class="mockup-container direction-8">
+        <div class="mockup-info">
+            <h2>8. Compact Mobile-First</h2>
+            <p class="philosophy"><strong>Philosophy:</strong> Optimized for smaller screens. Compact scene cards, 2-column clip grid. Touch-friendly with larger tap targets.</p>
+
+            <div class="pros-cons">
+                <div class="pros">
+                    <h4 style="color: #10b981;">Strengths</h4>
+                    <ul>
+                        <li>Works perfectly on mobile and tablet</li>
+                        <li>Touch-optimized interaction</li>
+                        <li>Compact cards reduce scrolling</li>
+                        <li>Accessible on any device</li>
+                    </ul>
+                </div>
+                <div class="cons">
+                    <h4 style="color: #f59e0b;">Trade-offs</h4>
+                    <ul>
+                        <li>Feels cramped on desktop</li>
+                        <li>Doesn't leverage large screens</li>
+                        <li>Smaller previews harder to evaluate</li>
+                        <li>Less immersive curation experience</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="mockup-frame">
+            <div class="mockup-topbar">
+                <h3>Compact View</h3>
+                <div class="progress">0 / 3 complete</div>
+                <button class="btn-assemble" disabled style="opacity: 0.5;">Assemble</button>
+            </div>
+            <div class="mockup-content">
+                <div class="scene-card" style="padding: 1rem;">
+                    <div class="scene-header">
+                        <span class="scene-number">Scene 1</span>
+                        <span class="scene-status" style="background: #f59e0b;">Pending</span>
+                    </div>
+                    <div class="scene-text" style="font-size: 0.8125rem;">A majestic lion roams the savanna at sunset.</div>
+                    <div class="clip-grid" style="grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div></div>
+                        <div class="clip-thumbnail"><div class="play-icon">▶</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p><strong>Selected Direction:</strong> Scene-Focused Timeline Dashboard (Direction 1)</p>
+        <p><strong>Rationale:</strong> Provides full control and visibility. Users can see progress, jump between scenes, and feel empowered as directors making the final cut. The vertical scroll keeps scenes in order like a timeline without forcing linear progression. Feels like InVideo AI's timeline editor - spatial, visual, and gives full control.</p>
+        <p style="margin-top: 1rem; opacity: 0.6;">Generated by BMAD Method - Create UX Design Workflow v1.0 | 2025-11-01</p>
+    </div>
+
+    <script>
+        function showMockup(num) {
+            // Hide all mockups
+            document.querySelectorAll('.mockup-container').forEach(m => m.classList.remove('active'));
+            // Show selected mockup
+            document.getElementById('mockup-' + num).classList.add('active');
+
+            // Update nav buttons
+            document.querySelectorAll('.nav-btn').forEach((btn, idx) => {
+                btn.classList.toggle('active', idx + 1 === num);
+            });
+        }
+    </script>
+</body>
+</html>

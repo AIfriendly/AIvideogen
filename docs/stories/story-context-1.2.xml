@@ -1,0 +1,902 @@
+<story-context id="story-1.2-database-schema-infrastructure" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.2</storyId>
+    <title>Database Schema & Infrastructure</title>
+    <status>Ready</status>
+    <generatedAt>2025-11-02</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>BMAD-METHOD/docs/stories/story-1.2.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>a SQLite database schema and client for conversation persistence</iWant>
+    <soThat>project data and conversation history can be stored and retrieved reliably across sessions</soThat>
+    <tasks>
+      <task id="1" status="pending">Create Database Schema File (schema.sql with 3 tables: system_prompts, projects, messages)</task>
+      <task id="2" status="pending">Implement Database Client (client.ts with foreign key enforcement)</task>
+      <task id="3" status="pending">Create Database Initialization Script (init.ts with idempotent schema setup)</task>
+      <task id="4" status="pending">Implement Database Query Functions (queries.ts with CRUD operations and system prompt queries)</task>
+      <task id="5" status="pending">Add Database Directory Structure (lib/db/ with proper file organization)</task>
+    </tasks>
+  </story>
+
+  <objectives>
+    <objective priority="1">
+      Create foundational database layer using SQLite via better-sqlite3 library (v12.4.1) for storing projects, conversation messages, and system prompts with proper foreign key relationships.
+    </objective>
+    <objective priority="2">
+      Implement Epic 1 scope constraints: Projects table DOES NOT include selected_voice or script_json fields (Epic 2/3 scope). Projects table DOES include status, config_json, and system_prompt_id fields.
+    </objective>
+    <objective priority="3">
+      Enable system prompts functionality with proper schema (id, name, prompt, description, category, is_preset, is_default, timestamps) and indexes on is_default field.
+    </objective>
+    <objective priority="4">
+      Configure foreign key constraints with nullable system_prompt_id using ON DELETE SET NULL, and ON DELETE CASCADE for messages when parent project is deleted.
+    </objective>
+    <objective priority="5">
+      Create indexes on critical fields: messages(project_id), messages(timestamp), projects(last_active), projects(system_prompt_id), system_prompts(is_default) for query performance.
+    </objective>
+    <objective priority="6">
+      Provide clean TypeScript API for CRUD operations including getSystemPrompts() and getDefaultSystemPrompt() functions.
+    </objective>
+  </objectives>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">
+      <title>Projects Table Created with Epic 1 Fields Only</title>
+      <details>
+        - Projects table includes: id, name, topic, current_step, status, config_json, system_prompt_id, created_at, last_active
+        - Projects table DOES NOT include: selected_voice (Epic 2), script_json (Epic 2/3)
+        - status field defaults to 'draft'
+        - config_json field is TEXT type for extensibility
+        - system_prompt_id is nullable TEXT with foreign key to system_prompts(id)
+      </details>
+      <status>PENDING</status>
+    </criterion>
+    <criterion id="AC2">
+      <title>Messages Table Created with Foreign Key and Role Constraint</title>
+      <details>
+        - Messages table includes: id, project_id, role, content, timestamp
+        - project_id has FOREIGN KEY constraint to projects(id) with ON DELETE CASCADE
+        - role field has CHECK constraint for ('user', 'assistant', 'system')
+        - Indexes created on messages(project_id) and messages(timestamp)
+      </details>
+      <status>PENDING</status>
+    </criterion>
+    <criterion id="AC3">
+      <title>System Prompts Table Created with All Fields</title>
+      <details>
+        - System prompts table includes: id, name, prompt, description, category, is_preset, is_default, created_at, updated_at
+        - description and category fields are TEXT (nullable)
+        - is_preset and is_default are BOOLEAN with defaults to false
+        - Index created on system_prompts(is_default)
+      </details>
+      <status>PENDING</status>
+    </criterion>
+    <criterion id="AC4">
+      <title>Foreign Key Constraints Properly Configured</title>
+      <details>
+        - Foreign keys enabled via pragma setting (db.pragma('foreign_keys = ON'))
+        - projects.system_prompt_id is nullable with ON DELETE SET NULL behavior
+        - messages.project_id uses ON DELETE CASCADE (messages deleted when project deleted)
+        - Error handling for FK violations implemented with meaningful error messages
+      </details>
+      <status>PENDING</status>
+    </criterion>
+    <criterion id="AC5">
+      <title>Database Schema and Client Files Created</title>
+      <details>
+        - lib/db/schema.sql contains all table definitions with CREATE TABLE IF NOT EXISTS
+        - lib/db/client.ts initializes database and exports db instance
+        - lib/db/init.ts implements idempotent initialization function
+        - lib/db/queries.ts implements CRUD operations and system prompt queries
+        - Database file created at project root as 'ai-video-generator.db'
+      </details>
+      <status>PENDING</status>
+    </criterion>
+    <criterion id="AC6">
+      <title>Query Functions Include System Prompt Operations</title>
+      <details>
+        - getSystemPrompts(): SystemPrompt[] - Retrieve all system prompts
+        - getDefaultSystemPrompt(): SystemPrompt | null - Retrieve default system prompt
+        - createProject(name: string, systemPromptId?: string): Project - Create with optional system prompt
+        - All query functions have proper TypeScript return types and error handling
+      </details>
+      <status>PENDING</status>
+    </criterion>
+  </acceptanceCriteria>
+
+  <architecture-references>
+    <reference>
+      <source>docs/architecture.md</source>
+      <section>Database Schema (lines 1024-1126)</section>
+      <context>
+        Complete database schema specification for the AI Video Generator application. Story 1.2 implements three Epic 1 tables from this schema:
+
+        1. system_prompts table - Stores customizable and preset system prompts for AI interactions
+           - Fields: id, name, prompt, description, category, is_preset, is_default, timestamps
+           - Note: description and category fields added in Story 1.2 scope
+
+        2. projects table (Epic 1 scope only) - Core project metadata
+           - Epic 1 fields: id, name, topic, current_step, status, config_json, system_prompt_id, created_at, last_active
+           - Excluded from Epic 1: selected_voice (Epic 2), script_json (Epic 2/3)
+           - Foreign key: system_prompt_id REFERENCES system_prompts(id) ON DELETE SET NULL
+
+        3. messages table - Conversation history
+           - Fields: id, project_id, role, content, timestamp
+           - CHECK constraint: role IN ('user', 'assistant', 'system')
+           - Foreign key: project_id REFERENCES projects(id) ON DELETE CASCADE
+
+        Tables NOT in Story 1.2 scope (future epics):
+        - clip_selections (Epic 3/4)
+        - audio_files (Epic 2)
+        - rendered_videos (Epic 5)
+
+        Database Client Pattern (lines 1107-1126):
+        - Import Database from 'better-sqlite3'
+        - Database path: path.join(process.cwd(), 'ai-video-generator.db')
+        - Enable foreign keys: db.pragma('foreign_keys = ON')
+        - Idempotent initialization using CREATE TABLE IF NOT EXISTS
+      </context>
+    </reference>
+
+    <reference>
+      <source>docs/architecture.md</source>
+      <section>Project Structure (lines 136-251)</section>
+      <context>
+        Database file structure within the project:
+
+        lib/db/ directory contains:
+        - client.ts: SQLite connection and database instance export
+        - schema.sql: SQL schema definitions for all tables
+        - queries.ts: Reusable query functions for CRUD operations
+        - (Story 1.2 adds: init.ts for initialization logic)
+
+        Database file location:
+        - ai-video-generator.db at project root (git-ignored)
+        - Should be added to .gitignore to prevent version control
+
+        Testing structure:
+        - lib/db/__tests__/ for unit tests of database operations
+        - Expected: client.test.ts, queries.test.ts, init.test.ts
+      </context>
+    </reference>
+
+    <reference>
+      <source>docs/architecture.md</source>
+      <section>Technology Stack (lines 80-133)</section>
+      <context>
+        Database technology selection:
+
+        Database: SQLite via better-sqlite3 version 12.4.1
+        - FOSS compliant: Yes
+        - Rationale: Embedded, no server, perfect for local single-user
+        - Affects: All epics
+
+        Development dependencies:
+        - @types/better-sqlite3 (dev dependency for TypeScript support)
+
+        Installation commands from Project Initialization:
+        npm install better-sqlite3
+        npm install --save-dev @types/better-sqlite3
+      </context>
+    </reference>
+  </architecture-references>
+
+  <tech-spec-references>
+    <reference>
+      <source>docs/tech-spec-epic-1.md</source>
+      <section>Database Schema (lines 100-125)</section>
+      <context>
+        Epic 1 database schema specification showing minimal scope:
+
+        Projects table (Epic 1):
+        - id TEXT PRIMARY KEY
+        - name TEXT NOT NULL
+        - topic TEXT (nullable until confirmed)
+        - current_step TEXT DEFAULT 'topic'
+        - created_at TEXT DEFAULT (datetime('now'))
+        - last_active TEXT DEFAULT (datetime('now'))
+
+        Story 1.2 expands this with:
+        - status TEXT DEFAULT 'draft' (for workflow tracking)
+        - config_json TEXT (for extensibility)
+        - system_prompt_id TEXT (optional FK to system_prompts)
+
+        Messages table (Epic 1):
+        - id TEXT PRIMARY KEY
+        - project_id TEXT NOT NULL (FK to projects)
+        - role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system'))
+        - content TEXT NOT NULL
+        - timestamp TEXT DEFAULT (datetime('now'))
+        - FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+
+        Indexes for performance:
+        - CREATE INDEX idx_messages_project ON messages(project_id);
+        - CREATE INDEX idx_messages_timestamp ON messages(timestamp);
+
+        Note: Tech spec shows simplified Epic 1 schema. Story 1.2 includes additional system_prompts table and expanded projects fields as specified in architecture.md for full MVP functionality.
+      </context>
+    </reference>
+  </tech-spec-references>
+
+  <database-schema>
+    <table name="system_prompts">
+      <description>Stores customizable and preset system prompts for AI interactions with description and category metadata</description>
+      <sql>
+CREATE TABLE IF NOT EXISTS system_prompts (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  description TEXT,
+  category TEXT,
+  is_preset BOOLEAN DEFAULT false,
+  is_default BOOLEAN DEFAULT false,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_system_prompts_is_default ON system_prompts(is_default);
+      </sql>
+      <fields>
+        <field name="id" type="TEXT" constraint="PRIMARY KEY">UUID v4 generated in application code</field>
+        <field name="name" type="TEXT" constraint="NOT NULL">Display name for the system prompt</field>
+        <field name="prompt" type="TEXT" constraint="NOT NULL">The actual system prompt text</field>
+        <field name="description" type="TEXT" constraint="NULL">Optional description of prompt purpose</field>
+        <field name="category" type="TEXT" constraint="NULL">Optional category for organization</field>
+        <field name="is_preset" type="BOOLEAN" constraint="DEFAULT false">Whether this is a built-in preset</field>
+        <field name="is_default" type="BOOLEAN" constraint="DEFAULT false">Whether this is the default prompt</field>
+        <field name="created_at" type="TEXT" constraint="DEFAULT (datetime('now'))">Timestamp of creation</field>
+        <field name="updated_at" type="TEXT" constraint="DEFAULT (datetime('now'))">Timestamp of last update</field>
+      </fields>
+      <indexes>
+        <index name="idx_system_prompts_is_default" columns="is_default">Optimize queries for default system prompt lookup</index>
+      </indexes>
+    </table>
+
+    <table name="projects">
+      <description>Core project metadata for video projects (Epic 1 scope only - no voice or script fields)</description>
+      <sql>
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  topic TEXT,
+  current_step TEXT DEFAULT 'topic',
+  status TEXT DEFAULT 'draft',
+  config_json TEXT,
+  system_prompt_id TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  last_active TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (system_prompt_id) REFERENCES system_prompts(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_projects_last_active ON projects(last_active);
+CREATE INDEX IF NOT EXISTS idx_projects_system_prompt ON projects(system_prompt_id);
+      </sql>
+      <fields>
+        <field name="id" type="TEXT" constraint="PRIMARY KEY">UUID v4 generated in application code</field>
+        <field name="name" type="TEXT" constraint="NOT NULL">Project display name</field>
+        <field name="topic" type="TEXT" constraint="NULL">Video topic (nullable until confirmed)</field>
+        <field name="current_step" type="TEXT" constraint="DEFAULT 'topic'">Current workflow step</field>
+        <field name="status" type="TEXT" constraint="DEFAULT 'draft'">Project status for tracking</field>
+        <field name="config_json" type="TEXT" constraint="NULL">Extensible JSON configuration</field>
+        <field name="system_prompt_id" type="TEXT" constraint="NULL, FK">Optional override for system prompt</field>
+        <field name="created_at" type="TEXT" constraint="DEFAULT (datetime('now'))">Project creation timestamp</field>
+        <field name="last_active" type="TEXT" constraint="DEFAULT (datetime('now'))">Last activity timestamp</field>
+      </fields>
+      <foreignKeys>
+        <foreignKey column="system_prompt_id" references="system_prompts(id)" onDelete="SET NULL">Optional system prompt reference</foreignKey>
+      </foreignKeys>
+      <indexes>
+        <index name="idx_projects_last_active" columns="last_active">Optimize queries for recent projects</index>
+        <index name="idx_projects_system_prompt" columns="system_prompt_id">Optimize system prompt relationship queries</index>
+      </indexes>
+      <epicScope>
+        Epic 1 scope INCLUDES: id, name, topic, current_step, status, config_json, system_prompt_id, created_at, last_active
+        Epic 1 scope EXCLUDES: selected_voice (Epic 2), script_json (Epic 2/3)
+      </epicScope>
+    </table>
+
+    <table name="messages">
+      <description>Conversation history linked to projects via foreign key</description>
+      <sql>
+CREATE TABLE IF NOT EXISTS messages (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
+  content TEXT NOT NULL,
+  timestamp TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_project ON messages(project_id);
+CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
+      </sql>
+      <fields>
+        <field name="id" type="TEXT" constraint="PRIMARY KEY">UUID v4 generated in application code</field>
+        <field name="project_id" type="TEXT" constraint="NOT NULL, FK">Reference to parent project</field>
+        <field name="role" type="TEXT" constraint="NOT NULL, CHECK">Message role: 'user', 'assistant', or 'system'</field>
+        <field name="content" type="TEXT" constraint="NOT NULL">Message content text</field>
+        <field name="timestamp" type="TEXT" constraint="DEFAULT (datetime('now'))">Message timestamp</field>
+      </fields>
+      <foreignKeys>
+        <foreignKey column="project_id" references="projects(id)" onDelete="CASCADE">Parent project reference with cascading delete</foreignKey>
+      </foreignKeys>
+      <checkConstraints>
+        <check column="role" constraint="IN ('user', 'assistant', 'system')">Validate role field values</check>
+      </checkConstraints>
+      <indexes>
+        <index name="idx_messages_project" columns="project_id">Optimize project message retrieval</index>
+        <index name="idx_messages_timestamp" columns="timestamp">Optimize chronological queries</index>
+      </indexes>
+    </table>
+  </database-schema>
+
+  <implementation-guidelines>
+    <guideline category="Foreign Key Constraints">
+      <rule>Enable foreign keys via pragma before any database operations: db.pragma('foreign_keys = ON')</rule>
+      <rule>ON DELETE CASCADE: When a project is deleted, all associated messages are automatically deleted</rule>
+      <rule>ON DELETE SET NULL: When a system prompt is deleted, projects.system_prompt_id is set to NULL (projects remain)</rule>
+      <rule>system_prompt_id is nullable (optional) - projects can exist without a custom system prompt</rule>
+      <rule>Implement error handling for FK violations with specific error messages (e.g., "Cannot delete system prompt: it is referenced by existing projects")</rule>
+    </guideline>
+
+    <guideline category="ID Generation">
+      <rule>Use UUIDs (v4) for all primary keys (id fields)</rule>
+      <rule>Generate IDs in the application code (query functions), not in the database</rule>
+      <rule>Import from Node.js crypto module: import { randomUUID } from 'crypto'</rule>
+      <rule>Example: const id = randomUUID();</rule>
+    </guideline>
+
+    <guideline category="Timestamp Handling">
+      <rule>Use SQLite's datetime('now') function for default timestamps in schema</rule>
+      <rule>Store timestamps as TEXT in ISO 8601 format (SQLite standard)</rule>
+      <rule>Messages: Retrieve in chronological order (ORDER BY timestamp ASC)</rule>
+      <rule>Projects: List by most recently active (ORDER BY last_active DESC)</rule>
+      <rule>Update last_active timestamp on project interactions</rule>
+    </guideline>
+
+    <guideline category="Type Safety">
+      <rule>Define TypeScript interfaces matching database schema exactly</rule>
+      <rule>Interface fields should match database column names (snake_case)</rule>
+      <rule>Use proper return types for all query functions (Promise if async, direct type if sync)</rule>
+      <rule>Handle null/undefined cases for optional fields: system_prompt_id, topic, config_json, description, category</rule>
+      <rule>Use strict type checking for role field: 'user' | 'assistant' | 'system'</rule>
+      <rule>Use type checking for status field: e.g., 'draft' | 'active' | 'completed'</rule>
+    </guideline>
+
+    <guideline category="Error Handling">
+      <rule>Wrap all database operations in try-catch blocks</rule>
+      <rule>Provide meaningful error messages for constraint violations</rule>
+      <rule>Handle unique constraint failures gracefully (e.g., duplicate IDs)</rule>
+      <rule>Handle FK violations with specific messages: "Cannot delete X: it is referenced by Y"</rule>
+      <rule>Handle CHECK constraint violations: "Invalid role: must be 'user', 'assistant', or 'system'"</rule>
+      <rule>Log database errors for debugging (include operation context)</rule>
+    </guideline>
+
+    <guideline category="Validation Specifications">
+      <rule>messages.role CHECK constraint: Must be 'user', 'assistant', or 'system'</rule>
+      <rule>projects.status CHECK constraint: Define valid status values (e.g., 'draft', 'active', 'completed')</rule>
+      <rule>Provide clear validation error messages when constraints are violated</rule>
+      <rule>Document CHECK constraint specifications in schema comments</rule>
+    </guideline>
+
+    <guideline category="Idempotency">
+      <rule>Use CREATE TABLE IF NOT EXISTS for all table creation statements</rule>
+      <rule>Use CREATE INDEX IF NOT EXISTS for all index creation statements</rule>
+      <rule>Ensure schema can be safely re-run without errors or data loss</rule>
+      <rule>init.ts should be safe to call multiple times</rule>
+    </guideline>
+
+    <guideline category="Query Function Specifications">
+      <section name="System Prompts">
+        <function signature="getSystemPrompts(): SystemPrompt[]">Retrieve all system prompts (no filtering)</function>
+        <function signature="getDefaultSystemPrompt(): SystemPrompt | null">Retrieve the default system prompt (where is_default = true)</function>
+        <function signature="createSystemPrompt(data: Omit&lt;SystemPrompt, 'id' | 'created_at' | 'updated_at'&gt;): SystemPrompt">Create new system prompt with UUID</function>
+      </section>
+
+      <section name="Projects">
+        <function signature="createProject(name: string, systemPromptId?: string): Project">Create new project with optional system prompt override</function>
+        <function signature="getProject(id: string): Project | null">Retrieve single project by ID</function>
+        <function signature="updateProject(id: string, updates: Partial&lt;Project&gt;): void">Update project fields (partial update)</function>
+        <function signature="deleteProject(id: string): void">Delete project (cascades to messages)</function>
+        <function signature="getAllProjects(): Project[]">Get all projects ordered by last_active DESC</function>
+      </section>
+
+      <section name="Messages">
+        <function signature="createMessage(projectId: string, role: 'user' | 'assistant' | 'system', content: string): Message">Create new message with validation</function>
+        <function signature="getMessagesByProject(projectId: string): Message[]">Get messages ordered by timestamp ASC</function>
+        <function signature="deleteMessagesByProject(projectId: string): void">Delete all messages for a project</function>
+      </section>
+    </guideline>
+  </implementation-guidelines>
+
+  <dependencies>
+    <dependency name="better-sqlite3" version="12.4.1" type="production">
+      <purpose>SQLite database client for Node.js - synchronous API, embedded database</purpose>
+      <installation>npm install better-sqlite3</installation>
+      <import>import Database from 'better-sqlite3';</import>
+      <architectureReference>docs/architecture.md lines 162-172</architectureReference>
+    </dependency>
+
+    <dependency name="@types/better-sqlite3" version="^7.6.13" type="development">
+      <purpose>TypeScript type definitions for better-sqlite3</purpose>
+      <installation>npm install --save-dev @types/better-sqlite3</installation>
+      <architectureReference>From Story 1.1 completion - see story-context-1.1.xml</architectureReference>
+    </dependency>
+
+    <dependency name="crypto" version="built-in" type="node-builtin">
+      <purpose>Node.js built-in module for UUID generation (randomUUID function)</purpose>
+      <import>import { randomUUID } from 'crypto';</import>
+      <usage>Generate UUID v4 for primary keys in all tables</usage>
+    </dependency>
+
+    <dependency name="fs" version="built-in" type="node-builtin">
+      <purpose>Node.js built-in module for file system operations (reading schema.sql)</purpose>
+      <import>import { readFileSync } from 'fs';</import>
+      <usage>Read schema.sql file in init.ts for database initialization</usage>
+    </dependency>
+
+    <dependency name="path" version="built-in" type="node-builtin">
+      <purpose>Node.js built-in module for path operations</purpose>
+      <import>import path from 'path';</import>
+      <usage>Construct database file path: path.join(process.cwd(), 'ai-video-generator.db')</usage>
+    </dependency>
+  </dependencies>
+
+  <related-context>
+    <reference type="story" id="1.1">
+      <title>Project Setup & Dependencies</title>
+      <relationship>Story 1.1 established project structure and installed better-sqlite3 dependency. Story 1.2 uses that foundation to implement database layer.</relationship>
+      <artifacts>
+        <artifact path="ai-video-generator/src/lib/utils.ts">Existing utility patterns for reference</artifact>
+        <artifact path="ai-video-generator/package.json">Contains better-sqlite3@12.4.1 and @types/better-sqlite3 dependencies</artifact>
+        <artifact path="ai-video-generator/.env.local">Contains DATABASE_PATH environment variable</artifact>
+        <artifact path="ai-video-generator/.gitignore">Should include *.db files to prevent version control of database</artifact>
+      </artifacts>
+    </reference>
+
+    <reference type="epic" id="1">
+      <title>Conversational Topic Discovery</title>
+      <context>
+        Epic 1 focuses on conversation-based topic discovery. The database layer (Story 1.2) provides persistence for:
+        - Projects: Store basic project metadata (name, topic, workflow step)
+        - Messages: Store conversation history for context and replay
+        - System Prompts: Store AI persona configurations (MVP uses default, Post-MVP adds UI)
+
+        Epic 1 scope constraints:
+        - NO selected_voice field (Epic 2: Content Generation Pipeline)
+        - NO script_json field (Epic 2/3: Script Generation)
+        - YES status field for workflow tracking
+        - YES config_json for extensibility
+        - YES system_prompt_id for persona configuration
+      </context>
+    </reference>
+
+    <reference type="document" id="prd">
+      <title>Product Requirements Document</title>
+      <section>Feature 1.1: Conversational AI Agent</section>
+      <relevance>Database supports multi-turn conversations with context persistence across sessions. Messages table stores full conversation history for context window.</relevance>
+    </reference>
+
+    <reference type="document" id="epics">
+      <title>Development Epics</title>
+      <section>Epic 1: Conversational Topic Discovery (lines 10-238)</section>
+      <context>
+        System Prompt/Persona Configuration (lines 32-95):
+        - MVP: Default persona hardcoded in codebase
+        - Post-MVP: Preset persona library + custom persona creation via UI
+        - Database schema includes system_prompts table for storing prompts
+        - projects.system_prompt_id enables per-project persona override
+
+        Story 1.2 implementation notes (lines 118-138):
+        - Creates projects and messages tables with indexes
+        - Foreign key constraints and indexes for performance
+        - Database client initializes successfully
+        - Query functions handle CRUD operations
+        - References: Tech Spec lines 100-125, Architecture lines 1024-1105
+      </context>
+    </reference>
+  </related-context>
+
+  <constraints>
+    <constraint>Database: SQLite via better-sqlite3 12.4.1 (embedded, serverless, local-first)</constraint>
+    <constraint>Database file location: ai-video-generator.db at project root (git-ignored)</constraint>
+    <constraint>Epic 1 scope: Projects table includes status, config_json, system_prompt_id; excludes selected_voice and script_json</constraint>
+    <constraint>Foreign keys: Must be enabled via pragma; nullable system_prompt_id with ON DELETE SET NULL</constraint>
+    <constraint>ID generation: UUID v4 generated in application code using crypto.randomUUID()</constraint>
+    <constraint>Timestamps: ISO 8601 format using SQLite datetime('now') for defaults</constraint>
+    <constraint>Idempotency: All schema statements must use IF NOT EXISTS clauses</constraint>
+    <constraint>Type safety: TypeScript interfaces must match schema exactly with proper null handling</constraint>
+    <constraint>Error handling: Specific error messages for FK violations and CHECK constraint failures</constraint>
+    <constraint>File organization: All database code in lib/db/ directory (client.ts, schema.sql, queries.ts, init.ts)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>Database Client</name>
+      <kind>module export</kind>
+      <signature>
+// lib/db/client.ts
+import Database from 'better-sqlite3';
+import path from 'path';
+
+const dbPath = path.join(process.cwd(), 'ai-video-generator.db');
+const db = new Database(dbPath);
+
+// Enable foreign keys
+db.pragma('foreign_keys = ON');
+
+export default db;
+      </signature>
+      <path>lib/db/client.ts</path>
+    </interface>
+
+    <interface>
+      <name>SystemPrompt Type</name>
+      <kind>TypeScript interface</kind>
+      <signature>
+interface SystemPrompt {
+  id: string;
+  name: string;
+  prompt: string;
+  description: string | null;
+  category: string | null;
+  is_preset: boolean;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+      </signature>
+      <path>lib/db/queries.ts</path>
+    </interface>
+
+    <interface>
+      <name>Project Type</name>
+      <kind>TypeScript interface</kind>
+      <signature>
+interface Project {
+  id: string;
+  name: string;
+  topic: string | null;
+  current_step: string;
+  status: string;
+  config_json: string | null;
+  system_prompt_id: string | null;
+  created_at: string;
+  last_active: string;
+}
+      </signature>
+      <path>lib/db/queries.ts</path>
+      <note>Epic 1 scope - excludes selected_voice and script_json</note>
+    </interface>
+
+    <interface>
+      <name>Message Type</name>
+      <kind>TypeScript interface</kind>
+      <signature>
+interface Message {
+  id: string;
+  project_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+}
+      </signature>
+      <path>lib/db/queries.ts</path>
+    </interface>
+
+    <interface>
+      <name>Database Initialization</name>
+      <kind>function</kind>
+      <signature>
+// lib/db/init.ts
+import { readFileSync } from 'fs';
+import path from 'path';
+import db from './client';
+
+export function initializeDatabase(): void {
+  const schemaPath = path.join(__dirname, 'schema.sql');
+  const schema = readFileSync(schemaPath, 'utf-8');
+  db.exec(schema);
+}
+      </signature>
+      <path>lib/db/init.ts</path>
+    </interface>
+
+    <interface>
+      <name>Query Functions</name>
+      <kind>module exports</kind>
+      <signature>
+// lib/db/queries.ts
+import db from './client';
+import { randomUUID } from 'crypto';
+
+// System Prompts
+export function getSystemPrompts(): SystemPrompt[];
+export function getDefaultSystemPrompt(): SystemPrompt | null;
+
+// Projects
+export function createProject(name: string, systemPromptId?: string): Project;
+export function getProject(id: string): Project | null;
+export function updateProject(id: string, updates: Partial&lt;Project&gt;): void;
+export function deleteProject(id: string): void;
+export function getAllProjects(): Project[];
+
+// Messages
+export function createMessage(projectId: string, role: 'user' | 'assistant' | 'system', content: string): Message;
+export function getMessagesByProject(projectId: string): Message[];
+export function deleteMessagesByProject(projectId: string): void;
+      </signature>
+      <path>lib/db/queries.ts</path>
+    </interface>
+  </interfaces>
+
+  <testing-strategy>
+    <standards>
+      Testing framework: Vitest or Jest (TypeScript-friendly) for unit and integration tests.
+      Database testing: Use in-memory SQLite database for tests (:memory: path).
+      Coverage target: >90% for database operations (critical path for data persistence).
+      Test isolation: Each test should use fresh database or transaction rollback.
+    </standards>
+
+    <locations>
+      - lib/db/__tests__/client.test.ts (database connection and initialization tests)
+      - lib/db/__tests__/init.test.ts (schema initialization and idempotency tests)
+      - lib/db/__tests__/queries.test.ts (CRUD operation tests for all entities)
+    </locations>
+
+    <testCases>
+      <category name="Database Client (client.test.ts)">
+        <test>Verify database file is created at correct path (ai-video-generator.db)</test>
+        <test>Verify foreign keys are enabled (query pragma foreign_keys returns 1)</test>
+        <test>Verify database connection is established successfully</test>
+        <test>Verify database client exports valid Database instance</test>
+      </category>
+
+      <category name="Schema Initialization (init.test.ts)">
+        <test>Verify all three tables are created (system_prompts, projects, messages)</test>
+        <test>Verify all indexes are created correctly</test>
+        <test>Verify idempotency: running initialization twice does not error</test>
+        <test>Verify foreign key constraints are defined in schema</test>
+        <test>Verify CHECK constraints are defined (messages.role)</test>
+        <test>Verify default values are set correctly (status='draft', timestamps)</test>
+      </category>
+
+      <category name="System Prompt Queries (queries.test.ts)">
+        <test ac="AC6">getSystemPrompts() returns empty array when no prompts exist</test>
+        <test ac="AC6">getSystemPrompts() returns all prompts after insertion</test>
+        <test ac="AC6">getDefaultSystemPrompt() returns null when no default exists</test>
+        <test ac="AC6">getDefaultSystemPrompt() returns correct prompt when is_default=true</test>
+        <test>createSystemPrompt() generates UUID and stores prompt correctly</test>
+        <test>System prompt includes description and category fields</test>
+      </category>
+
+      <category name="Project Queries (queries.test.ts)">
+        <test ac="AC1">createProject() generates UUID and stores project with Epic 1 fields</test>
+        <test ac="AC1">createProject() accepts optional systemPromptId parameter</test>
+        <test ac="AC1">Project includes status, config_json, system_prompt_id fields</test>
+        <test ac="AC1">Project excludes selected_voice and script_json (Epic 1 scope)</test>
+        <test>getProject() returns null for non-existent ID</test>
+        <test>getProject() returns complete project object for existing ID</test>
+        <test>updateProject() updates specified fields only (partial update)</test>
+        <test>getAllProjects() returns projects ordered by last_active DESC</test>
+        <test>deleteProject() removes project from database</test>
+      </category>
+
+      <category name="Message Queries (queries.test.ts)">
+        <test ac="AC2">createMessage() generates UUID and stores message</test>
+        <test ac="AC2">createMessage() validates role field (user, assistant, system)</test>
+        <test ac="AC2">createMessage() rejects invalid role value (CHECK constraint)</test>
+        <test>getMessagesByProject() returns empty array for new project</test>
+        <test>getMessagesByProject() returns messages ordered by timestamp ASC</test>
+        <test>getMessagesByProject() filters by project_id correctly</test>
+        <test>deleteMessagesByProject() removes all messages for project</test>
+      </category>
+
+      <category name="Foreign Key Constraints (queries.test.ts)">
+        <test ac="AC4">Deleting project cascades to messages (ON DELETE CASCADE)</test>
+        <test ac="AC4">Creating message with invalid project_id throws FK error</test>
+        <test ac="AC4">Deleting system prompt sets projects.system_prompt_id to NULL</test>
+        <test ac="AC4">Creating project with invalid system_prompt_id throws FK error</test>
+        <test ac="AC4">FK violation errors include meaningful error messages</test>
+        <test ac="AC4">system_prompt_id can be null (optional foreign key)</test>
+      </category>
+
+      <category name="Type Safety and Error Handling">
+        <test>All query functions have correct TypeScript return types</test>
+        <test>Null/undefined cases handled for optional fields</test>
+        <test>Database errors are caught and wrapped with meaningful messages</test>
+        <test>Constraint violations produce specific error messages</test>
+        <test>UUID generation produces valid v4 UUIDs</test>
+      </category>
+    </testCases>
+
+    <ideas>
+      <idea ac="AC1">Test that projects table schema matches Epic 1 specification exactly</idea>
+      <idea ac="AC2">Verify messages.role CHECK constraint rejects invalid values</idea>
+      <idea ac="AC3">Verify system_prompts table includes description and category fields</idea>
+      <idea ac="AC4">Test cascade behavior: delete project and verify messages are deleted</idea>
+      <idea ac="AC4">Test SET NULL behavior: delete system prompt and verify projects remain</idea>
+      <idea ac="AC5">Verify all four files exist: schema.sql, client.ts, init.ts, queries.ts</idea>
+      <idea ac="AC6">Test getSystemPrompts() and getDefaultSystemPrompt() functions</idea>
+      <idea>Test idempotency: run schema initialization multiple times</idea>
+      <idea>Test index performance: verify queries use indexes (EXPLAIN QUERY PLAN)</idea>
+      <idea>Test timestamp handling: verify ISO 8601 format and datetime('now') defaults</idea>
+    </ideas>
+  </testing-strategy>
+
+  <file-structure>
+    <directory path="lib/db">
+      <file name="schema.sql" status="to-create">
+        SQL schema definition with CREATE TABLE IF NOT EXISTS for all three tables (system_prompts, projects, messages) and all indexes. Includes CHECK constraints, foreign key constraints, and default values.
+      </file>
+      <file name="client.ts" status="to-create">
+        Database client initialization. Imports better-sqlite3, creates database instance at project root, enables foreign keys via pragma, exports db instance.
+      </file>
+      <file name="init.ts" status="to-create">
+        Database initialization script. Reads schema.sql file, executes SQL statements via db.exec(), provides idempotent initialization function.
+      </file>
+      <file name="queries.ts" status="to-create">
+        Database query functions. Defines TypeScript interfaces (SystemPrompt, Project, Message), implements CRUD operations for all entities, uses crypto.randomUUID() for IDs, includes error handling.
+      </file>
+    </directory>
+
+    <directory path="lib/db/__tests__">
+      <file name="client.test.ts" status="to-create">Unit tests for database client initialization and configuration</file>
+      <file name="init.test.ts" status="to-create">Unit tests for schema initialization and idempotency</file>
+      <file name="queries.test.ts" status="to-create">Unit tests for all query functions and foreign key constraints</file>
+    </directory>
+
+    <file path="ai-video-generator.db" status="will-be-created">
+      SQLite database file created at project root. Should be added to .gitignore. Created automatically on first run of initializeDatabase().
+    </file>
+
+    <file path=".gitignore" status="to-update">
+      Add *.db to .gitignore to prevent version control of database files.
+    </file>
+  </file-structure>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Database Schema (lines 1024-1126)</section>
+        <snippet>Complete database schema for SQLite database including system_prompts, projects, messages tables. Shows Epic 1 fields and foreign key relationships. Includes database client pattern with better-sqlite3.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Project Structure (lines 136-251)</section>
+        <snippet>Project file organization showing lib/db/ directory structure with client.ts, schema.sql, queries.ts files. Database file location at project root.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Technology Stack (lines 80-133)</section>
+        <snippet>Database technology selection: SQLite via better-sqlite3 12.4.1 for embedded, serverless, local-first storage. FOSS compliant.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Technical Specification: Epic 1</title>
+        <section>Database Schema (lines 100-125)</section>
+        <snippet>Epic 1 minimal database schema showing projects and messages tables with indexes. Story 1.2 expands with system_prompts table and additional project fields.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Development Epics</title>
+        <section>Epic 1: Conversational Topic Discovery (lines 10-238)</section>
+        <snippet>Epic 1 overview including system prompt/persona configuration strategy. Story 1.2 database implementation supporting MVP default persona and Post-MVP custom personas.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>ai-video-generator/package.json</path>
+        <kind>configuration</kind>
+        <symbol>dependencies</symbol>
+        <lines>dependencies section</lines>
+        <reason>Contains better-sqlite3@12.4.1 dependency installed in Story 1.1</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/.env.local</path>
+        <kind>configuration</kind>
+        <symbol>DATABASE_PATH</symbol>
+        <lines>all</lines>
+        <reason>Contains DATABASE_PATH environment variable for database file location</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/utils.ts</path>
+        <kind>utility</kind>
+        <symbol>cn</symbol>
+        <lines>4-6</lines>
+        <reason>Example of existing utility pattern for reference when implementing database utilities</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <dependency name="next" version="16.0.1" />
+        <dependency name="react" version="19.2.0" />
+        <dependency name="react-dom" version="19.2.0" />
+        <dependency name="zustand" version="^5.0.8" />
+        <dependency name="better-sqlite3" version="^12.4.1" />
+        <dependency name="ollama" version="^0.6.2" />
+        <dependency name="class-variance-authority" version="^0.7.1" />
+        <dependency name="clsx" version="^2.1.1" />
+        <dependency name="lucide-react" version="^0.552.0" />
+        <dependency name="tailwind-merge" version="^3.3.1" />
+        <dependency name="plyr" version="^3.8.3" />
+      </node>
+      <node devDependencies="true">
+        <dependency name="@types/node" version="^20" />
+        <dependency name="@types/react" version="^19" />
+        <dependency name="@types/react-dom" version="^19" />
+        <dependency name="@types/better-sqlite3" version="^7.6.13" />
+        <dependency name="typescript" version="^5" />
+        <dependency name="tailwindcss" version="^4" />
+        <dependency name="@tailwindcss/postcss" version="^4" />
+        <dependency name="eslint" version="^9" />
+        <dependency name="eslint-config-next" version="16.0.1" />
+        <dependency name="babel-plugin-react-compiler" version="1.0.0" />
+        <dependency name="tw-animate-css" version="^1.4.0" />
+      </node>
+      <python>
+        <dependency name="yt-dlp" version=">=2025.10.22" />
+        <dependency name="kokoro-tts" version=">=0.1.0" />
+      </python>
+      <system>
+        <dependency name="Node.js" version="18+" />
+        <dependency name="Ollama" version="latest" />
+        <dependency name="FFmpeg" version="latest" />
+      </system>
+    </dependencies>
+  </artifacts>
+
+  <dev-notes>
+    <estimation>
+      <effort>5 story points (4-6 hours)</effort>
+      <breakdown>
+        - Schema design and SQL: 1 hour
+        - Database client implementation: 30 minutes
+        - Query functions implementation: 2 hours
+        - Testing and validation: 1.5-2 hours
+        - Documentation and review: 30 minutes
+      </breakdown>
+    </estimation>
+
+    <keyDecisions>
+      <decision>Use UUID v4 for all primary keys (generated in application code, not database)</decision>
+      <decision>Enable foreign keys globally via pragma (critical for referential integrity)</decision>
+      <decision>Use ON DELETE CASCADE for messages (cleanup when project deleted)</decision>
+      <decision>Use ON DELETE SET NULL for system_prompt_id (projects survive prompt deletion)</decision>
+      <decision>Store timestamps as TEXT in ISO 8601 format (SQLite standard)</decision>
+      <decision>Use synchronous better-sqlite3 API (simpler than async, adequate for local DB)</decision>
+      <decision>Epic 1 scope: Include system_prompt_id, status, config_json; exclude selected_voice, script_json</decision>
+    </keyDecisions>
+
+    <implementationNotes>
+      <note priority="critical">Must enable foreign keys via pragma BEFORE any database operations</note>
+      <note priority="critical">Epic 1 scope: Projects table excludes selected_voice and script_json fields</note>
+      <note priority="high">system_prompt_id is nullable - projects can exist without custom prompt</note>
+      <note priority="high">Add *.db to .gitignore to prevent version control of database files</note>
+      <note priority="medium">Use CREATE TABLE IF NOT EXISTS for idempotency (safe re-runs)</note>
+      <note priority="medium">Generate UUIDs with crypto.randomUUID() in query functions</note>
+      <note priority="low">Consider adding database migration strategy for future schema changes</note>
+    </implementationNotes>
+
+    <sequencing>
+      <step order="1">Create lib/db directory structure</step>
+      <step order="2">Write schema.sql with all three tables and indexes</step>
+      <step order="3">Implement client.ts with database connection and pragma</step>
+      <step order="4">Implement init.ts with schema loading and execution</step>
+      <step order="5">Implement queries.ts with TypeScript interfaces and CRUD functions</step>
+      <step order="6">Add *.db to .gitignore</step>
+      <step order="7">Write comprehensive tests for all database operations</step>
+      <step order="8">Run tests and verify all acceptance criteria</step>
+    </sequencing>
+  </dev-notes>
+</story-context>
