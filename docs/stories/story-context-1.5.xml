@@ -1,0 +1,1067 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>1.5</story-id>
+    <title>Frontend Chat Components</title>
+    <epic>Epic 1 - Conversational Topic Discovery</epic>
+    <status>ready-for-dev</status>
+    <created>2025-11-03</created>
+    <last-updated>2025-11-03</last-updated>
+    <assigned-to>TBD</assigned-to>
+    <sprint>TBD</sprint>
+    <story-points>13</story-points>
+    <estimated-hours>36.5</estimated-hours>
+    <github-repository>https://github.com/bmad-dev/BMAD-METHOD</github-repository>
+  </metadata>
+
+  <story-overview>
+    <goal>Build chat UI components with message display and conversation state management</goal>
+    <description>
+      Implement the frontend chat interface that allows users to interact with the AI assistant for topic discovery.
+      This story creates the core UI components for displaying conversation history, handling user input, and managing
+      conversation state using Zustand. The interface integrates with the POST /api/chat endpoint to send messages and
+      receive responses, providing a smooth conversational experience with proper loading states and error handling.
+    </description>
+    <business-value>
+      <value>Provides the primary user interface for topic discovery through natural conversation</value>
+      <value>Enables persistent conversation history that survives page refreshes</value>
+      <value>Creates a foundation for future conversational features (topic confirmation, content planning)</value>
+      <value>Establishes UI/UX patterns for chat-based interactions throughout the application</value>
+      <value>Improves user experience with real-time feedback (loading states, auto-scroll)</value>
+    </business-value>
+  </story-overview>
+
+  <acceptance-criteria>
+    <criterion id="AC-1.5.1">
+      <title>ChatInterface renders with input field and message list</title>
+      <requirements>
+        <requirement>Component displays message history area and input controls</requirement>
+        <requirement>Input field accepts user text input with proper keyboard navigation</requirement>
+        <requirement>Send button triggers message submission</requirement>
+        <requirement>UI follows shadcn/ui design system with Tailwind CSS styling</requirement>
+      </requirements>
+    </criterion>
+
+    <criterion id="AC-1.5.2">
+      <title>MessageList displays conversation history with role indicators (user/assistant)</title>
+      <requirements>
+        <requirement>Messages render with distinct visual styling for user vs assistant</requirement>
+        <requirement>User messages align right with appropriate background color</requirement>
+        <requirement>Assistant messages align left with appropriate background color</requirement>
+        <requirement>Role indicators (avatar/icon) clearly distinguish message types</requirement>
+        <requirement>Timestamps display for each message</requirement>
+      </requirements>
+    </criterion>
+
+    <criterion id="AC-1.5.3">
+      <title>Messages persist and reload on page refresh with per-project isolation</title>
+      <requirements>
+        <requirement>Conversation state persists to localStorage via Zustand middleware</requirement>
+        <requirement>Storage key includes projectId for per-project state isolation</requirement>
+        <requirement>Messages reload from localStorage when component mounts</requirement>
+        <requirement>State rehydration happens before first render to prevent flash of empty state</requirement>
+        <requirement>Invalid/corrupted localStorage data handled gracefully</requirement>
+      </requirements>
+    </criterion>
+
+    <criterion id="AC-1.5.4">
+      <title>Loading indicator shows while waiting for LLM response with 30s timeout</title>
+      <requirements>
+        <requirement>Spinner or skeleton UI displays immediately after message submission</requirement>
+        <requirement>Loading state positioned at bottom of message list</requirement>
+        <requirement>Loading indicator includes helpful text: "Assistant is thinking..."</requirement>
+        <requirement>Loading state clears when response arrives or error occurs</requirement>
+        <requirement>Request aborts after 30 seconds with timeout error message</requirement>
+      </requirements>
+    </criterion>
+
+    <criterion id="AC-1.5.5">
+      <title>Input field disabled during message processing with length validation</title>
+      <requirements>
+        <requirement>Input and send button disabled while waiting for LLM response</requirement>
+        <requirement>Visual indication of disabled state (grayed out, cursor change)</requirement>
+        <requirement>Keyboard input prevented during disabled state</requirement>
+        <requirement>Re-enabled immediately after response or error</requirement>
+        <requirement>Maximum message length enforced (5000 characters)</requirement>
+        <requirement>Character count displayed when approaching limit</requirement>
+      </requirements>
+    </criterion>
+
+    <criterion id="AC-1.5.6">
+      <title>Error messages display with specific error code mapping</title>
+      <requirements>
+        <requirement>Network errors show user-friendly error message</requirement>
+        <requirement>Error UI distinguishes between different error types (connection, validation, server)</requirement>
+        <requirement>Specific error codes mapped to actionable messages (OLLAMA_CONNECTION_ERROR, etc.)</requirement>
+        <requirement>Retry option available for failed requests</requirement>
+        <requirement>Error messages include actionable guidance for user</requirement>
+      </requirements>
+    </criterion>
+
+    <criterion id="AC-1.5.7">
+      <title>Auto-scroll to bottom when new messages arrive</title>
+      <requirements>
+        <requirement>MessageList scrolls to latest message when assistant responds</requirement>
+        <requirement>Scroll behavior smooth and not jarring</requirement>
+        <requirement>Auto-scroll only triggers for new messages, not during manual scrolling</requirement>
+        <requirement>User can manually scroll up without interruption</requirement>
+      </requirements>
+    </criterion>
+  </acceptance-criteria>
+
+  <tasks>
+    <task id="TASK-1.5.1" estimated-hours="3.5">
+      <title>Set Up Zustand Conversation Store with Per-Project Isolation</title>
+      <file>lib/stores/conversation-store.ts</file>
+      <subtasks>
+        <subtask>Create conversation-store.ts file with Zustand store factory pattern</subtask>
+        <subtask>Define TypeScript interfaces for Message type: { id, role, content, timestamp }</subtask>
+        <subtask>Define ConversationState interface: { messages, isLoading, error, addMessage, setLoading, setError, clearError }</subtask>
+        <subtask>Implement createConversationStore factory function accepting projectId parameter</subtask>
+        <subtask>Configure persist middleware with dynamic storage key: bmad-conversation-state-${projectId}</subtask>
+        <subtask>Add action creators: addMessage, setLoading, setError, clearError</subtask>
+        <subtask>Add selector hooks for component consumption</subtask>
+        <subtask>Test state persistence across page refreshes with multiple projects</subtask>
+        <subtask>Verify different projects maintain separate conversation histories</subtask>
+      </subtasks>
+    </task>
+
+    <task id="TASK-1.5.2" estimated-hours="4.0">
+      <title>Create MessageList Component</title>
+      <file>components/features/conversation/MessageList.tsx</file>
+      <subtasks>
+        <subtask>Create MessageList.tsx component with TypeScript</subtask>
+        <subtask>Accept messages prop: Message[] from conversation store</subtask>
+        <subtask>Implement message mapping with role-based styling (user: right-aligned blue/gray, assistant: left-aligned white/light)</subtask>
+        <subtask>Add role indicators (avatar/icon) using lucide-react icons (User icon, Bot icon)</subtask>
+        <subtask>Display message content with proper text formatting (whitespace preservation)</subtask>
+        <subtask>Display timestamps in human-readable format using date-fns</subtask>
+        <subtask>Implement loading indicator component for "thinking" state</subtask>
+        <subtask>Add useEffect hook with ref for auto-scroll to bottom</subtask>
+        <subtask>Configure scroll behavior: scrollIntoView({ behavior: 'smooth' })</subtask>
+        <subtask>Add empty state UI: "Start a conversation to discover your video topic..."</subtask>
+        <subtask>Style with Tailwind CSS following shadcn/ui patterns</subtask>
+        <subtask>Ensure responsive design for mobile/tablet viewports</subtask>
+      </subtasks>
+    </task>
+
+    <task id="TASK-1.5.3" estimated-hours="3.5">
+      <title>Create ChatInterface Component with Browser-Safe UUID Generation</title>
+      <file>components/features/conversation/ChatInterface.tsx</file>
+      <subtasks>
+        <subtask>Create ChatInterface.tsx component with TypeScript</subtask>
+        <subtask>Import MessageList component and conversation store hooks</subtask>
+        <subtask>Set up component state for input field: const [input, setInput] = useState('')</subtask>
+        <subtask>Create message submission handler: handleSendMessage()</subtask>
+        <subtask>Implement browser-safe UUID generation with fallback (crypto.randomUUID() with fallback to timestamp-based)</subtask>
+        <subtask>Implement input validation (trim whitespace, check non-empty, length limit)</subtask>
+        <subtask>Get projectId from URL params or props (assume passed from parent)</subtask>
+        <subtask>Create form with shadcn/ui Input and Button components</subtask>
+        <subtask>Add keyboard handler for Enter key submission (Shift+Enter for newline)</subtask>
+        <subtask>Disable input and button when isLoading is true</subtask>
+        <subtask>Clear input field after successful submission</subtask>
+        <subtask>Add error display component (Alert from shadcn/ui)</subtask>
+        <subtask>Style container with proper layout (flex column, full height)</subtask>
+        <subtask>Configure MessageList to take remaining vertical space</subtask>
+        <subtask>Position input controls at bottom (sticky/fixed footer)</subtask>
+        <subtask>Add proper ARIA labels for accessibility</subtask>
+      </subtasks>
+    </task>
+
+    <task id="TASK-1.5.4" estimated-hours="4.5" dependencies="TASK-1.5.1, TASK-1.5.3">
+      <title>Integrate with Chat API Endpoint with Timeout and Error Code Mapping</title>
+      <subtasks>
+        <subtask>Create API client function: sendChatMessage(projectId, message)</subtask>
+        <subtask>Use fetch API with POST method to /api/chat</subtask>
+        <subtask>Implement AbortController with 30s timeout</subtask>
+        <subtask>Send request body: { projectId, message }</subtask>
+        <subtask>Add proper headers: Content-Type: application/json</subtask>
+        <subtask>Parse response JSON: { success, data: { messageId, response, timestamp } }</subtask>
+        <subtask>Handle success response: add user and assistant messages to store</subtask>
+        <subtask>Implement comprehensive error handling (network, HTTP, JSON parse, timeout)</subtask>
+        <subtask>Define error code to message mapping (OLLAMA_CONNECTION_ERROR, INVALID_PROJECT_ID, etc.)</subtask>
+        <subtask>Extract error codes from API response: errorData?.error?.code</subtask>
+        <subtask>Map error codes to user-friendly messages</subtask>
+        <subtask>Set loading state before request, clear after response/error</subtask>
+        <subtask>Add request logging for debugging (console.log in development)</subtask>
+      </subtasks>
+    </task>
+
+    <task id="TASK-1.5.5" estimated-hours="2.5" dependencies="TASK-1.5.3">
+      <title>Implement Message Input Validation with Length Limit</title>
+      <subtasks>
+        <subtask>Create validation function: validateMessageInput(message)</subtask>
+        <subtask>Check message is non-empty after trimming whitespace</subtask>
+        <subtask>Implement 5000 character maximum length validation</subtask>
+        <subtask>Display inline validation errors below input field</subtask>
+        <subtask>Prevent submission if validation fails</subtask>
+        <subtask>Add character count indicator (show when >4500 characters)</subtask>
+        <subtask>Clear validation errors when user starts typing</subtask>
+        <subtask>Add visual feedback for validation state (red border, error text)</subtask>
+        <subtask>Implement debounced validation for real-time feedback</subtask>
+        <subtask>Test edge cases: only whitespace, only newlines, very long messages</subtask>
+      </subtasks>
+    </task>
+
+    <task id="TASK-1.5.6" estimated-hours="3.5" dependencies="TASK-1.5.2, TASK-1.5.3, TASK-1.5.4">
+      <title>Implement Loading States and Error Display</title>
+      <subtasks>
+        <subtask>Create loading indicator component (Spinner or Skeleton)</subtask>
+        <subtask>Position loading indicator in MessageList during API call</subtask>
+        <subtask>Add "Assistant is thinking..." text with loading indicator</subtask>
+        <subtask>Disable input field with visual indication during loading</subtask>
+        <subtask>Create error display component using shadcn/ui Alert</subtask>
+        <subtask>Implement error variants for specific error codes (OLLAMA_CONNECTION_ERROR, INVALID_PROJECT_ID, etc.)</subtask>
+        <subtask>Add retry button for recoverable errors</subtask>
+        <subtask>Implement error dismissal (X button or auto-dismiss after 10s)</subtask>
+        <subtask>Test error display for all error codes from API</subtask>
+        <subtask>Ensure errors don't block further interactions after dismissal</subtask>
+      </subtasks>
+    </task>
+
+    <task id="TASK-1.5.7" estimated-hours="2.5" dependencies="TASK-1.5.2">
+      <title>Implement Auto-Scroll Functionality</title>
+      <subtasks>
+        <subtask>Create ref for message list container: const messageEndRef = useRef&lt;HTMLDivElement&gt;(null)</subtask>
+        <subtask>Add scroll trigger in useEffect when messages array changes</subtask>
+        <subtask>Implement smooth scroll behavior: messageEndRef.current?.scrollIntoView({ behavior: 'smooth' })</subtask>
+        <subtask>Add scroll anchor element at bottom of MessageList</subtask>
+        <subtask>Detect manual user scrolling to prevent auto-scroll interruption</subtask>
+        <subtask>Implement scroll position tracking: detect if user is at bottom</subtask>
+        <subtask>Only auto-scroll if user was already at bottom (within 100px threshold)</subtask>
+        <subtask>Add "Scroll to bottom" button when user scrolls up (UX enhancement)</subtask>
+        <subtask>Test scroll behavior with long conversation histories (20+ messages)</subtask>
+        <subtask>Ensure scroll works on mobile devices (touch scrolling)</subtask>
+      </subtasks>
+    </task>
+
+    <task id="TASK-1.5.8" estimated-hours="3.0" dependencies="TASK-1.5.1">
+      <title>Add Conversation Persistence and Rehydration with Per-Project Keys</title>
+      <subtasks>
+        <subtask>Configure Zustand persist middleware with localStorage</subtask>
+        <subtask>Implement dynamic storage key pattern: bmad-conversation-state-${projectId}</subtask>
+        <subtask>Implement state serialization: convert Date objects to ISO strings</subtask>
+        <subtask>Implement state deserialization: parse ISO strings back to Date objects</subtask>
+        <subtask>Add version field to persisted state for future migration support</subtask>
+        <subtask>Handle localStorage quota exceeded errors gracefully</subtask>
+        <subtask>Implement state cleanup for old/stale conversations (optional)</subtask>
+        <subtask>Test state rehydration on page refresh with different projectIds</subtask>
+        <subtask>Test state isolation: verify different projects don't share conversation state</subtask>
+        <subtask>Test state persistence across browser tabs (same project)</subtask>
+        <subtask>Add clear conversation action for testing/debugging</subtask>
+        <subtask>Handle corrupted localStorage data (try/catch with fallback to empty state)</subtask>
+      </subtasks>
+    </task>
+  </tasks>
+
+  <technical-specifications>
+    <component-architecture>
+      <hierarchy>
+        <component name="ChatInterface" type="Main Container">
+          <child name="MessageList" type="Conversation History Display">
+            <child name="MessageItem" type="Individual Message">
+              <child name="Avatar/Icon" type="Role Indicator" />
+              <child name="Message Content" type="Text Display" />
+              <child name="Timestamp" type="Date Display" />
+            </child>
+            <child name="LoadingIndicator" type="During API Call" />
+          </child>
+          <child name="ErrorDisplay" type="Alert Component" />
+          <child name="MessageInput" type="Input Field + Send Button" />
+        </component>
+      </hierarchy>
+    </component-architecture>
+
+    <state-management>
+      <store-type>Zustand with persist middleware</store-type>
+      <factory-pattern>createConversationStore(projectId: string)</factory-pattern>
+      <storage-key-pattern>bmad-conversation-state-${projectId}</storage-key-pattern>
+
+      <interfaces>
+        <interface name="Message">
+          <field name="id" type="string" description="Unique message identifier" />
+          <field name="role" type="'user' | 'assistant'" description="Message sender role" />
+          <field name="content" type="string" description="Message text content" />
+          <field name="timestamp" type="string" description="ISO 8601 formatted timestamp" />
+        </interface>
+
+        <interface name="ConversationState">
+          <field name="messages" type="Message[]" description="Array of conversation messages" />
+          <field name="isLoading" type="boolean" description="API request loading state" />
+          <field name="error" type="string | null" description="Error message if request fails" />
+          <action name="addMessage" params="(message: Message)" description="Appends message to messages array" />
+          <action name="setLoading" params="(isLoading: boolean)" description="Toggles loading state" />
+          <action name="setError" params="(error: string | null)" description="Sets error message" />
+          <action name="clearError" params="()" description="Clears error state" />
+          <action name="clearConversation" params="()" description="Resets conversation to empty state" />
+        </interface>
+      </interfaces>
+
+      <persistence>
+        <storage>localStorage</storage>
+        <serialization>Convert Date objects to ISO strings</serialization>
+        <deserialization>Parse ISO strings back to Date objects</deserialization>
+        <version-support>Version field for future migration</version-support>
+        <error-handling>Graceful fallback for quota exceeded and corrupted data</error-handling>
+      </persistence>
+    </state-management>
+
+    <api-integration>
+      <endpoint>POST /api/chat</endpoint>
+      <request-body>
+        <field name="projectId" type="string" />
+        <field name="message" type="string" />
+      </request-body>
+      <response-body>
+        <field name="success" type="boolean" />
+        <field name="data" type="object">
+          <field name="messageId" type="string" />
+          <field name="response" type="string" />
+          <field name="timestamp" type="string" />
+        </field>
+      </response-body>
+      <timeout>30 seconds using AbortController</timeout>
+      <error-codes>
+        <code name="OLLAMA_CONNECTION_ERROR" message="Unable to connect to Ollama. Please ensure it is running at http://localhost:11434" />
+        <code name="INVALID_PROJECT_ID" message="Project not found. Please refresh the page." />
+        <code name="EMPTY_MESSAGE" message="Message cannot be empty" />
+        <code name="DATABASE_ERROR" message="Failed to save message. Please try again." />
+      </error-codes>
+    </api-integration>
+
+    <validation-rules>
+      <rule name="non-empty" description="Message must not be empty after trimming whitespace" />
+      <rule name="max-length" value="5000" description="Maximum message length in characters" />
+      <rule name="character-count-display" threshold="4500" description="Show character count when approaching limit" />
+      <rule name="character-count-warning" threshold="4500" color="yellow" />
+      <rule name="character-count-danger" threshold="4900" color="red" />
+    </validation-rules>
+
+    <ui-specifications>
+      <message-styling>
+        <user-message>
+          <alignment>right</alignment>
+          <background>primary color</background>
+          <icon>User icon from lucide-react</icon>
+          <max-width>70%</max-width>
+        </user-message>
+        <assistant-message>
+          <alignment>left</alignment>
+          <background>muted color</background>
+          <icon>Bot icon from lucide-react</icon>
+          <max-width>70%</max-width>
+        </assistant-message>
+      </message-styling>
+
+      <loading-states>
+        <position>Bottom of message list</position>
+        <indicator>Spinner with "Assistant is thinking..." text</indicator>
+        <disabled-elements>Input field and send button</disabled-elements>
+        <visual-feedback>Grayed out, cursor not-allowed</visual-feedback>
+      </loading-states>
+
+      <error-display>
+        <component>shadcn/ui Alert</component>
+        <variants>destructive, warning, info</variants>
+        <dismissal>X button or auto-dismiss after 10s</dismissal>
+        <retry>Button for recoverable errors</retry>
+      </error-display>
+
+      <auto-scroll>
+        <behavior>smooth</behavior>
+        <trigger>New message arrival</trigger>
+        <threshold>100px from bottom</threshold>
+        <manual-override>User can scroll up without interruption</manual-override>
+      </auto-scroll>
+    </ui-specifications>
+
+    <browser-compatibility>
+      <uuid-generation>
+        <primary>crypto.randomUUID() for modern browsers</primary>
+        <fallback>msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}</fallback>
+        <supported-browsers>Chrome 92+, Firefox 95+, Safari 15.4+</supported-browsers>
+        <fallback-compatibility>All browsers including older versions</fallback-compatibility>
+      </uuid-generation>
+      <abort-controller>
+        <support>All modern browsers</support>
+        <note>Not supported in IE11 (acceptable tradeoff)</note>
+      </abort-controller>
+    </browser-compatibility>
+
+    <accessibility>
+      <keyboard-navigation>
+        <enter-key>Submit message</enter-key>
+        <shift-enter>Newline in message</shift-enter>
+        <tab>Navigate through controls</tab>
+        <escape>Clear error display</escape>
+      </keyboard-navigation>
+      <aria-labels>
+        <label target="input" value="Message input" />
+        <label target="send-button" value="Send message" />
+        <label target="error" role="alert" />
+        <label target="loading" aria-live="polite" />
+      </aria-labels>
+      <screen-reader>
+        <announce>New messages when they arrive</announce>
+        <announce>Loading state changes</announce>
+        <announce>Errors with context</announce>
+      </screen-reader>
+    </accessibility>
+  </technical-specifications>
+
+  <dependencies>
+    <story-dependencies>
+      <dependency id="1.1" title="Project Setup" status="completed">
+        <provides>Next.js 15.5 App Router configuration</provides>
+        <provides>TypeScript 5.x setup</provides>
+        <provides>Tailwind CSS 3.x configuration</provides>
+        <provides>shadcn/ui components installation</provides>
+        <provides>Zustand 5.0.8 state management library</provides>
+        <provides>lucide-react icon library</provides>
+        <provides>date-fns date formatting library</provides>
+      </dependency>
+
+      <dependency id="1.2" title="Database Schema" status="completed">
+        <provides>messages table schema</provides>
+        <provides>Database connection and ORM setup</provides>
+      </dependency>
+
+      <dependency id="1.3" title="LLM Provider Integration" status="completed">
+        <provides>Ollama integration at http://localhost:11434</provides>
+        <provides>System prompt for topic discovery</provides>
+        <provides>LLM response generation</provides>
+      </dependency>
+
+      <dependency id="1.4" title="Chat API Endpoint" status="completed" critical="true">
+        <provides>POST /api/chat endpoint</provides>
+        <provides>Request validation</provides>
+        <provides>Message persistence to database</provides>
+        <provides>LLM response generation</provides>
+        <provides>Error code definitions (OLLAMA_CONNECTION_ERROR, INVALID_PROJECT_ID, etc.)</provides>
+      </dependency>
+    </story-dependencies>
+
+    <technical-dependencies>
+      <dependency name="Next.js" version="15.5" type="framework" />
+      <dependency name="React" version="19" type="library" />
+      <dependency name="TypeScript" version="5.x" type="language" />
+      <dependency name="Tailwind CSS" version="3.x" type="styling" />
+      <dependency name="shadcn/ui" version="latest" type="ui-components" />
+      <dependency name="Zustand" version="5.0.8" type="state-management" />
+      <dependency name="lucide-react" version="latest" type="icons" />
+      <dependency name="date-fns" version="latest" type="utilities" />
+    </technical-dependencies>
+  </dependencies>
+
+  <architecture-constraints>
+    <tech-stack>
+      <framework>Next.js 15.5 App Router</framework>
+      <language>TypeScript 5.x</language>
+      <styling>Tailwind CSS 3.x with shadcn/ui design system</styling>
+      <state-management>Zustand 5.0.8 with persist middleware</state-management>
+      <icons>lucide-react</icons>
+      <date-formatting>date-fns</date-formatting>
+    </tech-stack>
+
+    <patterns>
+      <pattern name="Factory Pattern">
+        <description>Use createConversationStore factory for per-project state isolation</description>
+        <rationale>Enables multiple projects to maintain separate conversation histories</rationale>
+      </pattern>
+
+      <pattern name="Optimistic UI">
+        <description>Add user messages to store immediately before API response</description>
+        <rationale>Provides instant feedback and improves perceived performance</rationale>
+      </pattern>
+
+      <pattern name="Error Code Mapping">
+        <description>Map API error codes to user-friendly, actionable messages</description>
+        <rationale>Improves user experience by providing clear guidance on error resolution</rationale>
+      </pattern>
+
+      <pattern name="Browser-Safe Fallbacks">
+        <description>Implement fallback mechanisms for modern browser APIs</description>
+        <rationale>Ensures compatibility across wide range of browser versions</rationale>
+      </pattern>
+    </patterns>
+
+    <conventions>
+      <convention>Use 'use client' directive for client components</convention>
+      <convention>Follow shadcn/ui component structure and styling patterns</convention>
+      <convention>Use TypeScript interfaces for all data structures</convention>
+      <convention>Implement proper error boundaries for React components</convention>
+      <convention>Use semantic HTML elements for accessibility</convention>
+      <convention>Follow ARIA best practices for screen reader support</convention>
+      <convention>Implement responsive design mobile-first approach</convention>
+      <convention>Use Tailwind CSS utility classes for styling</convention>
+    </conventions>
+
+    <file-structure>
+      <directory path="lib/stores">
+        <file>conversation-store.ts</file>
+      </directory>
+      <directory path="components/features/conversation">
+        <file>ChatInterface.tsx</file>
+        <file>MessageList.tsx</file>
+      </directory>
+      <directory path="components/ui">
+        <file>input.tsx (from shadcn/ui)</file>
+        <file>button.tsx (from shadcn/ui)</file>
+        <file>alert.tsx (from shadcn/ui)</file>
+      </directory>
+    </file-structure>
+  </architecture-constraints>
+
+  <testing-requirements>
+    <unit-tests>
+      <test-suite name="Zustand Store">
+        <test>addMessage action appends message to messages array</test>
+        <test>setLoading action toggles loading state</test>
+        <test>setError action sets error message</test>
+        <test>clearError action clears error state</test>
+        <test>clearConversation action resets state to initial values</test>
+        <test>State persists to localStorage with correct key pattern</test>
+        <test>State rehydrates correctly on store creation</test>
+        <test>Different projectIds create separate store instances</test>
+      </test-suite>
+
+      <test-suite name="Validation Logic">
+        <test>Empty message validation (trim whitespace)</test>
+        <test>Only whitespace message validation</test>
+        <test>Message length limit enforcement (5000 characters)</test>
+        <test>Character count calculation accuracy</test>
+      </test-suite>
+
+      <test-suite name="UUID Generation">
+        <test>crypto.randomUUID() used when available</test>
+        <test>Fallback to timestamp-based ID when crypto unavailable</test>
+        <test>Generated IDs are unique across multiple calls</test>
+      </test-suite>
+
+      <test-suite name="Error Code Mapping">
+        <test>OLLAMA_CONNECTION_ERROR maps to correct message</test>
+        <test>INVALID_PROJECT_ID maps to correct message</test>
+        <test>EMPTY_MESSAGE maps to correct message</test>
+        <test>DATABASE_ERROR maps to correct message</test>
+        <test>Unknown error codes use default message</test>
+      </test-suite>
+    </unit-tests>
+
+    <component-tests>
+      <test-suite name="ChatInterface Component">
+        <test>Renders with empty state message</test>
+        <test>Input field accepts user input</test>
+        <test>Character count displays when approaching limit (>4500 chars)</test>
+        <test>Send button disabled when input empty</test>
+        <test>Send button disabled during loading state</test>
+        <test>Error alert displays when error state set</test>
+        <test>Input clears after successful submission</test>
+        <test>Enter key triggers submission</test>
+        <test>Shift+Enter adds newline to input</test>
+      </test-suite>
+
+      <test-suite name="MessageList Component">
+        <test>Renders empty state when no messages</test>
+        <test>Displays messages with correct styling based on role</test>
+        <test>User messages align right with primary background</test>
+        <test>Assistant messages align left with muted background</test>
+        <test>Timestamps display in human-readable format</test>
+        <test>Loading indicator shows when isLoading true</test>
+        <test>Auto-scrolls to bottom when new message added</test>
+        <test>Renders long conversation histories efficiently</test>
+      </test-suite>
+    </component-tests>
+
+    <integration-tests>
+      <test-suite name="API Integration">
+        <test>Message submission calls POST /api/chat with correct payload</test>
+        <test>User message added to store optimistically</test>
+        <test>Assistant response added to store after API success</test>
+        <test>Loading state set before request, cleared after response</test>
+        <test>Error state set when API returns error</test>
+        <test>Request aborts after 30 seconds timeout</test>
+        <test>AbortError handled with timeout message</test>
+        <test>Network errors handled gracefully</test>
+      </test-suite>
+
+      <test-suite name="State Persistence">
+        <test>Messages persist to localStorage after submission</test>
+        <test>Messages reload from localStorage on component mount</test>
+        <test>Different projectIds maintain separate conversation state</test>
+        <test>State persists across browser tabs (same project)</test>
+        <test>Corrupted localStorage data handled gracefully</test>
+        <test>localStorage quota exceeded handled gracefully</test>
+      </test-suite>
+    </integration-tests>
+
+    <e2e-tests>
+      <test-suite name="Complete User Flow">
+        <test>User can type message and click send button</test>
+        <test>Loading indicator appears during API call</test>
+        <test>Assistant response displays after API completes</test>
+        <test>Conversation history persists on page refresh</test>
+        <test>Auto-scroll brings new message into view</test>
+        <test>Error message displays when API fails with specific error code</test>
+        <test>Character count warning appears when approaching limit</test>
+        <test>Message over 5000 characters rejected with error</test>
+        <test>Timeout error displays after 30 seconds with no response</test>
+        <test>Different projects maintain separate conversations</test>
+      </test-suite>
+
+      <test-suite name="Cross-Browser Testing">
+        <test>UI renders correctly in Chrome, Firefox, Safari</test>
+        <test>UUID generation works in modern and older browsers</test>
+        <test>Auto-scroll works on desktop and mobile devices</test>
+        <test>Touch scrolling works correctly on mobile</test>
+        <test>Keyboard navigation works across browsers</test>
+      </test-suite>
+
+      <test-suite name="Accessibility Testing">
+        <test>Keyboard navigation through all interactive elements</test>
+        <test>ARIA labels correctly announce element purposes</test>
+        <test>Screen reader announces new messages</test>
+        <test>Screen reader announces loading state changes</test>
+        <test>Error messages announced with alert role</test>
+        <test>Focus management works correctly after actions</test>
+      </test-suite>
+    </e2e-tests>
+
+    <coverage-target>80%</coverage-target>
+  </testing-requirements>
+
+  <code-examples>
+    <example name="Zustand Store Factory Pattern">
+      <description>Per-project state isolation using factory pattern</description>
+      <code language="typescript"><![CDATA[
+// lib/stores/conversation-store.ts
+
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+export interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string; // ISO 8601 format
+}
+
+interface ConversationState {
+  messages: Message[];
+  isLoading: boolean;
+  error: string | null;
+
+  // Actions
+  addMessage: (message: Message) => void;
+  setLoading: (isLoading: boolean) => void;
+  setError: (error: string | null) => void;
+  clearError: () => void;
+  clearConversation: () => void;
+}
+
+// Factory pattern for per-project state isolation
+export const createConversationStore = (projectId: string) =>
+  create<ConversationState>()(
+    persist(
+      (set) => ({
+        messages: [],
+        isLoading: false,
+        error: null,
+
+        addMessage: (message) =>
+          set((state) => ({ messages: [...state.messages, message] })),
+
+        setLoading: (isLoading) =>
+          set({ isLoading }),
+
+        setError: (error) =>
+          set({ error }),
+
+        clearError: () =>
+          set({ error: null }),
+
+        clearConversation: () =>
+          set({ messages: [], error: null, isLoading: false }),
+      }),
+      {
+        name: `bmad-conversation-state-${projectId}`, // Per-project isolation
+        version: 1,
+      }
+    )
+  );
+
+// Usage in components:
+// const useConversationStore = createConversationStore(projectId);
+      ]]></code>
+    </example>
+
+    <example name="Browser-Safe UUID Generation">
+      <description>UUID generation with fallback for older browsers</description>
+      <code language="typescript"><![CDATA[
+// Browser-safe UUID generation with fallback
+function generateMessageId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for older browsers or non-secure contexts
+  return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+      ]]></code>
+    </example>
+
+    <example name="AbortController with Timeout">
+      <description>30-second timeout implementation using AbortController</description>
+      <code language="typescript"><![CDATA[
+// AbortController with 30s timeout
+const controller = new AbortController();
+const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+try {
+  setLoading(true);
+
+  // Call API endpoint with timeout
+  const response = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, message: trimmedMessage }),
+    signal: controller.signal, // Attach abort signal
+  });
+
+  clearTimeout(timeoutId); // Clear timeout on success
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    const errorCode = errorData?.error?.code;
+    const errorMessage = ERROR_MESSAGES[errorCode] || errorData.error?.message || 'An unexpected error occurred';
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+
+  // Add assistant response
+  const assistantMessage = {
+    id: data.data.messageId,
+    role: 'assistant' as const,
+    content: data.data.response,
+    timestamp: data.data.timestamp,
+  };
+  addMessage(assistantMessage);
+
+} catch (err) {
+  clearTimeout(timeoutId); // Clear timeout on error
+
+  // Handle timeout errors specifically
+  if (err instanceof Error && err.name === 'AbortError') {
+    setError('Request timed out after 30 seconds. Please try again.');
+  } else {
+    setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+  }
+} finally {
+  setLoading(false);
+}
+      ]]></code>
+    </example>
+
+    <example name="Error Code Mapping">
+      <description>Mapping API error codes to user-friendly messages</description>
+      <code language="typescript"><![CDATA[
+// Error code mapping
+const ERROR_MESSAGES: Record<string, string> = {
+  OLLAMA_CONNECTION_ERROR: 'Unable to connect to Ollama. Please ensure it is running at http://localhost:11434',
+  INVALID_PROJECT_ID: 'Project not found. Please refresh the page.',
+  EMPTY_MESSAGE: 'Message cannot be empty',
+  DATABASE_ERROR: 'Failed to save message. Please try again.',
+};
+
+// Usage:
+const errorCode = errorData?.error?.code;
+const errorMessage = ERROR_MESSAGES[errorCode] || errorData.error?.message || 'An unexpected error occurred';
+      ]]></code>
+    </example>
+
+    <example name="Input Validation with Length Limit">
+      <description>5000 character validation with visual feedback</description>
+      <code language="typescript"><![CDATA[
+const MAX_MESSAGE_LENGTH = 5000;
+
+const handleSendMessage = async () => {
+  const trimmedMessage = input.trim();
+
+  if (!trimmedMessage) {
+    setError('Message cannot be empty');
+    return;
+  }
+
+  // Input length validation
+  if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
+    setError(`Message too long (max ${MAX_MESSAGE_LENGTH} characters)`);
+    return;
+  }
+
+  // Proceed with API call...
+};
+
+// Character count display
+const showCharCount = charCount > 4500;
+const charCountColor = charCount > 4900 ? 'text-red-500' : charCount > 4500 ? 'text-yellow-500' : 'text-muted-foreground';
+
+{showCharCount && (
+  <p className={`text-xs mt-1 ${charCountColor}`}>
+    {charCount} / {MAX_MESSAGE_LENGTH} characters
+  </p>
+)}
+      ]]></code>
+    </example>
+
+    <example name="Auto-Scroll Implementation">
+      <description>Smooth scroll to bottom when new messages arrive</description>
+      <code language="typescript"><![CDATA[
+// MessageList component
+const messageEndRef = useRef<HTMLDivElement>(null);
+
+// Auto-scroll to bottom when messages change
+useEffect(() => {
+  messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+}, [messages, isLoading]);
+
+// Render scroll anchor
+<div ref={messageEndRef} />
+      ]]></code>
+    </example>
+
+    <example name="Message Display with Role-Based Styling">
+      <description>Role-based message styling with icons and timestamps</description>
+      <code language="typescript"><![CDATA[
+{messages.map((message) => (
+  <div
+    key={message.id}
+    className={cn(
+      'flex gap-3',
+      message.role === 'user' ? 'justify-end' : 'justify-start'
+    )}
+  >
+    {message.role === 'assistant' && (
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+        <Bot className="w-5 h-5 text-primary" />
+      </div>
+    )}
+
+    <div
+      className={cn(
+        'max-w-[70%] rounded-lg px-4 py-2',
+        message.role === 'user'
+          ? 'bg-primary text-primary-foreground'
+          : 'bg-muted'
+      )}
+    >
+      <p className="whitespace-pre-wrap break-words">{message.content}</p>
+      <p
+        className={cn(
+          'text-xs mt-1',
+          message.role === 'user'
+            ? 'text-primary-foreground/70'
+            : 'text-muted-foreground'
+        )}
+      >
+        {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
+      </p>
+    </div>
+
+    {message.role === 'user' && (
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+        <User className="w-5 h-5 text-primary-foreground" />
+      </div>
+    )}
+  </div>
+))}
+      ]]></code>
+    </example>
+
+    <example name="Loading Indicator">
+      <description>Loading state display during API call</description>
+      <code language="typescript"><![CDATA[
+{isLoading && (
+  <div className="flex gap-3 justify-start">
+    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+      <Bot className="w-5 h-5 text-primary" />
+    </div>
+    <div className="bg-muted rounded-lg px-4 py-2 flex items-center gap-2">
+      <Loader2 className="w-4 h-4 animate-spin" />
+      <span className="text-sm text-muted-foreground">Assistant is thinking...</span>
+    </div>
+  </div>
+)}
+      ]]></code>
+    </example>
+  </code-examples>
+
+  <critical-fixes>
+    <fix id="FIX-1.5.1">
+      <title>Per-Project State Isolation</title>
+      <problem>Conversation state shared across all projects in localStorage</problem>
+      <solution>Implement factory pattern with dynamic storage key: bmad-conversation-state-${projectId}</solution>
+      <implementation>createConversationStore(projectId: string) factory function</implementation>
+      <rationale>Ensures different projects maintain separate conversation histories</rationale>
+    </fix>
+
+    <fix id="FIX-1.5.2">
+      <title>Browser-Safe UUID Generation</title>
+      <problem>crypto.randomUUID() unavailable in older browsers and non-secure contexts</problem>
+      <solution>Fallback to timestamp + random string: msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}</solution>
+      <implementation>generateMessageId() function with feature detection</implementation>
+      <rationale>Ensures compatibility across wide range of browser versions</rationale>
+    </fix>
+
+    <fix id="FIX-1.5.3">
+      <title>30-Second Request Timeout</title>
+      <problem>API requests could hang indefinitely with no user feedback</problem>
+      <solution>Implement AbortController with 30s timeout to abort long-running requests</solution>
+      <implementation>Create AbortController, setTimeout for abort, pass signal to fetch</implementation>
+      <rationale>Prevents indefinite loading states and provides clear timeout feedback</rationale>
+    </fix>
+
+    <fix id="FIX-1.5.4">
+      <title>5000 Character Input Validation</title>
+      <problem>No limit on message length could cause performance issues or API errors</problem>
+      <solution>Enforce 5000 character maximum with validation and visual feedback</solution>
+      <implementation>MAX_MESSAGE_LENGTH constant, validation in handleSendMessage, character count display</implementation>
+      <rationale>Prevents excessively long messages and provides clear user feedback</rationale>
+    </fix>
+
+    <fix id="FIX-1.5.5">
+      <title>Error Code to Message Mapping</title>
+      <problem>Generic error messages don't provide actionable guidance to users</problem>
+      <solution>Map specific error codes to user-friendly, actionable messages</solution>
+      <implementation>ERROR_MESSAGES object with code-to-message mapping, extract errorData?.error?.code</implementation>
+      <rationale>Improves user experience with clear, specific error guidance</rationale>
+    </fix>
+  </critical-fixes>
+
+  <risks-and-mitigations>
+    <risk severity="medium">
+      <description>State persistence may fail in browsers with localStorage disabled</description>
+      <mitigation>Implement try/catch with graceful fallback to in-memory state</mitigation>
+      <mitigation>Display warning message to user about disabled persistence</mitigation>
+    </risk>
+
+    <risk severity="low">
+      <description>Auto-scroll behavior may conflict with user manual scrolling</description>
+      <mitigation>Implement scroll position detection (only auto-scroll if near bottom)</mitigation>
+      <mitigation>Add "Scroll to bottom" button for user control</mitigation>
+    </risk>
+
+    <risk severity="low">
+      <description>Optimistic UI may cause confusion if API call fails</description>
+      <mitigation>Display clear error messages with retry option</mitigation>
+      <mitigation>Consider adding visual indicator for "pending" messages</mitigation>
+    </risk>
+
+    <risk severity="medium">
+      <description>Message history may grow large over time (memory/performance concerns)</description>
+      <mitigation>Implement pagination or virtualization for long conversation lists</mitigation>
+      <mitigation>Add conversation cleanup/archival mechanism</mitigation>
+      <mitigation>Monitor localStorage quota and handle gracefully</mitigation>
+    </risk>
+
+    <risk severity="low">
+      <description>Fallback UUID generation may produce collisions in edge cases</description>
+      <mitigation>Acceptable: probability extremely low for client-side message tracking</mitigation>
+      <mitigation>Server-side messageId from API is source of truth</mitigation>
+    </risk>
+
+    <risk severity="low">
+      <description>AbortController not supported in very old browsers (IE11)</description>
+      <mitigation>Acceptable tradeoff: IE11 not in support matrix for Next.js 15</mitigation>
+      <mitigation>Graceful degradation: requests still work, just no timeout</mitigation>
+    </risk>
+  </risks-and-mitigations>
+
+  <definition-of-done>
+    <checklist>
+      <item>All 8 tasks completed and checked off</item>
+      <item>All 7 acceptance criteria validated</item>
+      <item>Per-project state isolation implemented and tested</item>
+      <item>Browser-safe UUID generation with fallback implemented</item>
+      <item>30-second timeout with AbortController implemented</item>
+      <item>5000 character input validation implemented</item>
+      <item>Error code mapping for all API error codes implemented</item>
+      <item>Unit tests written and passing (>80% coverage)</item>
+      <item>Component tests passing for ChatInterface and MessageList</item>
+      <item>Integration tests passing for API integration</item>
+      <item>E2E tests passing for complete conversation flow</item>
+      <item>State isolation tested across multiple projects</item>
+      <item>Timeout behavior tested with slow network simulation</item>
+      <item>Error code mapping tested for all error scenarios</item>
+      <item>Code reviewed and approved</item>
+      <item>UI tested in Chrome, Firefox, Safari (including older versions)</item>
+      <item>Mobile responsive design verified on iOS/Android</item>
+      <item>Accessibility tested with keyboard navigation</item>
+      <item>Screen reader compatibility verified (NVDA/VoiceOver)</item>
+      <item>State persistence tested across page refreshes with different projectIds</item>
+      <item>Error handling tested for all error scenarios</item>
+      <item>Loading states tested for slow network conditions</item>
+      <item>Auto-scroll behavior tested with long conversations (20+ messages)</item>
+      <item>Character count indicator tested with varying input lengths</item>
+      <item>No TypeScript errors or warnings</item>
+      <item>No console errors in browser</item>
+      <item>shadcn/ui components properly integrated</item>
+      <item>Tailwind CSS styling follows design system</item>
+      <item>Documentation updated (component docs, inline comments)</item>
+    </checklist>
+  </definition-of-done>
+
+  <future-enhancements>
+    <enhancement>Message editing and deletion</enhancement>
+    <enhancement>Message reactions (like, copy, regenerate)</enhancement>
+    <enhancement>Conversation export (JSON, Markdown)</enhancement>
+    <enhancement>Message search and filtering</enhancement>
+    <enhancement>Conversation branching and forking</enhancement>
+    <enhancement>Voice input integration</enhancement>
+    <enhancement>Markdown rendering for formatted responses</enhancement>
+    <enhancement>Code syntax highlighting in messages</enhancement>
+    <enhancement>File attachment support</enhancement>
+    <enhancement>Multi-user conversation support (shared projects)</enhancement>
+    <enhancement>Real-time sync across browser tabs</enhancement>
+    <enhancement>Conversation analytics (message count, response times)</enhancement>
+  </future-enhancements>
+
+  <references>
+    <reference type="tech-spec">
+      <location>Lines 63-74 (Services and Modules table)</location>
+      <description>Component architecture and service definitions</description>
+    </reference>
+
+    <reference type="tech-spec">
+      <location>Lines 142-179 (API Endpoint specification)</location>
+      <description>POST /api/chat endpoint details and error codes</description>
+    </reference>
+
+    <reference type="architecture">
+      <location>Lines 258-277 (Epic 1 Components)</location>
+      <description>Frontend component architecture for Epic 1</description>
+    </reference>
+
+    <reference type="story">
+      <id>1.1</id>
+      <title>Project Setup</title>
+      <provides>Next.js configuration, dependencies, tooling setup</provides>
+    </reference>
+
+    <reference type="story">
+      <id>1.2</id>
+      <title>Database Schema</title>
+      <provides>messages table schema, database connection</provides>
+    </reference>
+
+    <reference type="story">
+      <id>1.3</id>
+      <title>LLM Provider Integration</title>
+      <provides>Ollama integration, system prompt, response generation</provides>
+    </reference>
+
+    <reference type="story">
+      <id>1.4</id>
+      <title>Chat API Endpoint</title>
+      <provides>POST /api/chat endpoint, error codes, validation</provides>
+    </reference>
+  </references>
+</story-context>
