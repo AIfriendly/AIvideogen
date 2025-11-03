@@ -1,0 +1,1225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>1.4</story-id>
+    <story-name>Chat API Endpoint</story-name>
+    <epic-id>1</epic-id>
+    <epic-name>Conversational Topic Discovery</epic-name>
+    <status>Ready</status>
+    <generated-date>2025-11-03</generated-date>
+  </metadata>
+
+  <dependencies>
+    <dependency>
+      <story-id>1.2</story-id>
+      <story-name>Database Integration</story-name>
+      <required-exports>
+        <export>
+          <file>src/lib/db/client.ts</file>
+          <function>getDatabase()</function>
+          <description>Returns better-sqlite3 Database instance for synchronous queries</description>
+        </export>
+      </required-exports>
+      <database-schema>
+        <table name="projects">
+          <columns>
+            <column name="id" type="TEXT" constraint="PRIMARY KEY"/>
+            <column name="name" type="TEXT" constraint="NOT NULL"/>
+            <column name="topic" type="TEXT"/>
+            <column name="current_step" type="TEXT" constraint="NOT NULL"/>
+            <column name="created_at" type="TEXT" constraint="NOT NULL"/>
+            <column name="last_active" type="TEXT" constraint="NOT NULL"/>
+          </columns>
+        </table>
+        <table name="messages">
+          <columns>
+            <column name="id" type="TEXT" constraint="PRIMARY KEY"/>
+            <column name="project_id" type="TEXT" constraint="NOT NULL"/>
+            <column name="role" type="TEXT" constraint="NOT NULL"/>
+            <column name="content" type="TEXT" constraint="NOT NULL"/>
+            <column name="timestamp" type="TEXT" constraint="NOT NULL"/>
+          </columns>
+        </table>
+      </database-schema>
+    </dependency>
+    <dependency>
+      <story-id>1.3</story-id>
+      <story-name>LLM Provider Integration</story-name>
+      <required-exports>
+        <export>
+          <file>src/lib/llm/provider.ts</file>
+          <interface>LLMProvider</interface>
+          <description>Interface defining chat() method for LLM communication</description>
+        </export>
+        <export>
+          <file>src/lib/llm/factory.ts</file>
+          <function>createLLMProvider()</function>
+          <description>Factory function returning configured LLMProvider instance</description>
+        </export>
+        <export>
+          <file>src/lib/llm/prompts/default-system-prompt.ts</file>
+          <constant>DEFAULT_SYSTEM_PROMPT</constant>
+          <description>Default system prompt for conversational context</description>
+        </export>
+        <export>
+          <file>src/lib/llm/ollama-provider.ts</file>
+          <class>OllamaProvider</class>
+          <description>Ollama implementation of LLMProvider interface</description>
+        </export>
+      </required-exports>
+    </dependency>
+  </dependencies>
+
+  <acceptance-criteria>
+    <criterion id="AC1">
+      <title>POST Endpoint Accepts Valid Requests</title>
+      <description>The /api/chat endpoint must accept POST requests with projectId and message in the request body and return appropriate responses</description>
+      <validation-rules>
+        <rule>Request body must contain projectId field (non-empty string)</rule>
+        <rule>Request body must contain message field (non-empty string)</rule>
+        <rule>Response must follow standardized format with success boolean</rule>
+        <rule>Successful response includes messageId, response text, and timestamp</rule>
+      </validation-rules>
+      <test-scenarios>
+        <scenario>
+          <name>Valid request with all required fields</name>
+          <input>
+            <request-method>POST</request-method>
+            <request-body>
+              {"projectId": "valid-uuid-123", "message": "Tell me about video editing"}
+            </request-body>
+          </input>
+          <expected-output>
+            <status-code>200</status-code>
+            <response-body>
+              {"success": true, "data": {"messageId": "generated-uuid", "response": "AI response text", "timestamp": "2025-11-03T10:30:00.000Z"}}
+            </response-body>
+          </expected-output>
+        </scenario>
+        <scenario>
+          <name>Request with missing projectId</name>
+          <input>
+            <request-method>POST</request-method>
+            <request-body>
+              {"message": "Tell me about video editing"}
+            </request-body>
+          </input>
+          <expected-output>
+            <status-code>400</status-code>
+            <response-body>
+              {"success": false, "error": {"message": "projectId is required", "code": "INVALID_PROJECT_ID"}}
+            </response-body>
+          </expected-output>
+        </scenario>
+        <scenario>
+          <name>Request with empty message</name>
+          <input>
+            <request-method>POST</request-method>
+            <request-body>
+              {"projectId": "valid-uuid-123", "message": ""}
+            </request-body>
+          </input>
+          <expected-output>
+            <status-code>400</status-code>
+            <response-body>
+              {"success": false, "error": {"message": "Message cannot be empty", "code": "EMPTY_MESSAGE"}}
+            </response-body>
+          </expected-output>
+        </scenario>
+      </test-scenarios>
+    </criterion>
+
+    <criterion id="AC2">
+      <title>Conversation History Retrieval</title>
+      <description>The endpoint must retrieve the last 20 messages from the database for the given project to provide context to the LLM</description>
+      <validation-rules>
+        <rule>Query must fetch messages ordered by timestamp ASC, then id ASC</rule>
+        <rule>Query must limit results to exactly 20 messages</rule>
+        <rule>Query must filter by project_id</rule>
+        <rule>Retrieved messages must be formatted for LLM provider (role, content)</rule>
+      </validation-rules>
+      <implementation-details>
+        <database-query>
+          <sql>SELECT * FROM messages WHERE project_id = ? ORDER BY timestamp ASC, id ASC LIMIT 20</sql>
+          <parameters>
+            <parameter name="project_id" type="string" source="request.body.projectId"/>
+          </parameters>
+        </database-query>
+        <message-transformation>
+          <code-example>
+// Transform database messages to LLM format
+const conversationHistory = dbMessages.map(msg => ({
+  role: msg.role as 'user' | 'assistant' | 'system',
+  content: msg.content
+}));
+          </code-example>
+        </message-transformation>
+      </implementation-details>
+      <test-scenarios>
+        <scenario>
+          <name>Project with fewer than 20 messages</name>
+          <setup>Database contains 5 messages for project</setup>
+          <expected>All 5 messages retrieved and sent to LLM</expected>
+        </scenario>
+        <scenario>
+          <name>Project with exactly 20 messages</name>
+          <setup>Database contains 20 messages for project</setup>
+          <expected>All 20 messages retrieved in chronological order</expected>
+        </scenario>
+        <scenario>
+          <name>Project with more than 20 messages</name>
+          <setup>Database contains 50 messages for project</setup>
+          <expected>Only the last 20 messages retrieved (most recent)</expected>
+        </scenario>
+        <scenario>
+          <name>Project with no message history</name>
+          <setup>Database contains 0 messages for project</setup>
+          <expected>Empty conversation history, only system prompt and current message sent</expected>
+        </scenario>
+      </test-scenarios>
+    </criterion>
+
+    <criterion id="AC3">
+      <title>LLM Integration and Response</title>
+      <description>The endpoint must send the conversation context to the LLM provider and receive a response</description>
+      <validation-rules>
+        <rule>Message array must include system prompt as first message</rule>
+        <rule>Message array must include conversation history (if any)</rule>
+        <rule>Message array must include current user message as last message</rule>
+        <rule>LLM provider must be created using factory function</rule>
+        <rule>Response must be received from LLM before proceeding</rule>
+      </validation-rules>
+      <implementation-details>
+        <code-example>
+// Initialize LLM provider
+const llmProvider = createLLMProvider();
+
+// Construct message array
+const messages = [
+  { role: 'system', content: DEFAULT_SYSTEM_PROMPT },
+  ...conversationHistory,
+  { role: 'user', content: userMessage }
+];
+
+// Get LLM response
+const response = await llmProvider.chat(messages);
+        </code-example>
+      </implementation-details>
+      <error-handling>
+        <error code="OLLAMA_CONNECTION_ERROR">
+          <http-status>503</http-status>
+          <trigger>LLM provider throws connection error</trigger>
+          <response-message>Unable to connect to Ollama service</response-message>
+          <user-action>Verify Ollama is running and accessible</user-action>
+        </error>
+      </error-handling>
+      <test-scenarios>
+        <scenario>
+          <name>Successful LLM response</name>
+          <setup>LLM provider is available and responding</setup>
+          <expected>Response text returned from LLM</expected>
+        </scenario>
+        <scenario>
+          <name>LLM connection failure</name>
+          <setup>Ollama service is not running</setup>
+          <expected>503 error with OLLAMA_CONNECTION_ERROR code</expected>
+        </scenario>
+        <scenario>
+          <name>LLM timeout</name>
+          <setup>LLM takes too long to respond</setup>
+          <expected>503 error with appropriate timeout message</expected>
+        </scenario>
+      </test-scenarios>
+    </criterion>
+
+    <criterion id="AC4">
+      <title>Message Persistence</title>
+      <description>Both user message and AI response must be saved to the database with proper transaction handling</description>
+      <validation-rules>
+        <rule>User message must be saved with role='user'</rule>
+        <rule>AI response must be saved with role='assistant'</rule>
+        <rule>Both messages must have unique UUIDs generated</rule>
+        <rule>Both messages must have ISO 8601 timestamps</rule>
+        <rule>Both messages must be associated with the correct project_id</rule>
+        <rule>Messages must be saved within a database transaction</rule>
+        <rule>Transaction must rollback on any error</rule>
+        <rule>Transaction must commit only after both messages saved successfully</rule>
+      </validation-rules>
+      <implementation-details>
+        <code-example>
+import { v4 as uuidv4 } from 'uuid';
+
+const db = getDatabase();
+const userMessageId = uuidv4();
+const assistantMessageId = uuidv4();
+const timestamp = new Date().toISOString();
+
+try {
+  // Begin transaction
+  db.prepare('BEGIN').run();
+
+  // Insert user message
+  db.prepare(`
+    INSERT INTO messages (id, project_id, role, content, timestamp)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(userMessageId, projectId, 'user', userMessage, timestamp);
+
+  // Insert assistant message
+  const assistantTimestamp = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO messages (id, project_id, role, content, timestamp)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(assistantMessageId, projectId, 'assistant', aiResponse, assistantTimestamp);
+
+  // Commit transaction
+  db.prepare('COMMIT').run();
+} catch (error) {
+  // Rollback on error
+  db.prepare('ROLLBACK').run();
+  throw error;
+}
+        </code-example>
+      </implementation-details>
+      <error-handling>
+        <error code="DATABASE_ERROR">
+          <http-status>500</http-status>
+          <trigger>Database insert or transaction operation fails</trigger>
+          <response-message>Failed to save messages to database</response-message>
+          <rollback-behavior>All transaction operations rolled back</rollback-behavior>
+        </error>
+      </error-handling>
+      <test-scenarios>
+        <scenario>
+          <name>Successful message persistence</name>
+          <setup>Valid database connection and messages</setup>
+          <expected>Both messages saved with correct metadata</expected>
+          <verification>Query database to confirm messages exist</verification>
+        </scenario>
+        <scenario>
+          <name>Database write failure on user message</name>
+          <setup>Simulate database error during user message insert</setup>
+          <expected>Transaction rolled back, no messages saved</expected>
+        </scenario>
+        <scenario>
+          <name>Database write failure on assistant message</name>
+          <setup>Simulate database error during assistant message insert</setup>
+          <expected>Transaction rolled back, user message not saved</expected>
+        </scenario>
+      </test-scenarios>
+    </criterion>
+
+    <criterion id="AC5">
+      <title>Error Handling and Response Codes</title>
+      <description>The endpoint must handle all error scenarios with appropriate HTTP status codes and error messages</description>
+      <validation-rules>
+        <rule>All errors must follow standardized error response format</rule>
+        <rule>Error responses must include success: false</rule>
+        <rule>Error responses must include error object with message and code</rule>
+        <rule>HTTP status codes must match error severity</rule>
+      </validation-rules>
+      <error-codes>
+        <error code="INVALID_PROJECT_ID">
+          <http-status>404</http-status>
+          <trigger>Project ID is missing, empty, or not found in database</trigger>
+          <message>Invalid or missing project ID</message>
+        </error>
+        <error code="EMPTY_MESSAGE">
+          <http-status>400</http-status>
+          <trigger>Message field is empty or contains only whitespace</trigger>
+          <message>Message cannot be empty</message>
+        </error>
+        <error code="OLLAMA_CONNECTION_ERROR">
+          <http-status>503</http-status>
+          <trigger>Unable to connect to Ollama service</trigger>
+          <message>Unable to connect to Ollama service</message>
+        </error>
+        <error code="DATABASE_ERROR">
+          <http-status>500</http-status>
+          <trigger>Any database operation fails</trigger>
+          <message>Database operation failed</message>
+        </error>
+      </error-codes>
+      <response-format>
+        <code-example>
+// Error response structure
+{
+  "success": false,
+  "error": {
+    "message": "Human-readable error description",
+    "code": "ERROR_CODE_CONSTANT"
+  }
+}
+
+// Success response structure
+{
+  "success": true,
+  "data": {
+    "messageId": "uuid-of-assistant-message",
+    "response": "AI generated response text",
+    "timestamp": "ISO 8601 timestamp"
+  }
+}
+        </code-example>
+      </response-format>
+      <test-scenarios>
+        <scenario>
+          <name>All error codes return correct HTTP status</name>
+          <tests>
+            <test error="INVALID_PROJECT_ID" expected-status="404"/>
+            <test error="EMPTY_MESSAGE" expected-status="400"/>
+            <test error="OLLAMA_CONNECTION_ERROR" expected-status="503"/>
+            <test error="DATABASE_ERROR" expected-status="500"/>
+          </tests>
+        </scenario>
+        <scenario>
+          <name>Error messages are user-friendly</name>
+          <expected>All error messages provide actionable information</expected>
+        </scenario>
+      </test-scenarios>
+    </criterion>
+  </acceptance-criteria>
+
+  <task-groups>
+    <task-group id="TG1">
+      <name>API Route Setup</name>
+      <description>Create Next.js 16 App Router API route file and basic structure</description>
+      <tasks>
+        <task id="1.4.1">
+          <description>Create app/api/chat/route.ts file</description>
+          <implementation-notes>
+            <note>Use Next.js 16 App Router conventions</note>
+            <note>Export async POST function as named export</note>
+          </implementation-notes>
+          <code-template>
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function POST(request: NextRequest) {
+  try {
+    // Implementation here
+  } catch (error) {
+    // Error handling here
+  }
+}
+          </code-template>
+        </task>
+        <task id="1.4.2">
+          <description>Define TypeScript interfaces for request/response</description>
+          <implementation-notes>
+            <note>Create ChatRequest interface with projectId and message</note>
+            <note>Create ChatResponse interface for success and error cases</note>
+            <note>Use discriminated unions for type safety</note>
+          </implementation-notes>
+          <code-template>
+interface ChatRequest {
+  projectId: string;
+  message: string;
+}
+
+interface ChatSuccessResponse {
+  success: true;
+  data: {
+    messageId: string;
+    response: string;
+    timestamp: string;
+  };
+}
+
+interface ChatErrorResponse {
+  success: false;
+  error: {
+    message: string;
+    code: string;
+  };
+}
+
+type ChatResponse = ChatSuccessResponse | ChatErrorResponse;
+          </code-template>
+        </task>
+        <task id="1.4.3">
+          <description>Implement request body parsing and validation</description>
+          <validation-checks>
+            <check>Verify request body is valid JSON</check>
+            <check>Verify projectId exists and is non-empty string</check>
+            <check>Verify message exists and is non-empty string</check>
+            <check>Trim whitespace from message</check>
+          </validation-checks>
+          <code-template>
+const body = await request.json() as ChatRequest;
+
+if (!body.projectId || typeof body.projectId !== 'string' || body.projectId.trim() === '') {
+  return NextResponse.json(
+    { success: false, error: { message: 'Invalid or missing project ID', code: 'INVALID_PROJECT_ID' } },
+    { status: 404 }
+  );
+}
+
+const message = body.message?.trim();
+if (!message) {
+  return NextResponse.json(
+    { success: false, error: { message: 'Message cannot be empty', code: 'EMPTY_MESSAGE' } },
+    { status: 400 }
+  );
+}
+          </code-template>
+        </task>
+      </tasks>
+    </task-group>
+
+    <task-group id="TG2">
+      <name>Database Integration</name>
+      <description>Implement conversation history retrieval and message persistence</description>
+      <tasks>
+        <task id="1.4.4">
+          <description>Import database client and verify project exists</description>
+          <dependencies>
+            <dependency>Story 1.2 must be completed</dependency>
+            <dependency>getDatabase() function must be exported</dependency>
+          </dependencies>
+          <code-template>
+import { getDatabase } from '@/lib/db/client';
+
+const db = getDatabase();
+
+// Verify project exists
+const project = db.prepare('SELECT id FROM projects WHERE id = ?').get(projectId);
+if (!project) {
+  return NextResponse.json(
+    { success: false, error: { message: 'Invalid or missing project ID', code: 'INVALID_PROJECT_ID' } },
+    { status: 404 }
+  );
+}
+          </code-template>
+        </task>
+        <task id="1.4.5">
+          <description>Retrieve last 20 messages from conversation history</description>
+          <implementation-notes>
+            <note>Order by timestamp ASC, then id ASC for chronological order</note>
+            <note>Limit to 20 messages to provide context without overwhelming LLM</note>
+            <note>Map database records to LLM message format</note>
+          </implementation-notes>
+          <code-template>
+interface DBMessage {
+  id: string;
+  project_id: string;
+  role: string;
+  content: string;
+  timestamp: string;
+}
+
+const dbMessages = db.prepare(`
+  SELECT * FROM messages
+  WHERE project_id = ?
+  ORDER BY timestamp ASC, id ASC
+  LIMIT 20
+`).all(projectId) as DBMessage[];
+
+const conversationHistory = dbMessages.map(msg => ({
+  role: msg.role as 'user' | 'assistant' | 'system',
+  content: msg.content
+}));
+          </code-template>
+        </task>
+        <task id="1.4.6">
+          <description>Implement transactional message persistence</description>
+          <implementation-notes>
+            <note>Use better-sqlite3 synchronous transaction API</note>
+            <note>Generate UUIDs for both messages</note>
+            <note>Use ISO 8601 timestamps</note>
+            <note>Rollback on any error</note>
+          </implementation-notes>
+          <code-template>
+import { v4 as uuidv4 } from 'uuid';
+
+const userMessageId = uuidv4();
+const assistantMessageId = uuidv4();
+const userTimestamp = new Date().toISOString();
+
+try {
+  db.prepare('BEGIN').run();
+
+  // Save user message
+  db.prepare(`
+    INSERT INTO messages (id, project_id, role, content, timestamp)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(userMessageId, projectId, 'user', message, userTimestamp);
+
+  // Save assistant message
+  const assistantTimestamp = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO messages (id, project_id, role, content, timestamp)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(assistantMessageId, projectId, 'assistant', aiResponse, assistantTimestamp);
+
+  db.prepare('COMMIT').run();
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      messageId: assistantMessageId,
+      response: aiResponse,
+      timestamp: assistantTimestamp
+    }
+  });
+} catch (error) {
+  db.prepare('ROLLBACK').run();
+  throw error;
+}
+          </code-template>
+        </task>
+      </tasks>
+    </task-group>
+
+    <task-group id="TG3">
+      <name>LLM Provider Integration</name>
+      <description>Implement LLM communication with proper context and error handling</description>
+      <tasks>
+        <task id="1.4.7">
+          <description>Import LLM provider dependencies</description>
+          <dependencies>
+            <dependency>Story 1.3 must be completed</dependency>
+            <dependency>createLLMProvider() factory must be exported</dependency>
+            <dependency>DEFAULT_SYSTEM_PROMPT must be exported</dependency>
+          </dependencies>
+          <code-template>
+import { createLLMProvider } from '@/lib/llm/factory';
+import { DEFAULT_SYSTEM_PROMPT } from '@/lib/llm/prompts/default-system-prompt';
+          </code-template>
+        </task>
+        <task id="1.4.8">
+          <description>Construct message array with system prompt and context</description>
+          <implementation-notes>
+            <note>System prompt must be first message</note>
+            <note>Include conversation history for context</note>
+            <note>Current user message must be last</note>
+          </implementation-notes>
+          <code-template>
+const messages = [
+  { role: 'system' as const, content: DEFAULT_SYSTEM_PROMPT },
+  ...conversationHistory,
+  { role: 'user' as const, content: message }
+];
+          </code-template>
+        </task>
+        <task id="1.4.9">
+          <description>Call LLM provider and handle response</description>
+          <implementation-notes>
+            <note>Create provider instance using factory</note>
+            <note>Await chat() method response</note>
+            <note>Handle connection errors specifically</note>
+          </implementation-notes>
+          <code-template>
+let aiResponse: string;
+
+try {
+  const llmProvider = createLLMProvider();
+  aiResponse = await llmProvider.chat(messages);
+} catch (error) {
+  console.error('LLM error:', error);
+  return NextResponse.json(
+    {
+      success: false,
+      error: {
+        message: 'Unable to connect to Ollama service',
+        code: 'OLLAMA_CONNECTION_ERROR'
+      }
+    },
+    { status: 503 }
+  );
+}
+          </code-template>
+        </task>
+      </tasks>
+    </task-group>
+
+    <task-group id="TG4">
+      <name>Error Handling Implementation</name>
+      <description>Implement comprehensive error handling for all failure scenarios</description>
+      <tasks>
+        <task id="1.4.10">
+          <description>Implement input validation errors (400, 404)</description>
+          <error-cases>
+            <case code="INVALID_PROJECT_ID" status="404"/>
+            <case code="EMPTY_MESSAGE" status="400"/>
+          </error-cases>
+        </task>
+        <task id="1.4.11">
+          <description>Implement LLM connection error handling (503)</description>
+          <error-cases>
+            <case code="OLLAMA_CONNECTION_ERROR" status="503"/>
+          </error-cases>
+        </task>
+        <task id="1.4.12">
+          <description>Implement database error handling (500)</description>
+          <error-cases>
+            <case code="DATABASE_ERROR" status="500"/>
+          </error-cases>
+          <implementation-notes>
+            <note>Wrap database operations in try-catch</note>
+            <note>Ensure transaction rollback on error</note>
+            <note>Log errors for debugging</note>
+          </implementation-notes>
+        </task>
+        <task id="1.4.13">
+          <description>Implement global error handler for unexpected errors</description>
+          <code-template>
+catch (error) {
+  console.error('Unexpected error in chat endpoint:', error);
+  return NextResponse.json(
+    {
+      success: false,
+      error: {
+        message: 'An unexpected error occurred',
+        code: 'INTERNAL_ERROR'
+      }
+    },
+    { status: 500 }
+  );
+}
+          </code-template>
+        </task>
+      </tasks>
+    </task-group>
+
+    <task-group id="TG5">
+      <name>Response Formatting</name>
+      <description>Ensure all responses follow standardized format</description>
+      <tasks>
+        <task id="1.4.14">
+          <description>Implement success response formatting</description>
+          <response-fields>
+            <field name="success" type="boolean" value="true"/>
+            <field name="data.messageId" type="string" description="UUID of assistant message"/>
+            <field name="data.response" type="string" description="AI generated response"/>
+            <field name="data.timestamp" type="string" description="ISO 8601 timestamp"/>
+          </response-fields>
+        </task>
+        <task id="1.4.15">
+          <description>Implement error response formatting</description>
+          <response-fields>
+            <field name="success" type="boolean" value="false"/>
+            <field name="error.message" type="string" description="Human-readable error"/>
+            <field name="error.code" type="string" description="Machine-readable error code"/>
+          </response-fields>
+        </task>
+        <task id="1.4.16">
+          <description>Validate response format consistency</description>
+          <validation>
+            <check>All responses include success field</check>
+            <check>Success responses include data object</check>
+            <check>Error responses include error object</check>
+            <check>HTTP status codes match error severity</check>
+          </validation>
+        </task>
+      </tasks>
+    </task-group>
+
+    <task-group id="TG6">
+      <name>Testing Implementation</name>
+      <description>Create comprehensive test suite for all scenarios</description>
+      <tasks>
+        <task id="1.4.17">
+          <description>Create unit tests for request validation</description>
+          <test-cases>
+            <case>Valid request with all fields</case>
+            <case>Missing projectId</case>
+            <case>Empty projectId</case>
+            <case>Missing message</case>
+            <case>Empty message</case>
+            <case>Whitespace-only message</case>
+          </test-cases>
+        </task>
+        <task id="1.4.18">
+          <description>Create integration tests for database operations</description>
+          <test-cases>
+            <case>Project exists validation</case>
+            <case>Conversation history retrieval (0, 10, 20, 30 messages)</case>
+            <case>Message persistence with transaction</case>
+            <case>Transaction rollback on error</case>
+          </test-cases>
+        </task>
+        <task id="1.4.19">
+          <description>Create integration tests for LLM communication</description>
+          <test-cases>
+            <case>Successful LLM response</case>
+            <case>LLM connection failure</case>
+            <case>LLM timeout</case>
+            <case>Message array construction</case>
+          </test-cases>
+        </task>
+        <task id="1.4.20">
+          <description>Create end-to-end tests for complete flow</description>
+          <test-cases>
+            <case>Complete successful chat interaction</case>
+            <case>Multiple sequential messages</case>
+            <case>Conversation history context preservation</case>
+            <case>Error recovery scenarios</case>
+          </test-cases>
+        </task>
+      </tasks>
+    </task-group>
+
+    <task-group id="TG7">
+      <name>Documentation and Code Quality</name>
+      <description>Ensure code is well-documented and follows best practices</description>
+      <tasks>
+        <task id="1.4.21">
+          <description>Add JSDoc comments to main POST function</description>
+          <documentation-requirements>
+            <requirement>Function purpose and behavior</requirement>
+            <requirement>Request body schema</requirement>
+            <requirement>Response format for success and error</requirement>
+            <requirement>Error codes and their meanings</requirement>
+          </documentation-requirements>
+        </task>
+        <task id="1.4.22">
+          <description>Add inline comments for complex logic</description>
+          <areas-to-document>
+            <area>Transaction handling</area>
+            <area>Message array construction</area>
+            <area>Error handling strategy</area>
+          </areas-to-document>
+        </task>
+        <task id="1.4.23">
+          <description>Ensure TypeScript strict mode compliance</description>
+          <checks>
+            <check>No implicit any types</check>
+            <check>Proper null/undefined handling</check>
+            <check>Exhaustive type checking for discriminated unions</check>
+          </checks>
+        </task>
+        <task id="1.4.24">
+          <description>Add error logging for debugging</description>
+          <logging-points>
+            <point>Database errors with full stack trace</point>
+            <point>LLM connection errors</point>
+            <point>Validation failures with input details</point>
+            <point>Unexpected errors</point>
+          </logging-points>
+        </task>
+      </tasks>
+    </task-group>
+  </task-groups>
+
+  <integration-requirements>
+    <requirement id="IR1">
+      <title>Story 1.2 Database Integration</title>
+      <description>Chat endpoint must use database functions from Story 1.2</description>
+      <required-imports>
+        <import>import { getDatabase } from '@/lib/db/client';</import>
+      </required-imports>
+      <required-operations>
+        <operation>Query projects table to verify project exists</operation>
+        <operation>Query messages table to retrieve conversation history</operation>
+        <operation>Insert user and assistant messages into messages table</operation>
+        <operation>Use transactions for atomic message persistence</operation>
+      </required-operations>
+      <api-contract>
+        <method>getDatabase()</method>
+        <returns>Database (better-sqlite3 instance)</returns>
+        <usage>Synchronous API, all operations use .run(), .get(), .all()</usage>
+      </api-contract>
+    </requirement>
+
+    <requirement id="IR2">
+      <title>Story 1.3 LLM Provider Integration</title>
+      <description>Chat endpoint must use LLM provider from Story 1.3</description>
+      <required-imports>
+        <import>import { createLLMProvider } from '@/lib/llm/factory';</import>
+        <import>import { DEFAULT_SYSTEM_PROMPT } from '@/lib/llm/prompts/default-system-prompt';</import>
+      </required-imports>
+      <required-operations>
+        <operation>Create LLM provider instance using factory</operation>
+        <operation>Construct message array with system prompt, history, and user message</operation>
+        <operation>Call chat() method with message array</operation>
+        <operation>Handle connection errors gracefully</operation>
+      </required-operations>
+      <api-contract>
+        <method>createLLMProvider()</method>
+        <returns>LLMProvider (OllamaProvider instance by default)</returns>
+        <interface>
+          chat(messages: Array&lt;{role: 'system'|'user'|'assistant', content: string}&gt;): Promise&lt;string&gt;
+        </interface>
+      </api-contract>
+    </requirement>
+  </integration-requirements>
+
+  <file-structure>
+    <file path="app/api/chat/route.ts">
+      <description>Next.js 16 App Router API endpoint for chat functionality</description>
+      <exports>
+        <export name="POST" type="function">Handles POST requests to /api/chat</export>
+      </exports>
+      <imports>
+        <import source="next/server">NextRequest, NextResponse</import>
+        <import source="uuid">v4 as uuidv4</import>
+        <import source="@/lib/db/client">getDatabase</import>
+        <import source="@/lib/llm/factory">createLLMProvider</import>
+        <import source="@/lib/llm/prompts/default-system-prompt">DEFAULT_SYSTEM_PROMPT</import>
+      </imports>
+      <estimated-lines>250-300</estimated-lines>
+    </file>
+  </file-structure>
+
+  <code-examples>
+    <example id="CE1">
+      <title>Complete POST Handler Structure</title>
+      <code>
+import { NextRequest, NextResponse } from 'next/server';
+import { v4 as uuidv4 } from 'uuid';
+import { getDatabase } from '@/lib/db/client';
+import { createLLMProvider } from '@/lib/llm/factory';
+import { DEFAULT_SYSTEM_PROMPT } from '@/lib/llm/prompts/default-system-prompt';
+
+interface ChatRequest {
+  projectId: string;
+  message: string;
+}
+
+interface DBMessage {
+  id: string;
+  project_id: string;
+  role: string;
+  content: string;
+  timestamp: string;
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    // 1. Parse and validate request
+    const body = await request.json() as ChatRequest;
+
+    if (!body.projectId || typeof body.projectId !== 'string' || body.projectId.trim() === '') {
+      return NextResponse.json(
+        { success: false, error: { message: 'Invalid or missing project ID', code: 'INVALID_PROJECT_ID' } },
+        { status: 404 }
+      );
+    }
+
+    const message = body.message?.trim();
+    if (!message) {
+      return NextResponse.json(
+        { success: false, error: { message: 'Message cannot be empty', code: 'EMPTY_MESSAGE' } },
+        { status: 400 }
+      );
+    }
+
+    // 2. Verify project exists
+    const db = getDatabase();
+    const project = db.prepare('SELECT id FROM projects WHERE id = ?').get(body.projectId);
+    if (!project) {
+      return NextResponse.json(
+        { success: false, error: { message: 'Invalid or missing project ID', code: 'INVALID_PROJECT_ID' } },
+        { status: 404 }
+      );
+    }
+
+    // 3. Retrieve conversation history
+    const dbMessages = db.prepare(`
+      SELECT * FROM messages
+      WHERE project_id = ?
+      ORDER BY timestamp ASC, id ASC
+      LIMIT 20
+    `).all(body.projectId) as DBMessage[];
+
+    const conversationHistory = dbMessages.map(msg => ({
+      role: msg.role as 'user' | 'assistant' | 'system',
+      content: msg.content
+    }));
+
+    // 4. Get LLM response
+    let aiResponse: string;
+    try {
+      const llmProvider = createLLMProvider();
+      const messages = [
+        { role: 'system' as const, content: DEFAULT_SYSTEM_PROMPT },
+        ...conversationHistory,
+        { role: 'user' as const, content: message }
+      ];
+      aiResponse = await llmProvider.chat(messages);
+    } catch (error) {
+      console.error('LLM error:', error);
+      return NextResponse.json(
+        { success: false, error: { message: 'Unable to connect to Ollama service', code: 'OLLAMA_CONNECTION_ERROR' } },
+        { status: 503 }
+      );
+    }
+
+    // 5. Persist messages in transaction
+    const userMessageId = uuidv4();
+    const assistantMessageId = uuidv4();
+    const userTimestamp = new Date().toISOString();
+
+    try {
+      db.prepare('BEGIN').run();
+
+      db.prepare(`
+        INSERT INTO messages (id, project_id, role, content, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(userMessageId, body.projectId, 'user', message, userTimestamp);
+
+      const assistantTimestamp = new Date().toISOString();
+      db.prepare(`
+        INSERT INTO messages (id, project_id, role, content, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(assistantMessageId, body.projectId, 'assistant', aiResponse, assistantTimestamp);
+
+      db.prepare('COMMIT').run();
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          messageId: assistantMessageId,
+          response: aiResponse,
+          timestamp: assistantTimestamp
+        }
+      });
+    } catch (error) {
+      db.prepare('ROLLBACK').run();
+      console.error('Database error:', error);
+      return NextResponse.json(
+        { success: false, error: { message: 'Database operation failed', code: 'DATABASE_ERROR' } },
+        { status: 500 }
+      );
+    }
+  } catch (error) {
+    console.error('Unexpected error in chat endpoint:', error);
+    return NextResponse.json(
+      { success: false, error: { message: 'An unexpected error occurred', code: 'INTERNAL_ERROR' } },
+      { status: 500 }
+    );
+  }
+}
+      </code>
+    </example>
+
+    <example id="CE2">
+      <title>Request/Response Examples</title>
+      <code>
+// Successful Request/Response
+POST /api/chat
+Content-Type: application/json
+
+{
+  "projectId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "message": "I want to create a video about sustainable living"
+}
+
+// Response 200 OK
+{
+  "success": true,
+  "data": {
+    "messageId": "f9e8d7c6-b5a4-3210-9876-543210fedcba",
+    "response": "That's a great topic! Sustainable living covers many aspects. Are you interested in focusing on specific areas like renewable energy, waste reduction, sustainable food choices, or a broader overview?",
+    "timestamp": "2025-11-03T14:32:15.456Z"
+  }
+}
+
+// Error Response - Empty Message
+POST /api/chat
+Content-Type: application/json
+
+{
+  "projectId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "message": "   "
+}
+
+// Response 400 Bad Request
+{
+  "success": false,
+  "error": {
+    "message": "Message cannot be empty",
+    "code": "EMPTY_MESSAGE"
+  }
+}
+
+// Error Response - Invalid Project
+POST /api/chat
+Content-Type: application/json
+
+{
+  "projectId": "non-existent-id",
+  "message": "Hello"
+}
+
+// Response 404 Not Found
+{
+  "success": false,
+  "error": {
+    "message": "Invalid or missing project ID",
+    "code": "INVALID_PROJECT_ID"
+  }
+}
+
+// Error Response - Ollama Unavailable
+// (When Ollama service is not running)
+
+// Response 503 Service Unavailable
+{
+  "success": false,
+  "error": {
+    "message": "Unable to connect to Ollama service",
+    "code": "OLLAMA_CONNECTION_ERROR"
+  }
+}
+      </code>
+    </example>
+  </code-examples>
+
+  <testing-scenarios>
+    <scenario id="TS1">
+      <name>Happy Path - Complete Chat Flow</name>
+      <steps>
+        <step>Create test project in database</step>
+        <step>Send POST request with valid projectId and message</step>
+        <step>Verify 200 response with success: true</step>
+        <step>Verify response contains messageId, response, timestamp</step>
+        <step>Query database to confirm user message saved</step>
+        <step>Query database to confirm assistant message saved</step>
+        <step>Verify messages have correct roles and content</step>
+      </steps>
+      <expected-outcome>Both messages persisted, LLM response returned</expected-outcome>
+    </scenario>
+
+    <scenario id="TS2">
+      <name>Conversation Context Preservation</name>
+      <steps>
+        <step>Create test project with 15 existing messages</step>
+        <step>Send new message to chat endpoint</step>
+        <step>Verify LLM receives all 15 previous messages as context</step>
+        <step>Verify system prompt is included as first message</step>
+        <step>Verify new user message is last in array</step>
+        <step>Verify response acknowledges previous conversation</step>
+      </steps>
+      <expected-outcome>Conversation context maintained across multiple messages</expected-outcome>
+    </scenario>
+
+    <scenario id="TS3">
+      <name>Conversation History Limit</name>
+      <steps>
+        <step>Create test project with 50 existing messages</step>
+        <step>Send new message to chat endpoint</step>
+        <step>Verify only last 20 messages retrieved from database</step>
+        <step>Verify messages are in chronological order</step>
+        <step>Verify oldest 30 messages not included in LLM context</step>
+      </steps>
+      <expected-outcome>Only last 20 messages used for context</expected-outcome>
+    </scenario>
+
+    <scenario id="TS4">
+      <name>Error Recovery - Database Transaction Rollback</name>
+      <steps>
+        <step>Mock database to succeed on user message insert</step>
+        <step>Mock database to fail on assistant message insert</step>
+        <step>Send valid chat request</step>
+        <step>Verify 500 response with DATABASE_ERROR</step>
+        <step>Query database to confirm no messages persisted</step>
+        <step>Verify transaction rolled back successfully</step>
+      </steps>
+      <expected-outcome>No partial data saved, transaction rolled back</expected-outcome>
+    </scenario>
+
+    <scenario id="TS5">
+      <name>Error Handling - Ollama Service Unavailable</name>
+      <steps>
+        <step>Stop Ollama service</step>
+        <step>Send valid chat request</step>
+        <step>Verify 503 response with OLLAMA_CONNECTION_ERROR</step>
+        <step>Verify error message provides helpful information</step>
+        <step>Verify no messages saved to database</step>
+      </steps>
+      <expected-outcome>Graceful error handling, no data corruption</expected-outcome>
+    </scenario>
+
+    <scenario id="TS6">
+      <name>Input Validation - All Edge Cases</name>
+      <test-cases>
+        <case input='{"message": "hello"}' expected-status="404" expected-code="INVALID_PROJECT_ID"/>
+        <case input='{"projectId": ""}' expected-status="404" expected-code="INVALID_PROJECT_ID"/>
+        <case input='{"projectId": "valid-id", "message": ""}' expected-status="400" expected-code="EMPTY_MESSAGE"/>
+        <case input='{"projectId": "valid-id", "message": "   "}' expected-status="400" expected-code="EMPTY_MESSAGE"/>
+        <case input='{"projectId": "non-existent", "message": "hi"}' expected-status="404" expected-code="INVALID_PROJECT_ID"/>
+      </test-cases>
+      <expected-outcome>All invalid inputs rejected with appropriate errors</expected-outcome>
+    </scenario>
+
+    <scenario id="TS7">
+      <name>Performance - Response Time</name>
+      <steps>
+        <step>Create test project with 20 messages</step>
+        <step>Send chat request and measure response time</step>
+        <step>Verify response received within acceptable timeframe</step>
+        <step>Monitor LLM response time separately</step>
+        <step>Monitor database operation time</step>
+      </steps>
+      <expected-outcome>Endpoint responds efficiently, bottlenecks identified</expected-outcome>
+    </scenario>
+  </testing-scenarios>
+
+  <implementation-notes>
+    <note priority="high">
+      Use better-sqlite3 synchronous API throughout - no async/await for database operations
+    </note>
+    <note priority="high">
+      Always wrap database writes in transactions with proper rollback on error
+    </note>
+    <note priority="high">
+      Validate project existence before retrieving conversation history
+    </note>
+    <note priority="medium">
+      Consider adding rate limiting for production deployment
+    </note>
+    <note priority="medium">
+      Log all errors with sufficient context for debugging
+    </note>
+    <note priority="medium">
+      Ensure message timestamps are consistent and use ISO 8601 format
+    </note>
+    <note priority="low">
+      Consider adding request ID for tracking across logs
+    </note>
+    <note priority="low">
+      Consider adding metrics/telemetry for monitoring
+    </note>
+  </implementation-notes>
+
+  <technical-constraints>
+    <constraint>
+      <type>Framework</type>
+      <requirement>Next.js 16 App Router API Routes</requirement>
+      <details>Must use app/api directory structure and export named async functions</details>
+    </constraint>
+    <constraint>
+      <type>Database</type>
+      <requirement>better-sqlite3 synchronous API</requirement>
+      <details>No async/await for database operations, use .run()/.get()/.all()</details>
+    </constraint>
+    <constraint>
+      <type>LLM Provider</type>
+      <requirement>Ollama via factory pattern</requirement>
+      <details>Must use createLLMProvider() factory, not direct instantiation</details>
+    </constraint>
+    <constraint>
+      <type>TypeScript</type>
+      <requirement>Strict mode enabled</requirement>
+      <details>No implicit any, proper null/undefined handling</details>
+    </constraint>
+    <constraint>
+      <type>Message Limit</type>
+      <requirement>20 message conversation history</requirement>
+      <details>Hard limit to balance context quality and LLM token usage</details>
+    </constraint>
+  </technical-constraints>
+
+  <success-criteria>
+    <criterion>All 5 acceptance criteria fully implemented and tested</criterion>
+    <criterion>All 24 tasks completed across 7 task groups</criterion>
+    <criterion>Integration with Stories 1.2 and 1.3 verified</criterion>
+    <criterion>All error codes return correct HTTP status codes</criterion>
+    <criterion>Database transactions properly handle rollback on error</criterion>
+    <criterion>LLM receives proper message context with system prompt</criterion>
+    <criterion>Response format consistent for both success and error cases</criterion>
+    <criterion>Code passes TypeScript strict mode compilation</criterion>
+    <criterion>All test scenarios pass successfully</criterion>
+    <criterion>Code is well-documented with JSDoc and inline comments</criterion>
+  </success-criteria>
+</story-context>

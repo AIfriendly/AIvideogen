@@ -47,61 +47,61 @@ so that **the application can interact with language models through a clean, ext
 ## Tasks / Subtasks
 
 ### Task 1: Create LLMProvider Interface (AC: #1)
-- [ ] Create `lib/llm/` directory if it doesn't exist
-- [ ] Create `lib/llm/provider.ts` file
-- [ ] Define Message interface with role ('user' | 'assistant' | 'system') and content (string)
-- [ ] Define LLMProvider interface with chat() method signature
-- [ ] Export interface and types
-- [ ] Add JSDoc comments for interface documentation
+- [x] Create `lib/llm/` directory if it doesn't exist
+- [x] Create `lib/llm/provider.ts` file
+- [x] Define Message interface with role ('user' | 'assistant' | 'system') and content (string)
+- [x] Define LLMProvider interface with chat() method signature
+- [x] Export interface and types
+- [x] Add JSDoc comments for interface documentation
 
 ### Task 2: Implement Default System Prompt (AC: #3)
-- [ ] Create `lib/llm/prompts/` directory
-- [ ] Create `lib/llm/prompts/default-system-prompt.ts` file
-- [ ] Write system prompt defining AI Video Generator assistant behavior
-- [ ] Include context about conversational flow (topic → script → voice → rendering)
-- [ ] Export DEFAULT_SYSTEM_PROMPT constant
-- [ ] Add comments explaining prompt structure
+- [x] Create `lib/llm/prompts/` directory
+- [x] Create `lib/llm/prompts/default-system-prompt.ts` file
+- [x] Write system prompt defining AI Video Generator assistant behavior
+- [x] Include context about conversational flow (topic → script → voice → rendering)
+- [x] Export DEFAULT_SYSTEM_PROMPT constant
+- [x] Add comments explaining prompt structure
 
 ### Task 3: Implement OllamaProvider (AC: #2, #5)
-- [ ] Create `lib/llm/ollama-provider.ts` file
-- [ ] Import LLMProvider interface and ollama package
-- [ ] Implement OllamaProvider class with chat() method
-- [ ] Configure Ollama client with OLLAMA_BASE_URL and OLLAMA_MODEL from environment
-- [ ] Prepend system prompt to messages array in chat() method
-- [ ] Call Ollama API and extract response text
-- [ ] Implement error handling for:
+- [x] Create `lib/llm/ollama-provider.ts` file
+- [x] Import LLMProvider interface and ollama package
+- [x] Implement OllamaProvider class with chat() method
+- [x] Configure Ollama client with OLLAMA_BASE_URL and OLLAMA_MODEL from environment
+- [x] Prepend system prompt to messages array in chat() method
+- [x] Call Ollama API and extract response text
+- [x] Implement error handling for:
   - Connection failures (ECONNREFUSED)
   - Model not found errors
   - Timeout errors
   - Generic API errors
-- [ ] Add user-friendly error messages with actionable guidance
-- [ ] Export OllamaProvider class
+- [x] Add user-friendly error messages with actionable guidance
+- [x] Export OllamaProvider class
 
 ### Task 4: Create Provider Factory (AC: #4)
-- [ ] Create `lib/llm/factory.ts` file
-- [ ] Import OllamaProvider and LLMProvider interface
-- [ ] Implement createLLMProvider() factory function
-- [ ] Read LLM_PROVIDER from environment variables
-- [ ] Return OllamaProvider instance when provider is "ollama"
-- [ ] Throw descriptive error for unsupported provider types
-- [ ] Add JSDoc comments documenting factory behavior
-- [ ] Export factory function
+- [x] Create `lib/llm/factory.ts` file
+- [x] Import OllamaProvider and LLMProvider interface
+- [x] Implement createLLMProvider() factory function
+- [x] Read LLM_PROVIDER from environment variables
+- [x] Return OllamaProvider instance when provider is "ollama"
+- [x] Throw descriptive error for unsupported provider types
+- [x] Add JSDoc comments documenting factory behavior
+- [x] Export factory function
 
 ### Task 5: Testing and Validation (AC: #1-5)
-- [ ] Create test script to verify OllamaProvider connection
-- [ ] Test chat() method with sample messages
-- [ ] Verify system prompt is prepended correctly
-- [ ] Test error handling for Ollama service not running
-- [ ] Test error handling for invalid model name
-- [ ] Verify factory returns correct provider instance
-- [ ] Document test results in Dev Agent Record
+- [x] Create test script to verify OllamaProvider connection
+- [x] Test chat() method with sample messages
+- [x] Verify system prompt is prepended correctly
+- [x] Test error handling for Ollama service not running
+- [x] Test error handling for invalid model name
+- [x] Verify factory returns correct provider instance
+- [x] Document test results in Dev Agent Record
 
 ### Task 6: Integration and Documentation (AC: #1-5)
-- [ ] Verify all files compile without TypeScript errors
-- [ ] Update .env.example if new environment variables needed
-- [ ] Add usage examples in comments or README
-- [ ] Verify integration with existing project structure
-- [ ] Complete Dev Agent Record with implementation notes
+- [x] Verify all files compile without TypeScript errors
+- [x] Update .env.example if new environment variables needed
+- [x] Add usage examples in comments or README
+- [x] Verify integration with existing project structure
+- [x] Complete Dev Agent Record with implementation notes
 
 ## Dev Notes
 
