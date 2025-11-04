@@ -21,14 +21,14 @@ PHASE_4_COMPLETE: false
 
 ## Story Queue (Epic 1)
 
-TODO_STORY: 1.7
-IN_PROGRESS_STORY: 1.6
-DONE_STORY: 1.5
+TODO_STORY: -
+IN_PROGRESS_STORY: 1.7
+DONE_STORY: 1.6
 BACKLOG_STORY: -
 
 ## Next Action
 
-NEXT_ACTION: Complete Story 1.6 - Project Management UI
+NEXT_ACTION: Complete Story 1.7 - Topic Confirmation Workflow
 NEXT_COMMAND: *complete-story
 NEXT_AGENT: sprint-manager
 
