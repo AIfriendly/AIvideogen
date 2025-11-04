@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { createConversationStore } from '@/lib/stores/conversation-store';
 import { generateMessageId, ERROR_MESSAGES } from '@/lib/utils/message-helpers';
 import { MessageList } from './MessageList';
@@ -30,7 +30,11 @@ export function ChatInterface({ projectId }: ChatInterfaceProps) {
   const [charCount, setCharCount] = useState(0);
 
   // Create store instance for this project (Critical Requirement #1: Per-Project State Isolation)
-  const useConversationStore = createConversationStore(projectId);
+  // FIX: Use useMemo to prevent recreation on every render
+  const useConversationStore = useMemo(
+    () => createConversationStore(projectId),
+    [projectId]
+  );
   const { messages, isLoading, error, addMessage, setLoading, setError, clearError } =
     useConversationStore();
 
@@ -134,7 +138,7 @@ export function ChatInterface({ projectId }: ChatInterfaceProps) {
   const charCountColor = charCount > 4900 ? 'text-red-500' : charCount > 4500 ? 'text-yellow-500' : 'text-muted-foreground';
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" data-testid="chat-interface" data-test-ac="AC-1.5.1">
       {/* Message Display Area */}
       <div className="flex-1 overflow-hidden">
         <MessageList messages={messages} isLoading={isLoading} />
@@ -142,16 +146,24 @@ export function ChatInterface({ projectId }: ChatInterfaceProps) {
 
       {/* Error Display */}
       {error && (
-        <Alert variant="destructive" className="mx-4 mb-2" role="alert">
+        <Alert
+          variant="destructive"
+          className="mx-4 mb-2"
+          role="alert"
+          data-testid="error-alert"
+          data-test-ac="AC-1.5.6"
+        >
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {/* Input Area */}
-      <div className="border-t p-4">
+      <div className="border-t p-4" data-testid="input-area">
         <div className="flex gap-2">
           <div className="flex-1">
             <Input
+              data-testid="chat-message-input"
+              data-test-ac="AC-1.5.1"
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
@@ -162,12 +174,18 @@ export function ChatInterface({ projectId }: ChatInterfaceProps) {
               maxLength={MAX_MESSAGE_LENGTH}
             />
             {showCharCount && (
-              <p className={`text-xs mt-1 ${charCountColor}`}>
+              <p
+                className={`text-xs mt-1 ${charCountColor}`}
+                data-testid="character-count"
+                data-test-ac="AC-1.5.5"
+              >
                 {charCount} / {MAX_MESSAGE_LENGTH} characters
               </p>
             )}
           </div>
           <Button
+            data-testid="chat-send-button"
+            data-test-ac="AC-1.5.1"
             onClick={handleSendMessage}
             disabled={isLoading || !input.trim()}
             aria-label="Send message"

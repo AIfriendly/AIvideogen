@@ -40,8 +40,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import db from '@/lib/db/client';
+import { initializeDatabase } from '@/lib/db/init';
 import { createLLMProvider } from '@/lib/llm/factory';
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/llm/prompts/default-system-prompt';
+
+// Initialize database on first import (idempotent - safe to call multiple times)
+initializeDatabase();
 
 /**
  * Request body structure for chat endpoint
@@ -156,14 +160,42 @@ export async function POST(request: NextRequest) {
     }
 
     // ==========================================
-    // STEP 2: Verify Project Exists
+    // STEP 2: Verify Project Exists (Auto-Create if Missing)
     // ==========================================
 
     let project: any;
     try {
       project = db.prepare('SELECT id FROM projects WHERE id = ?').get(projectId);
+
+      // FIX: Auto-create project if it doesn't exist
+      // This handles cases where frontend generates UUID but doesn't create project
+      if (!project) {
+        console.log(`Project ${projectId} not found. Auto-creating...`);
+
+        // Create project with default name
+        const createStmt = db.prepare(`
+          INSERT INTO projects (id, name, current_step, status)
+          VALUES (?, ?, ?, ?)
+        `);
+
+        createStmt.run(
+          projectId,
+          'New Project', // Default name
+          'topic',       // Start at topic discovery step
+          'draft'        // Initial status
+        );
+
+        // Verify creation
+        project = db.prepare('SELECT id FROM projects WHERE id = ?').get(projectId);
+
+        if (!project) {
+          throw new Error('Failed to auto-create project');
+        }
+
+        console.log(`Project ${projectId} auto-created successfully`);
+      }
     } catch (error) {
-      console.error('Database error while verifying project:', error);
+      console.error('Database error while verifying/creating project:', error);
       return NextResponse.json(
         {
           success: false,
@@ -173,19 +205,6 @@ export async function POST(request: NextRequest) {
           }
         } as ChatErrorResponse,
         { status: 500 }
-      );
-    }
-
-    if (!project) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            message: 'Invalid or missing project ID',
-            code: 'INVALID_PROJECT_ID'
-          }
-        } as ChatErrorResponse,
-        { status: 404 }
       );
     }
 

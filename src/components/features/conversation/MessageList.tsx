@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Message } from '@/lib/stores/conversation-store';
 import { User, Bot, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -22,25 +22,54 @@ interface MessageListProps {
 
 export function MessageList({ messages, isLoading }: MessageListProps) {
   const messageEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
 
-  // Auto-scroll to bottom when messages change
+  // Detect if user has manually scrolled up
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+    // Consider "at bottom" if within 100px threshold
+    setShouldAutoScroll(distanceFromBottom < 100);
+  };
+
+  // Auto-scroll to bottom only if user is near bottom (UX improvement)
   useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+    if (shouldAutoScroll) {
+      messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isLoading, shouldAutoScroll]);
 
   if (messages.length === 0 && !isLoading) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
+      <div
+        className="flex items-center justify-center h-full text-muted-foreground"
+        data-testid="empty-state"
+        data-test-ac="AC-1.5.2"
+      >
         <p>Start a conversation to discover your video topic...</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4 space-y-4">
+    <div
+      ref={scrollContainerRef}
+      onScroll={handleScroll}
+      className="h-full overflow-y-auto p-4 space-y-4"
+      data-testid="message-list"
+      data-test-ac="AC-1.5.2"
+      data-test-auto-scroll={shouldAutoScroll}
+    >
       {messages.map((message) => (
         <div
           key={message.id}
+          data-testid={`message-${message.id}`}
+          data-test-role={message.role}
+          data-test-ac="AC-1.5.2"
           className={cn(
             'flex gap-3',
             message.role === 'user' ? 'justify-end' : 'justify-start'
@@ -92,6 +121,8 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
       {isLoading && (
         <div
           className="flex gap-3 justify-start"
+          data-testid="loading-indicator"
+          data-test-ac="AC-1.5.4"
           role="status"
           aria-live="polite"
           aria-label="Loading assistant response"

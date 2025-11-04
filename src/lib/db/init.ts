@@ -15,9 +15,19 @@ import db from './client';
  */
 export function initializeDatabase(): void {
   try {
-    // Read schema.sql file from the same directory
-    const schemaPath = path.join(__dirname, 'schema.sql');
-    const schema = readFileSync(schemaPath, 'utf-8');
+    // Read schema.sql file - try multiple paths for different build environments
+    let schema: string;
+    let schemaPath: string;
+
+    // Try path relative to source directory first (development)
+    try {
+      schemaPath = path.join(process.cwd(), 'src', 'lib', 'db', 'schema.sql');
+      schema = readFileSync(schemaPath, 'utf-8');
+    } catch {
+      // Try path relative to __dirname (production build)
+      schemaPath = path.join(__dirname, 'schema.sql');
+      schema = readFileSync(schemaPath, 'utf-8');
+    }
 
     // Execute the schema SQL to create tables and indexes
     db.exec(schema);
