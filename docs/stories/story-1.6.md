@@ -79,16 +79,16 @@ Implement a project management interface that allows users to maintain multiple 
 **File:** `components/features/projects/ProjectSidebar.tsx`
 
 **Subtasks:**
-- [ ] Create ProjectSidebar.tsx with TypeScript
-- [ ] Implement fixed 280px width layout with Tailwind CSS
-- [ ] Add "New Chat" button at top with Plus icon
-- [ ] Create project list container with scroll overflow
-- [ ] Fetch all projects from /api/projects on component mount
-- [ ] Store projects in project-store (Zustand)
-- [ ] Render ProjectListItem for each project
-- [ ] Highlight active project with indigo left border (border-l-4 border-indigo-600)
-- [ ] Add empty state: "No projects yet. Click 'New Chat' to start."
-- [ ] Ensure responsive: Hide on mobile (<768px), show on desktop
+- [x] Create ProjectSidebar.tsx with TypeScript
+- [x] Implement fixed 280px width layout with Tailwind CSS
+- [x] Add "New Chat" button at top with Plus icon
+- [x] Create project list container with scroll overflow
+- [x] Fetch all projects from /api/projects on component mount
+- [x] Store projects in project-store (Zustand)
+- [x] Render ProjectListItem for each project
+- [x] Highlight active project with indigo left border (border-l-4 border-indigo-600)
+- [x] Add empty state: "No projects yet. Click 'New Chat' to start."
+- [x] Ensure responsive: Hide on mobile (<768px), show on desktop
 
 **Estimated Effort:** 3 hours
 
@@ -98,16 +98,16 @@ Implement a project management interface that allows users to maintain multiple 
 **File:** `components/features/projects/ProjectListItem.tsx`
 
 **Subtasks:**
-- [ ] Create ProjectListItem.tsx component accepting Project props
-- [ ] Display project name (text-sm font-medium)
-- [ ] Display relative timestamp using date-fns formatDistanceToNow
-- [ ] Add hover state background (hover:bg-slate-100)
-- [ ] Add click handler to switch projects
-- [ ] Add optional three-dot menu button (visible on hover)
-- [ ] Implement dropdown menu with "Delete" option
-- [ ] Add confirmation dialog for deletion
-- [ ] Truncate long project names with ellipsis (max 2 lines)
-- [ ] Add accessible ARIA labels
+- [x] Create ProjectListItem.tsx component accepting Project props
+- [x] Display project name (text-sm font-medium)
+- [x] Display relative timestamp using date-fns formatDistanceToNow
+- [x] Add hover state background (hover:bg-slate-100)
+- [x] Add click handler to switch projects
+- [x] Add optional three-dot menu button (visible on hover)
+- [x] Implement dropdown menu with "Delete" option
+- [x] Add confirmation dialog for deletion
+- [x] Truncate long project names with ellipsis (max 2 lines)
+- [x] Add accessible ARIA labels
 
 **Estimated Effort:** 2.5 hours
 
@@ -117,16 +117,16 @@ Implement a project management interface that allows users to maintain multiple 
 **File:** `components/features/projects/NewChatButton.tsx`
 
 **Subtasks:**
-- [ ] Create NewChatButton.tsx component
-- [ ] Use shadcn/ui Button component with primary variant
-- [ ] Add Plus icon from lucide-react
-- [ ] Implement click handler to call POST /api/projects
-- [ ] Set newly created project as active in project-store
-- [ ] Clear conversation-store messages
-- [ ] Navigate to new project URL
-- [ ] Add loading state during project creation
-- [ ] Handle API errors with toast notification
-- [ ] Focus chat input after project creation
+- [x] Create NewChatButton.tsx component
+- [x] Use shadcn/ui Button component with primary variant
+- [x] Add Plus icon from lucide-react
+- [x] Implement click handler to call POST /api/projects
+- [x] Set newly created project as active in project-store
+- [x] Clear conversation-store messages
+- [x] Navigate to new project URL
+- [x] Add loading state during project creation
+- [x] Handle API errors with toast notification
+- [x] Focus chat input after project creation
 
 **Estimated Effort:** 2 hours
 
@@ -136,17 +136,17 @@ Implement a project management interface that allows users to maintain multiple 
 **File:** `lib/stores/project-store.ts`
 
 **Subtasks:**
-- [ ] Create project-store.ts with Zustand
-- [ ] Define Project interface (id, name, topic, lastActive, createdAt)
-- [ ] Define ProjectState interface with projects array and activeProjectId
-- [ ] Implement setActiveProject action
-- [ ] Implement loadProjects action
-- [ ] Implement addProject action
-- [ ] Implement updateProject action (for name updates)
-- [ ] Implement removeProject action
-- [ ] Configure persist middleware for activeProjectId only
-- [ ] Use localStorage key: "bmad-project-storage"
-- [ ] Add action to update last_active timestamp via API
+- [x] Create project-store.ts with Zustand
+- [x] Define Project interface (id, name, topic, lastActive, createdAt)
+- [x] Define ProjectState interface with projects array and activeProjectId
+- [x] Implement setActiveProject action
+- [x] Implement loadProjects action
+- [x] Implement addProject action
+- [x] Implement updateProject action (for name updates)
+- [x] Implement removeProject action
+- [x] Configure persist middleware for activeProjectId only
+- [x] Use localStorage key: "bmad-project-storage"
+- [x] Add action to update last_active timestamp via API
 
 **Estimated Effort:** 3 hours
 
@@ -156,24 +156,24 @@ Implement a project management interface that allows users to maintain multiple 
 **Files:** `app/api/projects/route.ts`, `app/api/projects/[id]/route.ts`
 
 **Subtasks:**
-- [ ] Create GET /api/projects endpoint (list all projects)
-- [ ] Query: SELECT * FROM projects ORDER BY last_active DESC
-- [ ] Return projects array with success response format
-- [ ] Create POST /api/projects endpoint (create new project)
-- [ ] Generate UUID for new project
-- [ ] Insert with name="New Project", current_step='topic'
-- [ ] Set created_at and last_active to current timestamp
-- [ ] Return created project object
-- [ ] Create GET /api/projects/[id] endpoint (get single project)
-- [ ] Create PUT /api/projects/[id] endpoint (update project)
-- [ ] Accept name, topic, current_step in request body
-- [ ] Auto-update last_active timestamp on every update
-- [ ] Create DELETE /api/projects/[id] endpoint (optional)
-- [ ] Cascade delete to messages table
-- [ ] Return success response with deleted project ID
-- [ ] Add error handling for all endpoints
-- [ ] Validate project ID format (UUID)
-- [ ] Return 404 for non-existent projects
+- [x] Create GET /api/projects endpoint (list all projects)
+- [x] Query: SELECT * FROM projects ORDER BY last_active DESC
+- [x] Return projects array with success response format
+- [x] Create POST /api/projects endpoint (create new project)
+- [x] Generate UUID for new project
+- [x] Insert with name="New Project", current_step='topic'
+- [x] Set created_at and last_active to current timestamp
+- [x] Return created project object
+- [x] Create GET /api/projects/[id] endpoint (get single project)
+- [x] Create PUT /api/projects/[id] endpoint (update project)
+- [x] Accept name, topic, current_step in request body
+- [x] Auto-update last_active timestamp on every update
+- [x] Create DELETE /api/projects/[id] endpoint (optional)
+- [x] Cascade delete to messages table
+- [x] Return success response with deleted project ID
+- [x] Add error handling for all endpoints
+- [x] Validate project ID format (UUID)
+- [x] Return 404 for non-existent projects
 
 **Estimated Effort:** 4 hours
 
@@ -183,20 +183,20 @@ Implement a project management interface that allows users to maintain multiple 
 **File:** `lib/utils/generate-project-name.ts`
 
 **Subtasks:**
-- [ ] Create generateProjectName utility function
-- [ ] Accept first user message as parameter
-- [ ] Define maximum length: 30 characters
-- [ ] Handle short messages (< 5 chars): return "New Project [date]"
-- [ ] Trim whitespace from input
-- [ ] If length <= 30, return as-is
-- [ ] If length > 30, truncate to 30 chars
-- [ ] Find last space index in truncated string
-- [ ] If last space > 5 chars, trim to last complete word
-- [ ] Otherwise, hard truncate to 27 chars and add "..."
-- [ ] Add unit tests for edge cases (empty, very long, no spaces)
-- [ ] Update POST /api/chat to call this function on first message
-- [ ] Call PUT /api/projects/[id] to update name in database
-- [ ] Update project-store with new name
+- [x] Create generateProjectName utility function
+- [x] Accept first user message as parameter
+- [x] Define maximum length: 30 characters
+- [x] Handle short messages (< 5 chars): return "New Project [date]"
+- [x] Trim whitespace from input
+- [x] If length <= 30, return as-is
+- [x] If length > 30, truncate to 30 chars
+- [x] Find last space index in truncated string
+- [x] If last space > 5 chars, trim to last complete word
+- [x] Otherwise, hard truncate to 27 chars and add "..."
+- [x] Add unit tests for edge cases (empty, very long, no spaces)
+- [x] Update POST /api/chat to call this function on first message
+- [x] Call PUT /api/projects/[id] to update name in database
+- [x] Update project-store with new name
 
 **Estimated Effort:** 2 hours
 
@@ -206,19 +206,19 @@ Implement a project management interface that allows users to maintain multiple 
 **Dependencies:** Task 1, Task 4, Task 5
 
 **Subtasks:**
-- [ ] Create switchToProject function in project-store or hook
-- [ ] Cancel any in-flight API requests (AbortController)
-- [ ] Save current scroll position to sessionStorage (optional)
-- [ ] Update activeProjectId in project-store (triggers localStorage persist)
-- [ ] Clear messages in conversation-store
-- [ ] Fetch messages for new project: GET /api/projects/[id]/messages
-- [ ] Load messages into conversation-store
-- [ ] Update URL with window.history.pushState
-- [ ] Update last_active for new project: PUT /api/projects/[id]
-- [ ] Restore saved scroll position (optional)
-- [ ] Focus chat input after switch
-- [ ] Add loading state during switch
-- [ ] Handle errors (project not found, network failure)
+- [x] Create switchToProject function in project-store or hook
+- [x] Cancel any in-flight API requests (AbortController)
+- [x] Save current scroll position to sessionStorage (optional)
+- [x] Update activeProjectId in project-store (triggers localStorage persist)
+- [x] Clear messages in conversation-store
+- [x] Fetch messages for new project: GET /api/projects/[id]/messages
+- [x] Load messages into conversation-store
+- [x] Update URL with window.history.pushState
+- [x] Update last_active for new project: PUT /api/projects/[id]
+- [x] Restore saved scroll position (optional)
+- [x] Focus chat input after switch
+- [x] Add loading state during switch
+- [x] Handle errors (project not found, network failure)
 
 **Estimated Effort:** 3.5 hours
 
@@ -228,16 +228,16 @@ Implement a project management interface that allows users to maintain multiple 
 **Dependencies:** Task 4
 
 **Subtasks:**
-- [ ] Configure Zustand persist middleware in project-store
-- [ ] Persist only activeProjectId (not full projects array)
-- [ ] Use localStorage key: "bmad-project-storage"
-- [ ] On app initialization, read activeProjectId from localStorage
-- [ ] If activeProjectId exists, verify project still exists in database
-- [ ] If valid, navigate to /projects/[activeProjectId]
-- [ ] If invalid or missing, query most recent project (ORDER BY last_active DESC LIMIT 1)
-- [ ] If no projects exist, stay on landing page
-- [ ] Handle localStorage disabled/unavailable gracefully
-- [ ] Add state rehydration before first render (prevent flash)
+- [x] Configure Zustand persist middleware in project-store
+- [x] Persist only activeProjectId (not full projects array)
+- [x] Use localStorage key: "bmad-project-storage"
+- [x] On app initialization, read activeProjectId from localStorage
+- [x] If activeProjectId exists, verify project still exists in database
+- [x] If valid, navigate to /projects/[activeProjectId]
+- [x] If invalid or missing, query most recent project (ORDER BY last_active DESC LIMIT 1)
+- [x] If no projects exist, stay on landing page
+- [x] Handle localStorage disabled/unavailable gracefully
+- [x] Add state rehydration before first render (prevent flash)
 
 **Estimated Effort:** 2.5 hours
 
@@ -247,16 +247,16 @@ Implement a project management interface that allows users to maintain multiple 
 **File:** `app/layout.tsx` or `components/layout/MainLayout.tsx`
 
 **Subtasks:**
-- [ ] Import ProjectSidebar component
-- [ ] Add ProjectSidebar to main layout left side
-- [ ] Create flex layout: sidebar (280px) + main content (flex-1)
-- [ ] Ensure sidebar full height (h-screen)
-- [ ] Add border-r separator between sidebar and content
-- [ ] Make sidebar sticky (overflow-y-auto for project list)
-- [ ] Responsive: Hide sidebar on mobile, show hamburger menu icon
-- [ ] Add mobile drawer/sheet for project list on small screens
-- [ ] Ensure sidebar visible on all pages except landing/auth
-- [ ] Test layout on various screen sizes (mobile, tablet, desktop)
+- [x] Import ProjectSidebar component
+- [x] Add ProjectSidebar to main layout left side
+- [x] Create flex layout: sidebar (280px) + main content (flex-1)
+- [x] Ensure sidebar full height (h-screen)
+- [x] Add border-r separator between sidebar and content
+- [x] Make sidebar sticky (overflow-y-auto for project list)
+- [x] Responsive: Hide sidebar on mobile, show hamburger menu icon
+- [x] Add mobile drawer/sheet for project list on small screens
+- [x] Ensure sidebar visible on all pages except landing/auth
+- [x] Test layout on various screen sizes (mobile, tablet, desktop)
 
 **Estimated Effort:** 2.5 hours
 
