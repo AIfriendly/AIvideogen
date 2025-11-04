@@ -1,0 +1,1004 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>1.6</story-id>
+    <epic-id>1</epic-id>
+    <title>Project Management UI</title>
+    <status>Ready</status>
+    <created>2025-11-04</created>
+    <assigned-to>lichking</assigned-to>
+    <sprint>Epic 1 Sprint 2</sprint>
+    <estimated-hours>33.0</estimated-hours>
+    <story-points>13</story-points>
+  </metadata>
+
+  <story-summary>
+    This story implements a complete project management interface with a 280px fixed-width sidebar that enables users to create, list, and switch between multiple isolated video projects. Users can click "New Chat" to start fresh conversations, see auto-generated project names from their first message, and have their active project persist across page reloads via localStorage. The sidebar displays all projects ordered by most recent activity with visual highlighting for the active project.
+  </story-summary>
+
+  <business-value>
+    <item>Enables users to work on multiple video ideas simultaneously without mixing conversations</item>
+    <item>Maintains clear separation between different creative projects with isolated conversation history</item>
+    <item>Provides quick access to recent projects via sidebar navigation ordered by activity</item>
+    <item>Improves workflow efficiency with persistent project state across browser sessions</item>
+    <item>Establishes foundation for project-based video production pipeline</item>
+  </business-value>
+
+  <acceptance-criteria>
+    <criterion id="AC1">
+      <title>New Chat button creates new project and sets it as active</title>
+      <details>
+        <item>Button located at top of sidebar</item>
+        <item>Clicking creates new project with default name "New Project"</item>
+        <item>New project immediately becomes active project</item>
+        <item>Chat interface clears and focuses on input field</item>
+        <item>New project appears at top of sidebar list</item>
+      </details>
+    </criterion>
+    <criterion id="AC2">
+      <title>Sidebar displays all projects ordered by last_active (most recent first)</title>
+      <details>
+        <item>Fixed 280px width sidebar on left side of screen</item>
+        <item>Projects displayed in descending order by last_active timestamp</item>
+        <item>Each project shows name and relative timestamp (e.g., "2 hours ago", "Yesterday")</item>
+        <item>Active project visually highlighted with indigo left border (4px)</item>
+        <item>Sidebar persists across all application pages</item>
+      </details>
+    </criterion>
+    <criterion id="AC3">
+      <title>Clicking a project loads its conversation history</title>
+      <details>
+        <item>Click any project in sidebar switches to that project</item>
+        <item>Conversation messages load from database (project_id filter)</item>
+        <item>URL updates to /projects/[id] for deep linking</item>
+        <item>Input field focuses automatically after switch</item>
+        <item>Message history displays chronologically (oldest to newest)</item>
+      </details>
+    </criterion>
+    <criterion id="AC4">
+      <title>Project names auto-generate from first user message</title>
+      <details>
+        <item>On first message submission, extract first 30 characters</item>
+        <item>Trim to last complete word (don't cut mid-word)</item>
+        <item>Update project name in database and sidebar immediately</item>
+        <item>If message too short (&lt; 5 chars), keep "New Project" with timestamp</item>
+      </details>
+    </criterion>
+    <criterion id="AC5">
+      <title>Active project persists across page reloads</title>
+      <details>
+        <item>Active project ID stored in localStorage with key "bmad-active-project-id"</item>
+        <item>On app load, read active project ID from localStorage</item>
+        <item>If valid project ID found, load that project automatically</item>
+        <item>If invalid or missing, load most recent project (highest last_active)</item>
+        <item>Navigate to correct URL on initial load</item>
+      </details>
+    </criterion>
+    <criterion id="AC6">
+      <title>Project deletion functionality (optional for MVP)</title>
+      <details>
+        <item>Three-dot menu icon appears on project hover</item>
+        <item>Delete option in dropdown menu</item>
+        <item>Confirmation dialog: "Delete '[Project Name]'? This will permanently delete all conversation history."</item>
+        <item>On confirm: DELETE from database (cascades to messages)</item>
+        <item>If deleted project was active, switch to most recent remaining project</item>
+        <item>Sidebar updates immediately after deletion</item>
+      </details>
+    </criterion>
+  </acceptance-criteria>
+
+  <tasks>
+    <task id="1" estimated-hours="3.0">
+      <title>Create ProjectSidebar Component</title>
+      <file>components/features/projects/ProjectSidebar.tsx</file>
+      <subtasks>
+        <item>Create ProjectSidebar.tsx with TypeScript</item>
+        <item>Implement fixed 280px width layout with Tailwind CSS</item>
+        <item>Add "New Chat" button at top with Plus icon</item>
+        <item>Create project list container with scroll overflow</item>
+        <item>Fetch all projects from /api/projects on component mount</item>
+        <item>Store projects in project-store (Zustand)</item>
+        <item>Render ProjectListItem for each project</item>
+        <item>Highlight active project with indigo left border (border-l-4 border-indigo-600)</item>
+        <item>Add empty state: "No projects yet. Click 'New Chat' to start."</item>
+        <item>Ensure responsive: Hide on mobile (&lt;768px), show on desktop</item>
+      </subtasks>
+    </task>
+    <task id="2" estimated-hours="2.5">
+      <title>Create ProjectListItem Component</title>
+      <file>components/features/projects/ProjectListItem.tsx</file>
+      <subtasks>
+        <item>Create ProjectListItem.tsx component accepting Project props</item>
+        <item>Display project name (text-sm font-medium)</item>
+        <item>Display relative timestamp using date-fns formatDistanceToNow</item>
+        <item>Add hover state background (hover:bg-slate-100)</item>
+        <item>Add click handler to switch projects</item>
+        <item>Add optional three-dot menu button (visible on hover)</item>
+        <item>Implement dropdown menu with "Delete" option</item>
+        <item>Add confirmation dialog for deletion</item>
+        <item>Truncate long project names with ellipsis (max 2 lines)</item>
+        <item>Add accessible ARIA labels</item>
+      </subtasks>
+    </task>
+    <task id="3" estimated-hours="2.0">
+      <title>Create NewChatButton Component</title>
+      <file>components/features/projects/NewChatButton.tsx</file>
+      <subtasks>
+        <item>Create NewChatButton.tsx component</item>
+        <item>Use shadcn/ui Button component with primary variant</item>
+        <item>Add Plus icon from lucide-react</item>
+        <item>Implement click handler to call POST /api/projects</item>
+        <item>Set newly created project as active in project-store</item>
+        <item>Clear conversation-store messages</item>
+        <item>Navigate to new project URL</item>
+        <item>Add loading state during project creation</item>
+        <item>Handle API errors with toast notification</item>
+        <item>Focus chat input after project creation</item>
+      </subtasks>
+    </task>
+    <task id="4" estimated-hours="3.0">
+      <title>Implement Zustand Project Store</title>
+      <file>lib/stores/project-store.ts</file>
+      <subtasks>
+        <item>Create project-store.ts with Zustand</item>
+        <item>Define Project interface (id, name, topic, lastActive, createdAt)</item>
+        <item>Define ProjectState interface with projects array and activeProjectId</item>
+        <item>Implement setActiveProject action</item>
+        <item>Implement loadProjects action</item>
+        <item>Implement addProject action</item>
+        <item>Implement updateProject action (for name updates)</item>
+        <item>Implement removeProject action</item>
+        <item>Configure persist middleware for activeProjectId only</item>
+        <item>Use localStorage key: "bmad-project-storage"</item>
+        <item>Add action to update last_active timestamp via API</item>
+      </subtasks>
+    </task>
+    <task id="5" estimated-hours="4.0">
+      <title>Implement Project API Endpoints</title>
+      <files>
+        <file>app/api/projects/route.ts</file>
+        <file>app/api/projects/[id]/route.ts</file>
+      </files>
+      <subtasks>
+        <item>Create GET /api/projects endpoint (list all projects)</item>
+        <item>Query: SELECT * FROM projects ORDER BY last_active DESC</item>
+        <item>Return projects array with success response format</item>
+        <item>Create POST /api/projects endpoint (create new project)</item>
+        <item>Generate UUID for new project</item>
+        <item>Insert with name="New Project", current_step='topic'</item>
+        <item>Set created_at and last_active to current timestamp</item>
+        <item>Return created project object</item>
+        <item>Create GET /api/projects/[id] endpoint (get single project)</item>
+        <item>Create PUT /api/projects/[id] endpoint (update project)</item>
+        <item>Accept name, topic, current_step in request body</item>
+        <item>Auto-update last_active timestamp on every update</item>
+        <item>Create DELETE /api/projects/[id] endpoint (optional)</item>
+        <item>Cascade delete to messages table</item>
+        <item>Return success response with deleted project ID</item>
+        <item>Add error handling for all endpoints</item>
+        <item>Validate project ID format (UUID)</item>
+        <item>Return 404 for non-existent projects</item>
+      </subtasks>
+    </task>
+    <task id="6" estimated-hours="2.0">
+      <title>Implement Project Name Auto-Generation</title>
+      <file>lib/utils/generate-project-name.ts</file>
+      <subtasks>
+        <item>Create generateProjectName utility function</item>
+        <item>Accept first user message as parameter</item>
+        <item>Define maximum length: 30 characters</item>
+        <item>Handle short messages (&lt; 5 chars): return "New Project [date]"</item>
+        <item>Trim whitespace from input</item>
+        <item>If length &lt;= 30, return as-is</item>
+        <item>If length &gt; 30, truncate to 30 chars</item>
+        <item>Find last space index in truncated string</item>
+        <item>If last space &gt; 5 chars, trim to last complete word</item>
+        <item>Otherwise, hard truncate to 27 chars and add "..."</item>
+        <item>Add unit tests for edge cases (empty, very long, no spaces)</item>
+        <item>Update POST /api/chat to call this function on first message</item>
+        <item>Call PUT /api/projects/[id] to update name in database</item>
+        <item>Update project-store with new name</item>
+      </subtasks>
+    </task>
+    <task id="7" estimated-hours="3.5" dependencies="1,4,5">
+      <title>Implement Project Switching Logic</title>
+      <subtasks>
+        <item>Create switchToProject function in project-store or hook</item>
+        <item>Cancel any in-flight API requests (AbortController)</item>
+        <item>Save current scroll position to sessionStorage (optional)</item>
+        <item>Update activeProjectId in project-store (triggers localStorage persist)</item>
+        <item>Clear messages in conversation-store</item>
+        <item>Fetch messages for new project: GET /api/projects/[id]/messages</item>
+        <item>Load messages into conversation-store</item>
+        <item>Update URL with window.history.pushState</item>
+        <item>Update last_active for new project: PUT /api/projects/[id]</item>
+        <item>Restore saved scroll position (optional)</item>
+        <item>Focus chat input after switch</item>
+        <item>Add loading state during switch</item>
+        <item>Handle errors (project not found, network failure)</item>
+      </subtasks>
+    </task>
+    <task id="8" estimated-hours="2.5" dependencies="4">
+      <title>Implement Active Project Persistence</title>
+      <subtasks>
+        <item>Configure Zustand persist middleware in project-store</item>
+        <item>Persist only activeProjectId (not full projects array)</item>
+        <item>Use localStorage key: "bmad-project-storage"</item>
+        <item>On app initialization, read activeProjectId from localStorage</item>
+        <item>If activeProjectId exists, verify project still exists in database</item>
+        <item>If valid, navigate to /projects/[activeProjectId]</item>
+        <item>If invalid or missing, query most recent project (ORDER BY last_active DESC LIMIT 1)</item>
+        <item>If no projects exist, stay on landing page</item>
+        <item>Handle localStorage disabled/unavailable gracefully</item>
+        <item>Add state rehydration before first render (prevent flash)</item>
+      </subtasks>
+    </task>
+    <task id="9" estimated-hours="2.5">
+      <title>Integrate Sidebar into Application Layout</title>
+      <file>app/layout.tsx or components/layout/MainLayout.tsx</file>
+      <subtasks>
+        <item>Import ProjectSidebar component</item>
+        <item>Add ProjectSidebar to main layout left side</item>
+        <item>Create flex layout: sidebar (280px) + main content (flex-1)</item>
+        <item>Ensure sidebar full height (h-screen)</item>
+        <item>Add border-r separator between sidebar and content</item>
+        <item>Make sidebar sticky (overflow-y-auto for project list)</item>
+        <item>Responsive: Hide sidebar on mobile, show hamburger menu icon</item>
+        <item>Add mobile drawer/sheet for project list on small screens</item>
+        <item>Ensure sidebar visible on all pages except landing/auth</item>
+        <item>Test layout on various screen sizes (mobile, tablet, desktop)</item>
+      </subtasks>
+    </task>
+  </tasks>
+
+  <documentation-artifacts>
+    <artifact>
+      <source>docs/prd.md</source>
+      <section>Feature 1.1 - Project Management (lines 32-77)</section>
+      <description>User stories and requirements for multiple project conversations, project switching, and auto-generated names</description>
+    </artifact>
+    <artifact>
+      <source>docs/epics.md</source>
+      <section>Epic 1, Story 1.6 (lines 217-247)</section>
+      <description>Complete story overview, tasks, and acceptance criteria for Project Management UI</description>
+    </artifact>
+    <artifact>
+      <source>docs/tech-spec.md</source>
+      <section>In Scope - Story 1.6 (lines 27-33)</section>
+      <description>Sidebar specifications (280px width), "New Chat" button, project switching, localStorage persistence</description>
+    </artifact>
+    <artifact>
+      <source>docs/tech-spec.md</source>
+      <section>Services and Modules - Story 1.6 (lines 71-88)</section>
+      <description>Component structure: ProjectSidebar.tsx, ProjectListItem.tsx, NewChatButton.tsx, project-store.ts, /api/projects routes</description>
+    </artifact>
+    <artifact>
+      <source>docs/tech-spec.md</source>
+      <section>API Specifications - /api/projects (lines 188-288)</section>
+      <description>Complete API endpoint specifications for all 5 project management endpoints</description>
+    </artifact>
+    <artifact>
+      <source>docs/architecture.md</source>
+      <section>Epic to Architecture Mapping - Story 1.6 (lines 287-309)</section>
+      <description>Component architecture, backend APIs, database queries, and key workflow for project management</description>
+    </artifact>
+    <artifact>
+      <source>docs/architecture.md</source>
+      <section>Project Store Pattern (lines 1021-1092)</section>
+      <description>Zustand store implementation with localStorage persistence pattern and state management</description>
+    </artifact>
+    <artifact>
+      <source>docs/architecture.md</source>
+      <section>Database Queries - Project Management (lines 1233-1329)</section>
+      <description>SQL queries: getAllProjects(), createProject(), updateProjectLastActive(), deleteProject()</description>
+    </artifact>
+    <artifact>
+      <source>docs/architecture.md</source>
+      <section>Project Switching Workflow (lines 1774-1854)</section>
+      <description>Complete workflow with AbortController, message loading, URL updates, and name generation logic</description>
+    </artifact>
+    <artifact>
+      <source>docs/stories/story-1.2.md</source>
+      <section>Database Schema</section>
+      <description>Existing projects and messages tables with indexes and foreign keys (no changes required)</description>
+    </artifact>
+    <artifact>
+      <source>docs/stories/story-1.5.md</source>
+      <section>Frontend Chat Components</section>
+      <description>Existing ChatInterface.tsx and conversation-store.ts integration points</description>
+    </artifact>
+  </documentation-artifacts>
+
+  <code-artifacts>
+    <existing-files>
+      <file>
+        <path>lib/db/client.ts</path>
+        <description>Database connection using better-sqlite3, will be used by all /api/projects endpoints</description>
+      </file>
+      <file>
+        <path>lib/stores/conversation-store.ts</path>
+        <description>Zustand store for conversation messages, will be cleared on project switch</description>
+      </file>
+      <file>
+        <path>components/ui/button.tsx</path>
+        <description>shadcn/ui Button component for NewChatButton</description>
+      </file>
+      <file>
+        <path>components/ui/dialog.tsx</path>
+        <description>shadcn/ui Dialog component for delete confirmation</description>
+      </file>
+      <file>
+        <path>components/ui/dropdown-menu.tsx</path>
+        <description>shadcn/ui DropdownMenu component for project actions</description>
+      </file>
+      <file>
+        <path>app/api/chat/route.ts</path>
+        <description>Existing chat endpoint, will be modified to trigger project name generation on first message</description>
+      </file>
+      <file>
+        <path>components/features/conversation/ChatInterface.tsx</path>
+        <description>Existing chat UI that will receive focus after project switch</description>
+      </file>
+    </existing-files>
+    <new-files>
+      <file>
+        <path>components/features/projects/ProjectSidebar.tsx</path>
+        <description>Main sidebar component with 280px fixed width, project list, and "New Chat" button</description>
+      </file>
+      <file>
+        <path>components/features/projects/ProjectListItem.tsx</path>
+        <description>Individual project item with name, timestamp, hover states, and delete menu</description>
+      </file>
+      <file>
+        <path>components/features/projects/NewChatButton.tsx</path>
+        <description>Button component to create new projects via POST /api/projects</description>
+      </file>
+      <file>
+        <path>lib/stores/project-store.ts</path>
+        <description>Zustand store for project management with localStorage persistence</description>
+      </file>
+      <file>
+        <path>app/api/projects/route.ts</path>
+        <description>API endpoints: GET (list all projects), POST (create new project)</description>
+      </file>
+      <file>
+        <path>app/api/projects/[id]/route.ts</path>
+        <description>API endpoints: GET (single project), PUT (update project), DELETE (remove project)</description>
+      </file>
+      <file>
+        <path>lib/utils/generate-project-name.ts</path>
+        <description>Utility function to generate project names from first user message (30 char limit)</description>
+      </file>
+      <file>
+        <path>lib/hooks/use-project-switching.ts</path>
+        <description>Custom hook for project switching logic with AbortController</description>
+      </file>
+    </new-files>
+  </code-artifacts>
+
+  <dependencies>
+    <technical-dependencies>
+      <dependency>
+        <name>Next.js</name>
+        <version>15.5</version>
+        <usage>App Router for API routes and page routing</usage>
+      </dependency>
+      <dependency>
+        <name>React</name>
+        <version>19</version>
+        <usage>Component rendering and hooks</usage>
+      </dependency>
+      <dependency>
+        <name>TypeScript</name>
+        <version>5.x</version>
+        <usage>Type safety for all components and API handlers</usage>
+      </dependency>
+      <dependency>
+        <name>Zustand</name>
+        <version>5.0.8</version>
+        <usage>State management for projects and active project ID with localStorage persistence</usage>
+      </dependency>
+      <dependency>
+        <name>better-sqlite3</name>
+        <version>Latest</version>
+        <usage>Database queries for projects table (CRUD operations)</usage>
+      </dependency>
+      <dependency>
+        <name>shadcn/ui</name>
+        <version>Latest</version>
+        <usage>UI components (Button, Dialog, DropdownMenu, Sheet for mobile)</usage>
+      </dependency>
+      <dependency>
+        <name>lucide-react</name>
+        <version>Latest</version>
+        <usage>Icons (Plus for "New Chat", MoreVertical for menu, Trash for delete)</usage>
+      </dependency>
+      <dependency>
+        <name>date-fns</name>
+        <version>Latest</version>
+        <usage>formatDistanceToNow for relative timestamps in project list</usage>
+      </dependency>
+      <dependency>
+        <name>Tailwind CSS</name>
+        <version>3.x</version>
+        <usage>Styling (280px width, hover states, responsive breakpoints)</usage>
+      </dependency>
+    </technical-dependencies>
+    <story-dependencies>
+      <dependency>
+        <story-id>1.2</story-id>
+        <title>Database Setup</title>
+        <reason>Requires projects and messages tables with indexes</reason>
+        <status>Completed</status>
+      </dependency>
+      <dependency>
+        <story-id>1.5</story-id>
+        <title>Frontend Chat Components</title>
+        <reason>Integrates with conversation-store for message clearing on project switch</reason>
+        <status>Completed</status>
+      </dependency>
+    </story-dependencies>
+  </dependencies>
+
+  <development-constraints>
+    <constraint>
+      <category>Framework</category>
+      <requirement>Must use Next.js 15.5 App Router (no Pages Router)</requirement>
+    </constraint>
+    <constraint>
+      <category>Language</category>
+      <requirement>All code must be TypeScript with strict mode enabled</requirement>
+    </constraint>
+    <constraint>
+      <category>State Management</category>
+      <requirement>Use Zustand for project and conversation state (no Redux or Context API)</requirement>
+    </constraint>
+    <constraint>
+      <category>Database</category>
+      <requirement>Use better-sqlite3 with existing schema (no schema changes allowed)</requirement>
+    </constraint>
+    <constraint>
+      <category>UI Components</category>
+      <requirement>Must use shadcn/ui components for buttons, dialogs, and menus (no custom implementations)</requirement>
+    </constraint>
+    <constraint>
+      <category>Styling</category>
+      <requirement>Tailwind CSS only (no CSS modules, styled-components, or inline styles)</requirement>
+    </constraint>
+    <constraint>
+      <category>Sidebar Width</category>
+      <requirement>Fixed 280px width (matches Figma design specification)</requirement>
+    </constraint>
+    <constraint>
+      <category>Responsive</category>
+      <requirement>Mobile breakpoint at 768px, sidebar hidden below, hamburger menu required</requirement>
+    </constraint>
+    <constraint>
+      <category>Persistence</category>
+      <requirement>Use localStorage via Zustand persist middleware (key: "bmad-project-storage")</requirement>
+    </constraint>
+    <constraint>
+      <category>API Response Format</category>
+      <requirement>All API responses must follow standard format: { success: boolean, data?: any, error?: { message: string, code: string } }</requirement>
+    </constraint>
+    <constraint>
+      <category>Error Handling</category>
+      <requirement>All database errors must be caught and returned as 500 with DATABASE_ERROR code</requirement>
+    </constraint>
+    <constraint>
+      <category>Project ID</category>
+      <requirement>Must use crypto.randomUUID() for new project IDs (standard UUID v4 format)</requirement>
+    </constraint>
+    <constraint>
+      <category>Active Project Indicator</category>
+      <requirement>4px indigo left border (border-l-4 border-indigo-600) for active project</requirement>
+    </constraint>
+    <constraint>
+      <category>Name Generation</category>
+      <requirement>30 character max, trim to last complete word, minimum 5 chars or fallback to "New Project [date]"</requirement>
+    </constraint>
+  </development-constraints>
+
+  <api-specifications>
+    <endpoint>
+      <method>GET</method>
+      <path>/api/projects</path>
+      <description>List all projects ordered by most recent activity</description>
+      <request>
+        <parameters>None</parameters>
+      </request>
+      <response>
+        <success-status>200</success-status>
+        <success-body>
+{
+  "success": true,
+  "data": {
+    "projects": [
+      {
+        "id": "uuid-string",
+        "name": "Project name",
+        "topic": "Optional topic string or null",
+        "currentStep": "topic",
+        "lastActive": "2025-11-04T12:34:56.789Z",
+        "createdAt": "2025-11-03T08:00:00.000Z"
+      }
+    ]
+  }
+}
+        </success-body>
+        <error-status>500</error-status>
+        <error-body>
+{
+  "success": false,
+  "error": {
+    "message": "Failed to fetch projects",
+    "code": "DATABASE_ERROR"
+  }
+}
+        </error-body>
+      </response>
+      <database-query>SELECT id, name, topic, current_step as currentStep, last_active as lastActive, created_at as createdAt FROM projects ORDER BY last_active DESC</database-query>
+    </endpoint>
+
+    <endpoint>
+      <method>POST</method>
+      <path>/api/projects</path>
+      <description>Create a new project with default name "New Project"</description>
+      <request>
+        <body>
+{
+  "name": "Optional project name (defaults to 'New Project')"
+}
+        </body>
+      </request>
+      <response>
+        <success-status>200</success-status>
+        <success-body>
+{
+  "success": true,
+  "data": {
+    "project": {
+      "id": "newly-generated-uuid",
+      "name": "New Project",
+      "topic": null,
+      "currentStep": "topic",
+      "lastActive": "2025-11-04T12:34:56.789Z",
+      "createdAt": "2025-11-04T12:34:56.789Z"
+    }
+  }
+}
+        </success-body>
+        <error-status>500</error-status>
+        <error-body>
+{
+  "success": false,
+  "error": {
+    "message": "Failed to create project",
+    "code": "DATABASE_ERROR"
+  }
+}
+        </error-body>
+      </response>
+      <database-query>INSERT INTO projects (id, name, current_step, created_at, last_active) VALUES (?, ?, 'topic', ?, ?)</database-query>
+    </endpoint>
+
+    <endpoint>
+      <method>GET</method>
+      <path>/api/projects/[id]</path>
+      <description>Get a single project by ID</description>
+      <request>
+        <parameters>
+          <param>id: UUID string in URL path</param>
+        </parameters>
+      </request>
+      <response>
+        <success-status>200</success-status>
+        <success-body>
+{
+  "success": true,
+  "data": {
+    "project": {
+      "id": "uuid-string",
+      "name": "Project name",
+      "topic": "Optional topic",
+      "currentStep": "topic",
+      "lastActive": "2025-11-04T12:34:56.789Z",
+      "createdAt": "2025-11-03T08:00:00.000Z"
+    }
+  }
+}
+        </success-body>
+        <error-status>404</error-status>
+        <error-body>
+{
+  "success": false,
+  "error": {
+    "message": "Project not found",
+    "code": "NOT_FOUND"
+  }
+}
+        </error-body>
+      </response>
+      <database-query>SELECT id, name, topic, current_step as currentStep, last_active as lastActive, created_at as createdAt FROM projects WHERE id = ?</database-query>
+    </endpoint>
+
+    <endpoint>
+      <method>PUT</method>
+      <path>/api/projects/[id]</path>
+      <description>Update project details (name, topic, currentStep) and automatically update last_active timestamp</description>
+      <request>
+        <parameters>
+          <param>id: UUID string in URL path</param>
+        </parameters>
+        <body>
+{
+  "name": "Optional updated name",
+  "topic": "Optional updated topic",
+  "currentStep": "Optional updated step"
+}
+        </body>
+      </request>
+      <response>
+        <success-status>200</success-status>
+        <success-body>
+{
+  "success": true,
+  "data": {
+    "project": {
+      "id": "uuid-string",
+      "name": "Updated name",
+      "topic": "Updated topic",
+      "currentStep": "topic",
+      "lastActive": "2025-11-04T12:40:00.000Z",
+      "createdAt": "2025-11-03T08:00:00.000Z"
+    }
+  }
+}
+        </success-body>
+        <error-status>404</error-status>
+        <error-body>
+{
+  "success": false,
+  "error": {
+    "message": "Project not found",
+    "code": "NOT_FOUND"
+  }
+}
+        </error-body>
+      </response>
+      <database-query>UPDATE projects SET name = COALESCE(?, name), topic = COALESCE(?, topic), current_step = COALESCE(?, current_step), last_active = ? WHERE id = ?</database-query>
+    </endpoint>
+
+    <endpoint>
+      <method>DELETE</method>
+      <path>/api/projects/[id]</path>
+      <description>Delete project and cascade delete all associated messages (optional for MVP)</description>
+      <request>
+        <parameters>
+          <param>id: UUID string in URL path</param>
+        </parameters>
+      </request>
+      <response>
+        <success-status>200</success-status>
+        <success-body>
+{
+  "success": true,
+  "data": {
+    "deletedProjectId": "uuid-string"
+  }
+}
+        </success-body>
+        <error-status>404</error-status>
+        <error-body>
+{
+  "success": false,
+  "error": {
+    "message": "Project not found",
+    "code": "NOT_FOUND"
+  }
+}
+        </error-body>
+      </response>
+      <database-query>DELETE FROM projects WHERE id = ? (CASCADE to messages via foreign key)</database-query>
+      <notes>Messages are automatically deleted via ON DELETE CASCADE foreign key constraint</notes>
+    </endpoint>
+
+    <endpoint>
+      <method>GET</method>
+      <path>/api/projects/[id]/messages</path>
+      <description>Get all messages for a specific project (used during project switching)</description>
+      <request>
+        <parameters>
+          <param>id: UUID string in URL path (project ID)</param>
+        </parameters>
+      </request>
+      <response>
+        <success-status>200</success-status>
+        <success-body>
+{
+  "success": true,
+  "data": [
+    {
+      "id": "message-uuid",
+      "projectId": "project-uuid",
+      "role": "user",
+      "content": "Message text",
+      "timestamp": "2025-11-04T12:34:56.789Z"
+    }
+  ]
+}
+        </success-body>
+      </response>
+      <database-query>SELECT id, project_id as projectId, role, content, timestamp FROM messages WHERE project_id = ? ORDER BY timestamp ASC</database-query>
+      <notes>This endpoint may already exist from Story 1.4 or 1.5, reference existing implementation</notes>
+    </endpoint>
+  </api-specifications>
+
+  <test-strategy>
+    <unit-tests>
+      <test>
+        <file>lib/utils/generate-project-name.test.ts</file>
+        <cases>
+          <case>Empty string input returns "New Project [date]"</case>
+          <case>Short message (&lt; 5 chars) returns "New Project [date]"</case>
+          <case>Message exactly 30 chars returns as-is</case>
+          <case>Message under 30 chars returns as-is</case>
+          <case>Message over 30 chars with spaces truncates to last word</case>
+          <case>Message over 30 chars without spaces hard truncates with "..."</case>
+          <case>Message with only whitespace returns "New Project [date]"</case>
+          <case>Message with special characters handles correctly</case>
+          <case>Message with emoji characters counts correctly</case>
+        </cases>
+      </test>
+      <test>
+        <file>lib/stores/project-store.test.ts</file>
+        <cases>
+          <case>setActiveProject updates activeProjectId and persists to localStorage</case>
+          <case>loadProjects replaces projects array</case>
+          <case>addProject adds to beginning of array and sets as active</case>
+          <case>updateProject modifies correct project by ID</case>
+          <case>removeProject deletes project and clears active if matching</case>
+          <case>localStorage persistence only saves activeProjectId</case>
+          <case>Store rehydrates activeProjectId from localStorage on init</case>
+        </cases>
+      </test>
+    </unit-tests>
+
+    <component-tests>
+      <test>
+        <component>ProjectSidebar</component>
+        <cases>
+          <case>Renders empty state when no projects exist</case>
+          <case>Renders project list when projects exist</case>
+          <case>Highlights active project with indigo border</case>
+          <case>Orders projects by lastActive descending</case>
+          <case>Fetches projects from API on mount</case>
+          <case>Displays "New Chat" button at top</case>
+          <case>Sidebar has fixed 280px width</case>
+          <case>Hides on mobile (&lt;768px), shows on desktop</case>
+        </cases>
+      </test>
+      <test>
+        <component>ProjectListItem</component>
+        <cases>
+          <case>Displays project name correctly</case>
+          <case>Shows relative timestamp using date-fns</case>
+          <case>Applies hover background color on mouse enter</case>
+          <case>Calls switchProject on click</case>
+          <case>Shows three-dot menu on hover (desktop)</case>
+          <case>Truncates long names with ellipsis</case>
+          <case>Opens delete confirmation dialog</case>
+          <case>Has correct ARIA labels for accessibility</case>
+        </cases>
+      </test>
+      <test>
+        <component>NewChatButton</component>
+        <cases>
+          <case>Shows "New Chat" text with Plus icon</case>
+          <case>Calls POST /api/projects on click</case>
+          <case>Shows loading state during API call</case>
+          <case>Updates project-store with new project</case>
+          <case>Clears conversation-store messages</case>
+          <case>Navigates to new project URL</case>
+          <case>Displays error toast on API failure</case>
+          <case>Focuses chat input after creation</case>
+        </cases>
+      </test>
+    </component-tests>
+
+    <integration-tests>
+      <test>
+        <scenario>Create new project flow</scenario>
+        <steps>
+          <step>User clicks "New Chat" button</step>
+          <step>POST /api/projects creates project in database</step>
+          <step>New project appears at top of sidebar</step>
+          <step>New project becomes active (indigo border)</step>
+          <step>Chat interface clears and focuses input</step>
+          <step>URL updates to /projects/[new-id]</step>
+        </steps>
+      </test>
+      <test>
+        <scenario>Project switching flow</scenario>
+        <steps>
+          <step>User has multiple projects in sidebar</step>
+          <step>User clicks different project in list</step>
+          <step>Active project changes (border moves)</step>
+          <step>GET /api/projects/[id]/messages loads conversation</step>
+          <step>Messages display in chat interface</step>
+          <step>URL updates to /projects/[id]</step>
+          <step>PUT /api/projects/[id] updates last_active</step>
+        </steps>
+      </test>
+      <test>
+        <scenario>Project deletion flow</scenario>
+        <steps>
+          <step>User hovers over project, clicks three-dot menu</step>
+          <step>User clicks "Delete" option</step>
+          <step>Confirmation dialog appears with project name</step>
+          <step>User confirms deletion</step>
+          <step>DELETE /api/projects/[id] removes from database</step>
+          <step>Project disappears from sidebar</step>
+          <step>If deleted project was active, switches to most recent</step>
+        </steps>
+      </test>
+      <test>
+        <scenario>Project name auto-generation flow</scenario>
+        <steps>
+          <step>User creates new project (shows "New Project")</step>
+          <step>User types and sends first message</step>
+          <step>generateProjectName extracts first 30 chars</step>
+          <step>PUT /api/projects/[id] updates name in database</step>
+          <step>Sidebar updates to show auto-generated name</step>
+          <step>Name appears immediately without page reload</step>
+        </steps>
+      </test>
+      <test>
+        <scenario>Active project persistence flow</scenario>
+        <steps>
+          <step>User has project ABC active</step>
+          <step>User closes browser tab</step>
+          <step>localStorage contains activeProjectId: "ABC"</step>
+          <step>User reopens application</step>
+          <step>App reads activeProjectId from localStorage</step>
+          <step>Verifies project ABC exists in database</step>
+          <step>Navigates to /projects/ABC automatically</step>
+          <step>Project ABC highlighted in sidebar</step>
+        </steps>
+      </test>
+    </integration-tests>
+
+    <e2e-tests>
+      <test>
+        <scenario>Multi-project workflow with isolation</scenario>
+        <description>User creates 3 projects, adds messages to each, switches between them, verifies conversation isolation</description>
+      </test>
+      <test>
+        <scenario>Browser session persistence</scenario>
+        <description>User creates project, adds messages, closes browser, reopens, verifies same project active with messages</description>
+      </test>
+      <test>
+        <scenario>Delete active project behavior</scenario>
+        <description>User has 3 projects, deletes currently active one, verifies automatic switch to most recent remaining project</description>
+      </test>
+      <test>
+        <scenario>Auto-generated names appear in sidebar</scenario>
+        <description>User creates project, sends first message "Create a video about space exploration", sees name "Create a video about space..." in sidebar immediately</description>
+      </test>
+      <test>
+        <scenario>Mobile responsive sidebar</scenario>
+        <description>On mobile viewport, sidebar hidden, hamburger menu visible, tapping opens drawer with project list</description>
+      </test>
+    </e2e-tests>
+
+    <manual-tests>
+      <test>Sidebar scroll behavior with 20+ projects</test>
+      <test>Hover states on all interactive elements</test>
+      <test>Keyboard navigation through project list (tab, enter)</test>
+      <test>Screen reader announces project names and timestamps</test>
+      <test>Three-dot menu positions correctly at bottom of list</test>
+      <test>Confirmation dialog centers on all screen sizes</test>
+      <test>Loading states display correctly during API calls</test>
+      <test>Error toasts appear in correct position</test>
+      <test>Sidebar border separator visible in light and dark themes</test>
+      <test>Project names truncate gracefully with ellipsis</test>
+    </manual-tests>
+  </test-strategy>
+
+  <performance-considerations>
+    <item>Fetch project list once on app load, not on every render</item>
+    <item>Use React.memo on ProjectListItem to prevent unnecessary re-renders with large lists</item>
+    <item>Implement AbortController to cancel in-flight message requests during rapid project switching</item>
+    <item>Debounce last_active updates (only on message send or explicit switch, not on every keystroke)</item>
+    <item>Use virtualization (react-window) if project list exceeds 100 items (future enhancement)</item>
+    <item>Lazy load project messages only when switching (don't preload all conversations)</item>
+    <item>Database query uses existing index on last_active for fast sorting</item>
+    <item>LocalStorage writes are synchronous but fast (only stores small activeProjectId string)</item>
+  </performance-considerations>
+
+  <edge-cases>
+    <case>
+      <scenario>localStorage disabled or unavailable</scenario>
+      <handling>Gracefully fall back to most recent project, no crash</handling>
+    </case>
+    <case>
+      <scenario>Active project deleted by another tab/session</scenario>
+      <handling>On next load, verify project exists, fall back to most recent if missing</handling>
+    </case>
+    <case>
+      <scenario>First message is empty or only whitespace</scenario>
+      <handling>generateProjectName returns "New Project [date]" fallback</handling>
+    </case>
+    <case>
+      <scenario>First message has no spaces (single 50-char word)</scenario>
+      <handling>Hard truncate to 27 chars and add "..."</handling>
+    </case>
+    <case>
+      <scenario>Rapid project switching (clicking multiple projects quickly)</scenario>
+      <handling>AbortController cancels previous requests, only last switch completes</handling>
+    </case>
+    <case>
+      <scenario>Network failure during project creation</scenario>
+      <handling>Display error toast, don't add to sidebar, user can retry</handling>
+    </case>
+    <case>
+      <scenario>Database locked during write operation</scenario>
+      <handling>better-sqlite3 retries, if fails return 500 error with DATABASE_ERROR code</handling>
+    </case>
+    <case>
+      <scenario>User deletes last remaining project</scenario>
+      <handling>Show empty state "No projects yet. Click 'New Chat' to start."</handling>
+    </case>
+    <case>
+      <scenario>URL manually changed to non-existent project ID</scenario>
+      <handling>GET /api/projects/[id] returns 404, show error message, redirect to most recent project</handling>
+    </case>
+  </edge-cases>
+
+  <definition-of-done>
+    <item>All 9 tasks completed and subtasks checked off</item>
+    <item>All 6 acceptance criteria validated and passing</item>
+    <item>Unit tests written for generateProjectName (9 test cases) with &gt;80% coverage</item>
+    <item>Unit tests written for project-store (7 test cases) with &gt;80% coverage</item>
+    <item>Component tests passing for ProjectSidebar, ProjectListItem, NewChatButton</item>
+    <item>Integration tests passing for create, switch, delete, name generation, persistence flows</item>
+    <item>E2E tests passing for multi-project workflow and session persistence</item>
+    <item>Code reviewed and approved by senior developer</item>
+    <item>UI tested in Chrome, Firefox, Safari (latest versions)</item>
+    <item>Mobile responsive design verified on iOS Safari and Android Chrome</item>
+    <item>Accessibility tested with keyboard navigation (tab, enter, escape)</item>
+    <item>Screen reader compatibility verified (NVDA or VoiceOver)</item>
+    <item>No TypeScript errors or warnings in build output</item>
+    <item>No console errors or warnings in browser developer tools</item>
+    <item>Sidebar displays correctly at exactly 280px width</item>
+    <item>Project switching is fast (&lt;300ms) and smooth with no flickering</item>
+    <item>Active project persists correctly across page reloads and browser restarts</item>
+    <item>Auto-generated project names appear immediately in sidebar after first message</item>
+    <item>Deletion confirmation dialog displays correct project name and works properly</item>
+    <item>Database queries optimized and using existing indexes</item>
+    <item>API endpoints return correct response format (success, data, error structure)</item>
+    <item>All edge cases handled gracefully (localStorage disabled, deleted project, network failures)</item>
+    <item>Component documentation added (JSDoc comments for props and functions)</item>
+    <item>Inline code comments added for complex logic (name generation, switching workflow)</item>
+  </definition-of-done>
+
+  <related-stories>
+    <story>
+      <id>1.2</id>
+      <title>Database Setup</title>
+      <relationship>Provides projects and messages tables with schema</relationship>
+    </story>
+    <story>
+      <id>1.4</id>
+      <title>Chat API Endpoint</title>
+      <relationship>Will be modified to trigger project name generation on first message</relationship>
+    </story>
+    <story>
+      <id>1.5</id>
+      <title>Frontend Chat Components</title>
+      <relationship>Integrates with conversation-store for message clearing on project switch</relationship>
+    </story>
+  </related-stories>
+
+  <github-repository>https://github.com/AIfriendly/AIvideogen</github-repository>
+</story-context>
