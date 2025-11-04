@@ -43,6 +43,7 @@ import db from '@/lib/db/client';
 import { initializeDatabase } from '@/lib/db/init';
 import { createLLMProvider } from '@/lib/llm/factory';
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/llm/prompts/default-system-prompt';
+import { generateProjectName } from '@/lib/utils/generate-project-name';
 
 // Initialize database on first import (idempotent - safe to call multiple times)
 initializeDatabase();
@@ -299,6 +300,26 @@ export async function POST(request: NextRequest) {
         INSERT INTO messages (id, project_id, role, content, timestamp)
         VALUES (?, ?, ?, ?, ?)
       `).run(userMessageId, projectId, 'user', message, userTimestamp);
+
+      // Check if this is the first message for this project
+      // If so, auto-generate project name from the message
+      const messageCount = db.prepare(`
+        SELECT COUNT(*) as count FROM messages WHERE project_id = ?
+      `).get(projectId) as { count: number };
+
+      if (messageCount.count === 1) {
+        // This is the first message - generate project name
+        const projectName = generateProjectName(message);
+
+        // Update project name in database
+        db.prepare(`
+          UPDATE projects
+          SET name = ?, last_active = ?
+          WHERE id = ?
+        `).run(projectName, userTimestamp, projectId);
+
+        console.log(`[Chat API] Auto-generated project name: "${projectName}" for project ${projectId}`);
+      }
 
       // Timestamp for assistant message (when generated)
       const assistantTimestamp = new Date().toISOString();
