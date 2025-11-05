@@ -43,7 +43,8 @@ development_status:
   1-3-llm-provider-abstraction: done
   1-4-chat-api-endpoint: done
   1-5-frontend-chat-components: ready-for-dev
-  1-6-topic-confirmation-workflow: backlog
+  1-6-project-management-ui: done
+  1-7-topic-confirmation-workflow: ready-for-dev
   epic-1-retrospective: optional
 
   # Epic 2: Content Generation Pipeline

@@ -1,0 +1,401 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.7</storyId>
+    <title>Topic Confirmation Workflow</title>
+    <status>Ready</status>
+    <generatedAt>2025-11-05</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-1.7.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>creator</asA>
+    <iWant>to confirm or edit the detected video topic through a dialog interface</iWant>
+    <soThat>I can explicitly approve the topic before proceeding to production or refine it through continued conversation</soThat>
+    <tasks>
+      - Task 1: Create TopicConfirmation Dialog Component (components/features/conversation/TopicConfirmation.tsx)
+      - Task 2: Implement Topic Extraction Logic (lib/conversation/topic-extraction.ts)
+      - Task 3: Integrate Topic Detection in Chat Flow (app/api/chat/route.ts)
+      - Task 4: Integrate TopicConfirmation in ChatInterface (components/features/conversation/ChatInterface.tsx)
+      - Task 5: Implement Confirmation Handler with Database Update (app/api/projects/[id]/route.ts)
+      - Task 6: Implement Voice Selection Placeholder Page (app/projects/[id]/voice/page.tsx)
+      - Task 7: Update Workflow Store (stores/workflow-store.ts)
+      - Task 8: Add Integration Tests (tests/integration/topic-confirmation.test.ts)
+      - Task 9: Add Unit Tests for Topic Extraction (tests/unit/topic-extraction.test.ts)
+      - Task 10: Update API Response Types (types/api.ts)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    AC1: TopicConfirmation dialog appears when user issues video creation command
+      - Dialog triggered when LLM detects video creation intent (e.g., "make a video about X", "create the video now")
+      - Dialog displays extracted topic text prominently
+      - Dialog includes "Confirm" and "Edit" action buttons
+      - Dialog overlays chat interface with backdrop (prevents interaction with chat)
+      - Dialog is dismissible only via "Confirm" or "Edit" buttons (not by clicking backdrop)
+
+    AC2: Topic extracted from conversation context and displayed for confirmation
+      - System analyzes recent conversation messages (last 10 messages or entire conversation if shorter)
+      - Topic extraction uses LLM-based analysis or pattern matching from user's explicit statement
+      - Extracted topic displayed clearly in dialog (e.g., "Video topic: Mars colonization")
+      - If topic cannot be determined, dialog shows placeholder: "Video topic not clear from conversation"
+
+    AC3: User can confirm the topic
+      - Clicking "Confirm" button updates database immediately
+      - project.topic field set to extracted topic string
+      - project.name field updated from "New Project" to the topic (first 50 chars, truncated to last complete word)
+      - project.current_step field advanced from 'topic' to 'voice'
+      - project.last_active timestamp updated
+      - Dialog closes after successful database update
+      - User navigated to voice selection interface (placeholder for Epic 2)
+
+    AC4: User can edit/refine the topic
+      - Clicking "Edit" button closes dialog immediately
+      - No database fields updated (topic remains null, current_step remains 'topic')
+      - Chat input field receives focus automatically
+      - Conversation history remains intact and visible
+      - User can continue conversation to refine topic
+      - When user issues new video creation command, TopicConfirmation dialog reappears with refined topic
+
+    AC5: Navigation to voice selection step (Epic 2 placeholder)
+      - After confirmation, user navigated to `/projects/[id]/voice` route
+      - Route displays placeholder message: "Voice selection coming in Epic 2"
+      - Project remains in 'voice' step state
+      - Back navigation to chat preserves project state
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>Feature 1.1 - Conversational AI Agent</section>
+        <snippet>Agent must confirm the final topic with the user before proceeding to script generation. Upon confirmation, the agent must pass the confirmed topic string to be used as the "video title" in subsequent steps. (lines 42-46)</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>Feature 1.1 AC2 - Successful Command Trigger</section>
+        <snippet>When the user issues the command "Okay, make a video about Mars colonization." Then the agent must provide a confirmation message ("Confirming: I will start creating a video about Mars colonization. Is that correct?") and await user approval. (lines 49-52)</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>Feature 1.3 - Voice Selection</section>
+        <snippet>The system shall present a voice selection interface after topic confirmation and before script generation. (lines 112-113)</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic 1 - Conversational Topic Discovery</title>
+        <section>Story 1.7 - Topic Confirmation Workflow</section>
+        <snippet>Goal: Implement topic detection, confirmation dialog, and project initialization. Tasks include creating TopicConfirmation.tsx dialog, topic extraction from conversation, confirmation/edit workflow, and navigation to voice selection step. (lines 249-271)</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Technical Specification Epic 1</title>
+        <section>AC4: Topic Confirmation Workflow</section>
+        <snippet>Given TopicConfirmation dialog with topic, when user clicks Confirm, project's topic field updated, name updated from "New Project" to topic, current_step advances to 'voice', and user navigated to voice selection interface. (lines 569-575)</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Technical Specification Epic 1</title>
+        <section>AC13: Topic Edit Workflow</section>
+        <snippet>Given TopicConfirmation dialog, when user clicks Edit, dialog closes immediately without database updates. Project's topic remains null, current_step remains 'topic'. Chat input receives focus. User can continue conversation to refine topic. (lines 637-646)</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Technical Specification Epic 1</title>
+        <section>Topic Detection and Confirmation Flow</section>
+        <snippet>LLM detects video creation intent, responds with confirmation request. Frontend detects pattern, displays TopicConfirmation dialog with extracted topic. User clicks Confirm or Edit. On confirmation, database updated and navigation to voice selection. (lines 331-342)</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Epic 1 Component Mapping</section>
+        <snippet>TopicConfirmation.tsx component provides topic approval dialog with Confirm/Edit buttons. Located at components/features/conversation/TopicConfirmation.tsx. (lines 185-188)</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Database Schema - Projects Table</section>
+        <snippet>Projects table includes topic field (confirmed topic string), current_step field (workflow step: 'topic', 'voice', etc.), and last_active timestamp. Topic and current_step updated on confirmation. (lines 1146-1157)</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>API Endpoint PUT /api/projects/:id</section>
+        <snippet>Update project metadata endpoint accepts name, topic, currentStep fields in request body. Returns updated project with lastActive timestamp. Used for topic confirmation updates. (lines 1531-1544)</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>src/components/features/conversation/ChatInterface.tsx</path>
+        <kind>component</kind>
+        <symbol>ChatInterface</symbol>
+        <lines>1-199</lines>
+        <reason>Main chat UI component where TopicConfirmation dialog will be integrated. Contains message handling, state management (conversation-store), and API integration with /api/chat endpoint. Task 4 adds dialog state and handlers here.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/features/conversation/MessageList.tsx</path>
+        <kind>component</kind>
+        <symbol>MessageList</symbol>
+        <lines>N/A</lines>
+        <reason>Existing component for displaying conversation history. Referenced by ChatInterface. Conversation history must remain intact during Edit workflow (AC4).</reason>
+      </artifact>
+      <artifact>
+        <path>src/app/api/chat/route.ts</path>
+        <kind>api-route</kind>
+        <symbol>POST handler</symbol>
+        <lines>109-387</lines>
+        <reason>Chat API endpoint where topic detection logic will be integrated (Task 3). Currently handles message persistence, LLM calls, and project name auto-generation. Will add topic detection and include topicDetected/extractedTopic fields in response.</reason>
+      </artifact>
+      <artifact>
+        <path>src/app/api/projects/[id]/route.ts</path>
+        <kind>api-route</kind>
+        <symbol>PUT handler</symbol>
+        <lines>160-267</lines>
+        <reason>Project update endpoint that will be used by confirmation handler (Task 5). Already supports updating name, topic, currentStep fields. Updates last_active timestamp automatically. AC3 requires calling this endpoint with topic, name, and currentStep='voice'.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/stores/conversation-store.ts</path>
+        <kind>store</kind>
+        <symbol>createConversationStore</symbol>
+        <lines>1-91</lines>
+        <reason>Factory for per-project conversation state. Used by ChatInterface. Provides messages array, loading state, and error handling. Edit workflow (AC4) requires conversation to remain intact.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/db/project-queries.ts</path>
+        <kind>service</kind>
+        <symbol>updateProject</symbol>
+        <lines>205-264</lines>
+        <reason>Database function for updating project fields (name, topic, currentStep). Used by PUT /api/projects/[id] route. Confirmation handler will update project.topic, project.name, and project.current_step via this function.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/db/schema.sql</path>
+        <kind>schema</kind>
+        <symbol>projects table</symbol>
+        <lines>23-35</lines>
+        <reason>Database schema showing projects table structure: id, name, topic (nullable), current_step (default 'topic'), last_active. Topic confirmation updates these fields: topic='extracted topic', name='topic truncated to 50 chars', current_step='voice'.</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/ui/dialog.tsx</path>
+        <kind>ui-component</kind>
+        <symbol>Dialog primitives</symbol>
+        <lines>N/A</lines>
+        <reason>shadcn/ui Dialog component (Radix UI primitives) will be used as base for TopicConfirmation dialog (Task 1). Provides overlay, backdrop, and accessibility features. Dialog must prevent backdrop-click dismissal (AC1).</reason>
+      </artifact>
+      <artifact>
+        <path>src/components/ui/button.tsx</path>
+        <kind>ui-component</kind>
+        <symbol>Button</symbol>
+        <lines>N/A</lines>
+        <reason>shadcn/ui Button component for Confirm and Edit action buttons. Edit button (secondary/outline), Confirm button (primary/indigo) per Task 1.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/llm/prompts/default-system-prompt.ts</path>
+        <kind>config</kind>
+        <symbol>DEFAULT_SYSTEM_PROMPT</symbol>
+        <lines>N/A</lines>
+        <reason>System prompt used for LLM conversations. Defines assistant behavior for creative brainstorming and topic confirmation. LLM uses this prompt to detect video creation intent and respond with confirmation requests.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package>next</package>
+        <version>16.0.1</version>
+        <reason>App Router API routes for /api/chat and /api/projects endpoints. Server components for voice placeholder page.</reason>
+      </node>
+      <node>
+        <package>react</package>
+        <version>19</version>
+        <reason>UI framework for TopicConfirmation dialog component and ChatInterface integration.</reason>
+      </node>
+      <node>
+        <package>zustand</package>
+        <version>5.0.8</version>
+        <reason>State management for conversation-store (existing) and workflow-store (Task 7 - may need creation or update).</reason>
+      </node>
+      <node>
+        <package>@radix-ui/react-dialog</package>
+        <version>latest</version>
+        <reason>shadcn/ui Dialog primitives for TopicConfirmation component. Provides accessibility and overlay functionality.</reason>
+      </node>
+      <node>
+        <package>better-sqlite3</package>
+        <version>12.4.1</version>
+        <reason>SQLite database driver for project updates (topic, name, current_step fields).</reason>
+      </node>
+      <node>
+        <package>lucide-react</package>
+        <version>latest</version>
+        <reason>Icon library for dialog UI elements if needed.</reason>
+      </node>
+      <node>
+        <package>typescript</package>
+        <version>5.x</version>
+        <reason>Type definitions for API response interfaces (Task 10), topic extraction function, and component props.</reason>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Component Structure: TopicConfirmation.tsx must follow existing dialog patterns (shadcn/ui/Radix UI primitives). Stateless component controlled by parent ChatInterface.tsx via props.
+    - State Management: Dialog state managed locally in ChatInterface (useState for showTopicConfirmation, extractedTopic). Project state updates flow through project-store (if exists) or direct API calls.
+    - Data Flow: User message → POST /api/chat → LLM response with topic detection → API includes topicDetected=true, extractedTopic fields → ChatInterface opens dialog → User clicks Confirm → PUT /api/projects/[id] with topic/name/currentStep → Navigate to /voice route.
+    - Error Handling: API errors during confirmation displayed via toast notifications. Failed database updates do not close dialog (user can retry). Network errors show: "Failed to save topic. Please try again."
+    - Testing Strategy: Unit tests for topic extraction (pattern matching, edge cases). Integration tests for full workflow (dialog → confirmation → DB → navigation). Component tests for TopicConfirmation UI (accessibility, button interactions).
+    - Database Transactions: Project updates must be atomic (topic, name, current_step all updated together or none updated).
+    - Edit Workflow: Clicking Edit must NOT trigger any database writes. Dialog closes, chat input focused, conversation remains intact. User can continue chatting and issue new video creation command.
+    - Topic Extraction Patterns: Match explicit commands like "make a video about [topic]", "create a video on [topic]", "let's make [topic] video". For generic commands ("make the video now"), analyze last 5 user messages for context.
+    - Project Name Generation: Truncate topic to 50 chars at last complete word boundary (reuse existing generateProjectName utility from lib/utils).
+    - Navigation: After confirmation, navigate to /projects/[id]/voice route (Task 6 creates placeholder). Voice selection is Epic 2, so placeholder shows: "Voice selection coming in Epic 2".
+    - Accessibility: Dialog must have proper ARIA attributes (aria-labelledby, aria-describedby), focus trap, and keyboard navigation (Escape key triggers Edit behavior).
+    - File Locations: Follow architecture.md structure - TopicConfirmation in components/features/conversation/, topic-extraction in lib/conversation/, tests in tests/unit/ and tests/integration/.
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>ChatResponse (updated for Story 1.7)</name>
+      <kind>API Response Type</kind>
+      <signature>
+        interface ChatResponse {
+          success: true;
+          data: {
+            messageId: string;
+            response: string;
+            timestamp: string;
+            topicDetected?: boolean;      // NEW: indicates video creation intent detected
+            extractedTopic?: string;      // NEW: extracted topic string
+          };
+        }
+      </signature>
+      <path>types/api.ts (Task 10)</path>
+      <reason>Extended chat API response to include topic detection fields. ChatInterface checks topicDetected to trigger dialog.</reason>
+    </interface>
+
+    <interface>
+      <name>TopicConfirmationProps</name>
+      <kind>Component Props Interface</kind>
+      <signature>
+        interface TopicConfirmationProps {
+          isOpen: boolean;
+          topic: string;
+          onConfirm: () => void;
+          onEdit: () => void;
+        }
+      </signature>
+      <path>components/features/conversation/TopicConfirmation.tsx</path>
+      <reason>Props for TopicConfirmation dialog. isOpen controls visibility, topic is extracted string, onConfirm handles confirmation with DB update and navigation, onEdit closes dialog and focuses input.</reason>
+    </interface>
+
+    <interface>
+      <name>extractTopicFromConversation</name>
+      <kind>Function Signature</kind>
+      <signature>
+        function extractTopicFromConversation(messages: Message[]): string | null;
+        // Returns: extracted topic string or null if no clear topic detected
+      </signature>
+      <path>lib/conversation/topic-extraction.ts</path>
+      <reason>Topic extraction logic using pattern matching. Analyzes conversation messages for video creation commands and extracts topic. Returns null if topic cannot be determined (AC2).</reason>
+    </interface>
+
+    <interface>
+      <name>ProjectUpdateRequest</name>
+      <kind>API Request Body</kind>
+      <signature>
+        interface ProjectUpdateRequest {
+          name?: string;        // Updated project name (topic truncated to 50 chars)
+          topic?: string;       // Confirmed topic string
+          currentStep?: string; // Workflow step: 'topic' → 'voice' on confirmation
+        }
+      </signature>
+      <path>app/api/projects/[id]/route.ts (existing)</path>
+      <reason>Request body for PUT /api/projects/[id]. Confirmation handler calls this with all three fields: name=truncated topic, topic=full topic, currentStep='voice'.</reason>
+    </interface>
+
+    <interface>
+      <name>WorkflowStore (may need creation)</name>
+      <kind>Zustand Store</kind>
+      <signature>
+        interface WorkflowState {
+          currentStep: 'topic' | 'voice' | 'script' | 'clips' | 'curation' | 'assembly';
+          topic: string | null;
+          setCurrentStep: (step: WorkflowStep) => void;
+          setTopic: (topic: string) => void;
+        }
+      </signature>
+      <path>stores/workflow-store.ts (Task 7)</path>
+      <reason>Workflow state management. Tracks current_step and topic. May need to be created if doesn't exist. After confirmation, setCurrentStep('voice') and setTopic(extractedTopic) called.</reason>
+    </interface>
+
+    <interface>
+      <name>Voice Selection Placeholder Route</name>
+      <kind>Next.js Page Route</kind>
+      <signature>
+        Route: /projects/[id]/voice
+        Component: async function VoicePage({ params }: { params: { id: string } })
+        Returns: Placeholder UI with "Voice Selection - Coming in Epic 2" message
+      </signature>
+      <path>app/projects/[id]/voice/page.tsx (Task 6)</path>
+      <reason>Placeholder route for Epic 2 voice selection. After topic confirmation, user navigated here (AC5). Displays project name and topic from database, includes "Back to Chat" button.</reason>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing framework: Vitest or Jest (TypeScript-friendly) for unit and integration tests. React Testing Library for component tests. Playwright for E2E tests. All tests follow AAA pattern (Arrange, Act, Assert). Mock Ollama responses for predictable LLM behavior. Use in-memory SQLite for database tests. Coverage target: >80% for business logic, 100% for critical confirmation workflow path.
+    </standards>
+
+    <locations>
+      tests/unit/ - Unit tests for topic-extraction.ts (pattern matching, edge cases)
+      tests/integration/ - Integration tests for full topic confirmation workflow
+      tests/component/ - Component tests for TopicConfirmation.tsx (UI, accessibility)
+      tests/e2e/ - End-to-end tests for complete user journey (brainstorm → confirm → navigate)
+    </locations>
+
+    <ideas>
+      Unit Tests (tests/unit/topic-extraction.test.ts):
+        - AC2: Extract topic from "make a video about Mars colonization" → returns "Mars colonization"
+        - AC2: Extract topic from "create a video on renewable energy" → returns "renewable energy"
+        - AC2: Generic command "make the video" with context → analyzes last 5 messages
+        - AC2: No clear topic in conversation → returns null
+        - AC2: Empty conversation history → returns null
+        - Edge case: Very long topic strings (>200 chars) → truncates appropriately
+        - Edge case: Special characters in topic → handles correctly
+
+      Component Tests (tests/component/TopicConfirmation.test.tsx):
+        - AC1: Dialog renders with topic text prominently displayed
+        - AC1: Dialog shows Confirm and Edit buttons
+        - AC1: Dialog backdrop prevents chat interaction
+        - AC1: Dialog cannot be dismissed by clicking backdrop
+        - AC4: Clicking Edit button closes dialog immediately
+        - AC3: Clicking Confirm button triggers onConfirm callback
+        - Accessibility: Dialog has proper ARIA attributes
+        - Accessibility: Focus trap works correctly
+        - Accessibility: Escape key triggers Edit behavior
+
+      Integration Tests (tests/integration/topic-confirmation.test.ts):
+        - AC1: Topic detection in chat flow triggers dialog appearance
+        - AC2: Extracted topic displayed in dialog matches conversation context
+        - AC3: Confirm button updates database (topic, name, current_step='voice')
+        - AC3: After confirmation, user navigated to /projects/[id]/voice route
+        - AC4: Edit button closes dialog without any database updates
+        - AC4: After Edit, chat input receives focus
+        - AC4: Conversation history remains intact after Edit
+        - AC4: New video creation command after Edit triggers new dialog with refined topic
+        - Error handling: Failed database update shows error message
+        - Error handling: Network error during confirmation shows retry option
+        - Multiple edit cycles: Edit → refine → edit → confirm workflow
+
+      E2E Tests (tests/e2e/topic-confirmation.e2e.ts):
+        - Complete flow: Open chat → brainstorm topic → issue command → confirm → navigate to voice
+        - Edit flow: Brainstorm → command → dialog → Edit → continue conversation → refine → new command → confirm
+        - Project state: Confirmed topic persists across page refresh
+        - Project name: Auto-generated from topic and displayed in sidebar
+        - Navigation: Back button from voice page returns to chat with preserved state
+    </ideas>
+  </tests>
+</story-context>
