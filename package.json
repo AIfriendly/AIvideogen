@@ -18,7 +18,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:p0": "vitest run tests/api/projects.security.test.ts tests/regression/new-chat-404-fix.test.tsx",
+    "test:security": "vitest run tests/api/projects.security.test.ts",
+    "test:regression": "vitest run tests/regression/"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

@@ -44,6 +44,8 @@ import { initializeDatabase } from '@/lib/db/init';
 import { createLLMProvider } from '@/lib/llm/factory';
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/llm/prompts/default-system-prompt';
 import { generateProjectName } from '@/lib/utils/generate-project-name';
+import { extractTopicFromConversation } from '@/lib/conversation/topic-extraction';
+import { Message } from '@/types/api';
 
 // Initialize database on first import (idempotent - safe to call multiple times)
 initializeDatabase();
@@ -69,6 +71,7 @@ interface DBMessage {
 
 /**
  * Success response structure
+ * Updated in Story 1.7 to include topic detection fields
  */
 interface ChatSuccessResponse {
   success: true;
@@ -76,6 +79,8 @@ interface ChatSuccessResponse {
     messageId: string;
     response: string;
     timestamp: string;
+    topicDetected?: boolean;
+    extractedTopic?: string;
   };
 }
 
@@ -334,17 +339,48 @@ export async function POST(request: NextRequest) {
       db.prepare('COMMIT').run();
 
       // ==========================================
-      // STEP 6: Return Success Response
+      // STEP 6: Topic Detection (Story 1.7)
       // ==========================================
+
+      // Load full conversation history with new messages for topic detection
+      const allMessages = db.prepare(`
+        SELECT id, project_id, role, content, timestamp FROM messages
+        WHERE project_id = ?
+        ORDER BY timestamp ASC, id ASC
+      `).all(projectId) as DBMessage[];
+
+      // Transform to API format
+      const conversationMessages: Message[] = allMessages.map(msg => ({
+        id: msg.id,
+        projectId: msg.project_id,
+        role: msg.role as 'user' | 'assistant' | 'system',
+        content: msg.content,
+        timestamp: msg.timestamp
+      }));
+
+      // Extract topic from conversation
+      const extractedTopic = extractTopicFromConversation(conversationMessages);
+
+      // ==========================================
+      // STEP 7: Return Success Response
+      // ==========================================
+
+      const responseData: ChatSuccessResponse['data'] = {
+        messageId: assistantMessageId,
+        response: aiResponse,
+        timestamp: assistantTimestamp
+      };
+
+      // Include topic detection fields if topic found
+      if (extractedTopic) {
+        responseData.topicDetected = true;
+        responseData.extractedTopic = extractedTopic;
+      }
 
       return NextResponse.json(
         {
           success: true,
-          data: {
-            messageId: assistantMessageId,
-            response: aiResponse,
-            timestamp: assistantTimestamp
-          }
+          data: responseData
         } as ChatSuccessResponse,
         { status: 200 }
       );
