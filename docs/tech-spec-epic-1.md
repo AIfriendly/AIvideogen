@@ -11,7 +11,7 @@ Status: Draft
 
 Epic 1 implements the foundational conversational AI agent that enables users to brainstorm and finalize video topics through natural language dialogue. This epic establishes the core interaction pattern for the AI Video Generator by providing an unrestricted, creative brainstorming assistant powered by local Ollama (Llama 3.2) that guides users from initial ideas to confirmed video topics ready for production.
 
-The implementation includes a chat-based UI, persistent conversation history, topic confirmation workflow, and a configurable system prompt architecture (MVP: hardcoded default persona) that defines the assistant's behavior. This epic serves as the entry point for all subsequent video creation workflows.
+The implementation includes a chat-based UI, persistent conversation history, topic confirmation workflow, and a configurable system prompt architecture (MVP: hardcoded default persona) that defines the assistant's behavior. **Story 1.6 adds multi-project management capabilities with a sidebar navigation system (280px fixed width), enabling users to create, organize, and switch between multiple video projects while maintaining conversation isolation and context.** This epic serves as the entry point for all subsequent video creation workflows.
 
 ## Objectives and Scope
 
@@ -24,6 +24,13 @@ The implementation includes a chat-based UI, persistent conversation history, to
 - Project creation upon topic confirmation
 - Default "Creative Assistant" system prompt (hardcoded in MVP)
 - Basic error handling for LLM connection failures
+- **Project Management (Story 1.6):**
+  - Sidebar with project list (280px fixed width, ordered by last_active)
+  - "New Chat" button to create new projects
+  - Project switching with conversation history isolation
+  - Auto-generated project names from first user message
+  - Active project persistence via localStorage
+  - Optional: Project deletion with confirmation dialog
 
 **Out of Scope (Post-MVP):**
 - UI configuration for system prompts/personas
@@ -37,11 +44,12 @@ The implementation includes a chat-based UI, persistent conversation history, to
 ## System Architecture Alignment
 
 **Components Referenced:**
-- Frontend: `components/features/conversation/ChatInterface.tsx`, `MessageList.tsx`, `TopicConfirmation.tsx`
-- API Layer: `app/api/chat/route.ts`
+- Frontend (Conversation): `components/features/conversation/ChatInterface.tsx`, `MessageList.tsx`, `TopicConfirmation.tsx`
+- Frontend (Project Management): `components/features/projects/ProjectSidebar.tsx`, `ProjectListItem.tsx`, `NewChatButton.tsx`
+- API Layer: `app/api/chat/route.ts`, `app/api/projects/route.ts`, `app/api/projects/[id]/route.ts`
 - LLM Abstraction: `lib/llm/provider.ts`, `lib/llm/ollama-provider.ts`, `lib/llm/factory.ts`
 - System Prompts: `lib/llm/prompts/default-system-prompt.ts`
-- State Management: `stores/conversation-store.ts` (Zustand)
+- State Management: `stores/conversation-store.ts`, `stores/project-store.ts` (Zustand)
 - Database: SQLite `messages` and `projects` tables via better-sqlite3
 
 **Architecture Constraints:**
@@ -66,12 +74,18 @@ The implementation includes a chat-based UI, persistent conversation history, to
 |----------------|---------------|--------|---------|-------|
 | **ChatInterface.tsx** | Main conversation UI component | User text input | Rendered chat messages, input field | Frontend |
 | **MessageList.tsx** | Display conversation history | Array of message objects | Scrollable message list with role indicators | Frontend |
-| **TopicConfirmation.tsx** | Topic approval dialog | Extracted topic string | User confirmation (yes/no) | Frontend |
+| **TopicConfirmation.tsx** | Topic approval dialog with Confirm/Edit buttons | Extracted topic string | User confirmation (Confirm → navigate to Epic 2) or Edit (close dialog, continue chat) | Frontend |
+| **ProjectSidebar.tsx** | Project list navigation (280px fixed width) | Projects array | Sidebar with project list, New Chat button | Frontend |
+| **ProjectListItem.tsx** | Individual project display in sidebar | Project object | Clickable project item with name, timestamp | Frontend |
+| **NewChatButton.tsx** | Create new project action button | None (click event) | Creates new project, switches to it | Frontend |
 | **app/api/chat/route.ts** | LLM conversation endpoint | `{ projectId, message }` | `{ messageId, response, timestamp }` | Backend API |
+| **app/api/projects/route.ts** | Project CRUD operations (list, create) | GET: none, POST: `{ name? }` | Project list or created project | Backend API |
+| **app/api/projects/[id]/route.ts** | Single project operations (get, update, delete) | GET/PUT/DELETE with projectId | Project details or success confirmation | Backend API |
 | **OllamaProvider** | Ollama LLM integration | Messages array, system prompt | AI response string | Backend Service |
 | **getLLMProvider()** | Provider factory function | None (reads env vars) | LLMProvider instance | Backend Service |
 | **conversation-store.ts** | Client-side conversation state | User/assistant messages | Messages array, loading state | State Management |
-| **db/queries.ts** | Database operations | Project ID, message data | Saved records, query results | Database Layer |
+| **project-store.ts** | Active project & project list state | Projects array, active project ID | Active project, project list, localStorage persistence | State Management |
+| **db/queries.ts** | Database operations | Project ID, message data, project metadata | Saved records, query results | Database Layer |
 
 ### Data Models and Contracts
 
@@ -178,6 +192,108 @@ export interface Message {
 - `EMPTY_MESSAGE`: User message is empty or whitespace-only
 - `DATABASE_ERROR`: SQLite operation failed
 
+**API Endpoint: GET /api/projects**
+
+Get all projects ordered by last_active (most recent first).
+
+**Request:** None (GET request)
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "data": {
+    "projects": [
+      {
+        "id": "uuid-string",
+        "name": "Mars colonization ideas",
+        "topic": "Mars colonization" | null,
+        "currentStep": "topic",
+        "lastActive": "2025-11-04T14:30:00.000Z",
+        "createdAt": "2025-11-04T12:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+**API Endpoint: POST /api/projects**
+
+Create a new project.
+
+**Request:**
+```json
+{
+  "name": "New Project"  // Optional, defaults to "New Project"
+}
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "data": {
+    "project": {
+      "id": "uuid-string",
+      "name": "New Project",
+      "currentStep": "topic",
+      "createdAt": "2025-11-04T14:35:00.000Z",
+      "lastActive": "2025-11-04T14:35:00.000Z"
+    }
+  }
+}
+```
+
+**API Endpoint: GET /api/projects/[id]**
+
+Get a single project by ID.
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "data": {
+    "project": {
+      "id": "uuid-string",
+      "name": "Mars colonization ideas",
+      "topic": "Mars colonization",
+      "currentStep": "voice",
+      "createdAt": "2025-11-04T12:00:00.000Z",
+      "lastActive": "2025-11-04T14:30:00.000Z"
+    }
+  }
+}
+```
+
+**API Endpoint: PUT /api/projects/[id]**
+
+Update project metadata.
+
+**Request:**
+```json
+{
+  "name": "Mars colonization ideas",  // Optional
+  "topic": "Mars colonization",       // Optional
+  "currentStep": "voice"               // Optional
+}
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "data": {
+    "project": {
+      "id": "uuid-string",
+      "name": "Mars colonization ideas",
+      "topic": "Mars colonization",
+      "currentStep": "voice",
+      "lastActive": "2025-11-04T14:40:00.000Z"
+    }
+  }
+}
+```
+
 ### Workflows and Sequencing
 
 **Conversation Flow (Main Path):**
@@ -224,11 +340,74 @@ export interface Message {
    - Database: `UPDATE projects SET current_step = 'voice' WHERE id = ?`
    - Frontend: Navigate to voice selection step (Epic 2)
 
+6a. **Edit Path (if user clicks Edit)**
+   - UI: Close TopicConfirmation dialog (no animation/confirmation needed)
+   - Database: No changes to project (topic remains null, name unchanged, current_step remains 'topic')
+   - UI: Return focus to chat input field
+   - User: Can continue conversation to refine or clarify the topic
+   - Frontend: New topic confirmation can be triggered by issuing another video creation command
+   - Store: conversation-store remains intact with full conversation history
+
 **Error Handling Flow:**
 - Ollama Connection Failure → Display user-friendly error + retry button
 - Database Error → Log error, display generic error message
 - Empty Message → Client-side validation, prevent API call
 - Invalid Project → Create new project, start fresh conversation
+
+**Project Management Flow (Story 1.6):**
+
+1. **Creating New Project**
+   - User: Clicks "New Chat" button in sidebar
+   - Frontend: POST to `/api/projects` with default name "New Project"
+   - Database: `INSERT INTO projects (id, name, current_step, created_at, last_active) VALUES (uuid, 'New Project', 'topic', NOW(), NOW())`
+   - State: project-store sets new project as active, adds to project list
+   - Frontend: Clear conversation-store messages
+   - UI: Sidebar shows new project at top, highlighted as active
+   - UI: Chat interface clears, ready for first message
+   - localStorage: Active project ID persisted
+
+2. **Switching Projects**
+   - User: Clicks project in sidebar
+   - State: project-store setActiveProject(newProjectId)
+   - Frontend: Cancel any in-flight requests (AbortController)
+   - Frontend: Save current scroll position to sessionStorage
+   - Frontend: GET from `/api/projects/{newProjectId}/messages` to load conversation history
+   - State: conversation-store clears old messages, loads new project's messages
+   - Database: `UPDATE projects SET last_active = NOW() WHERE id = ?` (via PUT endpoint)
+   - UI: Sidebar highlights newly selected project
+   - URL: Update to `/projects/{newProjectId}` (pushState for browser back button)
+   - UI: Restore scroll position if previously saved
+
+3. **Auto-Generate Project Name (on first message)**
+   - User: Sends first message in new project (e.g., "Help me brainstorm fitness content")
+   - Frontend: POST to `/api/chat` as usual
+   - Backend: After saving message, check if project name is still "New Project"
+   - Backend: If yes, generate name from first 30 chars of user message, trim to last complete word
+   - Backend: `UPDATE projects SET name = ? WHERE id = ?` (e.g., "Help me brainstorm fitness...")
+   - Database: PUT to `/api/projects/{id}` with `{ name: generatedName }`
+   - State: project-store updates project name in local list
+   - UI: Sidebar updates project name immediately
+
+4. **Loading Projects on App Start**
+   - User: Opens application at `/`
+   - Frontend: GET from `/api/projects` to fetch all projects
+   - Database: `SELECT * FROM projects ORDER BY last_active DESC`
+   - State: project-store loads projects array
+   - localStorage: Check for saved activeProjectId
+   - Frontend: If activeProjectId exists, load that project's conversation
+   - Frontend: If no activeProjectId, load most recent project (first in list)
+   - URL: Navigate to `/projects/{activeProjectId}`
+
+5. **Project Deletion (Optional MVP)**
+   - User: Hovers over project → three-dot menu appears
+   - User: Clicks "Delete project"
+   - UI: Confirmation dialog appears ("Delete 'Mars colonization ideas'? This cannot be undone.")
+   - User: Confirms deletion
+   - Frontend: DELETE to `/api/projects/{id}`
+   - Database: `DELETE FROM projects WHERE id = ?` (cascades to messages via foreign key)
+   - State: project-store removes project from list
+   - Frontend: If deleted project was active, switch to most recent remaining project
+   - UI: Sidebar updates, deleted project disappears
 
 ---
 
@@ -408,6 +587,64 @@ DATABASE_PATH=./ai-video-generator.db
 - **And** a "Retry" button must be provided
 - **And** the conversation history must remain intact (read-only mode)
 
+**AC7: Create New Project (Story 1.6)**
+- **Given** the user has the application open
+- **When** the user clicks the "New Chat" button in the sidebar
+- **Then** a new project must be created in the database with name "New Project" and current_step "topic"
+- **And** the new project must become the active project (highlighted in sidebar)
+- **And** the chat interface must clear, ready for a new conversation
+- **And** the new project must appear at the top of the project list
+
+**AC8: Project List Display (Story 1.6)**
+- **Given** the user has 3 projects: "Cooking recipes" (last active yesterday), "Gaming tutorials" (last active today at 2pm), and "Travel vlogs" (last active last week)
+- **When** the user views the sidebar
+- **Then** the project list must display all 3 projects ordered by last_active: "Gaming tutorials" first, then "Cooking recipes", then "Travel vlogs"
+- **And** each project must show its name and relative timestamp (e.g., "Today, 2:00 PM", "Yesterday", "Nov 28")
+- **And** the currently active project must be visually highlighted with an indigo left border
+
+**AC9: Switch Between Projects (Story 1.6)**
+- **Given** the user has 2 projects: "Cooking recipes" (active) and "Gaming tutorials"
+- **When** the user clicks on "Gaming tutorials" in the sidebar
+- **Then** the chat interface must load the complete conversation history for "Gaming tutorials"
+- **And** the "Gaming tutorials" project must become highlighted as active
+- **And** the "Cooking recipes" conversation must be cleared from view
+- **And** the URL must update to `/projects/{gamingTutorialsId}`
+- **And** the "Gaming tutorials" project's last_active timestamp must be updated in the database
+
+**AC10: Auto-Generate Project Name (Story 1.6)**
+- **Given** a user has created a new project (name: "New Project")
+- **When** the user sends their first message: "Help me brainstorm fitness content for beginners"
+- **Then** the project name must be auto-updated to "Help me brainstorm fitness..." (first 30 chars, truncated to last complete word)
+- **And** the sidebar must immediately reflect the updated project name
+- **And** the project name must persist in the database
+
+**AC11: Project Persistence Across Sessions (Story 1.6)**
+- **Given** a user has 3 projects and "Gaming tutorials" is currently active
+- **When** the user closes the browser and reopens the application
+- **Then** the application must load the "Gaming tutorials" project as active (from localStorage)
+- **And** the sidebar must display all 3 projects in last_active order
+- **And** the chat interface must show the "Gaming tutorials" conversation history
+
+**AC12: Project Deletion (Optional - Story 1.6)**
+- **Given** a user has a project named "Test project" that they want to delete
+- **When** the user hovers over "Test project" and clicks the delete option from the three-dot menu
+- **Then** a confirmation dialog must appear: "Delete 'Test project'? This cannot be undone."
+- **When** the user confirms deletion
+- **Then** the project must be deleted from the database (including all associated messages via CASCADE)
+- **And** the project must disappear from the sidebar
+- **And** if "Test project" was the active project, the application must switch to the most recent remaining project
+
+**AC13: Topic Edit Workflow (Story 1.7)**
+- **Given** the TopicConfirmation dialog is displayed with topic "Mars colonization"
+- **When** the user clicks "Edit"
+- **Then** the dialog must close immediately without any database updates
+- **And** the project's topic field must remain null (not updated)
+- **And** the project's current_step must remain 'topic' (not advanced)
+- **And** the chat input field must receive focus
+- **And** the conversation history must remain intact and visible
+- **And** the user can continue the conversation to refine the topic
+- **And** when the user issues a new video creation command, a new TopicConfirmation dialog appears with the refined topic
+
 ---
 
 ## Traceability Mapping
@@ -420,6 +657,13 @@ DATABASE_PATH=./ai-video-generator.db
 | AC4: Topic Confirmation | PRD Feature 1.1 (lines 42-43) | projects table, workflow-store.ts | Unit test: Database update, navigation trigger |
 | AC5: Conversation Persistence | PRD Feature 1.1 (line 39) | messages table, MessageList.tsx | Integration test: Save, reload, verify history |
 | AC6: Ollama Error Handling | NFR 1 (FOSS), Architecture section | Error boundaries, try/catch in API route | Unit test: Mock connection failure, verify error UI |
+| AC7: Create New Project | PRD Feature 1.1, Epics Story 1.6 (lines 229-230) | NewChatButton.tsx, app/api/projects/route.ts, project-store.ts | Integration test: POST /api/projects, verify DB insert, check UI state |
+| AC8: Project List Display | PRD Feature 1.1, Epics Story 1.6 (lines 231-232) | ProjectSidebar.tsx, ProjectListItem.tsx, projects table | Unit test: Render with mock data, verify ordering by last_active |
+| AC9: Switch Between Projects | PRD Feature 1.1, Epics Story 1.6 (line 232) | project-store.ts, conversation-store.ts, app/api/projects/[id] | Integration test: Click project, verify messages loaded, URL updated |
+| AC10: Auto-Generate Project Name | PRD Feature 1.1, Epics Story 1.6 (line 233-234) | app/api/chat/route.ts, db/queries.ts (updateProjectName) | Integration test: Send first message, verify project name updated |
+| AC11: Project Persistence | PRD Feature 1.1, Epics Story 1.6 (line 235) | project-store.ts (localStorage), projects table | E2E test: Set active project, reload page, verify active project restored |
+| AC12: Project Deletion | PRD Feature 1.1, Epics Story 1.6 (line 236) | ProjectSidebar.tsx, app/api/projects/[id] (DELETE) | Integration test: DELETE request, verify cascade to messages, check UI update |
+| AC13: Topic Edit Workflow | PRD Feature 1.1, Epics Story 1.7 (lines 249-271) | TopicConfirmation.tsx (Edit button handler), conversation-store.ts | Integration test: Click Edit, verify dialog closes, no DB updates, chat remains active |
 
 ---
 
@@ -477,25 +721,50 @@ DATABASE_PATH=./ai-video-generator.db
 
 **Unit Tests:**
 - LLMProvider interface implementation (mock Ollama responses)
-- Database query functions (insert, retrieve messages)
+- Database query functions (insert, retrieve messages, create/update/delete projects)
 - Message validation logic (empty check, length limits)
-- TopicConfirmation component (user confirmation flow)
+- TopicConfirmation component (user confirmation flow, Edit button handler)
+- ProjectListItem component (display, click handling)
+- Project name generation utility (truncate to last complete word)
+- **Story 1.7 - Topic Edit:**
+  - TopicConfirmation Edit button click handler (dialog closes, no state changes)
+  - Verify no database calls made when Edit clicked
+  - Verify chat input receives focus after Edit
 
 **Integration Tests:**
 - Full conversation flow: User message → API → Ollama → Database → UI update
 - Conversation history loading from database
 - Error handling: Ollama connection failure scenarios
 - Topic extraction and confirmation workflow
+- **Story 1.6 - Project Management:**
+  - Create new project: POST /api/projects → DB insert → UI update
+  - Switch projects: Click project → Load messages → Update active state
+  - Auto-generate project name: First message → Name updated in DB and UI
+  - Project list ordering: Verify projects sorted by last_active DESC
+  - Project deletion: DELETE /api/projects/[id] → Cascade to messages → UI update
+- **Story 1.7 - Topic Confirmation Edit:**
+  - Edit workflow: Display TopicConfirmation → Click Edit → Dialog closes → No DB updates → Continue conversation
+  - Re-trigger confirmation: Edit topic → Continue conversation → Issue new command → New TopicConfirmation appears
+  - Verify project state unchanged: topic=null, current_step='topic', name unchanged
 
 **End-to-End Tests:**
 - Complete user journey: Open app → Brainstorm topic → Confirm → Navigate to voice selection
 - Browser refresh persistence (conversation history retained)
 - Multi-turn conversation with context retention
+- **Story 1.6 - Multi-Project Workflow:**
+  - Create 3 projects, switch between them, verify context isolation
+  - Close browser, reopen, verify active project restored from localStorage
+  - Delete project while active, verify switch to most recent remaining project
+- **Story 1.7 - Topic Edit and Refinement:**
+  - Full edit flow: Brainstorm → Issue command → TopicConfirmation appears → Click Edit → Continue conversation → Refine topic → Issue new command → Confirm refined topic
+  - Verify conversation continuity: Edit doesn't break message history or context
+  - Multiple edit cycles: Edit → Refine → Edit again → Refine → Finally confirm
 
 **Manual Testing:**
 - LLM response quality evaluation (subjective)
-- UI/UX feedback (message display, loading states)
+- UI/UX feedback (message display, loading states, sidebar interactions)
 - Performance testing with long conversations (20+ messages)
+- Performance testing with many projects (10+ projects in sidebar)
 
 ### Frameworks
 
@@ -506,8 +775,8 @@ DATABASE_PATH=./ai-video-generator.db
 ### Coverage Targets
 
 - **Code Coverage**: >80% for business logic (API routes, providers, queries)
-- **Critical Path Coverage**: 100% for topic confirmation workflow
-- **Edge Cases**: Ollama failures, empty messages, invalid project IDs
+- **Critical Path Coverage**: 100% for topic confirmation workflow (both Confirm and Edit paths) and project management workflows
+- **Edge Cases**: Ollama failures, empty messages, invalid project IDs, project switching edge cases, first message name generation, multiple Edit cycles, Edit with no follow-up conversation
 
 ### Test Data
 
@@ -515,23 +784,40 @@ DATABASE_PATH=./ai-video-generator.db
 - Sample conversation histories (5, 10, 20 messages)
 - Mock Ollama responses for common topics
 - Test projects with various states (no topic, confirmed topic)
+- **Story 1.6 Fixtures:**
+  - Mock project list (3-5 projects with different last_active timestamps)
+  - Edge case project names (very short, very long, special characters)
+  - First messages for auto-naming (short, long, with punctuation)
+- **Story 1.7 Fixtures:**
+  - Mock TopicConfirmation dialog states (open, closed)
+  - Sample topics for confirmation (clear topics, ambiguous topics, very long topics)
+  - Conversation histories leading to topic confirmation triggers
+  - Refined topic sequences (initial topic → refined topic after Edit)
 
 **Mocking Strategy:**
 - Mock Ollama client for predictable responses
 - Mock database with in-memory SQLite for tests
-- Mock Zustand stores for component tests
+- Mock Zustand stores for component tests (conversation-store, project-store)
+- Mock localStorage for project persistence tests
+- Mock window.history.pushState for URL navigation tests
 
 ---
 
-**Document Status:** Complete and Ready for Implementation
+**Document Status:** Complete and Ready for Implementation (Updated 2025-11-04 to include Stories 1.6 and 1.7)
 **Next Steps:**
 1. Set up Next.js project with TypeScript and Tailwind CSS (Architecture initialization commands)
-2. Implement database schema and initialize SQLite
+2. Implement database schema and initialize SQLite (includes projects and messages tables)
 3. Create LLM provider abstraction and Ollama integration
-4. Build chat UI components (ChatInterface, MessageList, TopicConfirmation)
-5. Implement /api/chat endpoint with conversation logic
-6. Write tests following test strategy
-7. Validate against acceptance criteria
+4. Build chat UI components (ChatInterface, MessageList)
+5. **Build TopicConfirmation dialog with Confirm/Edit buttons - Story 1.7**
+6. **Build project management UI components (ProjectSidebar, ProjectListItem, NewChatButton) - Story 1.6**
+7. Implement /api/chat endpoint with conversation logic
+8. **Implement topic detection and confirmation workflow - Story 1.7**
+9. **Implement Edit workflow (close dialog, continue conversation, no DB updates) - Story 1.7**
+10. **Implement /api/projects endpoints (GET, POST, PUT, DELETE) - Story 1.6**
+11. **Implement project-store.ts with localStorage persistence - Story 1.6**
+12. Write tests following test strategy (includes all 13 acceptance criteria)
+13. Validate against acceptance criteria (AC1-AC13)
 
 ---
 

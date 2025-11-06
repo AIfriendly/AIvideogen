@@ -28,11 +28,14 @@
 
 ### 1.1. Conversational AI Agent
 
-*   **Description:** A chat-based AI assistant that guides the user from initial idea to a concrete video topic, and initiates the video creation process.
+*   **Description:** A chat-based AI assistant that guides the user from initial idea to a concrete video topic, and initiates the video creation process. The system supports multiple concurrent projects, allowing users to manage and switch between different video conversations seamlessly.
 
 *   **User Stories:**
     1.  **As a creator,** I want to discuss my video ideas with an AI agent in a natural conversation, **so that** I can explore different angles and refine my topic before committing to production.
     2.  **As a creator,** I want to give a simple, explicit command to the agent to start the video creation process, **so that** the transition from idea to production is seamless and efficient.
+    3.  **As a creator,** I want to create multiple separate project conversations (e.g., one for cooking videos, another for gaming tutorials), **so that** different video ideas remain organized and don't get mixed together.
+    4.  **As a creator,** I want to easily switch between my active projects, **so that** I can resume work on any video idea without losing context.
+    5.  **As a creator,** I want my project list to automatically name conversations based on their content, **so that** I can quickly identify each project without manual labeling.
 
 *   **Functional Requirements:**
     *   The system shall provide a chat interface for user-agent interaction.
@@ -41,6 +44,14 @@
     *   The agent must recognize a specific command (e.g., "make a video about [topic]") to trigger the subsequent workflow steps.
     *   The agent must confirm the final topic with the user before proceeding to script generation.
     *   Upon confirmation, the agent must pass the confirmed topic string to be used as the "video title" in subsequent steps.
+    *   **Project Management:**
+        *   The system shall provide a "New Chat" button to create new projects/conversations.
+        *   The system shall display a sidebar listing all projects ordered by most recently active.
+        *   The system shall allow users to click any project to load its complete conversation history.
+        *   The system shall visually highlight the currently active project.
+        *   The system shall auto-generate project names from the first user message (e.g., "Cooking video ideas").
+        *   The system shall persist the selected project across page reloads using localStorage.
+        *   The system may optionally provide project deletion functionality with user confirmation.
 
 *   **Acceptance Criteria:**
     *   **AC1: Successful Brainstorming Interaction**
@@ -55,31 +66,58 @@
         *   **Given** the user has been discussing "the benefits of intermittent fasting".
         *   **When** the user issues a generic command like "Create the video now."
         *   **Then** the agent should use the conversation's context to confirm the topic ("Understood. Shall I proceed with the video on 'the benefits of intermittent fasting'?").
+    *   **AC4: Multiple Project Management**
+        *   **Given** a user has created 3 projects: "Cooking recipes", "Gaming tutorials", and "Travel vlogs".
+        *   **When** the user clicks on "Gaming tutorials" in the sidebar.
+        *   **Then** the chat interface must load only the conversation history for the "Gaming tutorials" project, without mixing messages from other projects.
+    *   **AC5: Project Creation and Persistence**
+        *   **Given** a user clicks "New Chat".
+        *   **When** the user types their first message "Help me brainstorm fitness content".
+        *   **Then** a new project is created, automatically named "Help me brainstorm fitness content" (or a truncated version), appears in the sidebar, and persists after page refresh.
 
 ### 1.2. Automated Script Generation
 
-*   **Description:** Based on the user-confirmed topic, the system automatically researches and writes a video script. The script is structured into distinct scenes to facilitate voiceover and visual pairing in later steps.
+*   **Description:** Based on the user-confirmed topic, the system automatically researches and writes a professional-quality video script that sounds human-written, not AI-generated. The script is structured into distinct scenes to facilitate voiceover and visual pairing in later steps. Scripts must be engaging, authentic, and indistinguishable from professional scriptwriter output.
 
 *   **User Stories:**
     1.  **As a creator,** I want the AI to generate a complete and coherent script for my video topic, **so that** I can save time on research and writing.
     2.  **As a creator,** I want the script to be divided into logical scenes, **so that** I can easily review the narrative flow and match visuals to each part of the story.
+    3.  **As a creator,** I need scripts that sound professional and human-written, **so that** viewers engage with my content and don't dismiss it as AI-generated.
+    4.  **As a creator,** I want scripts with strong narrative hooks and topic-appropriate tone, **so that** viewers are immediately engaged and continue watching.
 
 *   **Functional Requirements:**
     *   The system shall accept a video topic string as input.
     *   The system must generate a script that is factually relevant to the input topic.
     *   The generated script must be segmented into an ordered list of scenes.
     *   Each scene must contain a block of text for the voiceover.
+    *   **The system must generate scripts that sound professional, human-written, and engaging (NOT robotic or AI-generic).**
+    *   **The system must adapt script tone based on topic type (documentary, educational, entertainment, tutorial).**
+    *   **The system must avoid AI detection markers (generic phrases like "In today's video", "Moving on", "It's important to note").**
+    *   **The system must use professional scriptwriting techniques (strong hooks, storytelling, natural language, varied sentence structure).**
+    *   **The system shall validate script quality and reject robotic or bland scripts.**
     *   The system shall pass the structured script to the visual curation and voiceover generation modules.
 
 *   **Acceptance Criteria:**
     *   **AC1: Successful Script Generation**
         *   **Given** the script generation module receives the topic "The benefits of solar power".
         *   **When** the generation process completes.
-        *   **Then** the system must produce a structured script containing multiple scenes (e.g., Scene 1: "Introduction to solar energy...", Scene 2: "How solar panels work...", Scene 3: "Environmental benefits...", etc.).
+        *   **Then** the system must produce a structured script containing multiple scenes with professional, engaging narration.
     *   **AC2: Correct Script Structure**
         *   **Given** a script has been generated.
         *   **When** the script is passed to the next module.
         *   **Then** it must be in a structured format, such as a JSON array of objects, with each object containing at least a `scene_number` and `text` key.
+    *   **AC3: Professional Quality (Human-Like)**
+        *   **Given** a generated script for any topic.
+        *   **When** the script is reviewed.
+        *   **Then** it must sound like a professional scriptwriter created it, not an AI.
+        *   **And** it must NOT contain generic AI phrases ("In today's video", "Moving on", "Let's explore", "It's important to note").
+        *   **And** it must have a strong, engaging opening (no boring "welcome" intros).
+        *   **And** it must use topic-appropriate tone (conversational for tutorials, documentary-style for serious topics, etc.).
+    *   **AC4: Quality Validation**
+        *   **Given** the script generation process produces output.
+        *   **When** the system validates script quality.
+        *   **Then** robotic or bland scripts must be rejected and regeneration triggered (max 3 attempts).
+        *   **And** only scripts meeting professional quality standards are accepted and saved.
 
 ### 1.3. Voice Selection
 

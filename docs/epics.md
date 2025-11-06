@@ -18,7 +18,7 @@
 
 **User Value:** Creators can explore ideas naturally and receive AI guidance to refine their video topics before production begins. The AI assistant adapts its personality and behavior to match different content creation workflows.
 
-**Story Count Estimate:** 4-5 stories (MVP), +3 stories (Post-MVP UI)
+**Story Count Estimate:** 7 stories (MVP: Stories 1.1-1.7), +3 stories (Post-MVP UI)
 
 **Dependencies:** None (foundational epic)
 
@@ -214,7 +214,39 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 ---
 
-#### Story 1.6: Topic Confirmation Workflow
+#### Story 1.6: Project Management UI
+**Goal:** Enable users to create, list, and switch between multiple projects/conversations
+
+**Tasks:**
+- Create ProjectSidebar.tsx component with project list display
+- Add "New Chat" button functionality to create new projects
+- Implement project switching (load conversation history for selected projectId)
+- Display project metadata (auto-generated name, last_active timestamp)
+- Auto-generate project names from first user message in conversation
+- Persist selected projectId in localStorage across page reloads
+- Add project deletion functionality (optional for MVP)
+
+**Acceptance Criteria:**
+- Users can click "New Chat" button to start a fresh conversation in a new project
+- Sidebar displays list of all projects ordered by last_active (most recent first)
+- Clicking a project loads its complete conversation history
+- Currently active project is visually highlighted in the sidebar
+- Project names are auto-generated from the first message (e.g., "Cooking video ideas", "Gaming tutorial brainstorm")
+- Selected project persists on page refresh via localStorage
+- (Optional) Users can delete projects with confirmation dialog
+
+**Database Support:**
+- Projects table already exists with required fields (id, name, last_active)
+- getAllProjects() query already implemented (Story 1.2)
+- No schema changes required
+
+**References:**
+- Database Schema: epics.md lines 120-139 (Story 1.2)
+- Component Architecture: To be updated by architect based on this story
+
+---
+
+#### Story 1.7: Topic Confirmation Workflow
 **Goal:** Implement topic detection, confirmation dialog, and project initialization
 
 **Tasks:**
@@ -288,6 +320,223 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 - Simple, quick selection (don't slow down workflow)
 - Audio preview for each voice option
 - Option to change voice later (post-MVP: Epic 6)
+
+---
+
+### Epic 2 Stories
+
+#### Story 2.1: TTS Engine Integration & Voice Profile Setup
+**Goal:** Integrate FOSS TTS engine and create voice profile infrastructure
+
+**Tasks:**
+- Research and select FOSS TTS engine (kokproTTS)
+- Install and configure TTS engine dependencies
+- Create voice profile data structure (lib/tts/voice-profiles.ts)
+- Generate preview audio samples for each voice profile
+- Implement TTS provider abstraction layer (lib/tts/provider.ts)
+- Create audio file storage structure and naming convention
+- Add error handling for TTS service failures
+
+**Acceptance Criteria:**
+- TTS engine successfully installed and accessible via API
+- At least 3-5 distinct voice profiles defined with metadata (name, gender, accent, tone)
+- Preview audio samples generated and stored for each voice profile
+- TTSProvider interface defined with generateAudio() method
+- Audio files stored in organized directory structure (e.g., /public/audio/previews/, /public/audio/scenes/)
+- TTS connection errors handled gracefully with user-friendly messages
+
+**References:**
+- PRD Feature 1.3 (Voice Selection) lines 103-133
+- PRD NFR 1 (FOSS requirement) lines 20-24
+
+---
+
+#### Story 2.2: Database Schema Updates for Content Generation
+**Goal:** Extend database schema to support voice selection, scripts, and audio file tracking
+
+**Tasks:**
+- Add voice_id column to projects table (stores selected voice)
+- Create scenes table (id, project_id, scene_number, text, audio_file_path, duration, timestamps)
+- Add script_generated and voice_selected columns to projects table
+- Create database migration script
+- Implement query functions for scenes (lib/db/queries.ts)
+- Add indexes on scenes(project_id) and scenes(scene_number)
+- Update TypeScript types for new schema (types/database.ts)
+
+**Acceptance Criteria:**
+- Projects table includes voice_id, script_generated, voice_selected fields
+- Scenes table created with all required fields and foreign key to projects
+- Indexes created for performance on scene queries
+- Database migration runs successfully without data loss
+- Query functions handle CRUD operations for scenes
+- TypeScript types accurately reflect schema changes
+
+**References:**
+- PRD Feature 1.2 (Automated Script Generation) lines 78-102
+- PRD Feature 1.4 (Automated Voiceover) lines 134-158
+- Epic 1 Story 1.2 (Database Schema pattern) lines 119-139
+
+---
+
+#### Story 2.3: Voice Selection UI & Workflow Integration
+**Goal:** Build voice selection interface that appears after topic confirmation
+
+**Tasks:**
+- Create VoiceSelection.tsx component with voice option cards
+- Display voice metadata (name, gender, accent, tone) for each option
+- Implement audio preview playback for each voice option
+- Add voice selection confirmation button
+- Update project workflow state management (after topic confirmation, before script generation)
+- Create POST /api/projects/[id]/select-voice endpoint
+- Save selected voice_id to projects table
+- Navigate to script generation step after voice selection
+- Add loading states and error handling
+
+**Acceptance Criteria:**
+- VoiceSelection UI displays after user confirms topic (Epic 1 Story 1.7)
+- All voice profiles shown with metadata and preview button
+- Clicking preview button plays audio sample for that voice
+- User can select exactly one voice option
+- On confirmation, voice_id saved to database and voice_selected = true
+- User navigated to script generation loading screen
+- Error messages display if voice selection API fails
+
+**References:**
+- PRD Feature 1.3 AC1-AC3 (Voice Selection) lines 120-133
+- Epic 2 Workflow Integration lines 306-311
+
+---
+
+#### Story 2.4: LLM-Based Script Generation (Professional Quality)
+**Goal:** Generate professional, human-quality video scripts that are engaging, authentic, and indistinguishable from professional scriptwriter output
+
+**Tasks:**
+- Create advanced script generation prompt template (lib/llm/prompts/script-generation-prompt.ts) with professional scriptwriting principles
+- **Design prompt with strict quality requirements:**
+  - **Professional scriptwriting standards:** Compelling hooks, storytelling techniques, strong pacing
+  - **Topic-adaptive tone:** Documentary style for serious topics, conversational for tutorials, engaging for entertainment
+  - **Human authenticity:** Natural language, varied sentence structure, personality, avoid AI tells
+  - **Narrative techniques:** Strong openings (no "In today's video..."), smooth transitions, emotional resonance
+  - **Banned AI phrases:** Reject generic phrases like "Moving on", "It's important to note", "Let's explore", "In conclusion"
+  - **Engagement elements:** Rhetorical questions, vivid descriptions, relatable examples, conversational tone
+  - **Output format:** Structured JSON with scene breakdown
+  - **Text cleanliness:** ONLY spoken narration text - no markdown, scene labels, titles, or formatting
+- **Create quality validation function (lib/llm/validate-script-quality.ts):**
+  - Check for AI detection markers (generic openings, robotic transitions, overly formal language)
+  - Validate narrative flow and pacing
+  - Ensure topic-appropriate tone
+  - Reject scripts that sound robotic or bland
+- **Implement topic-based tone mapping:** Analyze topic to determine appropriate style (educational, documentary, entertainment, tutorial)
+- Implement POST /api/projects/[id]/generate-script endpoint
+- Load confirmed topic from projects.topic field
+- Call LLM provider with professionally-tuned script generation prompt
+- Parse LLM response and validate JSON structure
+- **Run quality validation before accepting script - retry if quality check fails**
+- Validate each scene text is TTS-ready (no markdown characters, no meta-labels like "Scene:", "Title:")
+- Save scenes to database (scenes table) with scene_number and text
+- Update projects.script_generated = true and current_step = 'voiceover'
+- Add retry logic for LLM failures, invalid responses, or quality check failures (max 3 attempts)
+- Implement scene count optimization (aim for 3-5 scenes for MVP)
+
+**Acceptance Criteria:**
+- Script generation endpoint accepts projectId as input
+- LLM generates structured script with 3-5 scenes minimum
+- Each scene has scene_number (sequential) and text (50-200 words)
+- Scene text contains ONLY spoken narration (no markdown *, #, **, no "Scene 1:", no meta-text)
+- **Scripts sound professional and human-written, NOT AI-generated**
+- **Scripts avoid generic AI phrases ("In today's video", "Moving on", "It's important to note", "Let's explore")**
+- **Scripts use topic-appropriate tone (documentary, educational, conversational, etc.)**
+- **Scripts have strong narrative hooks (no boring openings)**
+- **Scripts use natural, varied language with personality**
+- **Quality validation rejects robotic or bland scripts**
+- Scenes saved to database in correct order
+- Script generation handles various topic types (educational, entertainment, tutorials, documentary)
+- Invalid or low-quality LLM responses trigger retry with improved prompt (max 3 attempts)
+- Validation rejects scenes containing markdown or formatting characters
+- Projects.script_generated flag updated on success
+
+**Quality Examples:**
+
+❌ **Bad (AI-sounding):**
+"In today's video, we'll explore the fascinating world of Mars colonization. It's important to note that Mars is the fourth planet from the sun. Moving on to the next point, let's discuss the challenges of space travel."
+
+✅ **Good (Professional):**
+"Picture this: A million humans living on Mars by 2050. Sounds like science fiction, right? But SpaceX and NASA are betting everything on making it reality. The red planet, once just a distant dream, is now humanity's next home. Here's how we're actually going to pull it off."
+
+**References:**
+- PRD Feature 1.2 (Automated Script Generation) lines 78-102
+- PRD Feature 1.2 AC1-AC2 lines 94-102
+- Epic 1 Story 1.3 (LLM Provider pattern) lines 141-162
+
+---
+
+#### Story 2.5: Voiceover Generation for Scenes
+**Goal:** Generate TTS audio files for each script scene using selected voice with text sanitization
+
+**Tasks:**
+- Create POST /api/projects/[id]/generate-voiceovers endpoint
+- Load all scenes for project from database (ordered by scene_number)
+- Load selected voice_id from projects table
+- **Implement text sanitization function (lib/tts/sanitize-text.ts) to clean text before TTS:**
+  - Remove markdown characters (*, #, _, `, **)
+  - Remove scene labels ("Scene 1:", "Title:", etc.)
+  - Remove stage directions [in brackets]
+  - Collapse multiple newlines/whitespace
+  - Trim leading/trailing whitespace
+- For each scene, sanitize scene.text then call TTS provider with cleaned text and voice_id
+- Save generated MP3 files to /public/audio/scenes/{projectId}/scene-{number}.mp3
+- Update scenes table with audio_file_path and duration for each scene
+- Calculate total video duration (sum of all scene durations)
+- Update projects.current_step = 'visual-sourcing' (placeholder for Epic 3)
+- Implement progress tracking for multi-scene generation
+- Add error handling and partial completion recovery
+
+**Acceptance Criteria:**
+- Voiceover generation endpoint accepts projectId as input
+- **Text sanitization removes all non-speakable characters before TTS (markdown, labels, formatting)**
+- TTS generates MP3 file for each scene using selected voice consistently
+- **Generated audio contains ONLY clean narration (no spoken asterisks, scene numbers, or artifacts)**
+- Audio files saved with organized naming convention
+- Each scene record updated with audio_file_path and duration (seconds)
+- All scenes for a project use the same voice_id
+- Progress indicator shows current scene being processed
+- Partial failures allow resume (don't regenerate completed scenes)
+- Total project duration calculated and stored
+
+**References:**
+- PRD Feature 1.4 (Automated Voiceover) lines 134-158
+- PRD Feature 1.4 AC1-AC2 lines 150-158
+- Story 2.1 (TTS Provider abstraction)
+
+---
+
+#### Story 2.6: Script & Voiceover UI Display (Preview)
+**Goal:** Display generated script and allow users to preview voiceover before proceeding to visual sourcing
+
+**Tasks:**
+- Create ScriptPreview.tsx component
+- Display all scenes with scene_number, text, and duration
+- Add audio player for each scene to preview voiceover
+- Show total video duration
+- Add "Continue to Visual Sourcing" button (placeholder for Epic 3)
+- Implement loading states during script and voiceover generation
+- Add error display for generation failures
+- Allow users to view script while voiceovers are generating (async UI updates)
+
+**Acceptance Criteria:**
+- ScriptPreview displays all scenes in order with text
+- Each scene has playable audio preview
+- Audio players use audio_file_path from database
+- Total video duration displayed (sum of scene durations)
+- Loading states show progress during script generation and voiceover processing
+- "Continue" button enabled only after all voiceovers generated successfully
+- Error messages display if script or voiceover generation fails
+- UI updates dynamically as voiceovers complete (no full page refresh required)
+
+**References:**
+- PRD Feature 1.2 (Script structure) lines 78-102
+- PRD Feature 1.4 (Voiceover per scene) lines 134-158
+- Epic 1 Story 1.5 (Frontend component pattern) lines 189-215
 
 ---
 
@@ -376,13 +625,13 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 | Epic | Name | Story Est. | Dependencies | Phase |
 |------|------|------------|--------------|-------|
-| 1 | Conversational Topic Discovery | 3-4 | None | Foundation |
+| 1 | Conversational Topic Discovery | 7 | None | Foundation |
 | 2 | Content Generation Pipeline + Voice Selection | 5-6 | Epic 1 | Core |
 | 3 | Visual Content Sourcing (YouTube API) | 4-5 | Epic 2 | Core |
 | 4 | Visual Curation Interface | 5-6 | Epic 2, 3 | Core |
 | 5 | Video Assembly & Output | 4-5 | Epic 2, 4 | Delivery |
 
-**Total Estimated Stories:** 21-27 stories
+**Total Estimated Stories:** 26-29 stories
 
 **Recommended Development Order:**
 1. Epic 1 → Epic 2 → Epic 3 → Epic 4 → Epic 5

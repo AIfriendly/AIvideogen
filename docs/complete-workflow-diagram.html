@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Workflow Diagram - AI Video Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            padding: 40px 20px;
+            overflow-x: auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 12px;
+            color: #f8fafc;
+        }
+
+        .header p {
+            font-size: 1rem;
+            color: #cbd5e1;
+        }
+
+        .legend {
+            max-width: 1200px;
+            margin: 0 auto 40px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            padding: 20px;
+            background: #1e293b;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #0f172a;
+            border-radius: 8px;
+            font-size: 0.875rem;
+        }
+
+        .legend-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+
+        .epic1-color { background: #8b5cf6; }
+        .story1-6-color { background: #06b6d4; }
+        .epic2-color { background: #6366f1; }
+        .epic4-color { background: #10b981; }
+        .epic5-color { background: #f59e0b; }
+
+        .workflow-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px;
+            background: #1e293b;
+            border-radius: 16px;
+            border: 1px solid #334155;
+            overflow-x: auto;
+        }
+
+        .workflow {
+            min-width: 1200px;
+            position: relative;
+        }
+
+        .flow-section {
+            margin-bottom: 60px;
+            position: relative;
+        }
+
+        .section-label {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            padding-left: 12px;
+            border-left: 4px solid;
+            display: inline-block;
+        }
+
+        .epic1-label { border-color: #8b5cf6; color: #8b5cf6; }
+        .story1-6-label { border-color: #06b6d4; color: #06b6d4; }
+        .epic2-label { border-color: #6366f1; color: #6366f1; }
+        .epic4-label { border-color: #10b981; color: #10b981; }
+        .epic5-label { border-color: #f59e0b; color: #f59e0b; }
+
+        .flow-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .flow-node {
+            background: #0f172a;
+            border: 3px solid;
+            border-radius: 12px;
+            padding: 16px 24px;
+            min-width: 200px;
+            text-align: center;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .flow-node:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+
+        .epic1-node { border-color: #8b5cf6; }
+        .story1-6-node { border-color: #06b6d4; }
+        .epic2-node { border-color: #6366f1; }
+        .epic4-node { border-color: #10b981; }
+        .epic5-node { border-color: #f59e0b; }
+
+        .node-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #f8fafc;
+        }
+
+        .node-subtitle {
+            font-size: 0.75rem;
+            color: #cbd5e1;
+            font-style: italic;
+        }
+
+        .node-details {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            margin-top: 8px;
+            line-height: 1.4;
+        }
+
+        .arrow {
+            color: #6366f1;
+            font-size: 2rem;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .decision-node {
+            background: #1e293b;
+            border: 3px dashed #f59e0b;
+            border-radius: 8px;
+            padding: 12px 20px;
+            min-width: 150px;
+            text-align: center;
+            font-size: 0.875rem;
+            color: #f59e0b;
+            font-weight: 600;
+        }
+
+        .parallel-flows {
+            display: flex;
+            gap: 40px;
+            margin-top: 20px;
+            padding-left: 40px;
+        }
+
+        .parallel-branch {
+            flex: 1;
+        }
+
+        .branch-connector {
+            width: 2px;
+            background: #6366f1;
+            margin: 0 auto 20px;
+            height: 40px;
+        }
+
+        .merge-connector {
+            width: 2px;
+            background: #6366f1;
+            margin: 20px auto 0;
+            height: 40px;
+        }
+
+        .key-features {
+            max-width: 1200px;
+            margin: 40px auto 0;
+            padding: 24px;
+            background: #1e293b;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+
+        .key-features h2 {
+            font-size: 1.25rem;
+            margin-bottom: 16px;
+            color: #f8fafc;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .feature-card {
+            padding: 16px;
+            background: #0f172a;
+            border-radius: 8px;
+            border-left: 3px solid;
+        }
+
+        .feature-card h3 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+            color: #f8fafc;
+        }
+
+        .feature-card p {
+            font-size: 0.875rem;
+            color: #cbd5e1;
+            line-height: 1.5;
+        }
+
+        .epic1-feature { border-color: #8b5cf6; }
+        .epic2-feature { border-color: #6366f1; }
+        .epic4-feature { border-color: #10b981; }
+
+        @media (max-width: 768px) {
+            .flow-row {
+                flex-direction: column;
+            }
+
+            .arrow {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎬 AI Video Generator - Complete Workflow</h1>
+        <p>End-to-End User Journey Through All Epics</p>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-box epic1-color"></div>
+            <span>Epic 1: Conversational Topic Discovery</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-box story1-6-color"></div>
+            <span>Story 1.6: Project Management</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-box epic2-color"></div>
+            <span>Epic 2: Content Generation Pipeline</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-box epic4-color"></div>
+            <span>Epic 4: Visual Curation</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-box epic5-color"></div>
+            <span>Epic 5: Video Assembly (Future)</span>
+        </div>
+    </div>
+
+    <div class="workflow-container">
+        <div class="workflow">
+            <!-- Entry Point -->
+            <div class="flow-section">
+                <div class="section-label story1-6-label">🚀 Entry Point</div>
+                <div class="flow-row">
+                    <div class="flow-node story1-6-node">
+                        <div class="node-title">Open App</div>
+                        <div class="node-subtitle">First Load</div>
+                        <div class="node-details">Desktop web app<br>localhost:3000</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="decision-node">
+                        Has Projects?
+                    </div>
+                </div>
+
+                <div class="parallel-flows">
+                    <div class="parallel-branch">
+                        <div class="branch-connector"></div>
+                        <div class="flow-node story1-6-node">
+                            <div class="node-title">New User</div>
+                            <div class="node-subtitle">Auto-create first project</div>
+                        </div>
+                    </div>
+                    <div class="parallel-branch">
+                        <div class="branch-connector"></div>
+                        <div class="flow-node story1-6-node">
+                            <div class="node-title">Returning User</div>
+                            <div class="node-subtitle">Load recent project</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Epic 1 -->
+            <div class="flow-section">
+                <div class="section-label epic1-label">💬 Epic 1: Conversational Topic Discovery</div>
+                <div class="flow-row">
+                    <div class="flow-node story1-6-node">
+                        <div class="node-title">Project Sidebar</div>
+                        <div class="node-subtitle">Story 1.6</div>
+                        <div class="node-details">View projects<br>"New Chat" button<br>Switch projects</div>
+                    </div>
+                    <div class="arrow">+</div>
+                    <div class="flow-node epic1-node">
+                        <div class="node-title">Chat Interface</div>
+                        <div class="node-subtitle">Epic 1</div>
+                        <div class="node-details">AI welcome message<br>Natural conversation<br>Context maintained</div>
+                    </div>
+                </div>
+
+                <div class="flow-row" style="margin-top: 20px;">
+                    <div class="flow-node epic1-node">
+                        <div class="node-title">Brainstorming</div>
+                        <div class="node-subtitle">Multi-turn conversation</div>
+                        <div class="node-details">Explore ideas<br>Refine topic<br>Get AI suggestions</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-node epic1-node">
+                        <div class="node-title">Trigger Video Creation</div>
+                        <div class="node-subtitle">User says "Make video"</div>
+                        <div class="node-details">AI confirms topic<br>Prepares transition</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-node epic1-node">
+                        <div class="node-title">Topic Confirmation</div>
+                        <div class="node-subtitle">Story 1.7</div>
+                        <div class="node-details">Dialog with topic<br>User confirms/edits<br>Saves to database</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Epic 2 -->
+            <div class="flow-section">
+                <div class="section-label epic2-label">🎤 Epic 2: Content Generation Pipeline</div>
+
+                <div class="flow-row">
+                    <div class="flow-node epic2-node">
+                        <div class="node-title">Voice Selection UI</div>
+                        <div class="node-subtitle">Story 2.3</div>
+                        <div class="node-details">5 voice options<br>Audio preview playback<br>Select narrator</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-node epic2-node">
+                        <div class="node-title">Script Generation</div>
+                        <div class="node-subtitle">Story 2.4</div>
+                        <div class="node-details">Loading screen<br>AI generates 3-5 scenes<br>Quality validation</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-node epic2-node">
+                        <div class="node-title">Script & Voiceover Preview</div>
+                        <div class="node-subtitle">Story 2.6</div>
+                        <div class="node-details">Review script text<br>Play voiceover audio<br>Confirm readiness</div>
+                    </div>
+                </div>
+
+                <div style="margin: 20px 0; padding: 16px; background: rgba(99, 102, 241, 0.1); border-radius: 8px; border-left: 3px solid #6366f1;">
+                    <strong style="color: #6366f1;">Epic 2 Key Innovations:</strong>
+                    <ul style="margin-top: 8px; padding-left: 20px; color: #cbd5e1; font-size: 0.875rem;">
+                        <li>Voice personalization with preview before commitment</li>
+                        <li>Transparent script generation with progress feedback</li>
+                        <li>Progressive voiceover loading (real-time UI updates)</li>
+                        <li>Quality check retry (seamless regeneration if needed)</li>
+                        <li>Full review capability before visual sourcing</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Epic 4 -->
+            <div class="flow-section">
+                <div class="section-label epic4-label">🎬 Epic 4: Visual Curation</div>
+                <div class="flow-row">
+                    <div class="flow-node epic4-node">
+                        <div class="node-title">Visual Curation UI</div>
+                        <div class="node-subtitle">Scene-by-scene curation</div>
+                        <div class="node-details">View script<br>4-6 clip options/scene<br>Preview videos</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-node epic4-node">
+                        <div class="node-title">Select Clips</div>
+                        <div class="node-subtitle">User chooses visuals</div>
+                        <div class="node-details">Click thumbnail<br>Progress tracking<br>All scenes required</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-node epic4-node">
+                        <div class="node-title">Trigger Assembly</div>
+                        <div class="node-subtitle">All scenes complete</div>
+                        <div class="node-details">"Assemble Video" button<br>Confirmation dialog<br>Submit selections</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Epic 5 -->
+            <div class="flow-section">
+                <div class="section-label epic5-label">🎥 Epic 5: Video Assembly (Future)</div>
+                <div class="flow-row">
+                    <div class="flow-node epic5-node">
+                        <div class="node-title">Video Assembly</div>
+                        <div class="node-subtitle">Automatic processing</div>
+                        <div class="node-details">Combine clips<br>Sync audio<br>Generate video</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-node epic5-node">
+                        <div class="node-title">Thumbnail Generation</div>
+                        <div class="node-subtitle">AI-generated cover</div>
+                        <div class="node-details">Extract frame<br>Add title overlay<br>Create thumbnail</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-node epic5-node">
+                        <div class="node-title">Download/Share</div>
+                        <div class="node-subtitle">Final output</div>
+                        <div class="node-details">MP4 video file<br>Thumbnail image<br>Ready to publish</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workflow Loops -->
+            <div class="flow-section" style="border-top: 2px dashed #334155; padding-top: 40px; margin-top: 40px;">
+                <div class="section-label" style="border-color: #cbd5e1; color: #cbd5e1;">🔄 Workflow Loops</div>
+                <div class="flow-row">
+                    <div class="flow-node" style="border-color: #cbd5e1;">
+                        <div class="node-title">Create New Project</div>
+                        <div class="node-subtitle">Click "New Chat"</div>
+                        <div class="node-details">Returns to Chat Interface<br>Fresh conversation<br>New video idea</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-node" style="border-color: #cbd5e1;">
+                        <div class="node-title">Switch Projects</div>
+                        <div class="node-subtitle">Click sidebar project</div>
+                        <div class="node-details">Load saved state<br>Resume conversation<br>Continue curation</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="key-features">
+        <h2>🎯 Key User Experience Features by Epic</h2>
+        <div class="features-grid">
+            <div class="feature-card epic1-feature">
+                <h3>Epic 1: Conversational Discovery</h3>
+                <p>Natural language brainstorming with AI assistant. Multi-turn context-aware conversations. Explicit video creation trigger.</p>
+            </div>
+            <div class="feature-card epic1-feature">
+                <h3>Story 1.6: Project Management</h3>
+                <p>Multiple project organization. Sidebar navigation. Seamless project switching with state preservation.</p>
+            </div>
+            <div class="feature-card epic2-feature">
+                <h3>Epic 2: Voice Selection</h3>
+                <p>5 voice options with metadata. Audio preview before selection. Single voice per project consistency.</p>
+            </div>
+            <div class="feature-card epic2-feature">
+                <h3>Epic 2: Script Generation</h3>
+                <p>Transparent loading with stage messages. Quality validation and retry. Auto-navigation to preview.</p>
+            </div>
+            <div class="feature-card epic2-feature">
+                <h3>Epic 2: Script Preview</h3>
+                <p>Scene-by-scene script review. Voiceover audio playback per scene. Progressive loading (real-time updates).</p>
+            </div>
+            <div class="feature-card epic4-feature">
+                <h3>Epic 4: Visual Curation</h3>
+                <p>Director-style clip review. 4-6 options per scene. Video preview on hover. Progress tracking.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

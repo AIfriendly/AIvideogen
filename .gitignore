@@ -27,6 +27,10 @@ build/
 .cache/
 .turbo/
 
+# Audio files (generated TTS outputs)
+*.mp3
+*.wav
+
 # IDE
 .vscode/
 .idea/

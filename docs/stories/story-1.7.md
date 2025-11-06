@@ -2,7 +2,7 @@
 
 **Epic:** Epic 1 - Conversational Topic Discovery
 **Story ID:** 1.7
-**Status:** Ready for Review
+**Status:** Done
 **Created:** 2025-11-05
 **Last Updated:** 2025-11-05
 **Assigned To:** lichking
@@ -393,6 +393,8 @@ CREATE TABLE projects (
 |------------|------------|-------------------------------------------------------|
 | 2025-11-05 | lichking   | Initial draft created by SM agent (create-story workflow) |
 | 2025-11-05 | DEV agent  | Implementation complete - All 10 tasks done, 38 tests passing |
+| 2025-11-05 | lichking   | Bug fixes and enhancements - Added 3 tests, fixed "topic on X" pattern, enhanced context extraction |
+| 2025-11-05 | lichking   | Story marked as Done - All 41 tests passing, test review complete |
 
 ---
 
@@ -436,19 +438,30 @@ All 10 tasks implemented and tested:
 10. TypeScript types updated for API responses
 
 **Test Results:**
-- Topic extraction unit tests: 29/29 passed
+- Topic extraction unit tests: 32/32 passed (29 original + 3 new)
 - Topic confirmation integration tests: 9/9 passed
+- Total: 41/41 tests passing
 - All acceptance criteria validated through tests
 
 **Key Features Implemented:**
-- Pattern matching for video creation commands (6 patterns)
-- Context-aware topic extraction for generic commands
+- Pattern matching for video creation commands (8 patterns - 6 original + 2 enhanced)
+- Context-aware topic extraction for generic commands (6 context patterns)
+- Enhanced pronoun reference detection ("make a video about it")
 - Modal dialog with backdrop dismissal prevention
 - Escape key handling for edit workflow
 - Loading states during async operations
 - Error handling with toast notifications
 - Project name truncation to 50 chars at word boundaries
 - Navigation to voice selection placeholder page
+
+**Bug Fixes & Enhancements (2025-11-05):**
+- Fixed: "topic on X" pattern not recognized (e.g., "brainstorm a topic on ww2")
+- Added: 6 new context extraction patterns (brainstorm, discuss, help with, learn about, focused on)
+- Added: 2 new video creation patterns (do/build/produce/film verbs)
+- Enhanced: Pronoun reference detection (5 verbs, flexible articles)
+- Enhanced: Generic commands (6 patterns, polite/casual variants)
+- Enhanced: Stop word filtering (29 words + numeric detection)
+- Added: 3 new unit tests validating enhancements
 
 **Architecture Decisions:**
 - Used existing project-store.ts; no separate workflow-store needed

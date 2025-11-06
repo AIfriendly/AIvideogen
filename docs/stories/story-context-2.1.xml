@@ -1,0 +1,1399 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>2.1</story-id>
+    <story-title>TTS Engine Integration &amp; Voice Profile Setup</story-title>
+    <epic-id>2</epic-id>
+    <epic-title>Content Generation Pipeline</epic-title>
+    <generated-date>2025-11-06</generated-date>
+    <generated-by>SM Agent (Scrum Master)</generated-by>
+    <workflow>story-context</workflow>
+    <target-agent>DEV (Developer Agent)</target-agent>
+    <version>1.0</version>
+  </metadata>
+
+  <story-definition>
+    <goal>Integrate FOSS TTS engine (KokoroTTS) with persistent model caching and create comprehensive voice profile infrastructure</goal>
+
+    <description>
+      Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTTS (82M parameter model) as the voice synthesis engine with a long-running Python service for optimal performance. Create comprehensive voice profile documentation covering all 48+ KokoroTTS voices with complete metadata mapping (gender, accent, tone). Implement a TTS provider abstraction layer following the Epic 1 Ollama pattern for future extensibility. Generate preview audio samples for each voice profile with pre-sanitized text. Establish the audio file storage structure with relative paths from project root and clear schema documentation for Story 2.2 database integration. This story provides the technical foundation for voice selection (Story 2.3) and voiceover generation (Story 2.5).
+    </description>
+
+    <business-value>
+      <value>Enables high-quality voice synthesis for video narration (4.35 MOS score)</value>
+      <value>Provides comprehensive voice options for user personalization (48+ voices available)</value>
+      <value>Establishes FOSS-compliant TTS solution with no recurring API costs</value>
+      <value>Creates extensible architecture for future TTS provider additions</value>
+      <value>Delivers fast generation performance (3.2x faster than XTTS) via persistent model caching</value>
+      <value>Supports voice blending capability for future enhancements</value>
+      <value>Provides performance on par with Ollama's model caching pattern</value>
+    </business-value>
+
+    <acceptance-criteria>
+      <criterion id="AC1">
+        <title>TTS engine successfully installed and accessible via persistent service</title>
+        <requirements>
+          <requirement>KokoroTTS Python package v0.3.0+ installed in project environment</requirement>
+          <requirement>82M parameter model downloaded successfully (~320MB)</requirement>
+          <requirement>Long-running Python TTS service keeps model in memory (persistent caching like Ollama)</requirement>
+          <requirement>Service communicates via JSON protocol over stdin/stdout OR HTTP on dedicated port</requirement>
+          <requirement>Test synthesis call generates valid MP3 audio file (128kbps, 44.1kHz, Mono)</requirement>
+          <requirement>Error codes implemented: TTS_MODEL_NOT_FOUND, TTS_NOT_INSTALLED, TTS_SERVICE_ERROR</requirement>
+          <requirement>Installation verification script added to project setup documentation</requirement>
+          <requirement>Performance: Preview generation &lt;2s, scene synthesis &lt;3s</requirement>
+        </requirements>
+      </criterion>
+
+      <criterion id="AC2">
+        <title>All 48+ KokoroTTS voices documented with comprehensive metadata</title>
+        <requirements>
+          <requirement>VoiceProfile interface defined in TypeScript with fields: id, name, gender, accent, tone, previewUrl, modelId</requirement>
+          <requirement>Complete voice catalog file (voice-profiles.ts) documents ALL 48+ KokoroTTS voices (not just 5 examples)</requirement>
+          <requirement>Each profile has unique id, descriptive name, accurate metadata, and KokoroTTS model ID mapping</requirement>
+          <requirement>Voice profiles cover full diversity: male/female, multiple accents, various tones</requirement>
+          <requirement>Metadata includes gender, accent (American/British/neutral), tone (warm/professional/energetic/calm/friendly)</requirement>
+          <requirement>MVP uses subset of 5 voices for UI, but complete catalog is documented for future expansion</requirement>
+          <requirement>Voice ID to model ID mapping table included for all voices</requirement>
+        </requirements>
+      </criterion>
+
+      <criterion id="AC3">
+        <title>Preview audio samples generated with sanitized text</title>
+        <requirements>
+          <requirement>Preview script text pre-sanitized (no markdown, special characters, or non-speakable content)</requirement>
+          <requirement>Preview text validated against sanitization rules before TTS generation</requirement>
+          <requirement>MP3 preview files generated for each MVP voice profile using KokoroTTS</requirement>
+          <requirement>Audio format: MP3, 128kbps, 44.1kHz, Mono (standardized across all audio)</requirement>
+          <requirement>Files stored in `.cache/audio/previews/{voiceId}.mp3` with consistent naming</requirement>
+          <requirement>Preview audio files accessible via static file serving (Next.js public directory)</requirement>
+          <requirement>Preview generation script (npm script or standalone utility) for reproducibility</requirement>
+          <requirement>All preview files under 500KB each for fast loading</requirement>
+        </requirements>
+      </criterion>
+
+      <criterion id="AC4">
+        <title>TTSProvider interface follows Epic 1 Ollama pattern</title>
+        <requirements>
+          <requirement>TTSProvider interface defined in lib/tts/provider.ts following LLM provider abstraction pattern</requirement>
+          <requirement>Interface includes: `generateAudio(text: string, voiceId: string): Promise&lt;AudioResult&gt;`</requirement>
+          <requirement>AudioResult type includes: audioBuffer (Uint8Array for portability), duration (number), filePath (string)</requirement>
+          <requirement>KokoroProvider class implements TTSProvider interface with persistent service communication</requirement>
+          <requirement>Factory function `getTTSProvider()` returns provider based on environment config</requirement>
+          <requirement>Pattern correspondence table maps TTS components to Epic 1 LLM components</requirement>
+          <requirement>Error handling interface defined for synthesis failures with standard error codes</requirement>
+        </requirements>
+      </criterion>
+
+      <criterion id="AC5">
+        <title>Audio files stored with documented schema for Story 2.2</title>
+        <requirements>
+          <requirement>Directory structure created: `.cache/audio/previews/` and `.cache/audio/projects/{projectId}/`</requirement>
+          <requirement>Scene audio naming convention: `scene-{sceneNumber}.mp3` (e.g., scene-1.mp3, scene-2.mp3)</requirement>
+          <requirement>File paths stored as relative paths from project root (e.g., `.cache/audio/projects/{projectId}/scene-1.mp3`)</requirement>
+          <requirement>Explicit schema documentation for scenes table: audio_file_path TEXT (relative path), duration REAL (seconds)</requirement>
+          <requirement>Path format clarified for Story 2.2 database integration</requirement>
+          <requirement>Git ignores `.cache/` directory to prevent committing large audio files</requirement>
+          <requirement>File path validation prevents directory traversal attacks</requirement>
+          <requirement>Cleanup policy: Preview audio never deleted, project audio deleted after 30 days inactive</requirement>
+        </requirements>
+      </criterion>
+
+      <criterion id="AC6">
+        <title>TTS connection errors handled with standard error codes</title>
+        <requirements>
+          <requirement>Python service errors caught and converted to actionable error messages</requirement>
+          <requirement>Error codes: TTS_MODEL_NOT_FOUND, TTS_NOT_INSTALLED, TTS_SERVICE_ERROR, TTS_TIMEOUT</requirement>
+          <requirement>Missing model error: "Voice synthesis model not found. Please run setup script." (TTS_MODEL_NOT_FOUND)</requirement>
+          <requirement>Missing dependency error: "KokoroTTS not installed. Run: uv pip install -r requirements.txt" (TTS_NOT_INSTALLED)</requirement>
+          <requirement>Service unavailable: "TTS service not responding. Please restart." (TTS_SERVICE_ERROR)</requirement>
+          <requirement>Synthesis timeout error: "Voice generation timed out. Please try again." (TTS_TIMEOUT)</requirement>
+          <requirement>All errors logged with stack traces for debugging</requirement>
+          <requirement>API returns standard error format: `{ success: false, error: { message, code } }`</requirement>
+        </requirements>
+      </criterion>
+    </acceptance-criteria>
+  </story-definition>
+
+  <project-documentation>
+    <prd>
+      <section name="Feature 1.3: Voice Selection" lines="122-152">
+        <content>
+**Description:** Before script generation, users can choose from multiple AI-generated voices to narrate their video, allowing them to match the voice to their content's tone and style.
+
+**User Stories:**
+1. **As a creator,** I want to select from different AI voice options (male, female, different accents), **so that** I can choose a narrator that fits my video's topic and audience.
+2. **As a creator,** I want to preview voice samples before selecting, **so that** I can hear how each voice sounds before committing to it for my entire video.
+
+**Functional Requirements:**
+- The system shall present a voice selection interface after topic confirmation and before script generation.
+- The system must provide at least 3-5 distinct voice options with different characteristics (gender, accent, tone).
+- Each voice option must have a short audio preview sample that users can play.
+- The system must allow users to select exactly one voice for their video project.
+- The selected voice must be used consistently for all scene voiceovers in that project.
+- The system shall store the voice selection as part of the project metadata.
+- All voice options must use FOSS (free and open-source) TTS engines to comply with NFR 1.
+
+**Acceptance Criteria:**
+**AC1: Voice Selection UI Display**
+  - **Given** a user has confirmed their video topic.
+  - **When** the system transitions to voice selection.
+  - **Then** the UI must display at least 3 voice options with metadata (name, gender, accent/style).
+
+**AC2: Voice Preview**
+  - **Given** the voice selection UI is displayed.
+  - **When** the user clicks the preview button for a voice option.
+  - **Then** a short audio sample of that voice must play immediately.
+
+**AC3: Voice Selection Persistence**
+  - **Given** a user selects "Voice Option 2" for their project.
+  - **When** the voiceover generation completes for all scenes.
+  - **Then** all scene audio files must use "Voice Option 2" consistently.
+        </content>
+      </section>
+
+      <section name="Feature 1.4: Automated Voiceover" lines="153-177">
+        <content>
+**Description:** The system uses text-to-speech technology to generate a voiceover for each scene from the automated script using the user's selected voice.
+
+**Functional Requirements:**
+- The system shall take the structured script (containing text for each scene) as input.
+- The system must use the user's selected voice (from Feature 1.3) for generating all voiceovers.
+- For each scene, the system must generate a corresponding audio file of the spoken text.
+- The generated audio must be in a standard format (e.g., MP3).
+- The system must maintain the association between each scene and its generated audio file.
+
+**Acceptance Criteria:**
+**AC1: Successful Audio Generation**
+  - **Given** a scene with the text "This is a test sentence."
+  - **When** the voiceover generation process runs for that scene.
+  - **Then** an MP3 audio file is created that contains the spoken words "This is a test sentence."
+
+**AC2: Complete Voiceover for Script**
+  - **Given** a script with 3 scenes.
+  - **When** the voiceover process is complete.
+  - **Then** there must be 3 distinct audio files, each corresponding to the text of one of the scenes.
+        </content>
+      </section>
+
+      <section name="NFR 1: Technology Stack - FOSS Requirement" lines="18-24">
+        <content>
+**Requirement:** The entire system must be implemented using technologies that are free and open-source (FOSS).
+**Rationale:** To ensure the project is accessible, modifiable, and has no licensing costs associated with its core components.
+**Implication:** This constrains the choice of services for AI models (LLMs, TTS), stock media providers, and all underlying libraries. Any external service must have a free tier that is sufficient for the MVP's purposes without requiring payment.
+        </content>
+      </section>
+    </prd>
+
+    <architecture>
+      <section name="ADR-003: KokoroTTS for Voice Synthesis" lines="2250-2273">
+        <content>
+**Status:** Accepted
+**Date:** 2025-11-01
+
+**Context:**
+Need high-quality TTS with multiple voice options. Must be FOSS.
+
+**Decision:**
+Use KokoroTTS (82M parameter model) with 48+ voice options.
+
+**Consequences:**
+- ✅ FOSS compliant (Apache 2.0)
+- ✅ 48+ voices (exceeds PRD requirement of 3-5)
+- ✅ High quality (4.35 MOS score)
+- ✅ Fast inference (3.2x faster than XTTS)
+- ✅ Voice blending capability (bonus feature)
+- ⚠️ Python dependency
+
+**Alternatives Considered:**
+- Piper TTS: Fewer voices, less natural
+- Coqui TTS: Heavier, slower
+- eSpeak NG: Robotic sound quality
+        </content>
+      </section>
+
+      <section name="LLM Provider Abstraction Pattern" lines="416-536">
+        <content>
+**Architecture Pattern: Strategy Pattern**
+
+This pattern provides the template for TTS provider abstraction. Key elements:
+- Interface-based design (LLMProvider → TTSProvider)
+- Concrete implementation class (OllamaProvider → KokoroProvider)
+- Factory function for provider instantiation (getLLMProvider() → getTTSProvider())
+- Environment-based configuration
+- Extensibility for future providers (OpenAI, Anthropic → Google TTS, Azure TTS)
+
+**Benefits:**
+- ✅ Clean separation - All LLM/TTS calls go through abstraction
+- ✅ Easy testing - Can mock provider interfaces
+- ✅ Future-proof - Adding new providers is just a new class
+- ✅ Configuration-driven - Switch providers via .env
+- ✅ Cloud-ready - Easy migration to cloud LLM/TTS APIs
+        </content>
+      </section>
+
+      <section name="File Structure and Organization" lines="216-217">
+        <content>
+lib/tts/
+  ├── provider.ts                 (TTS provider interface)
+  ├── kokoro-provider.ts          (KokoroTTS implementation)
+  ├── factory.ts                  (Provider factory)
+  ├── voice-profiles.ts           (Voice catalog: 48+ voices)
+  └── sanitize-text.ts            (Text sanitization utilities)
+        </content>
+      </section>
+
+      <section name="State Management Architecture" lines="904-1125">
+        <content>
+**Hybrid Approach: Zustand + SQLite**
+
+**Client State (Zustand):**
+- Active workflow step
+- Current conversation messages (recent N)
+- UI state (loading, errors, modals)
+- Temporary selections (before save)
+
+**Persistent State (SQLite):**
+- Project metadata
+- Complete conversation history
+- Generated content (script, voice selection)
+- Clip selections
+- File references
+
+**Synchronization Pattern:**
+Save workflow state to database via API, load on mount.
+        </content>
+      </section>
+
+      <section name="Database Schema - Projects Table" lines="1145-1157">
+        <content>
+CREATE TABLE projects (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  topic TEXT,
+  current_step TEXT DEFAULT 'topic',
+  selected_voice TEXT,           -- Epic 2: Voice selection
+  script_json TEXT,               -- Epic 2: Generated script
+  system_prompt_id TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  last_active TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (system_prompt_id) REFERENCES system_prompts(id)
+);
+        </content>
+      </section>
+
+      <section name="API Design Conventions" lines="1458-1474">
+        <content>
+**Response Format:**
+```typescript
+// Success
+{
+  success: true,
+  data: { ... }
+}
+
+// Error
+{
+  success: false,
+  error: {
+    message: string,
+    code: string
+  }
+}
+```
+
+All API endpoints follow this standard format for consistency.
+        </content>
+      </section>
+    </architecture>
+
+    <tech-spec-epic-2>
+      <section name="Overview" lines="10-14">
+        <content>
+Epic 2 implements the complete content generation pipeline for the AI Video Generator, encompassing voice selection, professional-quality script generation, and text-to-speech synthesis. Building on Epic 1's topic confirmation workflow, this epic transforms confirmed topics into production-ready audio-scripted content. The implementation leverages KokoroTTS for high-quality voice synthesis with 48+ voice options, Ollama/Llama 3.2 for intelligent script generation with professional scriptwriting standards, and a comprehensive text sanitization pipeline to ensure clean TTS output.
+        </content>
+      </section>
+
+      <section name="Voice Profile Model" lines="66-77">
+        <content>
+```typescript
+interface VoiceProfile {
+  id: string;                    // Unique voice identifier
+  name: string;                   // Display name (e.g., "Sarah - American Female")
+  gender: 'male' | 'female';     // Voice gender
+  accent: string;                 // Accent/region (e.g., "american", "british")
+  tone: string;                   // Tone description (e.g., "warm", "professional")
+  previewUrl: string;             // Path to preview audio sample
+  modelId?: string;               // KokoroTTS model identifier
+}
+```
+        </content>
+      </section>
+
+      <section name="Scene Model (Database Schema)" lines="79-96">
+        <content>
+```sql
+CREATE TABLE scenes (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  scene_number INTEGER NOT NULL,
+  text TEXT NOT NULL,              -- Original script text
+  sanitized_text TEXT,             -- Cleaned text for TTS
+  audio_file_path TEXT,            -- Path to generated MP3
+  duration REAL,                   -- Duration in seconds
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  UNIQUE(project_id, scene_number)
+);
+CREATE INDEX idx_scenes_project ON scenes(project_id);
+CREATE INDEX idx_scenes_number ON scenes(scene_number);
+```
+        </content>
+      </section>
+
+      <section name="Performance Requirements" lines="270-279">
+        <content>
+**Performance:**
+- **Script Generation:** Complete within 5-10 seconds for typical topics (3-5 scenes)
+- **Voice Preview:** Audio samples load and play within 500ms of button click
+- **TTS Generation:** Process each scene in &lt; 3 seconds (KokoroTTS 3.2x faster than XTTS)
+- **Parallel Processing:** Generate voiceovers for multiple scenes concurrently (target: 5 parallel)
+- **Response Times:** API endpoints respond within 200ms for synchronous operations
+- **Memory Usage:** TTS model loaded once and reused across requests (82M model size)
+- **Cache Strategy:** Voice preview samples cached in browser for instant replay
+- **Database Queries:** Scene retrieval queries execute in &lt; 50ms with proper indexing
+        </content>
+      </section>
+
+      <section name="Security Requirements" lines="281-291">
+        <content>
+**Security:**
+- **Input Validation:** All text inputs sanitized to prevent script injection
+- **File Path Validation:** Audio file paths confined to `.cache/audio/` directory
+- **Topic Length Limit:** Maximum 12000 characters to prevent prompt injection attacks
+- **Script Length Limit:** Maximum 1200 words per scene to prevent resource exhaustion
+- **Voice ID Validation:** Only accept voice IDs from predefined whitelist
+- **SQL Injection Prevention:** Use parameterized queries for all database operations
+- **Local Processing:** All TTS and LLM processing happens locally (no external API calls)
+- **No PII Storage:** Scripts and audio files contain no personally identifiable information
+- **CORS Configuration:** API endpoints restricted to same-origin requests only
+        </content>
+      </section>
+
+      <section name="Dependencies" lines="318-352">
+        <content>
+**External Dependencies:**
+- **Ollama Server:** v0.4.7+ running at localhost:11434 with Llama 3.2 (3B) model loaded
+- **KokoroTTS:** Python package v0.3.0+ with 82M parameter model downloaded (~320MB)
+- **FFmpeg:** v7.1.2+ for audio format conversion if needed
+- **Python Runtime:** 3.10+ for KokoroTTS execution via child_process
+
+**NPM Package Dependencies:**
+```json
+{
+  "ollama": "^0.6.2",           // LLM client SDK
+  "uuid": "^11.0.4",             // Scene ID generation
+  "zod": "^3.24.1"               // API request/response validation
+}
+```
+
+**Python Dependencies (requirements.txt):**
+```
+kokoro-tts==0.3.0               # TTS engine
+numpy==1.24.3                   # Audio processing
+scipy==1.11.1                   # Audio utilities
+```
+
+**File System Dependencies:**
+- `.cache/audio/` directory must exist with write permissions
+- `.cache/audio/previews/` for voice sample storage
+- `.cache/audio/projects/{projectId}/` for scene audio files
+        </content>
+      </section>
+    </tech-spec-epic-2>
+  </project-documentation>
+
+  <codebase-state>
+    <epic-1-implementation>
+      <summary>
+Epic 1 is COMPLETE with all core infrastructure in place. This provides the foundation Story 2.1 builds upon.
+      </summary>
+
+      <existing-files>
+        <file path="ai-video-generator/src/lib/llm/ollama-provider.ts" status="complete">
+LLM provider implementation following the abstraction pattern that TTS will mirror.
+Key features:
+- Implements LLMProvider interface
+- Handles system prompt prepending
+- Comprehensive error handling with user-friendly messages
+- Connection health checks
+- Model availability validation
+        </file>
+
+        <file path="ai-video-generator/src/lib/llm/provider.ts" status="complete">
+LLM provider interface definition. Template for TTSProvider interface:
+- chat(messages, systemPrompt) method
+- Error handling pattern
+- Type definitions for messages and responses
+        </file>
+
+        <file path="ai-video-generator/src/lib/llm/factory.ts" status="complete">
+Provider factory pattern. Template for getTTSProvider():
+- Environment-based provider selection
+- Default fallback configuration
+- Extensible for multiple providers
+        </file>
+
+        <file path="ai-video-generator/src/lib/db/client.ts" status="complete">
+Database client with better-sqlite3:
+- SQLite connection management
+- Foreign key constraints enabled
+- Ready for schema extensions
+        </file>
+
+        <file path="ai-video-generator/src/lib/db/queries.ts" status="complete">
+Database query functions with comprehensive CRUD operations:
+- Project management (create, read, update, delete)
+- Message management
+- System prompts
+- Pattern for adding scene and audio queries
+        </file>
+
+        <file path="ai-video-generator/src/lib/db/schema.sql" status="complete">
+Current database schema (Epic 1 scope):
+- system_prompts table
+- projects table (without voice_id yet)
+- messages table
+- Proper indexes and foreign keys
+        </file>
+      </existing-files>
+
+      <patterns-to-follow>
+        <pattern name="Provider Abstraction">
+Location: lib/llm/provider.ts, ollama-provider.ts, factory.ts
+Template: Interface → Implementation → Factory
+Apply to: TTS provider (TTSProvider → KokoroProvider → getTTSProvider)
+        </pattern>
+
+        <pattern name="Error Handling">
+Location: lib/llm/ollama-provider.ts (handleError method)
+Template: User-friendly messages with actionable guidance
+Apply to: TTS errors (connection, model not found, timeout)
+        </pattern>
+
+        <pattern name="Database Queries">
+Location: lib/db/queries.ts
+Template: Parameterized queries, try-catch, typed returns
+Apply to: Scene and audio queries
+        </pattern>
+
+        <pattern name="API Response Format">
+Location: All API routes (app/api/*)
+Template: { success: boolean, data/error: object }
+Apply to: Voice selection and generation APIs
+        </pattern>
+      </patterns-to-follow>
+    </epic-1-implementation>
+
+    <missing-components>
+      <component name="TTS Provider Infrastructure" status="not-started">
+Files to create:
+- lib/tts/provider.ts (TTSProvider interface)
+- lib/tts/kokoro-provider.ts (KokoroProvider implementation)
+- lib/tts/factory.ts (getTTSProvider factory)
+- lib/tts/voice-profiles.ts (48+ voice catalog)
+- lib/tts/sanitize-text.ts (text sanitization)
+      </component>
+
+      <component name="Python TTS Service" status="not-started">
+Files to create:
+- scripts/kokoro-tts-service.py (persistent Python service)
+- scripts/verify-tts-setup.py (installation verification)
+- scripts/generate-voice-previews.ts (preview generation)
+- scripts/cleanup-audio.ts (audio cleanup utility)
+      </component>
+
+      <component name="Voice Selection API" status="not-started">
+Files to create:
+- app/api/voice/list/route.ts (GET voice profiles)
+- app/api/projects/[id]/select-voice/route.ts (POST voice selection)
+      </component>
+
+      <component name="Audio Storage Utilities" status="not-started">
+Files to create:
+- lib/utils/audio-storage.ts (path management, validation)
+      </component>
+
+      <component name="Database Schema Extensions" status="not-started">
+Schema updates needed:
+- ALTER TABLE projects ADD COLUMN voice_id TEXT
+- CREATE TABLE scenes (...)
+- Documentation in docs/story-2.1-schema-output.md
+      </component>
+
+      <component name="Documentation" status="not-started">
+Files to create:
+- docs/kokoro-voice-catalog.md (complete 48+ voice documentation)
+- docs/story-2.1-schema-output.md (schema for Story 2.2)
+- docs/tts-service-architecture.md (service design rationale)
+- docs/pattern-correspondence-epic1-epic2.md (pattern alignment)
+      </component>
+
+      <component name="Environment Configuration" status="not-started">
+Updates needed:
+- .env.local.example (TTS configuration variables)
+- docs/setup-guide.md (TTS installation instructions)
+      </component>
+
+      <component name="Tests" status="not-started">
+Test files to create:
+- tests/unit/voice-profiles.test.ts
+- tests/unit/audio-storage.test.ts
+- tests/unit/sanitize-text.test.ts
+- tests/integration/tts-provider.test.ts
+      </component>
+    </missing-components>
+
+    <dependencies>
+      <npm-packages status="installed">
+        <package name="ollama" version="^0.6.2">LLM client (pattern reference)</package>
+        <package name="better-sqlite3" version="^12.4.1">Database client</package>
+        <package name="zustand" version="^5.0.8">State management</package>
+        <package name="next" version="16.0.1">Framework</package>
+      </npm-packages>
+
+      <npm-packages status="to-install">
+        <package name="uuid" version="^11.0.4">Scene ID generation</package>
+        <package name="zod" version="^3.24.1">API validation (optional)</package>
+      </npm-packages>
+
+      <python-packages status="to-install">
+        <package name="kokoro-tts" version="0.3.0">TTS engine</package>
+        <package name="numpy" version="1.24.3">Audio processing</package>
+        <package name="scipy" version="1.11.1">Audio utilities</package>
+      </python-packages>
+
+      <system-requirements>
+        <requirement>Python 3.10+ installed</requirement>
+        <requirement>UV package manager installed (for Python dependencies)</requirement>
+        <requirement>FFmpeg 7.1.2+ in PATH (for audio conversion)</requirement>
+        <requirement>~500MB disk space for KokoroTTS model and preview audio</requirement>
+      </system-requirements>
+    </dependencies>
+  </codebase-state>
+
+  <implementation-guidance>
+    <architecture-decisions>
+      <decision id="persistent-service">
+        <title>Persistent TTS Service Architecture</title>
+        <problem>Per-request Python process spawn is inefficient (model reload each time ~2-3s overhead)</problem>
+        <solution>Long-running Python service with model kept in memory (like Ollama on port 11434)</solution>
+        <rationale>
+- Cold start (first request): ~3-5s (model load + synthesis)
+- Warm requests (subsequent): &lt;2s (synthesis only, model cached)
+- Matches Ollama's persistent caching approach
+- Service communicates via JSON protocol over stdin/stdout (simpler than HTTP)
+        </rationale>
+        <implementation>
+Task 2: Create scripts/kokoro-tts-service.py
+- Load KokoroTTS model once on startup
+- Accept JSON requests via stdin
+- Process in loop, keep model loaded
+- Return JSON responses via stdout
+- Graceful shutdown on SIGTERM
+        </implementation>
+      </decision>
+
+      <decision id="complete-voice-catalog">
+        <title>Document All 48+ Voices (Not Just MVP 5)</title>
+        <problem>Future stories need complete voice options, not just MVP subset</problem>
+        <solution>Document ALL 48+ KokoroTTS voices in voice-profiles.ts, mark MVP subset with flag</solution>
+        <rationale>
+- Full catalog prevents future rework
+- MVP uses 5 voices (mvpVoice: true flag)
+- Post-MVP can expose all voices instantly
+- Documentation comprehensive from day one
+        </rationale>
+        <implementation>
+Task 4: Create lib/tts/voice-profiles.ts
+- Define ALL 48+ voice profiles
+- Mark MVP voices: mvpVoice: true
+- Export MVP_VOICES = VOICE_PROFILES.filter(v => v.mvpVoice)
+- Document in docs/kokoro-voice-catalog.md
+        </implementation>
+      </decision>
+
+      <decision id="text-sanitization">
+        <title>Pre-Sanitize Preview Text</title>
+        <problem>TTS engines struggle with markdown, formatting, and scene labels</problem>
+        <solution>Sanitize ALL text before TTS generation, validate preview text passes rules</solution>
+        <rationale>
+- Remove markdown (*, _, #, `, etc.)
+- Remove scene labels ("Scene 1:", "Title:")
+- Remove stage directions ([...])
+- Collapse whitespace
+- Validate before synthesis
+        </rationale>
+        <implementation>
+Task 6: Create lib/tts/sanitize-text.ts
+- sanitizeForTTS(text): Remove all non-speakable characters
+- validateSanitization(text): Check for issues
+- PREVIEW_TEXT constant: Pre-sanitized text
+        </implementation>
+      </decision>
+
+      <decision id="schema-documentation">
+        <title>Explicit Schema Documentation for Story 2.2</title>
+        <problem>Story 2.2 needs exact schema requirements, file path formats</problem>
+        <solution>Create docs/story-2.1-schema-output.md with complete schema specifications</solution>
+        <rationale>
+- Story 2.2 will implement database schema extensions
+- Needs exact field names, types, constraints
+- Needs file path format (relative vs absolute)
+- Prevents ambiguity and rework
+        </rationale>
+        <implementation>
+Task 5: Create docs/story-2.1-schema-output.md
+- Scenes table schema (exact SQL)
+- Projects table additions (voice_id column)
+- File path format documentation
+- Duration field specification (REAL type, seconds)
+- Indexes required
+        </implementation>
+      </decision>
+
+      <decision id="pattern-correspondence">
+        <title>Pattern Correspondence: Epic 1 LLM ↔ Epic 2 TTS</title>
+        <problem>Need consistent architecture across epics</problem>
+        <solution>Map TTS components to Epic 1 LLM components explicitly</solution>
+        <rationale>
+- TTSProvider ↔ LLMProvider
+- KokoroProvider ↔ OllamaProvider
+- getTTSProvider() ↔ getLLMProvider()
+- Persistent service ↔ Ollama server on 11434
+- Reduces cognitive load for developers
+- Predictable behavior across provider types
+        </rationale>
+        <implementation>
+Task 15: Create docs/pattern-correspondence-epic1-epic2.md
+- Provider abstraction mapping
+- Persistent service pattern comparison
+- Configuration pattern alignment
+- Error handling pattern similarity
+        </implementation>
+      </decision>
+    </architecture-decisions>
+
+    <critical-path-tasks>
+      <task id="task-1" priority="high" dependencies="none">
+        <title>Install and Configure KokoroTTS Dependencies</title>
+        <files>requirements.txt, docs/setup-guide.md, scripts/verify-tts-setup.py</files>
+        <action>
+1. Add KokoroTTS dependencies to requirements.txt
+2. Create installation verification script
+3. Document TTS setup in docs/setup-guide.md
+4. Add npm script: "verify:tts"
+5. Test installation on clean environment
+        </action>
+        <validation>Run verify-tts-setup.py, confirm model downloads, test synthesis generates MP3</validation>
+      </task>
+
+      <task id="task-2" priority="high" dependencies="task-1">
+        <title>Design and Implement Persistent TTS Service Architecture</title>
+        <files>scripts/kokoro-tts-service.py, docs/tts-service-architecture.md</files>
+        <action>
+1. Document architecture decision (persistent service vs per-request spawn)
+2. Create scripts/kokoro-tts-service.py
+   - Load model once on startup
+   - JSON protocol via stdin/stdout
+   - Process requests in loop
+   - Graceful shutdown on SIGTERM
+3. Implement service lifecycle management (spawn, health check, restart)
+4. Performance validation (cold vs warm requests)
+        </action>
+        <validation>First request ~3-5s, subsequent requests &lt;2s, model stays in memory</validation>
+      </task>
+
+      <task id="task-3" priority="high" dependencies="none">
+        <title>Create TTS Provider Abstraction Layer</title>
+        <files>lib/tts/provider.ts, lib/tts/kokoro-provider.ts, lib/tts/factory.ts</files>
+        <action>
+1. Create lib/tts/provider.ts (TTSProvider interface)
+2. Create lib/tts/kokoro-provider.ts (implements TTSProvider)
+   - Manage persistent Python service
+   - Send JSON requests via stdin
+   - Read JSON responses from stdout
+   - Handle errors with standard codes
+3. Create lib/tts/factory.ts (getTTSProvider)
+4. Document pattern correspondence to Epic 1
+        </action>
+        <validation>Factory returns KokoroProvider, generateAudio() produces MP3 with duration</validation>
+      </task>
+
+      <task id="task-4" priority="high" dependencies="none">
+        <title>Document Complete KokoroTTS Voice Catalog (48+ Voices)</title>
+        <files>lib/tts/voice-profiles.ts, types/voice.ts, docs/kokoro-voice-catalog.md</files>
+        <action>
+1. Research ALL 48+ KokoroTTS voice model IDs
+2. Create types/voice.ts (VoiceProfile interface)
+3. Create comprehensive docs/kokoro-voice-catalog.md
+4. Create lib/tts/voice-profiles.ts
+   - Define ALL 48+ voice profiles
+   - Mark MVP voices: mvpVoice: true
+   - Export MVP_VOICES constant
+5. Add helper functions (getVoiceById, getMVPVoices, etc.)
+        </action>
+        <validation>VOICE_PROFILES has 48+ entries, MVP_VOICES has exactly 5</validation>
+      </task>
+
+      <task id="task-6" priority="medium" dependencies="task-4">
+        <title>Implement Text Sanitization for Preview Script</title>
+        <files>lib/tts/sanitize-text.ts, scripts/generate-voice-previews.ts</files>
+        <action>
+1. Create lib/tts/sanitize-text.ts
+   - sanitizeForTTS(): Remove markdown, scene labels, stage directions
+   - validateSanitization(): Check for issues
+   - PREVIEW_TEXT constant
+2. Validate preview text passes sanitization
+3. Document sanitization rules in code comments
+        </action>
+        <validation>Preview text has no markdown, no special characters, validation passes</validation>
+      </task>
+
+      <task id="task-7" priority="medium" dependencies="task-2,task-3,task-6">
+        <title>Generate Preview Audio Samples</title>
+        <files>scripts/generate-voice-previews.ts, .cache/audio/previews/</files>
+        <action>
+1. Create scripts/generate-voice-previews.ts
+   - Import MVP_VOICES (5 voices)
+   - Import sanitizeForTTS, validateSanitization
+   - For each MVP voice:
+     - Validate preview text
+     - Call KokoroProvider.generateAudio()
+     - Save MP3 to .cache/audio/previews/{voiceId}.mp3
+     - Verify format and file size
+2. Add npm script: "generate:previews"
+3. Run script, verify all 5 preview files generated
+4. Measure performance (&lt;2s per preview)
+        </action>
+        <validation>5 MP3 files in .cache/audio/previews/, each &lt;500KB, 128kbps, 44.1kHz, Mono</validation>
+      </task>
+    </critical-path-tasks>
+
+    <file-structure>
+      <directory path="lib/tts/">
+        <file name="provider.ts">
+          <purpose>TTSProvider interface definition (following LLMProvider pattern)</purpose>
+          <exports>
+- TTSProvider interface
+- AudioResult interface
+- Standard TTS types
+          </exports>
+        </file>
+
+        <file name="kokoro-provider.ts">
+          <purpose>KokoroTTS implementation of TTSProvider with persistent service</purpose>
+          <exports>
+- KokoroProvider class
+- Implements TTSProvider interface
+- Manages Python service lifecycle
+          </exports>
+        </file>
+
+        <file name="factory.ts">
+          <purpose>TTS provider factory for environment-based selection</purpose>
+          <exports>
+- getTTSProvider(): TTSProvider
+          </exports>
+        </file>
+
+        <file name="voice-profiles.ts">
+          <purpose>Complete KokoroTTS voice catalog (48+ voices)</purpose>
+          <exports>
+- VOICE_PROFILES: VoiceProfile[] (ALL 48+ voices)
+- MVP_VOICES: VoiceProfile[] (5 MVP voices)
+- Helper functions (getVoiceById, getMVPVoices, etc.)
+          </exports>
+        </file>
+
+        <file name="sanitize-text.ts">
+          <purpose>Text sanitization for TTS generation</purpose>
+          <exports>
+- sanitizeForTTS(text: string): string
+- validateSanitization(text: string): { valid: boolean, issues: string[] }
+- PREVIEW_TEXT constant
+          </exports>
+        </file>
+      </directory>
+
+      <directory path="lib/utils/">
+        <file name="audio-storage.ts">
+          <purpose>Audio file path management and validation</purpose>
+          <exports>
+- getPreviewAudioPath(voiceId: string): string
+- getSceneAudioPath(projectId: string, sceneNumber: number): string
+- ensureAudioDirectories(): Promise&lt;void&gt;
+- validateAudioPath(filePath: string): boolean
+- getAbsoluteAudioPath(relativePath: string): string
+          </exports>
+        </file>
+      </directory>
+
+      <directory path="scripts/">
+        <file name="kokoro-tts-service.py">
+          <purpose>Long-running Python TTS service with persistent model caching</purpose>
+          <functionality>
+- Load KokoroTTS model on startup
+- Accept JSON requests via stdin
+- Process synthesis requests in loop
+- Return JSON responses via stdout
+- Graceful shutdown on SIGTERM
+          </functionality>
+        </file>
+
+        <file name="verify-tts-setup.py">
+          <purpose>Installation verification script for TTS dependencies</purpose>
+          <checks>
+- Python version >= 3.10
+- KokoroTTS package installed
+- Model download successful
+- Test audio generation
+- Validate audio format
+          </checks>
+        </file>
+
+        <file name="generate-voice-previews.ts">
+          <purpose>Generate preview audio for all MVP voices</purpose>
+          <functionality>
+- Load MVP_VOICES
+- Validate preview text
+- Generate MP3 for each voice
+- Save to .cache/audio/previews/
+- Verify format and size
+          </functionality>
+        </file>
+
+        <file name="cleanup-audio.ts">
+          <purpose>Audio file cleanup utility</purpose>
+          <functionality>
+- Scan .cache/audio/projects/
+- Delete projects > 30 days old
+- NEVER delete preview audio
+- Log deleted files and space freed
+          </functionality>
+        </file>
+      </directory>
+
+      <directory path="app/api/voice/">
+        <file name="list/route.ts">
+          <purpose>GET /api/voice/list - Return available voice profiles</purpose>
+          <response>
+{
+  success: true,
+  data: {
+    voices: VoiceProfile[],      // MVP_VOICES (5 voices)
+    totalVoices: 5,               // MVP count
+    totalAvailable: 48,           // Full catalog count
+    defaultVoice: 'sarah'
+  }
+}
+          </response>
+        </file>
+      </directory>
+
+      <directory path="docs/">
+        <file name="kokoro-voice-catalog.md">
+          <purpose>Complete documentation of all 48+ KokoroTTS voices</purpose>
+          <content>
+- Table: App ID, Model ID, Name, Gender, Accent, Tone
+- Grouping by category
+- Usage notes per voice
+- MVP subset highlighted
+          </content>
+        </file>
+
+        <file name="story-2.1-schema-output.md">
+          <purpose>Schema documentation for Story 2.2 database integration</purpose>
+          <content>
+- Projects table additions (voice_id column)
+- Scenes table schema (exact SQL)
+- Audio file path format (relative paths)
+- Duration field specification (REAL, seconds)
+- Indexes required
+          </content>
+        </file>
+
+        <file name="tts-service-architecture.md">
+          <purpose>TTS service design rationale and architecture</purpose>
+          <content>
+- Problem statement (per-request spawn inefficiency)
+- Solution (persistent service)
+- Options evaluated (stdin/stdout vs HTTP)
+- Performance comparison
+          </content>
+        </file>
+
+        <file name="pattern-correspondence-epic1-epic2.md">
+          <purpose>Pattern alignment between Epic 1 (LLM) and Epic 2 (TTS)</purpose>
+          <content>
+- Provider abstraction pattern mapping
+- Persistent service pattern comparison
+- Configuration pattern alignment
+- Error handling pattern similarity
+          </content>
+        </file>
+      </directory>
+
+      <directory path="tests/">
+        <directory path="unit/">
+          <file name="voice-profiles.test.ts">Test voice profile validation, helper functions</file>
+          <file name="audio-storage.test.ts">Test path utilities, validation, security</file>
+          <file name="sanitize-text.test.ts">Test text sanitization edge cases</file>
+        </directory>
+
+        <directory path="integration/">
+          <file name="tts-provider.test.ts">Test TTS provider synthesis, service lifecycle, error handling</file>
+        </directory>
+      </directory>
+    </file-structure>
+
+    <code-examples>
+      <example name="TTSProvider Interface (lib/tts/provider.ts)">
+<![CDATA[
+export interface TTSProvider {
+  generateAudio(text: string, voiceId: string): Promise<AudioResult>;
+  getAvailableVoices(): Promise<VoiceProfile[]>;
+  cleanup(): Promise<void>;  // Shutdown service gracefully
+}
+
+export interface AudioResult {
+  audioBuffer: Uint8Array;  // Use Uint8Array for portability (not Buffer)
+  duration: number;
+  filePath: string;
+  fileSize: number;
+}
+]]>
+      </example>
+
+      <example name="KokoroProvider Service Management (lib/tts/kokoro-provider.ts)">
+<![CDATA[
+export class KokoroProvider implements TTSProvider {
+  private service: ChildProcess | null = null;
+  private serviceReady: boolean = false;
+
+  private async ensureServiceRunning(): Promise<void> {
+    if (this.service && this.serviceReady) return;
+
+    this.service = spawn('python', ['scripts/kokoro-tts-service.py']);
+
+    // Wait for "ready" message from service
+    await new Promise((resolve) => {
+      this.service.stderr.on('data', (data) => {
+        const msg = JSON.parse(data.toString());
+        if (msg.status === 'ready') {
+          this.serviceReady = true;
+          resolve();
+        }
+      });
+    });
+  }
+
+  async generateAudio(text: string, voiceId: string): Promise<AudioResult> {
+    await this.ensureServiceRunning();
+    // Send JSON request, read response, return AudioResult
+  }
+}
+]]>
+      </example>
+
+      <example name="Voice Profile Definition (lib/tts/voice-profiles.ts)">
+<![CDATA[
+export const VOICE_PROFILES: VoiceProfile[] = [
+  // MVP Voices (5)
+  {
+    id: 'sarah',
+    name: 'Sarah - American Female',
+    gender: 'female',
+    accent: 'american',
+    tone: 'warm',
+    previewUrl: '/audio/previews/sarah.mp3',
+    modelId: 'af_sky',
+    mvpVoice: true
+  },
+  {
+    id: 'james',
+    name: 'James - British Male',
+    gender: 'male',
+    accent: 'british',
+    tone: 'professional',
+    previewUrl: '/audio/previews/james.mp3',
+    modelId: 'am_adam',
+    mvpVoice: true
+  },
+  // ... 3 more MVP voices ...
+
+  // Extended Voices (43+ more)
+  {
+    id: 'emily',
+    name: 'Emily - American Female',
+    gender: 'female',
+    accent: 'american',
+    tone: 'energetic',
+    previewUrl: '/audio/previews/emily.mp3',
+    modelId: 'af_bella'
+  },
+  // ... 42 more voices ...
+];
+
+export const MVP_VOICES = VOICE_PROFILES.filter(v => v.mvpVoice);
+]]>
+      </example>
+
+      <example name="Text Sanitization (lib/tts/sanitize-text.ts)">
+<![CDATA[
+export function sanitizeForTTS(text: string): string {
+  // Remove markdown formatting
+  text = text.replace(/\*\*(.+?)\*\*/g, '$1');  // Bold
+  text = text.replace(/\*(.+?)\*/g, '$1');      // Italic
+  text = text.replace(/__(.+?)__/g, '$1');      // Underline
+  text = text.replace(/_(.+?)_/g, '$1');        // Italic alt
+  text = text.replace(/`(.+?)`/g, '$1');        // Code
+
+  // Remove scene labels
+  text = text.replace(/^Scene\s+\d+:?\s*/gmi, '');
+  text = text.replace(/^Title:?\s*/gmi, '');
+
+  // Remove stage directions
+  text = text.replace(/\[([^\]]+)\]/g, '');
+
+  // Collapse whitespace
+  text = text.replace(/\s+/g, ' ').trim();
+
+  return text;
+}
+
+export const PREVIEW_TEXT = "Hello, I'm your AI video narrator. Let me help bring your story to life with clarity and emotion.";
+]]>
+      </example>
+
+      <example name="Audio Storage Utilities (lib/utils/audio-storage.ts)">
+<![CDATA[
+import path from 'path';
+
+export function getPreviewAudioPath(voiceId: string): string {
+  return path.join('.cache', 'audio', 'previews', `${voiceId}.mp3`);
+}
+
+export function getSceneAudioPath(projectId: string, sceneNumber: number): string {
+  return path.join('.cache', 'audio', 'projects', projectId, `scene-${sceneNumber}.mp3`);
+}
+
+export function validateAudioPath(filePath: string): boolean {
+  const normalized = path.normalize(filePath);
+  const cacheDir = path.resolve('.cache', 'audio');
+
+  if (!normalized.startsWith(cacheDir)) {
+    throw new Error('Invalid audio path: outside cache directory');
+  }
+
+  return true;
+}
+]]>
+      </example>
+
+      <example name="Python TTS Service (scripts/kokoro-tts-service.py)">
+<![CDATA[
+import json
+import sys
+from kokoro_tts import KokoroTTS
+
+# Load model ONCE on startup (persistent caching)
+model = KokoroTTS()
+print(json.dumps({"status": "ready"}), file=sys.stderr, flush=True)
+
+# Process requests in loop
+while True:
+    line = sys.stdin.readline()
+    if not line:
+        break
+
+    request = json.loads(line)
+
+    if request["action"] == "synthesize":
+        audio = model.synthesize(request["text"], request["voiceId"])
+        audio.save(request["outputPath"], format="mp3", bitrate=128, sample_rate=44100, channels=1)
+
+        response = {
+            "success": True,
+            "duration": audio.duration,
+            "filePath": request["outputPath"],
+            "fileSize": os.path.getsize(request["outputPath"])
+        }
+        print(json.dumps(response), flush=True)
+
+    elif request["action"] == "shutdown":
+        break
+]]>
+      </example>
+    </code-examples>
+
+    <testing-strategy>
+      <unit-tests>
+        <test file="tests/unit/voice-profiles.test.ts">
+- VOICE_PROFILES array contains 48+ profiles
+- MVP_VOICES array contains exactly 5 profiles
+- Each voice profile has required fields
+- All voice IDs are unique
+- All modelIds are unique
+- Helper functions work correctly
+        </test>
+
+        <test file="tests/unit/audio-storage.test.ts">
+- getPreviewAudioPath() generates correct relative paths
+- getSceneAudioPath() handles project ID and scene number
+- validateAudioPath() prevents directory traversal attacks
+- getAbsoluteAudioPath() resolves correctly
+        </test>
+
+        <test file="tests/unit/sanitize-text.test.ts">
+- Remove markdown (bold, italic, code, etc.)
+- Remove scene labels
+- Remove stage directions
+- Collapse whitespace
+- Validate sanitization
+- Edge cases (nested markdown, multiple scene labels)
+        </test>
+      </unit-tests>
+
+      <integration-tests>
+        <test file="tests/integration/tts-provider.test.ts">
+- KokoroProvider service lifecycle (spawn, keep alive, graceful shutdown)
+- generateAudio() generates valid MP3 file
+- Generated audio has duration > 0
+- Persistent service reuses model across multiple requests
+- Invalid voice ID returns TTS_INVALID_VOICE error
+- Missing KokoroTTS returns TTS_NOT_INSTALLED error
+- Timeout handling returns TTS_TIMEOUT
+- Audio file stored at correct relative path
+- getTTSProvider() factory returns KokoroProvider
+- Service restart on crash with exponential backoff
+        </test>
+      </integration-tests>
+
+      <performance-tests>
+        <test name="Script Generation Response Time">
+Target: Complete within 5-10 seconds for typical topics
+Measure: Time from API call to script saved in database
+        </test>
+
+        <test name="Voice Preview Loading Time">
+Target: Audio samples load and play within 500ms
+Measure: Time from button click to audio playback start
+        </test>
+
+        <test name="TTS Generation Performance">
+Target: Process each scene in &lt; 3 seconds (warm service)
+Measure: Time from generateAudio() call to MP3 file saved
+        </test>
+
+        <test name="Parallel TTS Generation">
+Target: 5 scenes processed concurrently
+Measure: Total time for 5 scenes vs single scene (should be ~same)
+        </test>
+
+        <test name="Persistent Service Performance">
+Target: Warm requests &lt;2s, cold start ~5s
+Measure: First request vs subsequent requests with same service
+        </test>
+      </performance-tests>
+    </testing-strategy>
+  </implementation-guidance>
+
+  <dependencies-and-blockers>
+    <dependencies>
+      <dependency type="system">
+        <name>Python 3.10+</name>
+        <status>required</status>
+        <verification>python --version</verification>
+      </dependency>
+
+      <dependency type="system">
+        <name>UV Package Manager</name>
+        <status>required</status>
+        <verification>uv --version</verification>
+      </dependency>
+
+      <dependency type="system">
+        <name>FFmpeg 7.1.2+</name>
+        <status>required</status>
+        <verification>ffmpeg -version</verification>
+      </dependency>
+
+      <dependency type="python">
+        <name>kokoro-tts</name>
+        <version>0.3.0</version>
+        <install>uv pip install kokoro-tts==0.3.0</install>
+      </dependency>
+
+      <dependency type="python">
+        <name>numpy</name>
+        <version>1.24.3</version>
+        <install>uv pip install numpy==1.24.3</install>
+      </dependency>
+
+      <dependency type="python">
+        <name>scipy</name>
+        <version>1.11.1</version>
+        <install>uv pip install scipy==1.11.1</install>
+      </dependency>
+
+      <dependency type="npm">
+        <name>uuid</name>
+        <version>^11.0.4</version>
+        <install>npm install uuid</install>
+      </dependency>
+
+      <dependency type="epic">
+        <name>Epic 1 Completion</name>
+        <status>complete</status>
+        <provides>
+- Project infrastructure
+- Topic confirmation workflow
+- Database schema foundation
+- LLM provider abstraction pattern
+- API route patterns
+        </provides>
+      </dependency>
+    </dependencies>
+
+    <blockers>
+      <blocker type="none">
+No blockers identified. All Epic 1 infrastructure is in place.
+      </blocker>
+    </blockers>
+
+    <risks>
+      <risk severity="medium">
+        <description>KokoroTTS model download size (320MB) may slow initial setup</description>
+        <mitigation>Provide pre-download instructions and progress indicator in setup script</mitigation>
+      </risk>
+
+      <risk severity="low">
+        <description>Parallel TTS generation may exhaust system resources</description>
+        <mitigation>Limit concurrent generations to 5, queue remainder</mitigation>
+      </risk>
+
+      <risk severity="low">
+        <description>Persistent service may crash during synthesis</description>
+        <mitigation>Implement auto-restart with exponential backoff, health checks</mitigation>
+      </risk>
+    </risks>
+  </dependencies-and-blockers>
+
+  <definition-of-done>
+    <code-complete>
+      <item>All 15 tasks completed and code merged</item>
+      <item>KokoroTTS package installed and verified</item>
+      <item>Persistent Python TTS service implemented with JSON protocol</item>
+      <item>All 48+ voice profiles documented in comprehensive catalog</item>
+      <item>MVP subset (5 voices) defined and previews generated</item>
+      <item>Preview audio generated with pre-sanitized text</item>
+      <item>TTS provider abstraction implemented following Epic 1 pattern</item>
+      <item>Audio storage structure created with relative path format</item>
+      <item>Schema documentation created for Story 2.2</item>
+    </code-complete>
+
+    <testing-complete>
+      <item>Unit tests written and passing (voice profiles, path utilities, sanitization)</item>
+      <item>Integration tests written and passing (TTS provider, persistent service, error handling)</item>
+      <item>Performance tests validate persistent service model (cold vs warm)</item>
+      <item>Manual testing: Listen to all preview audio samples</item>
+      <item>Manual testing: Verify TTS synthesis with various text inputs</item>
+      <item>Error scenarios tested with standard error codes</item>
+      <item>Service lifecycle tested (startup, multiple requests, graceful shutdown)</item>
+    </testing-complete>
+
+    <documentation-complete>
+      <item>Setup guide updated with TTS installation and service startup instructions</item>
+      <item>Complete voice catalog documented (48+ voices) in docs/kokoro-voice-catalog.md</item>
+      <item>Pattern correspondence table created (Epic 1 LLM ↔ Epic 2 TTS)</item>
+      <item>TTS service architecture documented with rationale</item>
+      <item>Schema output documented for Story 2.2 integration</item>
+      <item>Environment variables documented</item>
+      <item>API endpoint documented (GET /api/voice/list)</item>
+      <item>Cleanup policy documented (preview never deleted, project audio 30 days)</item>
+    </documentation-complete>
+
+    <quality-checks>
+      <item>TypeScript strict mode passes (no type errors)</item>
+      <item>ESLint passes (no linting errors)</item>
+      <item>Code reviewed by peer or architect</item>
+      <item>Performance tested (preview &lt;2s, scene &lt;3s with warm service)</item>
+      <item>Performance tested (persistent service reuses model correctly)</item>
+      <item>Security reviewed (path validation, input sanitization)</item>
+      <item>Audio format validated (MP3, 128kbps, 44.1kHz, Mono)</item>
+      <item>Uint8Array used (not Buffer) for portability</item>
+    </quality-checks>
+
+    <deployment-ready>
+      <item>.env.local.example updated with TTS configuration</item>
+      <item>requirements.txt updated with KokoroTTS dependencies</item>
+      <item>.gitignore updated to exclude .cache/ and audio files</item>
+      <item>Migration path documented for cloud deployment</item>
+      <item>Service management documented (startup, shutdown, monitoring)</item>
+      <item>Rollback plan documented if issues found</item>
+    </deployment-ready>
+
+    <acceptance-criteria-validated>
+      <item>AC1: TTS engine accessible via persistent service with model caching</item>
+      <item>AC2: All 48+ voices documented with comprehensive metadata and model IDs</item>
+      <item>AC3: Preview audio generated with pre-sanitized text</item>
+      <item>AC4: TTSProvider interface follows Epic 1 Ollama pattern</item>
+      <item>AC5: Audio storage with relative paths and schema docs for Story 2.2</item>
+      <item>AC6: Error handling with standard error codes (TTS_MODEL_NOT_FOUND, etc.)</item>
+    </acceptance-criteria-validated>
+
+    <ready-for-next-story>
+      <item>Story 2.2 can begin with exact schema fields documented</item>
+      <item>Story 2.3 can consume MVP voice profiles and preview audio</item>
+      <item>Story 2.5 can use TTSProvider abstraction with persistent service</item>
+      <item>Pattern correspondence enables consistent Epic 2 implementation</item>
+    </ready-for-next-story>
+  </definition-of-done>
+
+  <notes>
+    <note type="architecture">
+The persistent TTS service architecture mirrors Ollama's approach:
+- Ollama: HTTP server on port 11434 with model in memory
+- KokoroTTS: Stdin/stdout JSON protocol with model in memory
+Both deliver fast subsequent requests through persistent model caching.
+    </note>
+
+    <note type="scope">
+MVP uses 5 voices for UI simplicity, but ALL 48+ voices are documented.
+Post-MVP can expose full catalog instantly without code changes.
+    </note>
+
+    <note type="performance">
+Performance targets:
+- Cold start (first request): ~3-5s (model load + synthesis)
+- Warm requests (subsequent): &lt;2s (synthesis only, model cached)
+- Preview generation: &lt;2s per voice
+- Scene synthesis: &lt;3s per scene
+    </note>
+
+    <note type="security">
+File path validation is CRITICAL:
+- All paths must start with `.cache/audio/`
+- Use path.normalize() to prevent directory traversal
+- Validate before ANY file operations
+    </note>
+
+    <note type="database">
+Story 2.1 documents schema but does NOT implement it.
+Story 2.2 will implement database schema extensions:
+- ALTER TABLE projects ADD COLUMN voice_id TEXT
+- CREATE TABLE scenes (...)
+    </note>
+  </notes>
+</story-context>

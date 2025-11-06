@@ -2,8 +2,9 @@
 
 **Epic:** Epic 1 - Conversational Topic Discovery
 **Story ID:** 1.4
-**Status:** Ready
+**Status:** Done
 **Created:** 2025-11-03
+**Completed:** 2025-11-03
 **Assigned To:** TBD
 **Sprint:** TBD
 
@@ -60,13 +61,13 @@ Implement the main chat API endpoint that handles user messages, manages convers
 **File:** `app/api/chat/route.ts`
 
 **Subtasks:**
-- [ ] Create route.ts file with POST handler export
-- [ ] Set up Next.js 16 App Router API route structure
-- [ ] Add TypeScript interfaces for request/response types
-- [ ] Import required dependencies:
+- [x] Create route.ts file with POST handler export
+- [x] Set up Next.js 16 App Router API route structure
+- [x] Add TypeScript interfaces for request/response types
+- [x] Import required dependencies:
   - `import { getDatabase } from '@/lib/db';` (Story 1.2)
   - `import { createLLMProvider, DEFAULT_SYSTEM_PROMPT } from '@/lib/llm/provider';` (Story 1.3)
-- [ ] Set up basic error boundary with try-catch
+- [x] Set up basic error boundary with try-catch
 
 **Estimated Effort:** 1 hour
 
@@ -76,13 +77,13 @@ Implement the main chat API endpoint that handles user messages, manages convers
 **Dependencies:** Task 1
 
 **Subtasks:**
-- [ ] Parse and validate JSON request body
-- [ ] Check projectId is non-empty UUID format (all versions, not just v4)
-- [ ] Check message is non-empty string (trim whitespace)
-- [ ] Verify projectId exists in database (JOIN projects table)
-- [ ] Return INVALID_PROJECT_ID error if project not found
-- [ ] Return EMPTY_MESSAGE error if message is empty/whitespace
-- [ ] Return 400 Bad Request for validation failures
+- [x] Parse and validate JSON request body
+- [x] Check projectId is non-empty UUID format (all versions, not just v4)
+- [x] Check message is non-empty string (trim whitespace)
+- [x] Verify projectId exists in database (JOIN projects table)
+- [x] Return INVALID_PROJECT_ID error if project not found
+- [x] Return EMPTY_MESSAGE error if message is empty/whitespace
+- [x] Return 400 Bad Request for validation failures
 
 **Estimated Effort:** 2 hours
 
@@ -92,12 +93,12 @@ Implement the main chat API endpoint that handles user messages, manages convers
 **Dependencies:** Task 2
 
 **Subtasks:**
-- [ ] Query messages table for projectId (last 20 messages)
-- [ ] Order by timestamp ASC, id ASC for chronological context
-- [ ] Map database rows to LLM message format: `{ role, content }`
-- [ ] Handle empty conversation history (new projects)
-- [ ] Add error handling for database query failures
-- [ ] Return DATABASE_ERROR if SQLite operation fails
+- [x] Query messages table for projectId (last 20 messages)
+- [x] Order by timestamp ASC, id ASC for chronological context
+- [x] Map database rows to LLM message format: `{ role, content }`
+- [x] Handle empty conversation history (new projects)
+- [x] Add error handling for database query failures
+- [x] Return DATABASE_ERROR if SQLite operation fails
 
 **Estimated Effort:** 2 hours
 
@@ -107,14 +108,14 @@ Implement the main chat API endpoint that handles user messages, manages convers
 **Dependencies:** Task 3
 
 **Subtasks:**
-- [ ] Use LLMProvider abstraction from Story 1.3 (NOT direct fetch calls)
-- [ ] Create provider instance: `createLLMProvider()`
-- [ ] Prepend DEFAULT_SYSTEM_PROMPT to conversation history
-- [ ] Call `llmProvider.chat(messages, DEFAULT_SYSTEM_PROMPT)`
-- [ ] Parse LLM response and extract assistant message
-- [ ] Handle Ollama connection errors (network, timeout)
-- [ ] Return OLLAMA_CONNECTION_ERROR with helpful message
-- [ ] Log LLM request/response for debugging (without full content)
+- [x] Use LLMProvider abstraction from Story 1.3 (NOT direct fetch calls)
+- [x] Create provider instance: `createLLMProvider()`
+- [x] Prepend DEFAULT_SYSTEM_PROMPT to conversation history
+- [x] Call `llmProvider.chat(messages, DEFAULT_SYSTEM_PROMPT)`
+- [x] Parse LLM response and extract assistant message
+- [x] Handle Ollama connection errors (network, timeout)
+- [x] Return OLLAMA_CONNECTION_ERROR with helpful message
+- [x] Log LLM request/response for debugging (without full content)
 
 **Estimated Effort:** 3 hours
 
@@ -124,15 +125,15 @@ Implement the main chat API endpoint that handles user messages, manages convers
 **Dependencies:** Task 4
 
 **Subtasks:**
-- [ ] Create database transaction for atomic saves (synchronous with better-sqlite3)
-- [ ] Use: `db.prepare('BEGIN').run()`, `db.prepare('COMMIT').run()`, `db.prepare('ROLLBACK').run()`
-- [ ] Insert user message: `INSERT INTO messages (id, project_id, role, content, timestamp)`
-- [ ] Generate UUID for user messageId
-- [ ] Insert assistant response with generated messageId
-- [ ] Commit transaction on success
-- [ ] Rollback transaction on failure
-- [ ] Return DATABASE_ERROR if persistence fails
-- [ ] Ensure timestamps are ISO 8601 format
+- [x] Create database transaction for atomic saves (synchronous with better-sqlite3)
+- [x] Use: `db.prepare('BEGIN').run()`, `db.prepare('COMMIT').run()`, `db.prepare('ROLLBACK').run()`
+- [x] Insert user message: `INSERT INTO messages (id, project_id, role, content, timestamp)`
+- [x] Generate UUID for user messageId
+- [x] Insert assistant response with generated messageId
+- [x] Commit transaction on success
+- [x] Rollback transaction on failure
+- [x] Return DATABASE_ERROR if persistence fails
+- [x] Ensure timestamps are ISO 8601 format
 
 **Estimated Effort:** 2.5 hours
 
@@ -142,12 +143,12 @@ Implement the main chat API endpoint that handles user messages, manages convers
 **Dependencies:** Task 5
 
 **Subtasks:**
-- [ ] Create success response object: `{ success: true, data: {...} }`
-- [ ] Include messageId (assistant message ID)
-- [ ] Include response text from LLM
-- [ ] Include timestamp of assistant message
-- [ ] Set HTTP status 200 for success
-- [ ] Return JSON with proper Content-Type header
+- [x] Create success response object: `{ success: true, data: {...} }`
+- [x] Include messageId (assistant message ID)
+- [x] Include response text from LLM
+- [x] Include timestamp of assistant message
+- [x] Set HTTP status 200 for success
+- [x] Return JSON with proper Content-Type header
 
 **Estimated Effort:** 1 hour
 
@@ -157,13 +158,13 @@ Implement the main chat API endpoint that handles user messages, manages convers
 **Dependencies:** All previous tasks
 
 **Subtasks:**
-- [ ] Create standardized error response helper function
-- [ ] Map error types to HTTP status codes (400, 404, 500, 503)
-- [ ] Implement all error codes: OLLAMA_CONNECTION_ERROR, INVALID_PROJECT_ID, EMPTY_MESSAGE, DATABASE_ERROR
-- [ ] Add error logging for server-side errors (500, 503)
-- [ ] Test each error scenario with appropriate status codes
-- [ ] Ensure no sensitive data leaked in error messages
-- [ ] Add error recovery guidance in error messages
+- [x] Create standardized error response helper function
+- [x] Map error types to HTTP status codes (400, 404, 500, 503)
+- [x] Implement all error codes: OLLAMA_CONNECTION_ERROR, INVALID_PROJECT_ID, EMPTY_MESSAGE, DATABASE_ERROR
+- [x] Add error logging for server-side errors (500, 503)
+- [x] Test each error scenario with appropriate status codes
+- [x] Ensure no sensitive data leaked in error messages
+- [x] Add error recovery guidance in error messages
 
 **Estimated Effort:** 2.5 hours
 
@@ -415,17 +416,17 @@ const invalidRequests = [
 
 ## Definition of Done
 
-- [ ] All 7 tasks completed and checked off
-- [ ] All 5 acceptance criteria validated
-- [ ] Unit tests written and passing (>80% coverage)
-- [ ] Integration tests passing for all error scenarios
-- [ ] Code reviewed and approved
-- [ ] API endpoint tested with Postman/curl
-- [ ] Error handling verified for all error codes
-- [ ] Documentation updated (API docs, inline comments)
-- [ ] No TypeScript errors or warnings
-- [ ] Ollama integration tested with running instance
-- [ ] Database transactions tested for rollback scenarios
+- [x] All 7 tasks completed and checked off
+- [x] All 5 acceptance criteria validated
+- [x] Unit tests written and passing (>80% coverage)
+- [x] Integration tests passing for all error scenarios
+- [x] Code reviewed and approved
+- [x] API endpoint tested with Postman/curl
+- [x] Error handling verified for all error codes
+- [x] Documentation updated (API docs, inline comments)
+- [x] No TypeScript errors or warnings
+- [x] Ollama integration tested with running instance
+- [x] Database transactions tested for rollback scenarios
 
 ---
 

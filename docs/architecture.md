@@ -187,6 +187,11 @@ ai-video-generator/
 │       │   ├── MessageList.tsx
 │       │   └── TopicConfirmation.tsx
 │       │
+│       ├── projects/          # Epic 1: Project management (Story 1.6)
+│       │   ├── ProjectSidebar.tsx
+│       │   ├── ProjectListItem.tsx
+│       │   └── NewChatButton.tsx
+│       │
 │       ├── voice/             # Epic 2: Voice selection
 │       │   ├── VoiceSelector.tsx
 │       │   └── VoicePreview.tsx
@@ -229,6 +234,7 @@ ai-video-generator/
 ├── stores/                    # Zustand state stores
 │   ├── workflow-store.ts      # Workflow state (current step, data)
 │   ├── conversation-store.ts  # Active conversation state
+│   ├── project-store.ts       # Project list and active project state
 │   └── curation-store.ts      # Clip selection state
 │
 ├── types/                     # TypeScript type definitions
@@ -256,6 +262,8 @@ ai-video-generator/
 ## Epic to Architecture Mapping
 
 ### Epic 1: Conversational Topic Discovery
+
+#### Story 1.1-1.5: Chat Interface & LLM Integration
 **Components:**
 - `components/features/conversation/ChatInterface.tsx` - Main chat UI
 - `components/features/conversation/MessageList.tsx` - Message display
@@ -275,6 +283,29 @@ ai-video-generator/
 2. Load conversation history → Send to Llama 3.2 via Ollama
 3. AI response → Saved to database → Displayed
 4. Topic confirmation → Create project record
+
+#### Story 1.6: Project Management UI
+**Components:**
+- `components/features/projects/ProjectSidebar.tsx` - Sidebar with project list (280px width)
+- `components/features/projects/ProjectListItem.tsx` - Individual project item display
+- `components/features/projects/NewChatButton.tsx` - Create new project action button
+
+**Backend:**
+- `app/api/projects/route.ts` - GET (list all projects), POST (create new project)
+- `app/api/projects/[id]/route.ts` - GET (project details), PUT (update metadata), DELETE (delete project - optional)
+- `lib/db/queries.ts` - getAllProjects(), createProject(), updateProjectLastActive(), deleteProject()
+- `stores/project-store.ts` - Active project ID, project list state, localStorage persistence
+
+**Database:**
+- `projects` table - All project records with name, topic, last_active timestamp
+- Query pattern: `SELECT * FROM projects ORDER BY last_active DESC`
+
+**Key Flow:**
+1. User clicks "New Chat" → Create project record → Set as active → Clear chat
+2. User clicks project in sidebar → Load project's messages → Update URL → Update last_active
+3. On any project activity → Update last_active timestamp
+4. First user message → Auto-generate project name (first 30 chars, trim to word)
+5. Active project ID persisted in localStorage → Restored on app reload
 
 ---
 
@@ -987,6 +1018,79 @@ export const useConversationStore = create<ConversationState>((set) => ({
 }));
 ```
 
+**Project Store (Story 1.6):**
+```typescript
+// stores/project-store.ts
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+interface Project {
+  id: string;
+  name: string;
+  topic: string | null;
+  lastActive: string;
+  createdAt: string;
+}
+
+interface ProjectState {
+  activeProjectId: string | null;
+  projects: Project[];
+
+  // Actions
+  setActiveProject: (id: string) => void;
+  loadProjects: (projects: Project[]) => void;
+  addProject: (project: Project) => void;
+  updateProject: (id: string, updates: Partial<Project>) => void;
+  removeProject: (id: string) => void;
+}
+
+export const useProjectStore = create<ProjectState>()(
+  persist(
+    (set) => ({
+      activeProjectId: null,
+      projects: [],
+
+      setActiveProject: (id) => {
+        set({ activeProjectId: id });
+        // Update last_active timestamp in database
+        fetch(`/api/projects/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lastActive: new Date().toISOString() }),
+        });
+      },
+
+      loadProjects: (projects) => set({ projects }),
+
+      addProject: (project) =>
+        set((state) => ({
+          projects: [project, ...state.projects],
+          activeProjectId: project.id,
+        })),
+
+      updateProject: (id, updates) =>
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === id ? { ...p, ...updates } : p
+          ),
+        })),
+
+      removeProject: (id) =>
+        set((state) => ({
+          projects: state.projects.filter((p) => p.id !== id),
+          activeProjectId: state.activeProjectId === id ? null : state.activeProjectId,
+        })),
+    }),
+    {
+      name: 'project-storage', // localStorage key
+      partialize: (state) => ({
+        activeProjectId: state.activeProjectId // Only persist active project ID
+      }),
+    }
+  )
+);
+```
+
 **Synchronization Pattern:**
 ```typescript
 // Save workflow state to database
@@ -1124,6 +1228,105 @@ export function initializeDatabase() {
 }
 
 export default db;
+```
+
+**Database Query Functions (Story 1.6 - Project Management):**
+```typescript
+// lib/db/queries.ts
+import db from './client';
+import { randomUUID } from 'crypto';
+
+interface Project {
+  id: string;
+  name: string;
+  topic: string | null;
+  current_step: string;
+  created_at: string;
+  last_active: string;
+}
+
+// Get all projects ordered by last_active (most recent first)
+export function getAllProjects(): Project[] {
+  return db.prepare(`
+    SELECT id, name, topic, current_step, created_at, last_active
+    FROM projects
+    ORDER BY last_active DESC
+  `).all() as Project[];
+}
+
+// Get single project by ID
+export function getProjectById(id: string): Project | null {
+  return db.prepare(`
+    SELECT id, name, topic, current_step, created_at, last_active
+    FROM projects
+    WHERE id = ?
+  `).get(id) as Project | null;
+}
+
+// Create new project
+export function createProject(name: string = 'New Project'): Project {
+  const id = randomUUID();
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    INSERT INTO projects (id, name, current_step, created_at, last_active)
+    VALUES (?, ?, 'topic', ?, ?)
+  `).run(id, name, now, now);
+
+  return getProjectById(id)!;
+}
+
+// Update project last_active timestamp
+export function updateProjectLastActive(id: string): void {
+  db.prepare(`
+    UPDATE projects
+    SET last_active = datetime('now')
+    WHERE id = ?
+  `).run(id);
+}
+
+// Update project name (auto-generated from first message)
+export function updateProjectName(id: string, name: string): void {
+  db.prepare(`
+    UPDATE projects
+    SET name = ?
+    WHERE id = ?
+  `).run(name, id);
+}
+
+// Update project metadata
+export function updateProject(id: string, updates: {
+  name?: string;
+  topic?: string;
+  current_step?: string;
+}): void {
+  const fields = Object.keys(updates)
+    .map(key => `${key} = ?`)
+    .join(', ');
+
+  const values = Object.values(updates);
+
+  db.prepare(`
+    UPDATE projects
+    SET ${fields}, last_active = datetime('now')
+    WHERE id = ?
+  `).run(...values, id);
+}
+
+// Delete project (optional for MVP, cascades to messages)
+export function deleteProject(id: string): void {
+  db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+}
+
+// Get all messages for a project
+export function getProjectMessages(projectId: string): Message[] {
+  return db.prepare(`
+    SELECT id, role, content, timestamp
+    FROM messages
+    WHERE project_id = ?
+    ORDER BY timestamp ASC
+  `).all(projectId) as Message[];
+}
 ```
 
 ---
@@ -1272,7 +1475,86 @@ export async function assembleVideo(
 
 ### Key API Endpoints
 
-**1. Chat/Conversation:**
+**1. Project Management:**
+```typescript
+// GET /api/projects
+// List all projects ordered by last_active (most recent first)
+Response: {
+  success: true,
+  data: {
+    projects: Array<{
+      id: string,
+      name: string,
+      topic: string | null,
+      currentStep: string,
+      lastActive: string,  // ISO 8601 timestamp
+      createdAt: string
+    }>
+  }
+}
+
+// POST /api/projects
+// Create new project
+Request: {
+  name?: string  // Optional, defaults to "New Project"
+}
+
+Response: {
+  success: true,
+  data: {
+    project: {
+      id: string,
+      name: string,
+      currentStep: 'topic',
+      createdAt: string,
+      lastActive: string
+    }
+  }
+}
+
+// GET /api/projects/:id
+// Get single project details
+Response: {
+  success: true,
+  data: {
+    project: {
+      id: string,
+      name: string,
+      topic: string | null,
+      currentStep: string,
+      createdAt: string,
+      lastActive: string
+    }
+  }
+}
+
+// PUT /api/projects/:id
+// Update project metadata (name, last_active)
+Request: {
+  name?: string,
+  topic?: string,
+  currentStep?: string
+}
+
+Response: {
+  success: true,
+  data: {
+    project: { /* updated project */ }
+  }
+}
+
+// DELETE /api/projects/:id (Optional for MVP)
+// Delete project and all associated messages
+Response: {
+  success: true,
+  data: {
+    deleted: true,
+    projectId: string
+  }
+}
+```
+
+**2. Chat/Conversation:**
 ```typescript
 // POST /api/chat
 Request: {
@@ -1290,7 +1572,7 @@ Response: {
 }
 ```
 
-**2. Script Generation:**
+**3. Script Generation:**
 ```typescript
 // POST /api/script
 Request: {
@@ -1487,6 +1769,87 @@ function CurationUI() {
     }
   };
 }
+```
+
+### Project Switching Workflow (Story 1.6)
+
+**Pattern for switching between projects:**
+```typescript
+// When user clicks a project in sidebar
+async function switchToProject(newProjectId: string) {
+  const currentProjectId = useProjectStore.getState().activeProjectId;
+
+  // 1. Cancel any in-flight requests for current project
+  if (currentRequestController) {
+    currentRequestController.abort();
+  }
+
+  // 2. Save current scroll position (optional, for restoring state)
+  const scrollPosition = window.scrollY;
+  sessionStorage.setItem(`scroll-${currentProjectId}`, String(scrollPosition));
+
+  // 3. Update active project in store (triggers localStorage persistence)
+  useProjectStore.getState().setActiveProject(newProjectId);
+
+  // 4. Clear current conversation state
+  useConversationStore.getState().clearMessages();
+
+  // 5. Load new project's conversation history
+  currentRequestController = new AbortController();
+  const response = await fetch(`/api/projects/${newProjectId}/messages`, {
+    signal: currentRequestController.signal,
+  });
+
+  if (response.ok) {
+    const messages = await response.json();
+    useConversationStore.getState().setMessages(messages.data);
+  }
+
+  // 6. Update URL for deep linking
+  window.history.pushState({}, '', `/projects/${newProjectId}`);
+
+  // 7. Restore scroll position (optional)
+  const savedScroll = sessionStorage.getItem(`scroll-${newProjectId}`);
+  if (savedScroll) {
+    window.scrollTo(0, parseInt(savedScroll));
+  }
+
+  // 8. last_active timestamp updated automatically in setActiveProject action
+}
+```
+
+**Auto-Generate Project Name Pattern:**
+```typescript
+// lib/utils/generate-project-name.ts
+export function generateProjectName(firstMessage: string): string {
+  const maxLength = 30;
+  const trimmed = firstMessage.trim();
+
+  // Too short? Use fallback
+  if (trimmed.length < 5) {
+    return `New Project ${new Date().toLocaleDateString()}`;
+  }
+
+  // Short enough? Use as-is
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+
+  // Truncate to last complete word
+  const truncated = trimmed.substring(0, maxLength);
+  const lastSpaceIndex = truncated.lastIndexOf(' ');
+
+  return lastSpaceIndex > 5
+    ? truncated.substring(0, lastSpaceIndex) + '...'
+    : truncated.substring(0, maxLength - 3) + '...';
+}
+
+// Usage: When user sends first message in new project
+const projectName = generateProjectName(firstUserMessage);
+await fetch(`/api/projects/${projectId}`, {
+  method: 'PUT',
+  body: JSON.stringify({ name: projectName }),
+});
 ```
 
 ### Date/Time Handling
