@@ -1,0 +1,294 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2.4</storyId>
+    <title>LLM-Based Script Generation (Professional Quality)</title>
+    <status>Ready</status>
+    <generatedAt>2025-11-07</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-2.4.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>video creator</asA>
+    <iWant>the system to generate professional-quality video scripts automatically</iWant>
+    <soThat>I can produce engaging videos without hiring a professional scriptwriter</soThat>
+    <tasks>
+      <task id="1">Create Advanced Script Generation Prompt Template</task>
+      <task id="2">Implement Quality Validation Function</task>
+      <task id="3">Implement Topic-Based Tone Mapping</task>
+      <task id="4">Implement Script Generation API Endpoint</task>
+      <task id="5">Implement Retry Logic for Quality and Failures</task>
+      <task id="6">Implement Scene Count Optimization</task>
+      <task id="7">Add Text Sanitization Validation</task>
+      <task id="8">Integration Testing</task>
+      <task id="9">Unit Testing</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Script generation endpoint accepts projectId as input</criterion>
+    <criterion id="2">LLM generates structured script with 3-5 scenes minimum</criterion>
+    <criterion id="3">Each scene has scene_number (sequential) and text (50-200 words)</criterion>
+    <criterion id="4">Scene text contains ONLY spoken narration (no markdown, no meta-text)</criterion>
+    <criterion id="5">Scripts sound professional and human-written, NOT AI-generated</criterion>
+    <criterion id="6">Scripts avoid generic AI phrases (e.g., "in today's video", "let's dive in")</criterion>
+    <criterion id="7">Scripts use topic-appropriate tone (educational, entertaining, dramatic, etc.)</criterion>
+    <criterion id="8">Scripts have strong narrative hooks (no boring openings)</criterion>
+    <criterion id="9">Scripts use natural, varied language with personality</criterion>
+    <criterion id="10">Quality validation rejects robotic or bland scripts</criterion>
+    <criterion id="11">Scenes saved to database in correct order</criterion>
+    <criterion id="12">Script generation handles various topic types</criterion>
+    <criterion id="13">Invalid or low-quality LLM responses trigger retry with improved prompt (max 3 attempts)</criterion>
+    <criterion id="14">Validation rejects scenes containing markdown or formatting characters</criterion>
+    <criterion id="15">projects.script_generated flag updated on success</criterion>
+    <criterion id="16">projects.current_step updated to 'voiceover' on success</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Content Generation Pipeline</title>
+        <section>Script Generation API</section>
+        <snippet>POST /api/projects/[id]/generate-script endpoint. Request accepts optional regenerate flag. Response includes scenes array with sceneNumber, text, estimatedDuration. Includes scriptQuality object with passed, score, and issues fields.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Content Generation Pipeline</title>
+        <section>Script Quality Validation Interface</section>
+        <snippet>ScriptQualityValidator interface with validate(script: Scene[]): ValidationResult method. ValidationResult includes passed (boolean), score (0-100), and issues array. QualityIssue types: generic_phrase, robotic_tone, poor_hook, inconsistent_tone with severity levels.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Content Generation Pipeline</title>
+        <section>Workflows and Sequencing - Script Generation Phase</section>
+        <snippet>Display loading indicator. POST /api/projects/[id]/generate-script triggered. Load topic from projects.topic field. Analyze topic for tone. Generate prompt. Call Ollama/Llama 3.2 via LLM provider abstraction. Parse JSON response. Run quality validation. If validation fails: Retry with improved prompt (max 3 attempts). If passes: Save scenes to database. Update script_generated flag.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>AI Video Generator - System Architecture</title>
+        <section>LLM Provider Abstraction</section>
+        <snippet>Strategy Pattern implementation. LLMProvider interface defines chat(messages: Message[], systemPrompt?: string): Promise&lt;string&gt; method. OllamaProvider implements interface using ollama npm package v0.6.2. Factory pattern (createLLMProvider()) enables runtime provider selection. Environment variables: LLM_PROVIDER, OLLAMA_BASE_URL, OLLAMA_MODEL.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>AI Video Generator - System Architecture</title>
+        <section>API Design</section>
+        <snippet>REST API conventions. Response format: {success: boolean, data?: any, error?: string}. Error codes: 400 (Bad Request), 404 (Not Found), 500 (Internal Server Error). All responses follow NextResponse.json() pattern.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/story-2.2.md</path>
+        <title>Story 2.2: Database Schema Updates for Content Generation</title>
+        <section>Database Schema</section>
+        <snippet>Projects table includes voice_id, script_generated, voice_selected, total_duration fields. Scenes table with id, project_id, scene_number, text, sanitized_text, audio_file_path, duration. Foreign key with ON DELETE CASCADE. UNIQUE constraint on (project_id, scene_number). Indexes on project_id and scene_number.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/story-1.3.md</path>
+        <title>Story 1.3: LLM Provider Abstraction</title>
+        <section>Implementation</section>
+        <snippet>LLMProvider interface in lib/llm/provider.ts. OllamaProvider class in lib/llm/ollama-provider.ts. createLLMProvider() factory in lib/llm/factory.ts. DEFAULT_SYSTEM_PROMPT in lib/llm/prompts/default-system-prompt.ts. Error handling for connection failures, model not found, and timeouts.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>src/lib/llm/provider.ts</path>
+        <kind>interface</kind>
+        <symbol>LLMProvider</symbol>
+        <lines>28-38</lines>
+        <reason>Core LLM provider interface that script generation must use. Defines chat() method signature with messages and systemPrompt parameters.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/llm/factory.ts</path>
+        <kind>factory</kind>
+        <symbol>createLLMProvider</symbol>
+        <lines>31-53</lines>
+        <reason>Factory function for creating LLM provider instances. Task 5 must use this to instantiate provider for script generation.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/llm/ollama-provider.ts</path>
+        <kind>class</kind>
+        <symbol>OllamaProvider</symbol>
+        <lines>20-114</lines>
+        <reason>Concrete implementation of LLMProvider for Ollama. Shows correct usage of ollama npm package and chat() method. Error handling pattern to follow.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/db/queries.ts</path>
+        <kind>module</kind>
+        <symbol>Scene CRUD Functions</symbol>
+        <lines>386-720</lines>
+        <reason>Database query functions from Story 2.2. Task 4 must use createScenes(), markScriptGenerated(), updateProject(), and getProject() functions.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/db/queries.ts</path>
+        <kind>function</kind>
+        <symbol>getProject</symbol>
+        <lines>176-187</lines>
+        <reason>Required for Task 4.2 to load confirmed topic from database. Returns Project with topic field.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/db/queries.ts</path>
+        <kind>function</kind>
+        <symbol>createScenes</symbol>
+        <lines>463-519</lines>
+        <reason>Required for Task 4.8 to bulk insert scenes. Uses transaction for atomicity. Handles foreign key and unique constraint errors.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/db/queries.ts</path>
+        <kind>function</kind>
+        <symbol>markScriptGenerated</symbol>
+        <lines>753-767</lines>
+        <reason>Required for Task 4.9 to update script_generated flag. Returns updated Project.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/db/queries.ts</path>
+        <kind>function</kind>
+        <symbol>updateProject</symbol>
+        <lines>194-270</lines>
+        <reason>Required for Task 4.9 to update current_step field. Supports partial updates with dynamic query building.</reason>
+      </artifact>
+      <artifact>
+        <path>src/lib/db/schema.sql</path>
+        <kind>schema</kind>
+        <symbol>scenes table</symbol>
+        <lines>62-78</lines>
+        <reason>Database schema for scenes table from Story 2.2. Defines structure that Task 4.7 must transform LLM output into.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="ollama" version="^0.6.2">Official JavaScript SDK for Ollama. Required for LLM provider abstraction.</package>
+        <package name="next" version="16.0.1">Next.js framework. Required for API routes and NextResponse.json().</package>
+        <package name="better-sqlite3" version="^12.4.1">SQLite database driver. Used by database query functions.</package>
+        <package name="typescript" version="^5">TypeScript compiler. Required for type safety.</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">MUST use createLLMProvider() factory pattern from Story 1.3 - do NOT instantiate OllamaProvider directly</constraint>
+    <constraint type="architecture">MUST follow layered architecture: API layer (Task 4) delegates to business logic layer (Task 5)</constraint>
+    <constraint type="architecture">API layer responsibilities: Validate input → Call business logic → Save results → Return response</constraint>
+    <constraint type="architecture">Business logic layer responsibilities: Call LLM → Validate quality → Retry if needed → Return scenes</constraint>
+    <constraint type="data">MUST transform LLM output (camelCase) to database format (snake_case) in Task 4.7</constraint>
+    <constraint type="data">LLM returns: {sceneNumber, text, estimatedDuration}. Database expects: {scene_number, text, sanitized_text, project_id}</constraint>
+    <constraint type="database">MUST use Story 2.2 query functions: getProject(), createScenes(), markScriptGenerated(), updateProject()</constraint>
+    <constraint type="database">MUST verify all Story 2.2 database functions exist before starting implementation</constraint>
+    <constraint type="quality">Quality validation MUST be called within retry loop (Task 5.2), NOT as separate step</constraint>
+    <constraint type="quality">Validation failures trigger immediate retry with enhanced prompt - no exponential backoff needed</constraint>
+    <constraint type="quality">Maximum 3 retry attempts for quality issues - prevents infinite loops and controls costs</constraint>
+    <constraint type="error">400 Bad Request: Missing topic, topic not confirmed, invalid project ID format</constraint>
+    <constraint type="error">404 Not Found: Project does not exist</constraint>
+    <constraint type="error">500 Internal Server Error: LLM failure after max retries, database error</constraint>
+    <constraint type="error">Error responses MUST include descriptive messages and validation issues for debugging</constraint>
+    <constraint type="security">MUST sanitize topic input in Task 4.4 to prevent prompt injection attacks</constraint>
+    <constraint type="security">MUST use parameterized database queries to prevent SQL injection</constraint>
+    <constraint type="testing">Unit tests required for: prompt generation, quality validation, tone mapping, text sanitization, retry logic</constraint>
+    <constraint type="testing">Integration tests required for: full script generation flow, database integration, retry behavior, various topic types</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/projects/[id]/generate-script</name>
+      <kind>REST endpoint</kind>
+      <signature>POST /api/projects/[id]/generate-script → {success: boolean, data: {projectId, sceneCount, scenes, attempts}}</signature>
+      <path>app/api/projects/[id]/generate-script/route.ts</path>
+      <notes>Task 4 implementation. Validates input, loads topic, calls business logic, saves scenes, updates project status.</notes>
+    </interface>
+    <interface>
+      <name>generateScriptWithRetry</name>
+      <kind>business logic function</kind>
+      <signature>async function generateScriptWithRetry(topic: string, projectConfig?: any, maxAttempts: number = 3): Promise&lt;{scenes: Scene[], attempts: number}&gt;</signature>
+      <path>lib/llm/script-generator.ts</path>
+      <notes>Task 5 implementation. Handles LLM interaction, quality validation, and retry logic. Encapsulates all complexity.</notes>
+    </interface>
+    <interface>
+      <name>validateScriptQuality</name>
+      <kind>validation function</kind>
+      <signature>function validateScriptQuality(scenes: Scene[]): ValidationResult</signature>
+      <path>lib/llm/validate-script-quality.ts</path>
+      <notes>Task 2 implementation. Returns {passed: boolean, score: number, issues: string[]}. Called by Task 5.2 within retry loop.</notes>
+    </interface>
+    <interface>
+      <name>generateScriptPrompt</name>
+      <kind>prompt template function</kind>
+      <signature>function generateScriptPrompt(topic: string, projectConfig?: any): string</signature>
+      <path>lib/llm/prompts/script-generation-prompt.ts</path>
+      <notes>Task 1 implementation. Analyzes topic, determines tone, returns formatted prompt with quality requirements.</notes>
+    </interface>
+    <interface>
+      <name>determineTone</name>
+      <kind>utility function</kind>
+      <signature>function determineTone(topic: string): ScriptTone</signature>
+      <path>lib/llm/tone-mapper.ts</path>
+      <notes>Task 3 implementation. Returns 'educational' | 'entertaining' | 'dramatic' | 'casual' | 'formal' | 'inspirational'.</notes>
+    </interface>
+    <interface>
+      <name>sanitizeScriptText</name>
+      <kind>utility function</kind>
+      <signature>function sanitizeScriptText(text: string): string</signature>
+      <path>lib/llm/sanitize-text.ts</path>
+      <notes>Task 7 implementation. Removes markdown, meta-labels, URLs. Returns clean text for TTS.</notes>
+    </interface>
+    <interface>
+      <name>LLMProvider.chat</name>
+      <kind>interface method</kind>
+      <signature>chat(messages: Message[], systemPrompt?: string): Promise&lt;string&gt;</signature>
+      <path>src/lib/llm/provider.ts</path>
+      <notes>Story 1.3 interface. Task 5 must use via createLLMProvider() factory. Messages format: [{role, content}].</notes>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Follow existing test patterns from Story 2.2 using Vitest framework. Unit tests must cover all validation logic, prompt generation, tone mapping, and sanitization. Integration tests must verify full API flow including database operations. Mock LLM responses for predictable testing. Test error handling for all failure scenarios.
+    </standards>
+    <locations>
+      <location>tests/api/generate-script.test.ts</location>
+      <location>tests/lib/llm/script-quality.test.ts</location>
+      <location>tests/lib/llm/tone-mapper.test.ts</location>
+      <location>tests/lib/llm/sanitize-text.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1,2,3,11">Test successful script generation with valid topic. Verify 3-5 scenes returned, scenes saved to database with correct scene_numbers.</idea>
+      <idea ac="4,14">Test TTS readiness validation. Mock LLM to return script with markdown characters. Verify validation rejects it and triggers retry.</idea>
+      <idea ac="5,6,10">Test quality validation. Mock LLM to return script with generic AI phrases. Verify validation rejects it and retry is triggered with enhanced prompt.</idea>
+      <idea ac="7">Test tone mapping. Verify educational topics get educational tone, entertainment topics get entertaining tone.</idea>
+      <idea ac="8,9">Test narrative flow validation. Mock weak opening hook. Verify validation detects poor quality.</idea>
+      <idea ac="13">Test retry logic. Mock LLM to fail twice, succeed on third attempt. Verify attempt count is 3 and final script is accepted.</idea>
+      <idea ac="13">Test max retry exhaustion. Mock LLM to always return low-quality scripts. Verify endpoint returns 500 error after 3 attempts with validation issues.</idea>
+      <idea ac="15,16">Test project status updates. Verify script_generated flag set to true and current_step updated to 'voiceover' after successful generation.</idea>
+      <idea ac="1">Test error handling. Test with missing topic (400), invalid project ID (404), LLM connection failure (500).</idea>
+      <idea ac="12">Test various topic types. Generate scripts for educational, entertainment, news, inspirational topics. Verify appropriate tone applied for each.</idea>
+    </ideas>
+  </tests>
+
+  <implementation-notes>
+    <note type="critical">DEPENDENCY VERIFICATION: Before starting, verify ALL Story 2.2 database functions exist: getProject(), createScenes(), markScriptGenerated(), updateProject(). Story 2.4 cannot proceed without these.</note>
+    <note type="critical">LAYERED ARCHITECTURE: Task 4 (API layer) MUST delegate to Task 5 (business logic layer). API layer handles HTTP and database. Business logic handles LLM and retry.</note>
+    <note type="critical">DATA TRANSFORMATION: Task 4.7 is REQUIRED step. LLM returns camelCase (sceneNumber), database expects snake_case (scene_number). Transform explicitly.</note>
+    <note type="critical">QUALITY VALIDATION INTEGRATION: Task 5.2 explicitly calls validateScriptQuality() from Task 2. Not a separate workflow step - integrated into retry loop.</note>
+    <note type="pattern">LLM Provider Usage: const provider = createLLMProvider(); const response = await provider.chat([{role: 'user', content: prompt}], systemPrompt);</note>
+    <note type="pattern">Response format: Parse JSON from LLM response. Expected: {scenes: [{sceneNumber: number, text: string}]}. Handle parsing errors.</note>
+    <note type="pattern">Error handling: Catch LLM technical failures separately from quality failures. Technical: exponential backoff. Quality: immediate retry with enhanced prompt.</note>
+    <note type="pattern">Retry enhancement: Attempt 1: Standard prompt. Attempt 2: Add "Previous attempt was too generic, be more creative". Attempt 3: Add "CRITICAL: Final attempt. Generate truly exceptional script".</note>
+    <note type="optimization">Parallel processing NOT applicable here. Script generation is single LLM call per project. Parallelization happens in voiceover generation (Story 2.5).</note>
+    <note type="optimization">Prompt caching: Consider caching tone-specific prompt templates (optional optimization, not required for MVP).</note>
+    <note type="security">Topic sanitization (Task 4.4): Remove dangerous characters, prevent prompt injection. Pattern: Trim whitespace, remove control characters, limit length to 500 chars.</note>
+    <note type="testing">Mock LLM responses using test doubles. Do NOT call actual Ollama service in unit tests. Integration tests can use Ollama if available.</note>
+    <note type="professional-quality">Banned phrases list: "in today's video", "let's dive in", "stay tuned", "make sure to", "don't forget to", "have you ever wondered", "imagine a world where", "without further ado".</note>
+    <note type="professional-quality">Quality markers: Varied sentence length, active voice, specific details (not vague generalizations), natural transitions, personality and voice.</note>
+    <note type="professional-quality">Narrative hooks: Start with surprising fact, bold statement, or intriguing question. Avoid generic questions. Create curiosity gap.</note>
+    <note type="scene-format">Scene output MUST be clean narration only. NO markdown (*#_), NO scene labels ("Scene 1:"), NO meta-text ("[pause]"). Only spoken words.</note>
+    <note type="scene-count">Optimal: 3-5 scenes. Minimum: 3 scenes (too short warning). Maximum: 7 scenes (too long warning). Guidance in prompt: explain pacing rationale.</note>
+  </implementation-notes>
+
+  <related-stories>
+    <story id="1.3" relationship="required">LLM Provider Abstraction - Provides createLLMProvider() factory and LLMProvider interface</story>
+    <story id="2.2" relationship="required">Database Schema Updates - Provides scenes table, createScenes(), markScriptGenerated(), updateProject() functions</story>
+    <story id="1.7" relationship="required">Topic Confirmation Workflow - Provides confirmed topic in projects.topic field</story>
+    <story id="2.5" relationship="blocked-by">Voice Selection and TTS Generation - Blocked by Story 2.4 (requires script_generated flag)</story>
+  </related-stories>
+</story-context>
