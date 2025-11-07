@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context id="story-2.3" version="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2.3</storyId>
+    <title>Voice Selection UI & Workflow Integration</title>
+    <status>Ready</status>
+    <generatedAt>2025-11-07</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-2.3.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a video creator</asA>
+    <iWant>to select from multiple AI voice options with audio previews after confirming my topic</iWant>
+    <soThat>I can choose a narrator voice that matches my video's tone and style before script generation</soThat>
+
+    <tasks>
+      <task id="1">Create VoiceSelection Client Component (components/features/voice/VoiceSelection.tsx) with 'use client' directive, fetching voices from GET /api/voice/list on mount, displaying voice cards in responsive grid, managing selection state via voice-store, and navigating to script-generation on confirmation</task>
+      <task id="2">Create VoiceCard UI Component (components/ui/VoiceCard.tsx) displaying voice metadata (name, gender, accent, tone), preview button with play icon, selected state styling, and accessibility support (ARIA labels, keyboard navigation)</task>
+      <task id="3">Implement audio preview playback using HTML5 Audio API, serving files from public/audio/previews/{voiceId}.mp3, ensuring single playback (stop others when new one starts), and handling errors gracefully</task>
+      <task id="4">Create Voice Selection API Endpoint (app/api/projects/[id]/select-voice/route.ts) with POST handler validating voiceId and projectId, updating database via Story 2.2 query functions, advancing current_step to 'script-generation', and returning standard response format</task>
+      <task id="5">Update Voice Selection Page Component (app/projects/[id]/voice/page.tsx) as Server Component loading project data, verifying topic confirmed, implementing workflow state guards with redirects, and rendering VoiceSelection Client Component</task>
+      <task id="6">Create Script Generation Loading Screen (app/projects/[id]/script-generation/page.tsx) as Server Component displaying loading UI with progress indicators and selected voice confirmation</task>
+      <task id="7">Add loading states and error handling in VoiceSelection component with loading spinners, disabled states during operations, error messages with retry, and validation feedback</task>
+      <task id="8">Create Voice Store (lib/stores/voice-store.ts) using Zustand with selectedVoiceId, isPlaying, currentPlayingVoice state, and selectVoice, playPreview, stopPreview, resetState actions following Epic 1 store patterns</task>
+      <task id="9">Add integration tests (tests/integration/voice-selection.test.ts) covering full workflow from topic confirmation through voice selection to script generation navigation</task>
+      <task id="10">Add API tests (tests/api/select-voice.test.ts) for POST /api/projects/{id}/select-voice endpoint validating request/response formats, error codes, and database updates</task>
+      <task id="11">Add unit tests for VoiceCard and VoiceSelection components (tests/unit/) testing rendering, interactions, accessibility, and state management</task>
+      <task id="12">Update workflow documentation (docs/workflow-status.md) adding voice selection step to Epic 2 workflow sequence</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">
+      <title>VoiceSelection UI displays after user confirms topic</title>
+      <given>User has confirmed their video topic (Epic 1 Story 1.7 completion)</given>
+      <when>The system transitions to the voice selection step</when>
+      <then>The VoiceSelection.tsx component renders with a list of available voice options AND the UI displays at least 3-5 voice option cards with metadata AND voice profiles are loaded from GET /api/voice/list endpoint (Story 2.1)</then>
+    </criterion>
+    <criterion id="2">
+      <title>All voice profiles shown with metadata and preview button</title>
+      <given>The VoiceSelection UI has loaded successfully</given>
+      <when>The component displays the voice options</when>
+      <then>Each voice card displays: name, gender, accent, and tone metadata AND each voice card includes a preview button to play audio sample AND voice metadata comes from the API endpoint (NOT direct MVP_VOICES imports)</then>
+    </criterion>
+    <criterion id="3">
+      <title>Clicking preview button plays audio sample for that voice</title>
+      <given>A voice option card is displayed</given>
+      <when>User clicks the preview button for that voice</when>
+      <then>The audio sample for that voice plays immediately (< 500ms load time) AND audio playback uses preview file from public/audio/previews/{voiceId}.mp3 AND preview audio is served via Next.js static file serving AND only one audio preview plays at a time (others are stopped)</then>
+    </criterion>
+    <criterion id="4">
+      <title>User can select exactly one voice option</title>
+      <given>Multiple voice options are displayed</given>
+      <when>User clicks on a voice card to select it</when>
+      <then>That voice card is visually highlighted as selected AND any previously selected voice card is deselected AND the confirmation button becomes enabled</then>
+    </criterion>
+    <criterion id="5">
+      <title>On confirmation, voice_id saved to database and voice_selected = true</title>
+      <given>User has selected a voice and clicks the confirmation button</given>
+      <when>The POST /api/projects/[id]/select-voice endpoint is called</when>
+      <then>The selected voice_id is saved to projects.voice_id AND projects.voice_selected is set to true AND projects.current_step advances to 'script-generation' AND projects.last_active timestamp is updated</then>
+    </criterion>
+    <criterion id="6">
+      <title>User navigated to script generation route</title>
+      <given>Voice selection has been successfully saved</given>
+      <when>The API response confirms voice_selected = true</when>
+      <then>User is navigated to /projects/{id}/script-generation route AND a loading screen displays with progress indicators AND the script generation workflow begins automatically (Story 2.4)</then>
+    </criterion>
+    <criterion id="7">
+      <title>Error messages display if voice selection API fails</title>
+      <given>Voice selection API endpoint encounters an error</given>
+      <when>The error occurs (network failure, database error, invalid voice_id)</when>
+      <then>An error message displays to the user with actionable guidance AND the UI remains on the voice selection screen AND user can retry the voice selection</then>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/prd.md" title="Product Requirements Document" section="1.3 Voice Selection">
+        <snippet>The system shall present a voice selection interface after topic confirmation and before script generation. The system must provide at least 3-5 distinct voice options with different characteristics (gender, accent, tone). Each voice option must have a short audio preview sample that users can play. The system must allow users to select exactly one voice for their video project. All voice options must use FOSS (free and open-source) TTS engines.</snippet>
+        <relevance>Defines business requirements for voice selection feature including preview capability and FOSS TTS requirement</relevance>
+      </doc>
+
+      <doc path="docs/tech-spec-epic-2.md" title="Epic 2 Technical Specification" section="Services and Modules">
+        <snippet>VoiceSelection.tsx - Display voice options with preview capability. Input: Voice profiles from API. Output: Selected voice_id. VoicePreview.tsx - Audio playback for voice samples. POST /api/voice/list - Retrieve available TTS voices. POST /api/projects/[id]/select-voice - Save voice selection to database. lib/tts/voice-profiles.ts - Voice profile configuration returning voice metadata array.</snippet>
+        <relevance>Defines component architecture, API endpoints, and data flow for voice selection workflow</relevance>
+      </doc>
+
+      <doc path="docs/tech-spec-epic-2.md" title="Epic 2 Technical Specification" section="Data Models and Contracts">
+        <snippet>VoiceProfile interface: { id: string, name: string, gender: 'male' | 'female', accent: string, tone: string, previewUrl: string, modelId?: string }. Project Schema Updates: ALTER TABLE projects ADD COLUMN voice_id TEXT; ALTER TABLE projects ADD COLUMN voice_selected BOOLEAN DEFAULT false;</snippet>
+        <relevance>Defines VoiceProfile TypeScript interface and database schema for voice selection persistence</relevance>
+      </doc>
+
+      <doc path="docs/tech-spec-epic-2.md" title="Epic 2 Technical Specification" section="Voice Selection APIs">
+        <snippet>GET /api/voice/list returns { success: true, data: { voices: VoiceProfile[], defaultVoice: string } }. POST /api/projects/[id]/select-voice Request: { voiceId: string } Response: { success: true, data: { projectId: string, voiceId: string, voiceSelected: boolean, currentStep: string } }</snippet>
+        <relevance>Specifies API contracts for voice list retrieval and voice selection persistence</relevance>
+      </doc>
+
+      <doc path="docs/tech-spec-epic-2.md" title="Epic 2 Technical Specification" section="Workflows and Sequencing">
+        <snippet>Voice Selection Phase: After topic confirmation, navigate to /projects/{id}/voice. Display VoiceSelection component with voice profiles from GET /api/voice/list. User previews voices from public/audio/previews/{voiceId}.mp3. User selects voice, calls POST /api/projects/[id]/select-voice. On success, navigate to /projects/{id}/script-generation.</snippet>
+        <relevance>Defines complete workflow sequence and navigation flow for voice selection step</relevance>
+      </doc>
+
+      <doc path="docs/architecture.md" title="System Architecture" section="Component Architecture Patterns">
+        <snippet>Pages (Server Components): app/projects/[id]/*/page.tsx - Fetch data on server (getProjectById, database queries), handle authentication, render Client Components with fetched data as props. Feature Components (Client Components): components/features/*/ - Interactive UI with 'use client' directive, handle user interactions and state management, call API endpoints. Example: ChatInterface.tsx (Epic 1).</snippet>
+        <relevance>Establishes component patterns that Story 2.3 must follow: Server Component pages rendering Client Component features</relevance>
+      </doc>
+
+      <doc path="docs/architecture.md" title="System Architecture" section="Epic 2 Architecture">
+        <snippet>Epic 2 Components: VoiceSelector.tsx - Voice selection UI. VoicePreview.tsx - Audio preview player. Backend: app/api/voice/list/route.ts - Get available KokoroTTS voices. lib/tts/kokoro.ts - KokoroTTS integration. Database: projects table stores selected voice. Audio files in .cache/audio/</snippet>
+        <relevance>Maps Epic 2 voice selection components to system architecture layers</relevance>
+      </doc>
+
+      <doc path="docs/stories/story-2.1.md" title="Story 2.1: TTS Engine Integration" section="Acceptance Criteria">
+        <snippet>All 48+ KokoroTTS voices documented with comprehensive metadata. VoiceProfile interface defined with fields: id, name, gender, accent, tone, previewUrl, modelId. MVP uses subset of 5 voices. Preview audio samples generated in .cache/audio/previews/{voiceId}.mp3 format: MP3, 128kbps, 44.1kHz, Mono. GET /api/voice/list endpoint returns MVP_VOICES array.</snippet>
+        <relevance>Story 2.1 provides voice profiles infrastructure, preview audio files, and API endpoint that Story 2.3 depends on</relevance>
+      </doc>
+
+      <doc path="docs/stories/story-2.2.md" title="Story 2.2: Database Schema Updates" section="Project Table Schema Updates">
+        <snippet>ALTER TABLE projects ADD COLUMN voice_id TEXT; ALTER TABLE projects ADD COLUMN voice_selected BOOLEAN DEFAULT false; ALTER TABLE projects ADD COLUMN current_step TEXT; Query functions in lib/db/queries.ts: updateProjectVoice(db, projectId, voiceId), markVoiceSelected(db, projectId, voiceId)</snippet>
+        <relevance>Story 2.2 provides database schema and query functions for persisting voice selection</relevance>
+      </doc>
+    </docs>
+
+    <code>
+      <file path="ai-video-generator/src/lib/tts/voice-profiles.ts" kind="module" symbol="MVP_VOICES" lines="585">
+        <snippet>export const MVP_VOICES = VOICE_PROFILES.filter((v) => v.mvpVoice === true); // 5 MVP voices: sarah, james, emma, michael, olivia</snippet>
+        <reason>MVP_VOICES array provides the 5 voice profiles that VoiceSelection component displays. VoiceSelection fetches via GET /api/voice/list, NOT direct import</reason>
+      </file>
+
+      <file path="ai-video-generator/src/lib/tts/voice-profiles.ts" kind="module" symbol="VoiceProfile" lines="1-19">
+        <snippet>Interface fields: id (string), name (string), gender ('male' | 'female'), accent (string), tone (string), previewUrl (string), modelId (string), mvpVoice (boolean)</snippet>
+        <reason>VoiceProfile TypeScript interface defines the shape of voice data returned from API and displayed in UI</reason>
+      </file>
+
+      <file path="ai-video-generator/src/app/api/voice/list/route.ts" kind="api-endpoint" symbol="GET" lines="40-69">
+        <snippet>export async function GET() returns NextResponse.json({ success: true, data: { voices: MVP_VOICES, totalVoices: 5, defaultVoice: 'sarah', stats: {...} } })</snippet>
+        <reason>API endpoint that VoiceSelection component calls on mount to fetch voice profiles. Returns MVP_VOICES array with metadata</reason>
+      </file>
+
+      <file path="ai-video-generator/src/components/features/conversation/ChatInterface.tsx" kind="client-component" symbol="ChatInterface" lines="1-80">
+        <snippet>'use client'; component with props interface, useMemo for store creation, state management with Zustand, API calls with error handling, loading states, and navigation</snippet>
+        <reason>Epic 1 reference pattern for Client Component structure. VoiceSelection should follow same patterns: 'use client', props interface, Zustand store, API calls, error handling</reason>
+      </file>
+
+      <file path="ai-video-generator/src/app/projects/[id]/page.tsx" kind="server-component" symbol="ProjectPage" lines="1-80">
+        <snippet>Server Component (no 'use client') fetching project data via API, verifying project exists, setting active project in store, handling 404, rendering ChatInterface Client Component with projectId prop</snippet>
+        <reason>Epic 1 reference pattern for Server Component page. Voice selection page (app/projects/[id]/voice/page.tsx) should follow same pattern: fetch data, verify state, render Client Component</reason>
+      </file>
+
+      <file path="ai-video-generator/src/lib/stores/conversation-store.ts" kind="zustand-store" symbol="createConversationStore" lines="1-60">
+        <snippet>Factory pattern: export const createConversationStore = (projectId: string) => create&lt;State&gt;()(persist(...)); State interface with data fields and action methods; localStorage persistence with per-project key</snippet>
+        <reason>Epic 1 Zustand store pattern. Voice store (lib/stores/voice-store.ts) should follow same factory pattern with per-project isolation</reason>
+      </file>
+
+      <file path="ai-video-generator/src/lib/db/queries.ts" kind="database-queries" symbol="Project" lines="35-49">
+        <snippet>Project interface includes Epic 2 fields: voice_id (string | null), voice_selected (boolean), current_step (string), total_duration (number | null)</snippet>
+        <reason>Database schema from Story 2.2 showing fields that voice selection API endpoint must update</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <node>
+        <package name="next" version="16.0.1" usage="App Router framework for Server/Client Components and API routes"/>
+        <package name="react" version="19.2.0" usage="UI component library"/>
+        <package name="zustand" version="^5.0.8" usage="State management for voice selection store"/>
+        <package name="lucide-react" version="^0.552.0" usage="Icons (play button, checkmark for selection)"/>
+        <package name="tailwind-merge" version="^3.3.1" usage="CSS utility merging"/>
+        <package name="class-variance-authority" version="^0.7.1" usage="Component styling variants"/>
+        <package name="better-sqlite3" version="^12.4.1" usage="SQLite database for voice selection persistence"/>
+      </node>
+      <python>
+        <package name="kokoro-onnx" version=">=0.3.0" usage="TTS engine for voice preview generation (Story 2.1 dependency)"/>
+      </python>
+    </dependencies>
+  </artifacts>
+
+  <interfaces>
+    <interface name="GET /api/voice/list" kind="rest-endpoint">
+      <signature>GET /api/voice/list → { success: true, data: { voices: VoiceProfile[], totalVoices: number, totalAvailable: number, defaultVoice: string, stats: object } }</signature>
+      <path>ai-video-generator/src/app/api/voice/list/route.ts</path>
+      <usage>VoiceSelection component calls this on mount to fetch available voice profiles (Story 2.1)</usage>
+    </interface>
+
+    <interface name="POST /api/projects/[id]/select-voice" kind="rest-endpoint">
+      <signature>POST /api/projects/[id]/select-voice Body: { voiceId: string } → { success: boolean, data?: { projectId: string, voiceId: string, voiceSelected: boolean, currentStep: string }, error?: { message: string, code: string } }</signature>
+      <path>ai-video-generator/src/app/api/projects/[id]/select-voice/route.ts</path>
+      <usage>VoiceSelection component calls this to save voice selection and advance workflow (Story 2.3 - NEW)</usage>
+    </interface>
+
+    <interface name="VoiceProfile" kind="typescript-interface">
+      <signature>interface VoiceProfile { id: string; name: string; gender: 'male' | 'female'; accent: string; tone: string; previewUrl: string; modelId?: string; mvpVoice?: boolean; }</signature>
+      <path>ai-video-generator/src/lib/tts/voice-profiles.ts</path>
+      <usage>TypeScript interface for voice metadata used throughout voice selection components (Story 2.1)</usage>
+    </interface>
+
+    <interface name="VoiceSelectionProps" kind="component-props">
+      <signature>interface VoiceSelectionProps { projectId: string; }</signature>
+      <path>ai-video-generator/src/components/features/voice/VoiceSelection.tsx</path>
+      <usage>Props for VoiceSelection Client Component passed from Server Component page (Story 2.3 - NEW)</usage>
+    </interface>
+
+    <interface name="VoiceCardProps" kind="component-props">
+      <signature>interface VoiceCardProps { voice: VoiceProfile; selected: boolean; onSelect: (voiceId: string) => void; onPreview: (voiceId: string) => void; }</signature>
+      <path>ai-video-generator/src/components/ui/VoiceCard.tsx</path>
+      <usage>Props for VoiceCard UI component (Story 2.3 - NEW)</usage>
+    </interface>
+
+    <interface name="useVoiceStore" kind="zustand-store-hook">
+      <signature>interface VoiceState { selectedVoiceId: string | null; isPlaying: boolean; currentPlayingVoice: string | null; selectVoice: (id: string) => void; playPreview: (id: string) => void; stopPreview: () => void; resetState: () => void; }</signature>
+      <path>ai-video-generator/src/lib/stores/voice-store.ts</path>
+      <usage>Zustand store for managing voice selection state in VoiceSelection component (Story 2.3 - NEW)</usage>
+    </interface>
+  </interfaces>
+
+  <constraints>
+    <constraint>Component Architecture: Pages MUST be Server Components (no 'use client') in app/projects/[id]/*/page.tsx. Feature components MUST be Client Components ('use client') in components/features/*/. Server pages fetch data and render Client Components with props (Epic 1 pattern).</constraint>
+
+    <constraint>Data Fetching: VoiceSelection component MUST call GET /api/voice/list to fetch voice profiles. NEVER import MVP_VOICES directly in frontend components. API abstraction required for separation of concerns and future extensibility.</constraint>
+
+    <constraint>Audio Preview Serving: Preview audio files stored in public/audio/previews/{voiceId}.mp3. Next.js serves automatically from public/ directory. Preview URLs: /audio/previews/{voiceId}.mp3. NO custom API endpoint needed for audio serving.</constraint>
+
+    <constraint>State Management: Zustand store at lib/stores/voice-store.ts (NOT stores/voice-store.ts). Follow Epic 1 factory pattern with per-project isolation. Hybrid approach: UI state in Zustand, persistent state in SQLite via API.</constraint>
+
+    <constraint>API Design: POST /api/projects/[id]/select-voice follows Next.js App Router API route pattern. Database initialization: await initializeDatabase() at module level (Epic 1 pattern). Standard error response: { success: false, error: { message, code } }. Error codes: VOICE_NOT_FOUND, PROJECT_NOT_FOUND, DATABASE_ERROR.</constraint>
+
+    <constraint>Workflow Integration: Navigation sequence: /projects/{id} (chat) → /projects/{id}/voice → /projects/{id}/script-generation. current_step field tracks position: 'topic' → 'voice' → 'script-generation'. Workflow state guards in page components redirect if accessing out of sequence.</constraint>
+
+    <constraint>Database Schema (Story 2.2): Uses projects.voice_id (TEXT), projects.voice_selected (BOOLEAN), projects.current_step (TEXT). Query functions: updateProjectVoice(), markVoiceSelected(). Foreign key validation: voice_id must exist in MVP_VOICES (application-level check). Atomic updates in single transaction.</constraint>
+
+    <constraint>Error Handling: Network errors display message with retry. Database errors logged server-side, generic error to user. Invalid voice_id prevented in UI but validated in API. Missing preview audio shows graceful degradation (disable preview, show message).</constraint>
+
+    <constraint>Styling and UX: Tailwind CSS with dark mode theme (Slate colors). Responsive grid: 3 columns desktop, 2 tablet, 1 mobile. Accessibility: keyboard navigation (Tab, Enter, Space), ARIA labels, screen reader support. Focus visible indicators. Visual selection feedback (border highlight, checkmark).</constraint>
+
+    <constraint>Testing Standards: Unit tests for components (VoiceCard, VoiceSelection) with rendering, interactions, accessibility. Integration tests for full workflow (topic → voice → script). API tests for POST /api/projects/[id]/select-voice with validation, errors, database updates. Mock audio playback in tests.</constraint>
+
+    <constraint>File Structure Alignment: Pages in app/projects/[id]/ (Next.js convention). Features in components/features/voice/ (Client Components). UI in components/ui/ (shared). API in app/api/projects/[id]/ (Next.js). Stores in lib/stores/ (NOT top-level stores/). Tests mirror source (tests/integration/, tests/api/, tests/unit/).</constraint>
+  </constraints>
+
+  <tests>
+    <standards>
+      <framework>Vitest for unit and integration testing with React Testing Library for component testing. API tests use Vitest with fetch mocking. Database tests use in-memory SQLite. Mock audio playback (no actual file loading). Accessibility testing with ARIA attribute validation and keyboard event simulation. Performance testing for audio load times (&lt; 500ms) and API response times (&lt; 200ms).</framework>
+    </standards>
+
+    <locations>
+      <location>tests/integration/voice-selection.test.ts - Full workflow tests (topic → voice → script navigation)</location>
+      <location>tests/api/select-voice.test.ts - API endpoint tests (POST /api/projects/[id]/select-voice)</location>
+      <location>tests/unit/VoiceCard.test.tsx - VoiceCard component unit tests</location>
+      <location>tests/unit/VoiceSelection.test.tsx - VoiceSelection component unit tests</location>
+    </locations>
+
+    <ideas>
+      <idea ac="1">Test VoiceSelection UI displays after topic confirmation: Mock project with topic, render voice page, verify VoiceSelection component renders, verify voice cards displayed, verify API call to GET /api/voice/list</idea>
+      <idea ac="2">Test all MVP voices render with metadata: Mock API response with 5 voices, verify each card displays name/gender/accent/tone, verify preview button present, verify NO direct MVP_VOICES import</idea>
+      <idea ac="3">Test preview audio playback: Click preview button, verify audio element created with correct URL (/audio/previews/{voiceId}.mp3), verify only one audio plays (previous stopped), verify &lt; 500ms load time, test error handling for missing file</idea>
+      <idea ac="4">Test voice selection: Click voice card, verify visual highlight, click different card, verify first deselected, verify confirmation button enabled only when voice selected</idea>
+      <idea ac="5">Test voice selection API and database updates: Mock POST /api/projects/[id]/select-voice, verify request body {voiceId}, verify database updated (voice_id, voice_selected=true, current_step='script-generation', last_active), verify response format</idea>
+      <idea ac="6">Test navigation to script generation: Mock successful voice selection, verify navigation to /projects/{id}/script-generation, verify loading screen displayed, verify project data passed</idea>
+      <idea ac="7">Test error handling: Mock API failure (network, database, invalid voiceId), verify error message displayed, verify UI remains on voice selection, verify retry capability, test error codes (VOICE_NOT_FOUND, PROJECT_NOT_FOUND, DATABASE_ERROR)</idea>
+      <idea ac="workflow-guards">Test workflow state guards: Access /projects/{id}/voice without topic confirmed → redirect to chat. Access with current_step='script-generation' → redirect to script page. Verify guards prevent out-of-sequence access</idea>
+      <idea ac="accessibility">Test keyboard navigation: Tab through voice cards, Enter/Space to select, verify focus indicators, verify ARIA labels read correctly, test screen reader compatibility</idea>
+      <idea ac="store">Test voice store: selectVoice updates selectedVoiceId, playPreview sets isPlaying and currentPlayingVoice, stopPreview clears state, resetState on project change prevents leakage</idea>
+    </ideas>
+  </tests>
+
+  <dependencies-integration>
+    <dependency story="2.1" type="requires">
+      <description>Story 2.1 provides MVP_VOICES array, GET /api/voice/list endpoint, preview audio files in public/audio/previews/, and VoiceProfile TypeScript interface</description>
+      <artifacts>
+        <artifact>ai-video-generator/src/lib/tts/voice-profiles.ts (MVP_VOICES, VoiceProfile interface)</artifact>
+        <artifact>ai-video-generator/src/app/api/voice/list/route.ts (GET endpoint)</artifact>
+        <artifact>public/audio/previews/*.mp3 (5 MVP voice preview files)</artifact>
+      </artifacts>
+    </dependency>
+
+    <dependency story="2.2" type="requires">
+      <description>Story 2.2 provides database schema (projects.voice_id, voice_selected, current_step) and query functions (updateProjectVoice, markVoiceSelected)</description>
+      <artifacts>
+        <artifact>ai-video-generator/src/lib/db/migrations/002_content_generation_schema.ts (schema migration)</artifact>
+        <artifact>ai-video-generator/src/lib/db/queries.ts (Project interface with Epic 2 fields, query functions)</artifact>
+      </artifacts>
+    </dependency>
+
+    <dependency story="2.4" type="blocks">
+      <description>Story 2.3 blocks Story 2.4 (Script Generation) because script generation requires a selected voice_id from the database</description>
+      <integration-point>Voice selection sets projects.voice_id and current_step='script-generation', then navigates to /projects/{id}/script-generation where Story 2.4 script generation begins</integration-point>
+    </dependency>
+
+    <dependency story="2.5" type="blocks">
+      <description>Story 2.3 blocks Story 2.5 (Voiceover Generation) because TTS synthesis requires the selected voice_id from projects table</description>
+      <integration-point>Selected voice_id persisted in database is used by Story 2.5 to generate scene voiceovers with the correct voice profile</integration-point>
+    </dependency>
+  </dependencies-integration>
+
+  <epic1-patterns>
+    <pattern name="Server Component Page Pattern">
+      <reference>ai-video-generator/src/app/projects/[id]/page.tsx</reference>
+      <description>Server Component at app/projects/[id]/*/page.tsx fetches data on server (getProjectById, database queries), verifies state (project exists, workflow step valid), handles redirects (404, state guards), renders Client Component with props</description>
+      <application>Voice selection page (app/projects/[id]/voice/page.tsx) follows this pattern: fetch project, verify topic confirmed, check current_step, redirect if invalid, render VoiceSelection with projectId prop</application>
+    </pattern>
+
+    <pattern name="Client Component Feature Pattern">
+      <reference>ai-video-generator/src/components/features/conversation/ChatInterface.tsx</reference>
+      <description>Client Component with 'use client' directive, props interface, useMemo for Zustand store creation, state management, API calls with fetch, error handling, loading states, form submission, navigation with useRouter</description>
+      <application>VoiceSelection component (components/features/voice/VoiceSelection.tsx) follows this pattern: 'use client', VoiceSelectionProps interface, voice store with useMemo, fetch voices on mount, handle selection API call, navigate on success</application>
+    </pattern>
+
+    <pattern name="Zustand Store Factory Pattern">
+      <reference>ai-video-generator/src/lib/stores/conversation-store.ts</reference>
+      <description>Factory function creating per-project isolated stores: export const createStore = (projectId: string) => create()(persist(...)); State interface with data and actions; localStorage persistence with project-scoped key</description>
+      <application>Voice store (lib/stores/voice-store.ts) follows this pattern: createVoiceStore factory, VoiceState interface (selectedVoiceId, isPlaying, actions), localStorage persistence, per-project isolation</application>
+    </pattern>
+
+    <pattern name="API Route Pattern">
+      <reference>ai-video-generator/src/app/api/projects/[id]/route.ts</reference>
+      <description>Next.js App Router API route with database initialization at module level (await initializeDatabase()), named export async function POST/GET, request validation, database operations, standard response format { success, data/error }, error handling with codes</description>
+      <application>Voice selection API (app/api/projects/[id]/select-voice/route.ts) follows this pattern: module-level initializeDatabase(), export async function POST, validate voiceId/projectId, call query functions, return standard response, error codes (VOICE_NOT_FOUND, PROJECT_NOT_FOUND, DATABASE_ERROR)</application>
+    </pattern>
+
+    <pattern name="UI Component Pattern">
+      <reference>ai-video-generator/src/components/ui/button.tsx</reference>
+      <description>Reusable UI component with TypeScript props interface, class-variance-authority for variants, Tailwind CSS styling, accessibility (ARIA, keyboard), forwardRef for ref passing</description>
+      <application>VoiceCard component (components/ui/VoiceCard.tsx) follows this pattern: VoiceCardProps interface, Tailwind styling with dark mode, ARIA labels, keyboard handlers (Space/Enter), focus indicators</application>
+    </pattern>
+  </epic1-patterns>
+
+  <implementation-guidance>
+    <phase name="1. Foundation Setup">
+      <step>Create voice store (lib/stores/voice-store.ts) following conversation-store.ts factory pattern with VoiceState interface</step>
+      <step>Define TypeScript interfaces in components: VoiceSelectionProps, VoiceCardProps, SelectVoiceRequest, SelectVoiceResponse</step>
+      <step>Create component directory structure: components/features/voice/, components/ui/ for VoiceCard</step>
+    </phase>
+
+    <phase name="2. UI Components">
+      <step>Implement VoiceCard component (components/ui/VoiceCard.tsx) with metadata display, preview button, selection styling, accessibility</step>
+      <step>Implement VoiceSelection component (components/features/voice/VoiceSelection.tsx) with voice store integration, GET /api/voice/list fetch, audio playback logic, grid layout</step>
+      <step>Add loading states, error handling, validation feedback to VoiceSelection</step>
+    </phase>
+
+    <phase name="3. Backend API">
+      <step>Create POST /api/projects/[id]/select-voice/route.ts with database initialization, request validation, query function calls, error handling</step>
+      <step>Verify database query functions exist from Story 2.2 (updateProjectVoice, markVoiceSelected)</step>
+      <step>Test API endpoint with valid/invalid inputs, verify database updates, verify error codes</step>
+    </phase>
+
+    <phase name="4. Page Integration">
+      <step>Update app/projects/[id]/voice/page.tsx as Server Component with project data fetch, topic verification, workflow guards, VoiceSelection rendering</step>
+      <step>Create app/projects/[id]/script-generation/page.tsx as loading screen placeholder for Story 2.4</step>
+      <step>Test navigation flow: chat → voice → script-generation</step>
+    </phase>
+
+    <phase name="5. Testing">
+      <step>Write unit tests for VoiceCard (rendering, interactions, accessibility)</step>
+      <step>Write unit tests for VoiceSelection (API fetch, selection logic, audio playback)</step>
+      <step>Write API tests for select-voice endpoint (validation, database updates, errors)</step>
+      <step>Write integration tests for full workflow (topic → voice → script)</step>
+    </phase>
+
+    <phase name="6. Documentation">
+      <step>Update docs/workflow-status.md with voice selection step in Epic 2 workflow</step>
+      <step>Update docs/tech-spec-epic-2.md with VoiceSelection component details</step>
+      <step>Verify all acceptance criteria met with manual testing</step>
+    </phase>
+  </implementation-guidance>
+
+  <dev-notes>
+    <note>Audio Preview Implementation: Use HTML5 Audio API (new Audio(url)) for playback. Store audio refs in state or useRef. On preview click: stop current audio if playing, create new Audio with /audio/previews/{voiceId}.mp3, call play(). Update isPlaying state. Clean up audio on component unmount.</note>
+
+    <note>Single Playback Enforcement: When user clicks preview on Voice A while Voice B is playing, must call audioB.pause() and set audioB.currentTime = 0 before starting audioA. Track currentPlayingVoice in voice store to enable this across re-renders.</note>
+
+    <note>Workflow State Guards: In app/projects/[id]/voice/page.tsx, check project.topic !== null (else redirect to /projects/{id}). Check project.current_step in ['topic', 'voice'] (else redirect to appropriate step). This prevents accessing voice selection before topic confirmation or after voice already selected.</note>
+
+    <note>API Response Standard: All API endpoints return { success: boolean, data?: {...}, error?: { message: string, code: string } }. Success responses have data object. Error responses have error object with actionable message and error code for client handling.</note>
+
+    <note>Voice Selection Persistence: When user selects voice and clicks confirm, call POST /api/projects/[id]/select-voice with { voiceId }. API updates database atomically: voice_id, voice_selected=true, current_step='script-generation', last_active=now. On success, navigate to script-generation page. On error, display message and allow retry.</note>
+
+    <note>Responsive Grid Layout: Use Tailwind grid classes: grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4. On mobile (1 col), voices stack vertically. On tablet (2 cols), side-by-side. On desktop (3 cols), grid display. Ensure cards have consistent height with flex layout.</note>
+
+    <note>Accessibility Requirements: Each VoiceCard needs aria-label="Select {voice.name}" on card, role="button" with onClick, keyboard handlers (onKeyDown checking for Enter/Space), tabIndex={0} for focus. Preview button needs aria-label="Preview {voice.name}". Selection state needs aria-selected={selected}.</note>
+
+    <note>Error Code Handling: VOICE_NOT_FOUND (404) - Invalid voiceId not in MVP_VOICES. PROJECT_NOT_FOUND (404) - Invalid projectId. DATABASE_ERROR (500) - SQLite error during update. NETWORK_ERROR (client) - Fetch failed. Map error codes to user-friendly messages with retry guidance.</note>
+
+    <note>Testing Audio Playback: In tests, mock Audio constructor: global.Audio = jest.fn(() => ({ play: jest.fn(), pause: jest.fn(), currentTime: 0 })). Verify Audio created with correct URL. Verify play() called. Verify previous audio paused. Do NOT load actual MP3 files in tests.</note>
+
+    <note>Store Reset on Project Change: Voice store must reset state when projectId changes to prevent voice selection leaking between projects. Implement resetState() action called in VoiceSelection useEffect cleanup or when projectId prop changes.</note>
+  </dev-notes>
+</story-context>
