@@ -1,0 +1,598 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>2.2</story-id>
+    <title>Database Schema Updates for Content Generation</title>
+    <epic>Epic 2 - Content Generation Pipeline + Voice Selection</epic>
+    <status>Ready</status>
+    <ready-for-development>2025-11-07</ready-for-development>
+    <approved-by>Architect (Winston)</approved-by>
+    <created>2025-11-07</created>
+    <owner>Dev Agent</owner>
+    <repository>https://github.com/AIfriendly/AIvideogen</repository>
+    <story-file>d:\BMAD video generator\docs\stories\story-2.2.md</story-file>
+  </metadata>
+
+  <goal>
+    <summary>
+      Extend the database schema to support voice selection, script generation tracking, and scene-level audio management.
+      This story establishes the data foundation for the content generation pipeline by adding the scenes table and
+      enhancing the projects table with voice and script tracking fields.
+    </summary>
+    <business-value>
+      Enables Epic 2's content generation pipeline by providing persistent storage for voice selection, script scenes,
+      generation state tracking, and audio metadata. This is the data foundation for Stories 2.3 (Script Generation)
+      and 2.4 (Voice Selection UI).
+    </business-value>
+  </goal>
+
+  <context>
+    <background>
+      As we move into Epic 2's content generation pipeline, we need persistent storage for:
+      - Voice Selection: Track which TTS voice profile is assigned to each project
+      - Script Scenes: Store individual script segments with their associated audio files
+      - Generation State: Track whether scripts have been generated and voices selected
+      - Audio Metadata: Store audio file paths, durations, and timing information
+    </background>
+    <design-rationale>
+      - Follows pattern established in Epic 1 Story 1.2
+      - Uses SQLite with better-sqlite3
+      - Foreign key constraints for referential integrity
+      - Performance-optimized indexes
+      - The scenes table is the core data structure for managing the script-to-audio pipeline
+      - Each scene represents one segment of the script with corresponding audio file, duration, and metadata
+    </design-rationale>
+  </context>
+
+  <implementation-context>
+    <database-architecture>
+      <technology>SQLite via better-sqlite3 12.4.1</technology>
+      <database-path>ai-video-generator.db (project root)</database-path>
+      <configuration>
+        <foreign-keys>enabled via pragma</foreign-keys>
+        <primary-keys>TEXT (UUID v4)</primary-keys>
+        <timestamps>TEXT ISO 8601 format</timestamps>
+      </configuration>
+      <pattern-reference>architecture.md lines 1129-1231</pattern-reference>
+    </database-architecture>
+
+    <existing-schema>
+      <table name="projects">
+        <description>Created in Epic 1 Story 1.2</description>
+        <ddl><![CDATA[
+CREATE TABLE projects (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  topic TEXT,
+  current_step TEXT DEFAULT 'topic',
+  system_prompt_id TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  last_active TEXT DEFAULT (datetime('now'))
+);
+        ]]></ddl>
+      </table>
+      <table name="messages">
+        <description>Chat message history for projects</description>
+        <ddl><![CDATA[
+CREATE TABLE messages (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
+  content TEXT NOT NULL,
+  timestamp TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+        ]]></ddl>
+      </table>
+    </existing-schema>
+
+    <project-structure>
+      <structure><![CDATA[
+ai-video-generator/
+├── lib/
+│   ├── db/
+│   │   ├── client.ts          # SQLite connection
+│   │   ├── schema.sql         # Database schema DDL
+│   │   ├── queries.ts         # Query functions
+│   │   ├── init.ts            # Database initialization
+│   │   ├── index.ts           # Public exports
+│   │   └── migrations/
+│   │       ├── 001_*.ts       # Epic 1 migration
+│   │       └── 002_content_generation_schema.ts  # THIS STORY
+│   └── utils/
+├── types/
+│   └── database.ts            # TypeScript type definitions
+├── tests/
+│   └── db/
+│       └── scenes.test.ts     # Scene query tests
+├── app/
+│   └── api/
+└── ai-video-generator.db      # SQLite database file
+      ]]></structure>
+    </project-structure>
+
+    <dependencies>
+      <dependency>
+        <name>better-sqlite3</name>
+        <version>12.4.1</version>
+        <status>Already installed from Epic 1</status>
+      </dependency>
+      <dependency>
+        <name>uuid</name>
+        <purpose>UUID v4 generation for primary keys</purpose>
+      </dependency>
+      <dependency>
+        <name>@types/better-sqlite3</name>
+        <purpose>TypeScript definitions</purpose>
+      </dependency>
+    </dependencies>
+
+    <architectural-patterns>
+      <pattern name="Query Functions">
+        <location>lib/db/queries.ts</location>
+        <description>All database queries encapsulated in typed functions</description>
+        <requirements>
+          - Use parameterized queries for SQL injection prevention
+          - Return typed results matching TypeScript interfaces
+          - Throw descriptive errors for constraint violations
+          - Use transactions for multi-row operations
+          - Leverage indexes for performance
+        </requirements>
+      </pattern>
+      <pattern name="Database Migration">
+        <location>lib/db/migrations/</location>
+        <description>Versioned migration scripts with up/down functions</description>
+        <requirements>
+          - Check if migration has already been applied
+          - Use transactions for atomicity
+          - Handle migration version tracking
+          - Provide rollback capability
+          - Log migration progress
+        </requirements>
+      </pattern>
+      <pattern name="Type Definitions">
+        <location>types/database.ts</location>
+        <description>TypeScript interfaces for all database entities</description>
+        <requirements>
+          - Interface for full entity (all fields)
+          - Interface for insert (optional id, timestamps)
+          - Interface for update (all fields optional except id)
+        </requirements>
+      </pattern>
+    </architectural-patterns>
+  </implementation-context>
+
+  <technical-requirements>
+    <requirement id="1" priority="high">
+      <title>Project Table Schema Updates</title>
+      <description>Add four new columns to existing projects table</description>
+      <columns>
+        <column>
+          <name>voice_id</name>
+          <type>TEXT</type>
+          <nullable>true</nullable>
+          <description>Stores the selected TTS voice identifier</description>
+        </column>
+        <column>
+          <name>script_generated</name>
+          <type>BOOLEAN</type>
+          <default>false</default>
+          <nullable>false</nullable>
+          <description>Tracks whether script generation is complete</description>
+        </column>
+        <column>
+          <name>voice_selected</name>
+          <type>BOOLEAN</type>
+          <default>false</default>
+          <nullable>false</nullable>
+          <description>Tracks whether voice selection is complete</description>
+        </column>
+        <column>
+          <name>total_duration</name>
+          <type>REAL</type>
+          <nullable>true</nullable>
+          <description>Aggregated duration of all scenes in seconds</description>
+        </column>
+      </columns>
+      <migration-sql><![CDATA[
+ALTER TABLE projects ADD COLUMN voice_id TEXT;
+ALTER TABLE projects ADD COLUMN script_generated BOOLEAN DEFAULT false;
+ALTER TABLE projects ADD COLUMN voice_selected BOOLEAN DEFAULT false;
+ALTER TABLE projects ADD COLUMN total_duration REAL;
+      ]]></migration-sql>
+    </requirement>
+
+    <requirement id="2" priority="high">
+      <title>Create Scenes Table</title>
+      <description>Core data structure for managing script-to-audio pipeline</description>
+      <schema-design>
+        <field name="id">UUID v4 primary key</field>
+        <field name="project_id">Foreign key with CASCADE delete to maintain referential integrity</field>
+        <field name="scene_number">Sequential ordering within project (1-based indexing)</field>
+        <field name="text">Original script text as generated by LLM</field>
+        <field name="sanitized_text">Text after cleaning/preparation for TTS engine</field>
+        <field name="audio_file_path">Relative path from project root to generated audio file</field>
+        <field name="duration">Computed after TTS generation, used for video timing</field>
+        <constraint name="UNIQUE(project_id, scene_number)">Prevents duplicate scene numbers</constraint>
+      </schema-design>
+      <table-ddl><![CDATA[
+CREATE TABLE scenes (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  scene_number INTEGER NOT NULL,
+  text TEXT NOT NULL,              -- Original script text from LLM
+  sanitized_text TEXT,             -- Cleaned text for TTS input
+  audio_file_path TEXT,            -- Path to generated MP3 file
+  duration REAL,                   -- Duration in seconds
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  UNIQUE(project_id, scene_number)
+);
+      ]]></table-ddl>
+      <indexes><![CDATA[
+CREATE INDEX idx_scenes_project ON scenes(project_id);
+CREATE INDEX idx_scenes_number ON scenes(scene_number);
+      ]]></indexes>
+    </requirement>
+
+    <requirement id="3" priority="high">
+      <title>Database Migration Script</title>
+      <file>lib/db/migrations/002_content_generation_schema.ts</file>
+      <functions>
+        <function>
+          <signature>export async function up(db: Database): Promise&lt;void&gt;</signature>
+          <description>Apply migration: add columns to projects, create scenes table and indexes</description>
+        </function>
+        <function>
+          <signature>export async function down(db: Database): Promise&lt;void&gt;</signature>
+          <description>Rollback migration: drop scenes table and indexes, remove columns from projects</description>
+        </function>
+      </functions>
+      <requirements>
+        - Pre-migration backup automatically created
+        - Entire migration runs in single transaction
+        - Migration version stored in migrations table
+        - Idempotency: check if columns/tables already exist before creating
+        - Log migration progress
+      </requirements>
+      <rollback-sql><![CDATA[
+-- Rollback SQL (run in reverse order)
+DROP INDEX IF EXISTS idx_scenes_number;
+DROP INDEX IF EXISTS idx_scenes_project;
+DROP TABLE IF EXISTS scenes;
+ALTER TABLE projects DROP COLUMN total_duration;
+ALTER TABLE projects DROP COLUMN voice_selected;
+ALTER TABLE projects DROP COLUMN script_generated;
+ALTER TABLE projects DROP COLUMN voice_id;
+      ]]></rollback-sql>
+      <note>SQLite has limited ALTER TABLE DROP COLUMN support (added in 3.35.0). If older SQLite version detected, use table recreation strategy.</note>
+    </requirement>
+
+    <requirement id="4" priority="high">
+      <title>Query Functions for Scenes</title>
+      <file>lib/db/queries.ts (extend existing)</file>
+      <crud-operations>
+        <create>
+          <function>createScene(db: Database, scene: SceneInsert): Scene</function>
+          <function>createScenes(db: Database, scenes: SceneInsert[]): Scene[]</function>
+        </create>
+        <read>
+          <function>getSceneById(db: Database, id: string): Scene | null</function>
+          <function>getScenesByProjectId(db: Database, projectId: string): Scene[]</function>
+          <function>getSceneByNumber(db: Database, projectId: string, sceneNumber: number): Scene | null</function>
+          <function>countScenes(db: Database, projectId: string): number</function>
+        </read>
+        <update>
+          <function>updateScene(db: Database, id: string, updates: Partial&lt;SceneUpdate&gt;): Scene</function>
+          <function>updateSceneAudio(db: Database, id: string, audioPath: string, duration: number): Scene</function>
+          <function>updateSceneSanitizedText(db: Database, id: string, sanitizedText: string): Scene</function>
+        </update>
+        <delete>
+          <function>deleteScene(db: Database, id: string): void</function>
+          <function>deleteScenesByProjectId(db: Database, projectId: string): void</function>
+        </delete>
+      </crud-operations>
+      <project-query-updates>
+        <function>updateProjectVoice(db: Database, id: string, voiceId: string): Project</function>
+        <function>markScriptGenerated(db: Database, id: string): Project</function>
+        <function>markVoiceSelected(db: Database, id: string, voiceId: string): Project</function>
+        <function>updateProjectDuration(db: Database, id: string, totalDuration: number): Project</function>
+      </project-query-updates>
+    </requirement>
+
+    <requirement id="5" priority="high">
+      <title>TypeScript Type Definitions</title>
+      <file>types/database.ts (extend existing)</file>
+      <scene-types><![CDATA[
+export interface Scene {
+  id: string;
+  project_id: string;
+  scene_number: number;
+  text: string;
+  sanitized_text: string | null;
+  audio_file_path: string | null;
+  duration: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SceneInsert {
+  id?: string;  // Auto-generated if not provided
+  project_id: string;
+  scene_number: number;
+  text: string;
+  sanitized_text?: string | null;
+  audio_file_path?: string | null;
+  duration?: number | null;
+}
+
+export interface SceneUpdate {
+  text?: string;
+  sanitized_text?: string | null;
+  audio_file_path?: string | null;
+  duration?: number | null;
+  updated_at?: string;
+}
+      ]]></scene-types>
+      <project-type-updates><![CDATA[
+export interface Project {
+  // ... existing fields from Epic 1
+  voice_id: string | null;
+  script_generated: boolean;
+  voice_selected: boolean;
+  total_duration: number | null;
+}
+      ]]></project-type-updates>
+    </requirement>
+
+    <requirement id="6" priority="medium">
+      <title>Integration with Existing Database Layer</title>
+      <files>
+        <file>
+          <path>lib/db/index.ts</path>
+          <changes>
+            - Export new scene query functions
+            - Ensure migration runs on database initialization
+            - Verify foreign key constraints are enabled
+          </changes>
+        </file>
+        <file>
+          <path>lib/db/init.ts</path>
+          <changes>
+            - Register migration 002 in migration registry
+            - Ensure migrations run in order
+          </changes>
+        </file>
+      </files>
+    </requirement>
+
+    <performance-considerations>
+      <index name="idx_scenes_project">
+        <purpose>Enables fast lookup of all scenes for a project (O(log n))</purpose>
+        <query-pattern>SELECT * FROM scenes WHERE project_id = ?</query-pattern>
+      </index>
+      <index name="idx_scenes_number">
+        <purpose>Fast retrieval by scene number within project</purpose>
+        <query-pattern>SELECT * FROM scenes WHERE scene_number = ?</query-pattern>
+      </index>
+      <foreign-keys>
+        <requirement>Verify PRAGMA foreign_keys = ON is set on database connection</requirement>
+      </foreign-keys>
+      <batch-operations>
+        <requirement>Use createScenes() with prepared statements for bulk operations</requirement>
+      </batch-operations>
+      <denormalization>
+        <field>total_duration</field>
+        <rationale>Denormalized to avoid repeated SUM() queries across scenes</rationale>
+      </denormalization>
+    </performance-considerations>
+
+    <data-integrity>
+      <referential-integrity>Foreign key constraint ensures orphaned scenes cannot exist</referential-integrity>
+      <uniqueness>UNIQUE(project_id, scene_number) prevents duplicate scene numbering</uniqueness>
+      <not-null>Required fields enforce complete data entry</not-null>
+      <cascade-delete>Deleting project automatically removes all scenes</cascade-delete>
+    </data-integrity>
+
+    <conventions>
+      <audio-file-paths>
+        <pattern>{project_root}/audio/scenes/scene_{scene_number:03d}.mp3</pattern>
+        <examples>
+          <example>audio/scenes/scene_001.mp3</example>
+          <example>audio/scenes/scene_002.mp3</example>
+        </examples>
+      </audio-file-paths>
+      <error-handling>
+        <error name="SceneNotFoundError">Scene ID not found</error>
+        <error name="ProjectNotFoundError">Invalid project_id foreign key</error>
+        <error name="DuplicateSceneError">UNIQUE constraint violation on (project_id, scene_number)</error>
+        <error name="DatabaseError">General SQL errors</error>
+      </error-handling>
+    </conventions>
+  </technical-requirements>
+
+  <acceptance-criteria>
+    <criterion id="AC1">Projects table includes voice_id, script_generated, voice_selected, total_duration fields</criterion>
+    <criterion id="AC2">Scenes table created with all required fields and foreign key to projects</criterion>
+    <criterion id="AC3">Indexes created on scenes(project_id) and scenes(scene_number)</criterion>
+    <criterion id="AC4">Database migration runs successfully without data loss</criterion>
+    <criterion id="AC5">Migration can be rolled back cleanly</criterion>
+    <criterion id="AC6">Query functions handle CRUD operations for scenes</criterion>
+    <criterion id="AC7">Query functions properly enforce constraints and return typed results</criterion>
+    <criterion id="AC8">TypeScript types accurately reflect schema changes</criterion>
+    <criterion id="AC9">All query functions have corresponding unit tests</criterion>
+    <criterion id="AC10">Foreign key constraint ON DELETE CASCADE verified working</criterion>
+    <criterion id="AC11">No SQL injection vulnerabilities (all queries parameterized)</criterion>
+  </acceptance-criteria>
+
+  <testing-strategy>
+    <unit-tests>
+      <file>tests/db/scenes.test.ts</file>
+      <test-cases>
+        <test>Test createScene() with valid data</test>
+        <test>Test createScenes() bulk insert</test>
+        <test>Test getSceneById() returns correct scene</test>
+        <test>Test getSceneById() returns null for non-existent ID</test>
+        <test>Test getScenesByProjectId() returns all scenes for project</test>
+        <test>Test getSceneByNumber() with valid project and scene number</test>
+        <test>Test countScenes() returns correct count</test>
+        <test>Test updateScene() modifies fields correctly</test>
+        <test>Test updateSceneAudio() sets audio_file_path and duration</test>
+        <test>Test updateSceneSanitizedText() updates sanitized_text field</test>
+        <test>Test deleteScene() removes scene</test>
+        <test>Test deleteScenesByProjectId() removes all scenes for project</test>
+        <test>Test foreign key constraint prevents orphaned scenes</test>
+        <test>Test UNIQUE constraint on (project_id, scene_number)</test>
+        <test>Test CASCADE delete when project is deleted</test>
+        <test>Test index usage with EXPLAIN QUERY PLAN</test>
+        <test>Test updateProjectVoice() sets voice_id</test>
+        <test>Test markScriptGenerated() sets script_generated to true</test>
+        <test>Test markVoiceSelected() sets voice_selected and voice_id</test>
+        <test>Test updateProjectDuration() sets total_duration</test>
+      </test-cases>
+    </unit-tests>
+
+    <integration-tests>
+      <test-scenario name="Complete Pipeline">
+        <steps>
+          1. Create project
+          2. Add multiple scenes
+          3. Verify retrieval by project ID
+          4. Update scene audio metadata
+          5. Verify aggregated duration calculation
+        </steps>
+      </test-scenario>
+      <test-scenario name="Cascade Delete">
+        <steps>
+          1. Create project
+          2. Add scenes
+          3. Delete project
+          4. Verify scenes cascade deleted
+        </steps>
+      </test-scenario>
+      <test-scenario name="Transaction Rollback">
+        <steps>
+          1. Begin transaction
+          2. Bulk insert scenes with one invalid entry
+          3. Rollback transaction
+          4. Verify no scenes were inserted
+        </steps>
+      </test-scenario>
+      <test-scenario name="Migration">
+        <steps>
+          1. Create test database with Epic 1 schema
+          2. Run migration up()
+          3. Verify new columns and tables exist
+          4. Insert test data
+          5. Run migration down()
+          6. Verify rollback successful
+        </steps>
+      </test-scenario>
+    </integration-tests>
+
+    <verification-tests>
+      <test>Verify PRAGMA foreign_keys = ON is enabled</test>
+      <test>Verify index usage with EXPLAIN QUERY PLAN for common queries</test>
+      <test>Verify all queries use parameterized statements (SQL injection protection)</test>
+      <test>Verify error handling throws correct error types</test>
+      <test>Verify migration idempotency (running twice has no effect)</test>
+    </verification-tests>
+  </testing-strategy>
+
+  <file-locations>
+    <files-to-create>
+      <file>
+        <path>d:\BMAD video generator\ai-video-generator\lib\db\migrations\002_content_generation_schema.ts</path>
+        <description>Migration script with up() and down() functions</description>
+      </file>
+      <file>
+        <path>d:\BMAD video generator\ai-video-generator\tests\db\scenes.test.ts</path>
+        <description>Unit tests for scene query functions</description>
+      </file>
+    </files-to-create>
+
+    <files-to-modify>
+      <file>
+        <path>d:\BMAD video generator\ai-video-generator\lib\db\schema.sql</path>
+        <changes>Add scenes table DDL, project table ALTER statements, and indexes</changes>
+      </file>
+      <file>
+        <path>d:\BMAD video generator\ai-video-generator\lib\db\queries.ts</path>
+        <changes>Add scene CRUD functions and project query extensions</changes>
+      </file>
+      <file>
+        <path>d:\BMAD video generator\ai-video-generator\types\database.ts</path>
+        <changes>Add Scene, SceneInsert, SceneUpdate interfaces; update Project interface</changes>
+      </file>
+      <file>
+        <path>d:\BMAD video generator\ai-video-generator\lib\db\init.ts</path>
+        <changes>Register migration 002 in migration registry</changes>
+      </file>
+      <file>
+        <path>d:\BMAD video generator\ai-video-generator\lib\db\index.ts</path>
+        <changes>Export new scene query functions</changes>
+      </file>
+    </files-to-modify>
+
+    <database-file>
+      <path>d:\BMAD video generator\ai-video-generator\ai-video-generator.db</path>
+      <backup-before-migration>true</backup-before-migration>
+    </database-file>
+  </file-locations>
+
+  <references>
+    <prd>
+      <feature id="1.2">Automated Script Generation (lines 78-102)</feature>
+      <feature id="1.4">Automated Voiceover (lines 134-158)</feature>
+    </prd>
+    <architecture>
+      <section>Database Pattern (architecture.md lines 1129-1231)</section>
+    </architecture>
+    <epic-1>
+      <story id="1.2">Database Schema pattern (lines 119-139)</story>
+    </epic-1>
+    <tech-spec>
+      <section>Epic 2: Scene Model and Project Schema Updates</section>
+    </tech-spec>
+  </references>
+
+  <dependencies>
+    <requires>
+      <story>Story 1.2 - Database initialization and projects table</story>
+    </requires>
+    <blocks>
+      <story>Story 2.3 - Script Generation with LLM</story>
+      <story>Story 2.4 - Voice Selection UI</story>
+    </blocks>
+  </dependencies>
+
+  <definition-of-done>
+    <item>All tasks completed</item>
+    <item>All acceptance criteria met</item>
+    <item>Unit tests written and passing</item>
+    <item>Integration tests written and passing</item>
+    <item>Migration tested with rollback</item>
+    <item>Code reviewed (if applicable)</item>
+    <item>Documentation updated</item>
+    <item>Changes committed to repository</item>
+  </definition-of-done>
+
+  <dev-agent-workspace>
+    <implementation-log>
+      <!-- Dev agent will document implementation steps here -->
+    </implementation-log>
+    <files-created>
+      <!-- Dev agent will list all created files here -->
+    </files-created>
+    <files-modified>
+      <!-- Dev agent will list all modified files here -->
+    </files-modified>
+    <testing-results>
+      <!-- Dev agent will document test execution results here -->
+    </testing-results>
+    <issues-encountered>
+      <!-- Dev agent will document any problems and solutions here -->
+    </issues-encountered>
+  </dev-agent-workspace>
+</story-context>
