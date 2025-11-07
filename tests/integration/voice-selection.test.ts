@@ -12,27 +12,26 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import db from '@/lib/db/client';
 import { POST as selectVoiceHandler } from '@/app/api/projects/[id]/select-voice/route';
 import { GET as voiceListHandler } from '@/app/api/voice/list/route';
 import { getProject } from '@/lib/db/queries';
+import { setupProjectFixture } from '../fixtures/db-fixtures';
 
-describe('Voice Selection Workflow - Integration Tests', () => {
-  const testProjectId = '00000000-0000-0000-0000-000000000001';
+describe('[P1] Voice Selection Workflow - Integration Tests', () => {
+  let testProject: ReturnType<typeof setupProjectFixture>;
 
   beforeEach(() => {
-    // Clear database and create test project with confirmed topic
-    db.exec('DELETE FROM messages');
-    db.exec('DELETE FROM projects');
-
-    db.prepare(`
-      INSERT INTO projects (id, name, topic, current_step, status)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(testProjectId, 'Voice Test Project', 'Mars colonization', 'voice', 'draft');
+    // Use fixture for database setup - explicit, reusable, composable
+    testProject = setupProjectFixture({
+      name: 'Voice Test Project',
+      topic: 'Mars colonization',
+      current_step: 'voice',
+      status: 'draft',
+    });
   });
 
-  describe('AC1: Voice List API Integration', () => {
-    it('should fetch voice profiles from GET /api/voice/list', async () => {
+  describe('[P1] AC1: Voice List API Integration', () => {
+    it('[2.3-INT-001] should fetch voice profiles from GET /api/voice/list', async () => {
       const request = new Request('http://localhost:3000/api/voice/list', {
         method: 'GET',
       });
@@ -47,7 +46,7 @@ describe('Voice Selection Workflow - Integration Tests', () => {
       expect(data.data.voices.length).toBeGreaterThanOrEqual(5); // MVP voices
     });
 
-    it('should return voice metadata in correct format', async () => {
+    it('[2.3-INT-002] should return voice metadata in correct format', async () => {
       const response = await voiceListHandler();
       const data = await response.json();
 
@@ -62,14 +61,14 @@ describe('Voice Selection Workflow - Integration Tests', () => {
     });
   });
 
-  describe('AC5: Voice Selection Persistence', () => {
-    it('should save selected voice to database', async () => {
+  describe('[P0] AC5: Voice Selection Persistence', () => {
+    it('[2.3-INT-003] should save selected voice to database', async () => {
       const requestBody = {
         voiceId: 'sarah',
       };
 
       const request = new Request(
-        `http://localhost:3000/api/projects/${testProjectId}/select-voice`,
+        `http://localhost:3000/api/projects/${testProject.id}/select-voice`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -78,7 +77,7 @@ describe('Voice Selection Workflow - Integration Tests', () => {
       );
 
       const response = await selectVoiceHandler(request, {
-        params: Promise.resolve({ id: testProjectId }),
+        params: Promise.resolve({ id: testProject.id }),
       });
       const data = await response.json();
 
@@ -89,15 +88,15 @@ describe('Voice Selection Workflow - Integration Tests', () => {
       expect(data.data.currentStep).toBe('script-generation');
 
       // Verify database updated
-      const project = getProject(testProjectId);
+      const project = getProject(testProject.id);
       expect(project).toBeDefined();
       expect(project?.voice_id).toBe('sarah');
       expect(project?.voice_selected).toBe(1); // SQLite stores boolean as 0/1
       expect(project?.current_step).toBe('script-generation');
     });
 
-    it('should update last_active timestamp when voice selected', async () => {
-      const project = getProject(testProjectId);
+    it('[2.3-INT-004] should update last_active timestamp when voice selected', async () => {
+      const project = getProject(testProject.id);
       const originalLastActive = project?.last_active;
 
       // Wait a moment to ensure timestamp difference (1 second for SQLite datetime precision)
@@ -108,7 +107,7 @@ describe('Voice Selection Workflow - Integration Tests', () => {
       };
 
       const request = new Request(
-        `http://localhost:3000/api/projects/${testProjectId}/select-voice`,
+        `http://localhost:3000/api/projects/${testProject.id}/select-voice`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -117,22 +116,22 @@ describe('Voice Selection Workflow - Integration Tests', () => {
       );
 
       await selectVoiceHandler(request, {
-        params: Promise.resolve({ id: testProjectId }),
+        params: Promise.resolve({ id: testProject.id }),
       });
 
-      const updatedProject = getProject(testProjectId);
+      const updatedProject = getProject(testProject.id);
       expect(updatedProject?.last_active).not.toBe(originalLastActive);
     });
   });
 
-  describe('AC7: Error Handling', () => {
-    it('should return VOICE_NOT_FOUND error for invalid voiceId', async () => {
+  describe('[P0] AC7: Error Handling', () => {
+    it('[2.3-INT-005] should return VOICE_NOT_FOUND error for invalid voiceId', async () => {
       const requestBody = {
         voiceId: 'invalid-voice-id',
       };
 
       const request = new Request(
-        `http://localhost:3000/api/projects/${testProjectId}/select-voice`,
+        `http://localhost:3000/api/projects/${testProject.id}/select-voice`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -141,7 +140,7 @@ describe('Voice Selection Workflow - Integration Tests', () => {
       );
 
       const response = await selectVoiceHandler(request, {
-        params: Promise.resolve({ id: testProjectId }),
+        params: Promise.resolve({ id: testProject.id }),
       });
       const data = await response.json();
 
@@ -150,7 +149,7 @@ describe('Voice Selection Workflow - Integration Tests', () => {
       expect(data.error.code).toBe('VOICE_NOT_FOUND');
     });
 
-    it('should return PROJECT_NOT_FOUND error for invalid projectId', async () => {
+    it('[2.3-INT-006] should return PROJECT_NOT_FOUND error for invalid projectId', async () => {
       const nonExistentUuid = '00000000-0000-0000-0000-999999999999';
       const requestBody = {
         voiceId: 'sarah',
@@ -175,9 +174,9 @@ describe('Voice Selection Workflow - Integration Tests', () => {
       expect(data.error.code).toBe('PROJECT_NOT_FOUND');
     });
 
-    it('should validate request body format', async () => {
+    it('[2.3-INT-007] should validate request body format', async () => {
       const request = new Request(
-        `http://localhost:3000/api/projects/${testProjectId}/select-voice`,
+        `http://localhost:3000/api/projects/${testProject.id}/select-voice`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -186,7 +185,7 @@ describe('Voice Selection Workflow - Integration Tests', () => {
       );
 
       const response = await selectVoiceHandler(request, {
-        params: Promise.resolve({ id: testProjectId }),
+        params: Promise.resolve({ id: testProject.id }),
       });
       const data = await response.json();
 
@@ -196,14 +195,14 @@ describe('Voice Selection Workflow - Integration Tests', () => {
     });
   });
 
-  describe('Workflow State Guards', () => {
-    it('should allow voice selection when topic is confirmed', async () => {
+  describe('[P1] Workflow State Guards', () => {
+    it('[2.3-INT-008] should allow voice selection when topic is confirmed', async () => {
       const requestBody = {
         voiceId: 'emma',
       };
 
       const request = new Request(
-        `http://localhost:3000/api/projects/${testProjectId}/select-voice`,
+        `http://localhost:3000/api/projects/${testProject.id}/select-voice`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -212,19 +211,19 @@ describe('Voice Selection Workflow - Integration Tests', () => {
       );
 
       const response = await selectVoiceHandler(request, {
-        params: Promise.resolve({ id: testProjectId }),
+        params: Promise.resolve({ id: testProject.id }),
       });
 
       expect(response.status).toBe(200);
     });
 
-    it('should update current_step to script-generation after voice selection', async () => {
+    it('[2.3-INT-009] should update current_step to script-generation after voice selection', async () => {
       const requestBody = {
         voiceId: 'michael',
       };
 
       const request = new Request(
-        `http://localhost:3000/api/projects/${testProjectId}/select-voice`,
+        `http://localhost:3000/api/projects/${testProject.id}/select-voice`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -233,22 +232,22 @@ describe('Voice Selection Workflow - Integration Tests', () => {
       );
 
       await selectVoiceHandler(request, {
-        params: Promise.resolve({ id: testProjectId }),
+        params: Promise.resolve({ id: testProject.id }),
       });
 
-      const project = getProject(testProjectId);
+      const project = getProject(testProject.id);
       expect(project?.current_step).toBe('script-generation');
     });
   });
 
-  describe('Voice Selection Response Format', () => {
-    it('should return standard success response format', async () => {
+  describe('[P2] Voice Selection Response Format', () => {
+    it('[2.3-INT-010] should return standard success response format', async () => {
       const requestBody = {
         voiceId: 'olivia',
       };
 
       const request = new Request(
-        `http://localhost:3000/api/projects/${testProjectId}/select-voice`,
+        `http://localhost:3000/api/projects/${testProject.id}/select-voice`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -257,25 +256,26 @@ describe('Voice Selection Workflow - Integration Tests', () => {
       );
 
       const response = await selectVoiceHandler(request, {
-        params: Promise.resolve({ id: testProjectId }),
+        params: Promise.resolve({ id: testProject.id }),
       });
       const data = await response.json();
 
       expect(data).toHaveProperty('success');
       expect(data).toHaveProperty('data');
       expect(data.data).toHaveProperty('projectId');
+      expect(data.data.projectId).toBe(testProject.id);
       expect(data.data).toHaveProperty('voiceId');
       expect(data.data).toHaveProperty('voiceSelected');
       expect(data.data).toHaveProperty('currentStep');
     });
 
-    it('should return standard error response format', async () => {
+    it('[2.3-INT-011] should return standard error response format', async () => {
       const requestBody = {
         voiceId: 'invalid',
       };
 
       const request = new Request(
-        `http://localhost:3000/api/projects/${testProjectId}/select-voice`,
+        `http://localhost:3000/api/projects/${testProject.id}/select-voice`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -284,7 +284,7 @@ describe('Voice Selection Workflow - Integration Tests', () => {
       );
 
       const response = await selectVoiceHandler(request, {
-        params: Promise.resolve({ id: testProjectId }),
+        params: Promise.resolve({ id: testProject.id }),
       });
       const data = await response.json();
 

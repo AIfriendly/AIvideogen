@@ -39,7 +39,7 @@ vi.mock('@/lib/stores/voice-store', () => ({
 // Mock fetch
 global.fetch = vi.fn();
 
-describe('VoiceSelection Component', () => {
+describe('[P1] VoiceSelection Component', () => {
   const projectId = 'test-project-123';
 
   const mockVoices = [
@@ -70,8 +70,8 @@ describe('VoiceSelection Component', () => {
     (global.fetch as any).mockReset();
   });
 
-  describe('Loading State', () => {
-    it('should display loading spinner while fetching voices', () => {
+  describe('[P2] Loading State', () => {
+    it('[2.3-UNIT-018] should display loading spinner while fetching voices', () => {
       (global.fetch as any).mockImplementation(
         () =>
           new Promise(() => {
@@ -85,8 +85,8 @@ describe('VoiceSelection Component', () => {
     });
   });
 
-  describe('API Fetch on Mount', () => {
-    it('should fetch voices from /api/voice/list on mount', async () => {
+  describe('[P1] API Fetch on Mount', () => {
+    it('[2.3-UNIT-019] should fetch voices from /api/voice/list on mount', async () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -102,7 +102,7 @@ describe('VoiceSelection Component', () => {
       });
     });
 
-    it('should render voice cards after successful fetch', async () => {
+    it('[2.3-UNIT-020] should render voice cards after successful fetch', async () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -120,8 +120,8 @@ describe('VoiceSelection Component', () => {
     });
   });
 
-  describe('Error Handling', () => {
-    it('should display error message when API fetch fails', async () => {
+  describe('[P1] Error Handling', () => {
+    it('[2.3-UNIT-021] should display error message when API fetch fails', async () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: false,
         json: async () => ({
@@ -137,7 +137,7 @@ describe('VoiceSelection Component', () => {
       });
     });
 
-    it('should display error when network request fails', async () => {
+    it('[2.3-UNIT-022] should display error when network request fails', async () => {
       (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
 
       render(<VoiceSelection projectId={projectId} />);
@@ -148,8 +148,8 @@ describe('VoiceSelection Component', () => {
     });
   });
 
-  describe('Voice Selection', () => {
-    it('should display "No voice selected" initially', async () => {
+  describe('[P2] Voice Selection', () => {
+    it('[2.3-UNIT-023] should display "No voice selected" initially', async () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -165,7 +165,7 @@ describe('VoiceSelection Component', () => {
       });
     });
 
-    it('should disable confirmation button when no voice selected', async () => {
+    it('[2.3-UNIT-024] should disable confirmation button when no voice selected', async () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -183,8 +183,8 @@ describe('VoiceSelection Component', () => {
     });
   });
 
-  describe('Confirmation', () => {
-    it('should call select-voice API when confirmation button clicked', async () => {
+  describe('[P1] Confirmation', () => {
+    it('[2.3-UNIT-025] should call select-voice API when confirmation button clicked', async () => {
       // Mock voice list fetch
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
@@ -218,7 +218,7 @@ describe('VoiceSelection Component', () => {
       // This test validates the confirmation flow structure
     });
 
-    it('should navigate to script-generation page on successful selection', async () => {
+    it('[2.3-UNIT-026] should navigate to script-generation page on successful selection', async () => {
       // Mock voice list fetch
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
@@ -252,7 +252,7 @@ describe('VoiceSelection Component', () => {
       // This test structure validates navigation logic
     });
 
-    it('should display error when voice selection API fails', async () => {
+    it('[2.3-UNIT-027] should display error when voice selection API fails', async () => {
       // Mock voice list fetch
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
@@ -282,8 +282,8 @@ describe('VoiceSelection Component', () => {
     });
   });
 
-  describe('UI Elements', () => {
-    it('should render page header', async () => {
+  describe('[P3] UI Elements', () => {
+    it('[2.3-UNIT-028] should render page header', async () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -299,7 +299,7 @@ describe('VoiceSelection Component', () => {
       });
     });
 
-    it('should render description text', async () => {
+    it('[2.3-UNIT-029] should render description text', async () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -317,7 +317,7 @@ describe('VoiceSelection Component', () => {
       });
     });
 
-    it('should render voice cards in grid layout', async () => {
+    it('[2.3-UNIT-030] should render voice cards in grid layout', async () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         json: async () => ({

@@ -16,7 +16,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { VoiceCard } from '@/components/ui/VoiceCard';
 import type { VoiceProfile } from '@/lib/tts/provider';
 
-describe('VoiceCard Component', () => {
+describe('[P3] VoiceCard Component', () => {
   const mockVoice: VoiceProfile = {
     id: 'sarah',
     name: 'Sarah - American Female',
@@ -31,8 +31,8 @@ describe('VoiceCard Component', () => {
   const mockOnSelect = vi.fn();
   const mockOnPreview = vi.fn();
 
-  describe('Rendering', () => {
-    it('should render voice name', () => {
+  describe('[P3] Rendering', () => {
+    it('[2.3-UNIT-001] should render voice name', () => {
       render(
         <VoiceCard
           voice={mockVoice}
@@ -45,7 +45,7 @@ describe('VoiceCard Component', () => {
       expect(screen.getByText('Sarah - American Female')).toBeInTheDocument();
     });
 
-    it('should render voice metadata (gender, accent, tone)', () => {
+    it('[2.3-UNIT-002] should render voice metadata (gender, accent, tone)', () => {
       render(
         <VoiceCard
           voice={mockVoice}
@@ -60,7 +60,7 @@ describe('VoiceCard Component', () => {
       expect(screen.getByText('warm')).toBeInTheDocument();
     });
 
-    it('should render preview button', () => {
+    it('[2.3-UNIT-003] should render preview button', () => {
       render(
         <VoiceCard
           voice={mockVoice}
@@ -75,8 +75,8 @@ describe('VoiceCard Component', () => {
     });
   });
 
-  describe('Selection State', () => {
-    it('should apply selected styling when selected=true', () => {
+  describe('[P2] Selection State', () => {
+    it('[2.3-UNIT-004] should apply selected styling when selected=true', () => {
       const { container } = render(
         <VoiceCard
           voice={mockVoice}
@@ -90,7 +90,7 @@ describe('VoiceCard Component', () => {
       expect(card).toHaveAttribute('aria-selected', 'true');
     });
 
-    it('should show check icon when selected', () => {
+    it('[2.3-UNIT-005] should show check icon when selected', () => {
       render(
         <VoiceCard
           voice={mockVoice}
@@ -105,7 +105,7 @@ describe('VoiceCard Component', () => {
       expect(card).toBeInTheDocument();
     });
 
-    it('should not show check icon when not selected', () => {
+    it('[2.3-UNIT-006] should not show check icon when not selected', () => {
       render(
         <VoiceCard
           voice={mockVoice}
@@ -120,8 +120,8 @@ describe('VoiceCard Component', () => {
     });
   });
 
-  describe('Click Handlers', () => {
-    it('should call onSelect when card is clicked', () => {
+  describe('[P1] Click Handlers', () => {
+    it('[2.3-UNIT-007] should call onSelect when card is clicked', () => {
       render(
         <VoiceCard
           voice={mockVoice}
@@ -138,7 +138,7 @@ describe('VoiceCard Component', () => {
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
     });
 
-    it('should call onPreview when preview button is clicked', () => {
+    it('[2.3-UNIT-008] should call onPreview when preview button is clicked', () => {
       render(
         <VoiceCard
           voice={mockVoice}
@@ -155,7 +155,7 @@ describe('VoiceCard Component', () => {
       expect(mockOnPreview).toHaveBeenCalledTimes(1);
     });
 
-    it('should not call onSelect when preview button is clicked', () => {
+    it('[2.3-UNIT-009] should not call onSelect when preview button is clicked', () => {
       render(
         <VoiceCard
           voice={mockVoice}
@@ -172,8 +172,8 @@ describe('VoiceCard Component', () => {
     });
   });
 
-  describe('Accessibility', () => {
-    it('should have role="button" on card', () => {
+  describe('[P2] Accessibility', () => {
+    it('[2.3-UNIT-010] should have role="button" on card', () => {
       render(
         <VoiceCard
           voice={mockVoice}
@@ -187,7 +187,7 @@ describe('VoiceCard Component', () => {
       expect(card).toBeInTheDocument();
     });
 
-    it('should have aria-label with voice name', () => {
+    it('[2.3-UNIT-011] should have aria-label with voice name', () => {
       render(
         <VoiceCard
           voice={mockVoice}
@@ -201,7 +201,7 @@ describe('VoiceCard Component', () => {
       expect(card).toBeInTheDocument();
     });
 
-    it('should have aria-selected attribute', () => {
+    it('[2.3-UNIT-012] should have aria-selected attribute', () => {
       const { container } = render(
         <VoiceCard
           voice={mockVoice}
@@ -215,7 +215,7 @@ describe('VoiceCard Component', () => {
       expect(card).toHaveAttribute('aria-selected', 'true');
     });
 
-    it('should have tabIndex for keyboard navigation', () => {
+    it('[2.3-UNIT-013] should have tabIndex for keyboard navigation', () => {
       const { container } = render(
         <VoiceCard
           voice={mockVoice}
@@ -230,8 +230,8 @@ describe('VoiceCard Component', () => {
     });
   });
 
-  describe('Keyboard Navigation', () => {
-    it('should call onSelect when Enter key is pressed', () => {
+  describe('[P2] Keyboard Navigation', () => {
+    it('[2.3-UNIT-014] should call onSelect when Enter key is pressed', () => {
       render(
         <VoiceCard
           voice={mockVoice}
@@ -247,7 +247,7 @@ describe('VoiceCard Component', () => {
       expect(mockOnSelect).toHaveBeenCalledWith('sarah');
     });
 
-    it('should call onSelect when Space key is pressed', () => {
+    it('[2.3-UNIT-015] should call onSelect when Space key is pressed', () => {
       render(
         <VoiceCard
           voice={mockVoice}
@@ -263,7 +263,7 @@ describe('VoiceCard Component', () => {
       expect(mockOnSelect).toHaveBeenCalledWith('sarah');
     });
 
-    it('should not call onSelect for other keys', () => {
+    it('[2.3-UNIT-016] should not call onSelect for other keys', () => {
       render(
         <VoiceCard
           voice={mockVoice}
@@ -280,8 +280,8 @@ describe('VoiceCard Component', () => {
     });
   });
 
-  describe('Preview Button Accessibility', () => {
-    it('should have aria-label on preview button', () => {
+  describe('[P2] Preview Button Accessibility', () => {
+    it('[2.3-UNIT-017] should have aria-label on preview button', () => {
       render(
         <VoiceCard
           voice={mockVoice}
