@@ -51,8 +51,9 @@ development_status:
   epic-2: contexted
   2-1-tts-engine-integration-voice-profiles: done
   2-2-database-schema-updates: done
-  2-3-voice-selection-ui-workflow: ready-for-dev
-  2-4-llm-script-generation-professional-quality: ready-for-dev
+  2-3-voice-selection-ui-workflow: done
+  2-4-llm-script-generation-professional-quality: done
+  2-5-voiceover-generation-for-scenes: ready-for-dev
   epic-2-retrospective: optional
 
   # Epic 3: Visual Content Sourcing (YouTube API)

@@ -22,9 +22,9 @@ PHASE_4_COMPLETE: false
 ## Story Queue (Epic 2)
 
 TODO_STORY: -
-IN_PROGRESS_STORY: -
-DONE_STORY: 2.1, 2.2, 2.3
-BACKLOG_STORY: 2.5
+IN_PROGRESS_STORY: 2.5
+DONE_STORY: 2.1, 2.2, 2.3, 2.4
+BACKLOG_STORY: 2.6
 
 ## Epic 1 Status
 
@@ -36,13 +36,13 @@ ALL_STORIES_DONE: 7/7
 
 EPIC_2_IN_PROGRESS: true
 EPIC_2_STORIES_TOTAL: 6
-EPIC_2_STORIES_DONE: 2.1, 2.2, 2.3
-EPIC_2_STORIES_READY: 2.4
-EPIC_2_STORIES_TODO: 2.5, 2.6
+EPIC_2_STORIES_DONE: 2.1, 2.2, 2.3, 2.4
+EPIC_2_STORIES_READY: 2.5
+EPIC_2_STORIES_TODO: 2.6
 
 ## Next Action
 
-NEXT_ACTION: Implement Story 2.4 - Script Generation
+NEXT_ACTION: Implement Story 2.5 - Voiceover Generation
 NEXT_COMMAND: Run story-context (recommended) or dev-story workflow
 NEXT_AGENT: sm (for context) or dev (for implementation)
 NEXT_EPIC: Epic 2 - Content Generation Pipeline
@@ -55,11 +55,11 @@ NEXT_EPIC: Epic 2 - Content Generation Pipeline
    - Audio preview playback
    - Voice ID saved to database
    - current_step advances to 'script-generation'
-3. Script Generation (Story 2.4) → READY
+3. Script Generation (Story 2.4) → DONE
    - Generate video script based on topic
    - Break into scenes
    - Save to database
-4. Voiceover Generation (Story 2.5) → TODO
+4. Voiceover Generation (Story 2.5) → IN_PROGRESS
    - Generate TTS audio for each scene
    - Save audio files
 5. Video Assembly (Story 2.6) → TODO
@@ -67,4 +67,4 @@ NEXT_EPIC: Epic 2 - Content Generation Pipeline
 
 ---
 
-_Last Updated: 2025-11-07 (Story 2.3 completed)_
+_Last Updated: 2025-11-07 (Story 2.5 marked ready for implementation)_

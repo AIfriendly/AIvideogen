@@ -1,0 +1,875 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context id="2.5" title="Voiceover Generation for Scenes">
+  <metadata>
+    <epic>Epic 2 - Content Generation Pipeline</epic>
+    <dependencies>Story 2.1, 2.2, 2.3, 2.4</dependencies>
+    <status>ready-for-dev</status>
+    <created>2025-11-07</created>
+    <workflow-version>6.0.0</workflow-version>
+  </metadata>
+
+  <!-- ========================================
+       STORY 2.5 DOCUMENT
+       ======================================== -->
+  <story-document>
+    <title>Story 2.5: Voiceover Generation for Scenes</title>
+    <epic>Epic 2 - Content Generation Pipeline</epic>
+    <story-id>2.5</story-id>
+    <status>Ready</status>
+    <created>2025-11-07</created>
+    <last-updated>2025-11-07</last-updated>
+    <assigned-to>Dev Agent</assigned-to>
+    <sprint>Epic 2 Sprint 2</sprint>
+
+    <story-overview>
+      <goal>Generate TTS audio files for each script scene using selected voice with comprehensive text sanitization and progress tracking</goal>
+
+      <description>
+        Implement the voiceover generation workflow that converts script scenes into audio files using the voice profile selected in Story 2.3. The system loads all scenes from the database, sanitizes the text to remove non-speakable content (markdown, scene labels, stage directions), and generates MP3 audio files using KokoroTTS from Story 2.1. Each scene is processed sequentially with progress tracking via polling endpoint, audio files are saved to organized directories, and scene records are updated with file paths and durations. The system implements partial completion recovery to allow resuming generation if interrupted, and calculates total project duration for workflow planning.
+      </description>
+
+      <business-value>
+        <item>Converts written scripts into professional narration audio automatically</item>
+        <item>Ensures voice consistency across all scenes using single voice profile</item>
+        <item>Produces clean audio without TTS artifacts or spoken formatting</item>
+        <item>Enables progress monitoring during multi-scene generation</item>
+        <item>Provides resume capability for long-running generation jobs</item>
+        <item>Calculates accurate video duration for production planning</item>
+        <item>Establishes audio foundation for video assembly in Epic 3</item>
+      </business-value>
+    </story-overview>
+
+    <user-story>
+      As a video creator,
+      I want the system to generate professional audio narration for each script scene using my selected voice,
+      so that I have complete voiceover audio ready for video production without manual recording.
+    </user-story>
+
+    <acceptance-criteria>
+      <criterion id="AC1">
+        <title>Voiceover generation endpoint accepts projectId as input</title>
+        <given>Project has completed script generation (Story 2.4)</given>
+        <when>POST /api/projects/[id]/generate-voiceovers is called</when>
+        <then>The endpoint validates project exists and has scenes</then>
+        <and>Endpoint validates voice has been selected</and>
+        <and>Endpoint returns 400 if prerequisites not met with error codes</and>
+      </criterion>
+
+      <criterion id="AC2">
+        <title>Text sanitization removes all non-speakable characters before TTS</title>
+        <given>Scene text may contain markdown, labels, or formatting</given>
+        <when>Text is prepared for TTS generation</when>
+        <then>Markdown characters (*, #, _, `, **) are removed</then>
+        <and>Scene labels ("Scene 1:", "Title:", "Narrator:") are removed</and>
+        <and>Stage directions [in brackets] are removed</and>
+        <and>Multiple newlines/whitespace collapsed to single space</and>
+        <and>Leading/trailing whitespace trimmed</and>
+        <and>Only speakable punctuation (.,!?;:) is preserved</and>
+      </criterion>
+
+      <criterion id="AC3">
+        <title>Generated audio contains ONLY clean narration</title>
+        <given>Scene text has been sanitized</given>
+        <when>TTS audio is generated</when>
+        <then>Audio contains NO spoken asterisks, hashtags, or formatting</then>
+        <and>Audio contains NO spoken scene numbers or labels</and>
+        <and>Audio contains NO artifacts from markdown syntax</and>
+        <and>Audio sounds natural and professionally narrated</and>
+      </criterion>
+
+      <criterion id="AC4">
+        <title>TTS generates MP3 file for each scene using selected voice consistently</title>
+        <given>Project has selected voice_id (Story 2.3)</given>
+        <when>Each scene is processed for voiceover generation</when>
+        <then>KokoroTTS generates audio using the project's voice_id</then>
+        <and>All scenes use the SAME voice_id for consistency</and>
+        <and>Audio format is MP3, 128kbps, 44.1kHz, Mono (Story 2.1 standard)</and>
+        <and>Each scene generates exactly one audio file</and>
+      </criterion>
+
+      <criterion id="AC5">
+        <title>Audio files saved with organized naming convention</title>
+        <given>Audio generation succeeds for a scene</given>
+        <when>Audio file is saved to disk</when>
+        <then>File is saved to .cache/audio/projects/{projectId}/scene-{number}.mp3</then>
+        <and>Directory structure is created automatically if missing</and>
+        <and>Scene number matches scene.scene_number field</and>
+        <and>File naming is consistent and predictable</and>
+      </criterion>
+
+      <criterion id="AC6">
+        <title>Each scene record updated with audio_file_path and duration</title>
+        <given>Audio file has been saved successfully</given>
+        <when>Database update is performed</when>
+        <then>scenes.audio_file_path is updated with relative path</then>
+        <and>scenes.duration is updated with audio duration in seconds</and>
+        <and>Path format is .cache/audio/projects/{projectId}/scene-{number}.mp3</and>
+        <and>Duration is accurate (measured from generated audio file)</and>
+      </criterion>
+
+      <criterion id="AC7">
+        <title>Progress indicator shows current scene being processed</title>
+        <given>Multiple scenes are being processed</given>
+        <when>Generation is in progress</when>
+        <then>API returns current scene number being processed via polling endpoint</then>
+        <and>Progress percentage calculated as (completed / total) * 100</and>
+        <and>UI displays "Processing Scene X of Y..."</and>
+        <and>Progress updates through polling mechanism</and>
+      </criterion>
+
+      <criterion id="AC8">
+        <title>Partial failures allow resume (don't regenerate completed scenes)</title>
+        <given>Generation fails partway through (e.g., scene 3 of 5)</given>
+        <when>User retries voiceover generation</when>
+        <then>System detects scenes 1-2 already have audio files</then>
+        <and>System SKIPS regeneration for completed scenes</and>
+        <and>System resumes from first incomplete scene (scene 3)</and>
+        <and>Total generation time reduced by skipping completed work</and>
+      </criterion>
+
+      <criterion id="AC9">
+        <title>Total project duration calculated and stored</title>
+        <given>All scenes have generated audio with durations</given>
+        <when>Final scene completes generation</when>
+        <then>System calculates sum of all scene durations</then>
+        <and>projects.total_duration is updated with sum (in seconds)</and>
+        <and>Total duration is available for video planning</and>
+      </criterion>
+
+      <criterion id="AC10">
+        <title>Project workflow advances to visual-sourcing step</title>
+        <given>All scenes have generated audio successfully</given>
+        <when>Voiceover generation completes</when>
+        <then>projects.current_step is updated to 'visual-sourcing'</then>
+        <and>projects.last_active timestamp is updated</and>
+        <and>User can proceed to Epic 3 (visual sourcing - placeholder)</and>
+      </criterion>
+    </acceptance-criteria>
+  </story-document>
+
+  <!-- ========================================
+       ARCHITECTURE PATTERNS
+       ======================================== -->
+  <architecture-patterns>
+    <section title="Layered Architecture Pattern" source="architecture.md">
+      <pattern name="API Layer">
+        <description>Validates input, delegates to business logic, returns response</description>
+        <responsibility>API Layer (Task 2)</responsibility>
+        <example>
+          Task 2.1: Create POST endpoint handler
+          Task 2.2: Validate prerequisites (projectId, script_generated, voice_id)
+          Task 2.6: Update project status after completion
+          Task 2.7: Return success response
+        </example>
+      </pattern>
+
+      <pattern name="Business Logic Layer">
+        <description>Handles scene processing, TTS calls, file management, progress tracking</description>
+        <responsibility>Business Logic Layer (Task 3)</responsibility>
+        <example>
+          Task 3: Implement Voiceover Generation Business Logic
+          - generateVoiceoversWithProgress(projectId, scenes, voiceId, onProgress)
+          - Handles ALL LLM interaction and retry logic
+          - Encapsulates TTS complexity
+        </example>
+      </pattern>
+
+      <pattern name="Data Layer">
+        <description>Database queries for scenes and project updates</description>
+        <responsibility>Data Layer (Task 4)</responsibility>
+        <example>
+          Story 2.2 Query Functions:
+          - getProjectById(projectId)
+          - getScenesByProjectId(projectId)
+          - updateSceneAudio(sceneId, audioPath, duration)
+          - updateProjectDuration(projectId, totalDuration)
+        </example>
+      </pattern>
+
+      <pattern name="Presentation Layer">
+        <description>UI components for generation trigger and progress display</description>
+        <responsibility>Presentation Layer (Task 6)</responsibility>
+        <example>
+          components/features/voiceover/VoiceoverGenerator.tsx
+          - Client Component with 'use client' directive
+          - Handles user interactions
+          - Polls for progress updates
+          - Displays completion summary
+        </example>
+      </pattern>
+    </section>
+
+    <section title="TTS Provider Integration" source="architecture.md">
+      <pattern name="Factory Pattern">
+        <code-example>
+import { getTTSProvider } from '@/lib/tts/provider';
+
+const tts = getTTSProvider();
+const audio = await tts.generateAudio(sanitizedText, voiceId);
+// Result: { audioBuffer, duration, tempFilePath }
+        </code-example>
+        <specifications>
+          - Audio format: MP3, 128kbps, 44.1kHz, Mono (standardized)
+          - Provider handles KokoroTTS service communication
+          - Returns audioBuffer, duration, tempFilePath
+        </specifications>
+      </pattern>
+    </section>
+
+    <section title="Text Sanitization Pattern" source="story-2.5.md">
+      <pattern name="Sanitize Before TTS">
+        <description>Sanitize text BEFORE TTS call (not after)</description>
+        <steps>
+          1. Load scene text from database
+          2. Call sanitizeForTTS(text) from Task 1
+          3. Validate sanitized text has no artifacts
+          4. Pass cleaned text to TTS provider
+          5. Store both original and sanitized text (optional)
+        </steps>
+        <validation>
+          - Check for remaining markdown characters
+          - Check for remaining scene labels
+          - Check for remaining stage directions
+          - Return false if any non-speakable content detected
+        </validation>
+      </pattern>
+    </section>
+
+    <section title="Progress Tracking Pattern (Polling Approach for MVP)" source="story-2.5.md">
+      <pattern name="Polling Endpoint">
+        <description>Store progress state in database or in-memory cache, UI polls every 1 second</description>
+        <implementation>
+          - Store: projectId, currentScene, totalScenes, status (generating, complete, error)
+          - Endpoint: GET /api/projects/[id]/voiceover-progress
+          - Progress: (completed / total) * 100
+          - Poll interval: 1 second
+          - Stop polling when complete or error
+        </implementation>
+        <future-enhancement>Server-Sent Events (SSE) for real-time updates</future-enhancement>
+      </pattern>
+    </section>
+
+    <section title="Partial Completion Pattern" source="story-2.5.md">
+      <pattern name="Resume from Last Incomplete Scene">
+        <steps>
+          1. Check database for existing audio_file_path
+          2. Verify file exists on disk (fs.existsSync)
+          3. Skip generation if both conditions true
+          4. Resume from first incomplete scene
+          5. Log: "Skipping scene X - audio already exists"
+        </steps>
+        <benefit>Reduces generation time by skipping completed work</benefit>
+      </pattern>
+    </section>
+
+    <section title="Error Handling Strategy" source="story-2.5.md">
+      <error-types>
+        <transient>
+          <type>TTS_TIMEOUT</type>
+          <action>Retry once with 2-second delay</action>
+        </transient>
+        <transient>
+          <type>TTS_SERVICE_ERROR</type>
+          <action>Retry once with 2-second delay</action>
+        </transient>
+        <permanent>
+          <type>TTS_MODEL_NOT_FOUND</type>
+          <action>Abort with actionable error</action>
+        </permanent>
+      </error-types>
+      <error-codes>
+        <code status="400" name="SCRIPT_NOT_GENERATED">Script must be generated before voiceovers</code>
+        <code status="400" name="VOICE_NOT_SELECTED">Voice must be selected before voiceovers</code>
+        <code status="400" name="NO_SCENES_FOUND">No scenes exist for this project</code>
+        <code status="500" name="TTS_SERVICE_ERROR">TTS generation failed</code>
+        <code status="500" name="DATABASE_ERROR">Database operation failed</code>
+        <code status="404" name="PROJECT_NOT_FOUND">Project not found</code>
+      </error-codes>
+    </section>
+
+    <section title="Component Architecture" source="architecture.md">
+      <component-pattern>
+        <page-component type="Server Component">
+          <location>app/projects/[id]/voiceover/page.tsx</location>
+          <responsibilities>
+            - Fetch project data using getProjectById()
+            - Verify workflow state (script generated, voice selected)
+            - Render VoiceoverGenerator client component with projectId prop
+          </responsibilities>
+        </page-component>
+
+        <feature-component type="Client Component">
+          <location>components/features/voiceover/VoiceoverGenerator.tsx</location>
+          <directive>'use client'</directive>
+          <responsibilities>
+            - Trigger voiceover generation via POST /api/projects/[id]/generate-voiceovers
+            - Poll for progress via GET /api/projects/[id]/voiceover-progress
+            - Display progress bar and status messages
+            - Handle errors and display retry options
+          </responsibilities>
+        </feature-component>
+
+        <state-management>
+          <location>lib/stores/voiceover-store.ts</location>
+          <note>NOT stores/voiceover-store.ts</note>
+          <state>
+            - generationStatus: 'idle' | 'generating' | 'complete' | 'error'
+            - currentScene: number | null
+            - totalScenes: number
+            - progress: number (0-100)
+            - errorMessage: string | null
+          </state>
+          <actions>
+            - startGeneration(totalScenes)
+            - updateProgress(currentScene, totalScenes)
+            - completeGeneration()
+            - setError(message)
+            - resetState()
+          </actions>
+        </state-management>
+      </component-pattern>
+    </section>
+
+    <section title="File Structure" source="story-2.5.md">
+      <new-files>
+        - lib/tts/sanitize-text.ts - Text sanitization utilities
+        - lib/tts/voiceover-generator.ts - Business logic layer
+        - app/api/projects/[id]/generate-voiceovers/route.ts - API endpoint
+        - app/api/projects/[id]/voiceover-progress/route.ts - Progress polling endpoint
+        - components/features/voiceover/VoiceoverGenerator.tsx - Client Component
+        - app/projects/[id]/voiceover/page.tsx - Server Component page
+        - lib/stores/voiceover-store.ts - Voiceover state management (NOT stores/)
+      </new-files>
+
+      <modified-files>
+        - lib/db/queries.ts - Add scene and duration query functions (if missing from Story 2.2)
+        - types/database.ts - Add VoiceoverResult interface
+      </modified-files>
+
+      <audio-storage-structure>
+.cache/
+  audio/
+    previews/           # Voice preview files (Story 2.1)
+      {voiceId}.mp3
+    projects/           # Project voiceover files
+      {projectId}/
+        scene-1.mp3
+        scene-2.mp3
+        scene-3.mp3
+      </audio-storage-structure>
+    </section>
+  </architecture-patterns>
+
+  <!-- ========================================
+       RELATED STORIES
+       ======================================== -->
+  <related-stories>
+    <story id="2.3" title="Voice Selection UI &amp; Workflow Integration">
+      <relevant-sections>
+        <section title="Voice Selection Component Pattern">
+          <description>
+            Story 2.3 establishes the pattern of Server Component pages rendering Client Component features.
+            The voice selection page (app/projects/[id]/voice/page.tsx) fetches data and renders
+            VoiceSelection client component with props.
+          </description>
+          <pattern-for-2.5>
+            Story 2.5 follows the same pattern:
+            - Server Component page: app/projects/[id]/voiceover/page.tsx
+            - Client Component feature: components/features/voiceover/VoiceoverGenerator.tsx
+            - State management: lib/stores/voiceover-store.ts (Zustand)
+          </pattern-for-2.5>
+        </section>
+
+        <section title="Workflow State Guards">
+          <description>
+            Story 2.3 implements workflow guards in page components:
+            - Check project.current_step === 'voice' or 'topic'
+            - Redirect to appropriate step if accessing out of sequence
+          </description>
+          <pattern-for-2.5>
+            Story 2.5 implements similar guards:
+            - Check project.current_step === 'voiceover' or 'script'
+            - Redirect if accessing out of sequence
+            - Verify script_generated === true
+            - Verify voice_id !== null
+          </pattern-for-2.5>
+        </section>
+
+        <section title="Audio Preview Pattern">
+          <description>
+            Story 2.3 serves preview audio from public/audio/previews/{voiceId}.mp3
+            Uses Next.js static file serving (no custom API endpoint)
+          </description>
+          <pattern-for-2.5>
+            Story 2.5 generates and serves scene audio:
+            - Generated audio: .cache/audio/projects/{projectId}/scene-{number}.mp3
+            - Saved to database: scenes.audio_file_path
+            - Served via Next.js static serving or custom endpoint
+          </pattern-for-2.5>
+        </section>
+      </relevant-sections>
+    </story>
+
+    <story id="2.4" title="Script Generation">
+      <relevant-sections>
+        <section title="Layered Architecture for API">
+          <description>
+            Story 2.4 establishes layered architecture:
+            - API Layer (route.ts): Validates input, calls business logic, saves results
+            - Business Logic Layer (script-generator.ts): Handles LLM interaction, retry logic
+          </description>
+          <pattern-for-2.5>
+            Story 2.5 follows the same layered approach:
+            - API Layer (generate-voiceovers/route.ts): Validates input, delegates to business logic
+            - Business Logic Layer (voiceover-generator.ts): Handles TTS calls, file I/O, progress
+          </pattern-for-2.5>
+        </section>
+
+        <section title="Database Initialization Pattern">
+          <description>
+            Story 2.4 API route uses:
+            await initializeDatabase() at module level (Epic 1 pattern)
+          </description>
+          <pattern-for-2.5>
+            Story 2.5 API route must follow same pattern:
+            Import and await initializeDatabase() before route handler
+          </pattern-for-2.5>
+        </section>
+
+        <section title="Error Handling with Error Codes">
+          <description>
+            Story 2.4 uses standard error format with specific codes:
+            - 400: SCRIPT_NOT_GENERATED, TOPIC_NOT_CONFIRMED
+            - 404: PROJECT_NOT_FOUND
+            - 500: LLM_FAILURE, DATABASE_ERROR
+          </description>
+          <pattern-for-2.5>
+            Story 2.5 uses similar error codes:
+            - 400: SCRIPT_NOT_GENERATED, VOICE_NOT_SELECTED, NO_SCENES_FOUND
+            - 404: PROJECT_NOT_FOUND
+            - 500: TTS_SERVICE_ERROR, DATABASE_ERROR
+          </pattern-for-2.5>
+        </section>
+
+        <section title="Text Sanitization">
+          <description>
+            Story 2.4 generates clean scene text (no markdown, no meta-labels)
+            BUT does not guarantee 100% sanitization due to LLM variability
+          </description>
+          <critical-for-2.5>
+            Story 2.5 MUST sanitize scene text BEFORE TTS:
+            - Remove markdown characters (*, #, _, `, **)
+            - Remove scene labels ("Scene 1:", "Title:", "Narrator:")
+            - Remove stage directions [in brackets]
+            - Collapse whitespace
+            - Validate sanitized text has no artifacts
+          </critical-for-2.5>
+        </section>
+      </relevant-sections>
+    </story>
+  </related-stories>
+
+  <!-- ========================================
+       IMPLEMENTATION CONTEXT
+       ======================================== -->
+  <implementation-context>
+    <tts-provider source="voice-profiles.ts">
+      <title>KokoroTTS Voice Profile Catalog</title>
+      <description>
+        Story 2.1 provides comprehensive KokoroTTS voice catalog with 48+ voices.
+        MVP uses 5 voices: Sarah, James, Emma, Michael, Olivia
+      </description>
+
+      <mvp-voices>
+        <voice id="sarah" model-id="af_sky" gender="female" accent="american" tone="warm" />
+        <voice id="james" model-id="am_adam" gender="male" accent="british" tone="professional" />
+        <voice id="emma" model-id="af_bella" gender="female" accent="american" tone="energetic" />
+        <voice id="michael" model-id="am_michael" gender="male" accent="american" tone="calm" />
+        <voice id="olivia" model-id="bf_emma" gender="female" accent="british" tone="friendly" />
+      </mvp-voices>
+
+      <provider-interface>
+        <code-example>
+import { getTTSProvider } from '@/lib/tts/provider';
+
+const tts = getTTSProvider();
+const audio = await tts.generateAudio(sanitizedText, voiceId);
+
+// Returns:
+// {
+//   audioBuffer: Buffer,
+//   duration: number, // seconds
+//   tempFilePath: string
+// }
+        </code-example>
+
+        <audio-specifications>
+          - Format: MP3
+          - Bitrate: 128kbps
+          - Sample Rate: 44.1kHz
+          - Channels: Mono
+        </audio-specifications>
+      </provider-interface>
+
+      <helper-functions>
+        - getVoiceById(id: string): VoiceProfile | undefined
+        - getMVPVoices(): VoiceProfile[]
+        - getVoicesByGender(gender): VoiceProfile[]
+        - getVoicesByAccent(accent): VoiceProfile[]
+      </helper-functions>
+    </tts-provider>
+
+    <database-schema source="story-2.2.md">
+      <title>Database Schema Updates for Content Generation</title>
+      <description>
+        Story 2.2 extends database schema to support voice selection, scripts, and audio file tracking
+      </description>
+
+      <projects-table>
+        <field name="id" type="TEXT PRIMARY KEY" />
+        <field name="voice_id" type="TEXT" description="Selected voice (Story 2.3)" />
+        <field name="script_generated" type="BOOLEAN" description="Script generation flag (Story 2.4)" />
+        <field name="total_duration" type="REAL" description="Sum of scene durations (Story 2.5)" />
+        <field name="current_step" type="TEXT" description="Workflow tracking" />
+        <field name="last_active" type="TEXT" description="Last activity timestamp" />
+      </projects-table>
+
+      <scenes-table>
+        <field name="id" type="TEXT PRIMARY KEY" />
+        <field name="project_id" type="TEXT FOREIGN KEY" />
+        <field name="scene_number" type="INTEGER" />
+        <field name="text" type="TEXT" description="Scene narration text" />
+        <field name="audio_file_path" type="TEXT" description="Relative path to audio file (Story 2.5)" />
+        <field name="duration" type="REAL" description="Audio duration in seconds (Story 2.5)" />
+        <field name="sanitized_text" type="TEXT" description="Optional: cleaned text for TTS" />
+        <field name="created_at" type="TEXT" />
+        <field name="updated_at" type="TEXT" />
+        <index on="project_id" />
+        <index on="scene_number" />
+      </scenes-table>
+
+      <query-functions source="lib/db/queries.ts">
+        <function name="getProjectById" signature="(db: Database, projectId: string): Project">
+          <description>Load project with voice_id, script_generated, total_duration</description>
+          <usage-in-2.5>Task 2.2: Validate project exists and prerequisites met</usage-in-2.5>
+        </function>
+
+        <function name="getScenesByProjectId" signature="(db: Database, projectId: string): Scene[]">
+          <description>Load all scenes ordered by scene_number ASC</description>
+          <usage-in-2.5>Task 2.3: Load scenes for sequential processing</usage-in-2.5>
+          <required-for-2.5>YES - If missing, add in Task 4.2</required-for-2.5>
+        </function>
+
+        <function name="updateSceneAudio" signature="(db: Database, id: string, audioPath: string, duration: number): Scene">
+          <description>Update scenes.audio_file_path and scenes.duration</description>
+          <usage-in-2.5>Task 3.6: Update scene record after audio generation</usage-in-2.5>
+          <required-for-2.5>YES - If missing, add in Task 4.2</required-for-2.5>
+        </function>
+
+        <function name="updateProjectDuration" signature="(db: Database, projectId: string, totalDuration: number): Project">
+          <description>Update projects.total_duration with sum of scene durations</description>
+          <usage-in-2.5>Task 3.7: Calculate and store total duration after generation</usage-in-2.5>
+          <required-for-2.5>YES - If missing, add in Task 4.2</required-for-2.5>
+        </function>
+
+        <function name="updateProjectStep" signature="(db: Database, projectId: string, step: string): Project">
+          <description>Update projects.current_step for workflow tracking</description>
+          <usage-in-2.5>Task 2.6: Advance to 'visual-sourcing' after completion</usage-in-2.5>
+        </function>
+      </query-functions>
+    </database-schema>
+  </implementation-context>
+
+  <!-- ========================================
+       EPIC CONTEXT
+       ======================================== -->
+  <epic-context source="epics.md">
+    <epic-definition>
+      <title>Epic 2: Content Generation Pipeline</title>
+      <goal>
+        Automatically generate complete video scripts with scene structure and corresponding voiceovers
+        with user's choice of voice.
+      </goal>
+
+      <features-included>
+        - 1.2. Automated Script Generation
+        - 1.3. Automated Voiceover
+        - 2.1. Voice Selection (moved from post-MVP to MVP)
+      </features-included>
+
+      <user-value>
+        Creators receive production-ready scripts and narration without manual writing or recording,
+        with the ability to choose a voice that matches their content's tone.
+      </user-value>
+
+      <story-sequence>
+        <story id="2.1" title="TTS Engine Integration &amp; Voice Profile Setup" status="DONE" />
+        <story id="2.2" title="Database Schema Updates for Content Generation" status="DONE" />
+        <story id="2.3" title="Voice Selection UI &amp; Workflow Integration" status="DONE" />
+        <story id="2.4" title="LLM-Based Script Generation (Professional Quality)" status="DONE" />
+        <story id="2.5" title="Voiceover Generation for Scenes" status="READY" />
+        <story id="2.6" title="Script &amp; Voiceover UI Display (Preview)" status="TODO" />
+      </story-sequence>
+
+      <epic-2-workflow>
+        1. Topic Confirmation (Epic 1 Story 1.7) → DONE
+        2. Voice Selection (Story 2.3) → DONE
+           - User selects from 5 MVP voices
+           - Audio preview playback
+           - Voice ID saved to database
+           - current_step advances to 'script-generation'
+        3. Script Generation (Story 2.4) → DONE
+           - Generate video script based on topic
+           - Break into scenes
+           - Save to database
+        4. Voiceover Generation (Story 2.5) → IN_PROGRESS
+           - Generate TTS audio for each scene
+           - Save audio files
+           - Update database with paths and durations
+           - Calculate total duration
+        5. Script &amp; Voiceover Preview (Story 2.6) → TODO
+           - Display script with audio players
+           - Allow preview before visual sourcing
+      </epic-2-workflow>
+    </epic-definition>
+
+    <story-2.5-definition>
+      <goal>Generate TTS audio files for each script scene using selected voice with text sanitization</goal>
+
+      <tasks>
+        <task id="1">Create Text Sanitization Module (AC: #2, #3)</task>
+        <task id="2">Create Voiceover Generation API Endpoint (AC: #1, #4, #5, #6, #7, #8, #9, #10)</task>
+        <task id="3">Implement Voiceover Generation Business Logic (AC: #4, #5, #6, #7, #8, #9)</task>
+        <task id="4">Verify Dependency Query Functions (AC: #6, #9)</task>
+        <task id="5">Create Progress Polling Endpoint (AC: #7)</task>
+        <task id="6">Create Voiceover Generation UI Component (AC: #7)</task>
+        <task id="7">Create Voiceover Page Component (AC: #1, #10)</task>
+        <task id="8">Create Voiceover Store for State Management (AC: #7)</task>
+        <task id="9">Add Integration Tests (AC: All)</task>
+        <task id="10">Add Unit Tests (AC: #2, #3)</task>
+        <task id="11">Add Performance Optimization (AC: #4)</task>
+        <task id="12">Add Error Recovery (AC: #8)</task>
+      </tasks>
+
+      <acceptance-criteria-summary>
+        - Voiceover generation endpoint accepts projectId as input
+        - Text sanitization removes all non-speakable characters before TTS
+        - Generated audio contains ONLY clean narration (no artifacts)
+        - TTS generates MP3 file for each scene using selected voice consistently
+        - Audio files saved with organized naming convention
+        - Each scene record updated with audio_file_path and duration
+        - Progress indicator shows current scene being processed
+        - Partial failures allow resume (don't regenerate completed scenes)
+        - Total project duration calculated and stored
+        - Project workflow advances to visual-sourcing step
+      </acceptance-criteria-summary>
+    </story-2.5-definition>
+  </epic-context>
+
+  <!-- ========================================
+       DEVELOPMENT NOTES
+       ======================================== -->
+  <dev-notes>
+    <critical-dependencies>
+      <dependency story="2.1" status="DONE">
+        <requirement>TTS Engine Integration (getTTSProvider, KokoroTTS, voice profiles)</requirement>
+        <verification>Confirm getTTSProvider() factory exists in lib/tts/provider.ts</verification>
+      </dependency>
+
+      <dependency story="2.2" status="DONE">
+        <requirement>Database Schema Updates (scenes table, query functions)</requirement>
+        <verification>
+          Verify query functions exist in lib/db/queries.ts:
+          - getProjectById()
+          - getScenesByProjectId() [If missing, Task 4.2 adds it]
+          - updateSceneAudio() [If missing, Task 4.2 adds it]
+          - updateProjectDuration() [If missing, Task 4.2 adds it]
+          - updateProjectStep()
+        </verification>
+      </dependency>
+
+      <dependency story="2.3" status="DONE">
+        <requirement>Voice Selection UI (voice_id selection)</requirement>
+        <verification>Confirm projects.voice_id column exists and is populated</verification>
+      </dependency>
+
+      <dependency story="2.4" status="DONE">
+        <requirement>Script Generation (script scenes in database)</requirement>
+        <verification>Confirm projects.script_generated flag and scenes table populated</verification>
+      </dependency>
+    </critical-dependencies>
+
+    <workflow-integration>
+      <current-step>voiceover</current-step>
+      <previous-step>script-generation (Story 2.4)</previous-step>
+      <next-step>visual-sourcing (Epic 3 placeholder)</next-step>
+
+      <navigation-flow>
+        /projects/{id}/script-review → [User clicks "Generate Voiceover"] →
+        /projects/{id}/voiceover → [Voiceover generation] →
+        /projects/{id}/voiceover-complete (or redirect to Epic 3 placeholder)
+      </navigation-flow>
+
+      <state-guards>
+        <guard location="app/projects/[id]/voiceover/page.tsx">
+          - Check project.current_step === 'voiceover' or 'script'
+          - Redirect to appropriate step if accessing out of sequence
+          - If current_step === 'visual-sourcing', show completion state
+        </guard>
+      </state-guards>
+    </workflow-integration>
+
+    <testing-strategy>
+      <unit-tests>
+        - Text sanitization edge cases (all patterns)
+        - Whitespace normalization variants
+        - Validation function accuracy
+        - Error detection and reporting
+      </unit-tests>
+
+      <integration-tests>
+        - Full voiceover generation workflow
+        - Partial completion resume behavior
+        - Progress tracking accuracy
+        - Database update verification
+        - File system interaction
+      </integration-tests>
+
+      <manual-testing>
+        - Generate voiceovers for project with 5 scenes
+        - Listen to generated audio for quality
+        - Verify no spoken artifacts (asterisks, labels)
+        - Test resume after interruption (kill process mid-generation)
+        - Verify total duration accuracy
+      </manual-testing>
+    </testing-strategy>
+
+    <security-considerations>
+      <path-traversal-prevention>
+        - Validate projectId is UUID format (no directory traversal)
+        - Construct audio paths using path.join (not string concatenation)
+        - Verify final path is within .cache/audio/projects/ directory
+      </path-traversal-prevention>
+
+      <resource-management>
+        - Limit concurrent TTS requests (1 at a time per project)
+        - Implement timeout for TTS calls (30 seconds max)
+        - Clean up temporary files after generation
+        - Monitor disk space usage
+      </resource-management>
+
+      <input-validation>
+        - Sanitize scene text before TTS (prevent injection attacks)
+        - Validate scene count reasonable (&lt;100 scenes)
+        - Validate text length reasonable (&lt;10,000 characters per scene)
+      </input-validation>
+    </security-considerations>
+
+    <performance-considerations>
+      <tts-optimization>
+        - Use persistent KokoroTTS service (model stays in memory)
+        - Add small delay between calls to respect rate limits (100ms)
+        - Monitor TTS response times for performance degradation
+        - Log slow generation (&gt;5 seconds per scene)
+      </tts-optimization>
+
+      <filesystem-optimization>
+        - Create directory structure once (not per scene)
+        - Use buffered file writes
+        - Verify disk space before generation
+        - Implement file cleanup policy
+      </filesystem-optimization>
+
+      <database-optimization>
+        - Update scenes individually (allows partial completion)
+        - Update total duration only once at end
+        - Use transactions for related updates
+        - Add index on audio_file_path for resume detection
+      </database-optimization>
+    </performance-considerations>
+  </dev-notes>
+
+  <!-- ========================================
+       REFERENCES
+       ======================================== -->
+  <references>
+    <source-documents>
+      <document path="docs/epics.md" lines="473-510">
+        Story 2.5 definition: Goal, tasks, acceptance criteria
+      </document>
+      <document path="docs/prd.md" section="Feature 1.4">
+        Automated Voiceover requirements
+      </document>
+      <document path="docs/stories/story-2.1.md">
+        TTS provider abstraction, audio format standards
+      </document>
+      <document path="docs/stories/story-2.2.md">
+        Database schema for scenes table, query functions
+      </document>
+      <document path="docs/stories/story-2.3.md">
+        Voice selection workflow, component patterns
+      </document>
+      <document path="docs/stories/story-2.4.md">
+        Script generation workflow
+      </document>
+    </source-documents>
+
+    <architect-feedback>
+      <feedback-item id="1">
+        Component Path: Added Task 7 for Server Component page at app/projects/[id]/voiceover/page.tsx
+      </feedback-item>
+      <feedback-item id="2">
+        Database Initialization: Added Task 2.1.1 for initializeDatabase() at module level
+      </feedback-item>
+      <feedback-item id="3">
+        Store Path: Task 8.1 explicitly states lib/stores/voiceover-store.ts (NOT stores/)
+      </feedback-item>
+      <feedback-item id="4">
+        Query Functions: Added Task 4 to verify Story 2.2 provides required query functions
+      </feedback-item>
+      <feedback-item id="5">
+        Error Codes: Task 2.8 defines all error codes with HTTP status codes
+      </feedback-item>
+      <feedback-item id="6">
+        Business Logic: Task 2.4 clarifies delegation to generateVoiceoversWithProgress()
+      </feedback-item>
+      <feedback-item id="7">
+        Workflow Guards: Task 6.7 and Task 7.4 implement workflow state guards with redirects
+      </feedback-item>
+      <feedback-item id="8">
+        Progress Tracking: Tasks 2.5, 5.3, 6.4 specify polling approach for MVP simplicity
+      </feedback-item>
+    </architect-feedback>
+  </references>
+
+  <!-- ========================================
+       DEFINITION OF DONE
+       ======================================== -->
+  <definition-of-done>
+    <checklist>
+      <item>Text sanitization module implemented with all removal patterns</item>
+      <item>Sanitization unit tests pass (20+ test cases)</item>
+      <item>Voiceover generation API endpoint created and tested</item>
+      <item>Database initialization pattern followed (await initializeDatabase())</item>
+      <item>Business logic layer handles sequential processing</item>
+      <item>Partial completion resume works correctly</item>
+      <item>Progress tracking implemented via polling endpoint</item>
+      <item>Database query functions verified from Story 2.2</item>
+      <item>Audio files saved with correct naming convention</item>
+      <item>Scene records updated with paths and durations</item>
+      <item>Total duration calculated and stored</item>
+      <item>Workflow advances to 'visual-sourcing' step</item>
+      <item>Workflow state guards redirect out-of-sequence access</item>
+      <item>Server Component page created at app/projects/[id]/voiceover/page.tsx</item>
+      <item>UI component displays progress accurately</item>
+      <item>Voiceover store created at lib/stores/voiceover-store.ts</item>
+      <item>Error codes defined and implemented</item>
+      <item>Integration tests pass (6+ test scenarios)</item>
+      <item>Manual testing confirms clean audio output (no artifacts)</item>
+      <item>Error handling covers all failure modes</item>
+      <item>Documentation updated with workflow changes</item>
+      <item>Code review completed by Architect</item>
+      <item>All acceptance criteria validated</item>
+    </checklist>
+  </definition-of-done>
+</story-context>
