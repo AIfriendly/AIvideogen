@@ -124,11 +124,14 @@ CRITICAL QUALITY REQUIREMENTS:
    - NO URLs, hashtags, or technical formatting
    - ONLY words that will be spoken aloud
 
-5. SCENE STRUCTURE
+5. SCENE STRUCTURE ⚠️ CRITICAL WORD COUNT REQUIREMENT
    - Generate ${targetSceneCount} scenes total
-   - Each scene should be 50-200 words (roughly 30-90 seconds when spoken)
+   - ⚠️ EACH SCENE MUST BE **AT LEAST 50 WORDS** (count carefully!)
+   - ⚠️ MAXIMUM 200 WORDS PER SCENE
+   - Target 60-100 words per scene for best results
    - Scenes should flow naturally and build on each other
    - Each scene advances the narrative or adds new information
+   - COUNT YOUR WORDS - scripts with short scenes (under 50 words) will be rejected!
 
 OUTPUT FORMAT (respond ONLY with valid JSON):
 
@@ -184,6 +187,12 @@ The previous attempt had these quality issues:
 ${previousIssues.map(issue => `- ${issue}`).join('\n')}
 
 Please generate a MORE CREATIVE and ENGAGING script that avoids these issues.
+
+🚨 CRITICAL REMINDER:
+- Each scene MUST have AT LEAST 50 WORDS
+- If a scene has less than 50 words, it will be REJECTED
+- Count your words carefully - aim for 60-100 words per scene
+
 Focus on:
 - Stronger, more unique opening hook
 - More varied sentence structure and pacing
@@ -199,6 +208,12 @@ Focus on:
 This is the last attempt. The previous scripts were rejected for:
 ${previousIssues.map(issue => `- ${issue}`).join('\n')}
 
+🔴 MANDATORY WORD COUNT:
+- EACH SCENE **MUST** BE MINIMUM 50 WORDS (NO EXCEPTIONS)
+- AIM FOR 70-100 WORDS PER SCENE TO BE SAFE
+- SCENES UNDER 50 WORDS WILL BE AUTOMATICALLY REJECTED
+- Write longer scenes with more detail and examples
+
 Generate a TRULY EXCEPTIONAL script that:
 - Has a bold, surprising opening that NO AI would write
 - Demonstrates clear human creativity and insight
@@ -206,6 +221,7 @@ Generate a TRULY EXCEPTIONAL script that:
 - Includes unexpected angles or perspectives
 - Shows genuine personality and engagement
 - Is completely indistinguishable from professional human writing
+- HAS SUFFICIENT LENGTH - each scene AT LEAST 50 words
 
 This must be your absolute best work.`;
   }

@@ -19,6 +19,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ChatInterface } from '@/components/features/conversation';
 import { useProjectStore } from '@/lib/stores/project-store';
+import { Button } from '@/components/ui/button';
+import { Settings } from 'lucide-react';
 
 export default function ProjectPage() {
   const params = useParams();
@@ -103,11 +105,22 @@ export default function ProjectPage() {
     <div className="flex flex-col h-screen">
       {/* Header */}
       <header className="border-b p-4">
-        <div className="max-w-5xl mx-auto">
-          <h1 className="text-2xl font-bold">AI Video Generator</h1>
-          <p className="text-sm text-muted-foreground">
-            Describe your video idea and let's create something amazing
-          </p>
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">AI Video Generator</h1>
+            <p className="text-sm text-muted-foreground">
+              Describe your video idea and let's create something amazing
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push(`/projects/${projectId}/settings`)}
+            className="flex items-center gap-2"
+          >
+            <Settings className="w-4 h-4" />
+            Settings
+          </Button>
         </div>
       </header>
 

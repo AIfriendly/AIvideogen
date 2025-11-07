@@ -20,6 +20,9 @@
 
 import type { VoiceProfile } from './provider';
 
+// Re-export VoiceProfile type for convenience
+export type { VoiceProfile } from './provider';
+
 /**
  * Complete KokoroTTS Voice Catalog
  *

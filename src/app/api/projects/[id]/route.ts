@@ -198,6 +198,7 @@ export async function PUT(
       name?: string;
       topic?: string;
       currentStep?: string;
+      config_json?: string;
     } = {};
 
     try {
@@ -220,6 +221,7 @@ export async function PUT(
       name?: string;
       topic?: string;
       currentStep?: string;
+      config_json?: string;
     } = {};
 
     if (body.name !== undefined) {
@@ -232,6 +234,27 @@ export async function PUT(
 
     if (body.currentStep !== undefined) {
       updates.currentStep = body.currentStep;
+    }
+
+    if (body.config_json !== undefined) {
+      // Validate JSON format if provided
+      if (body.config_json !== null) {
+        try {
+          JSON.parse(body.config_json);
+        } catch {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                message: 'config_json must be valid JSON',
+                code: 'INVALID_REQUEST',
+              },
+            },
+            { status: 400 }
+          );
+        }
+      }
+      updates.config_json = body.config_json;
     }
 
     // Update project in database (also updates last_active)

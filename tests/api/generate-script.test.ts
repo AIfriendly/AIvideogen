@@ -26,6 +26,7 @@ import db from '@/lib/db/client';
 import { POST as generateScriptHandler } from '@/app/api/projects/[id]/generate-script/route';
 import { getProject, getScenesByProjectId } from '@/lib/db/queries';
 import * as scriptGenerator from '@/lib/llm/script-generator';
+import { createTestProject, createMockScriptResult } from '../factories/project.factory';
 
 // Mock the script generator to avoid actual LLM calls in tests
 vi.mock('@/lib/llm/script-generator', async () => {
@@ -36,37 +37,21 @@ vi.mock('@/lib/llm/script-generator', async () => {
   };
 });
 
-describe('POST /api/projects/[id]/generate-script', () => {
-  const testProjectId = '00000000-0000-0000-0000-000000000003';
-
-  // Mock professional script response
-  const mockScriptResult = {
-    scenes: [
-      {
-        sceneNumber: 1,
-        text: 'An octopus can unscrew a jar from the inside. Not because someone taught it - because it figured it out. These eight-armed creatures solve puzzles that stump most animals, and scientists are only beginning to understand why. Their intelligence is not just remarkable, it is alien.',
-        estimatedDuration: 45
-      },
-      {
-        sceneNumber: 2,
-        text: 'Unlike humans, who centralize thinking in one brain, octopuses distribute their neurons. Two-thirds of their brain cells live in their arms. Each arm can taste, touch, and make decisions independently. It is like having eight mini-brains working together, each one capable of problem-solving on its own.',
-        estimatedDuration: 60
-      },
-      {
-        sceneNumber: 3,
-        text: 'This distributed intelligence lets them do extraordinary things. They can camouflage in milliseconds, mimicking not just colors but textures. They escape from locked tanks. They use tools. One species collects coconut shells and assembles them into portable shelters. That is not instinct, that is planning.',
-        estimatedDuration: 55
-      }
-    ],
-    attempts: 1,
-    validationScore: 95
-  };
+describe('[P1] POST /api/projects/[id]/generate-script', () => {
+  // Use factory to generate unique test project ID for each test run
+  let testProjectId: string;
+  let mockScriptResult: ReturnType<typeof createMockScriptResult>;
 
   beforeEach(() => {
     // Clear database
     db.exec('DELETE FROM scenes');
     db.exec('DELETE FROM messages');
     db.exec('DELETE FROM projects');
+
+    // Generate unique test data for this test run (prevents parallel test collisions)
+    const testProject = createTestProject();
+    testProjectId = testProject.id;
+    mockScriptResult = createMockScriptResult({ sceneCount: 3 });
 
     // Reset mock
     vi.clearAllMocks();
@@ -75,16 +60,24 @@ describe('POST /api/projects/[id]/generate-script', () => {
     vi.mocked(scriptGenerator.generateScriptWithRetry).mockResolvedValue(mockScriptResult);
   });
 
-  describe('AC1: Valid Requests with ProjectId', () => {
+  describe('[P1] AC1: Valid Requests with ProjectId', () => {
     beforeEach(() => {
-      // Create test project with confirmed topic
+      // Create test project with confirmed topic using factory
+      const project = createTestProject({
+        id: testProjectId,
+        topic: 'Why octopuses are intelligent',
+        current_step: 'script',
+        status: 'draft',
+        script_generated: false,
+      });
+
       db.prepare(`
         INSERT INTO projects (id, name, topic, current_step, status, script_generated)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(testProjectId, 'Test Project', 'Why octopuses are intelligent', 'script', 'draft', 0);
+      `).run(project.id, project.name, project.topic, project.current_step, project.status, project.script_generated ? 1 : 0);
     });
 
-    it('should accept projectId and generate script successfully', async () => {
+    it('[2.4-INT-001] should accept projectId and generate script successfully', async () => {
       // Given: Project with confirmed topic
       const request = new Request(
         `http://localhost:3000/api/projects/${testProjectId}/generate-script`,
@@ -108,7 +101,7 @@ describe('POST /api/projects/[id]/generate-script', () => {
       expect(data.data.attempts).toBe(1);
     });
 
-    it('should call script generator with sanitized topic', async () => {
+    it('[2.4-INT-002] should call script generator with sanitized topic', async () => {
       const request = new Request(
         `http://localhost:3000/api/projects/${testProjectId}/generate-script`,
         { method: 'POST' }
@@ -125,15 +118,23 @@ describe('POST /api/projects/[id]/generate-script', () => {
     });
   });
 
-  describe('AC2 & AC3: Scene Structure Validation', () => {
+  describe('[P1] AC2 & AC3: Scene Structure Validation', () => {
     beforeEach(() => {
+      // Use factory for consistent test data
+      const project = createTestProject({
+        id: testProjectId,
+        topic: 'Test topic',
+        current_step: 'script',
+        status: 'draft',
+      });
+
       db.prepare(`
-        INSERT INTO projects (id, name, topic, current_step, status)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(testProjectId, 'Test Project', 'Test topic', 'script', 'draft');
+        INSERT INTO projects (id, name, topic, current_step, status, script_generated)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(project.id, project.name, project.topic, project.current_step, project.status, project.script_generated ? 1 : 0);
     });
 
-    it('should generate 3-5 scenes', async () => {
+    it('[2.4-INT-003] should generate 3-5 scenes', async () => {
       const request = new Request(
         `http://localhost:3000/api/projects/${testProjectId}/generate-script`,
         { method: 'POST' }
@@ -148,7 +149,7 @@ describe('POST /api/projects/[id]/generate-script', () => {
       expect(data.data.sceneCount).toBeLessThanOrEqual(7); // Allow up to 7 per story spec
     });
 
-    it('should return scenes with sequential scene_number', async () => {
+    it('[2.4-INT-004] should return scenes with sequential scene_number', async () => {
       const request = new Request(
         `http://localhost:3000/api/projects/${testProjectId}/generate-script`,
         { method: 'POST' }
@@ -165,7 +166,7 @@ describe('POST /api/projects/[id]/generate-script', () => {
       expect(scenes[2].scene_number).toBe(3);
     });
 
-    it('should return scenes with text field', async () => {
+    it('[2.4-INT-005] should return scenes with text field', async () => {
       const request = new Request(
         `http://localhost:3000/api/projects/${testProjectId}/generate-script`,
         { method: 'POST' }
@@ -184,15 +185,23 @@ describe('POST /api/projects/[id]/generate-script', () => {
     });
   });
 
-  describe('AC11: Database Storage', () => {
+  describe('[P1] AC11: Database Storage', () => {
     beforeEach(() => {
+      // Use factory for consistent test data
+      const project = createTestProject({
+        id: testProjectId,
+        topic: 'Test topic',
+        current_step: 'script',
+        status: 'draft',
+      });
+
       db.prepare(`
-        INSERT INTO projects (id, name, topic, current_step, status)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(testProjectId, 'Test Project', 'Test topic', 'script', 'draft');
+        INSERT INTO projects (id, name, topic, current_step, status, script_generated)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(project.id, project.name, project.topic, project.current_step, project.status, project.script_generated ? 1 : 0);
     });
 
-    it('should save scenes to database in correct order', async () => {
+    it('[2.4-INT-006] should save scenes to database in correct order', async () => {
       const request = new Request(
         `http://localhost:3000/api/projects/${testProjectId}/generate-script`,
         { method: 'POST' }
@@ -210,7 +219,7 @@ describe('POST /api/projects/[id]/generate-script', () => {
       expect(savedScenes[2].scene_number).toBe(3);
     });
 
-    it('should save scenes with correct project_id', async () => {
+    it('[2.4-INT-007] should save scenes with correct project_id', async () => {
       const request = new Request(
         `http://localhost:3000/api/projects/${testProjectId}/generate-script`,
         { method: 'POST' }
@@ -226,7 +235,7 @@ describe('POST /api/projects/[id]/generate-script', () => {
       });
     });
 
-    it('should transform camelCase to snake_case', async () => {
+    it('[2.4-INT-008] should transform camelCase to snake_case', async () => {
       const request = new Request(
         `http://localhost:3000/api/projects/${testProjectId}/generate-script`,
         { method: 'POST' }
@@ -244,15 +253,23 @@ describe('POST /api/projects/[id]/generate-script', () => {
     });
   });
 
-  describe('AC15 & AC16: Project Status Updates', () => {
+  describe('[P1] AC15 & AC16: Project Status Updates', () => {
     beforeEach(() => {
+      const project = createTestProject({
+        id: testProjectId,
+        topic: 'Test topic',
+        current_step: 'script',
+        status: 'draft',
+        script_generated: false,
+      });
+
       db.prepare(`
         INSERT INTO projects (id, name, topic, current_step, status, script_generated)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(testProjectId, 'Test Project', 'Test topic', 'script', 'draft', false);
+      `).run(project.id, project.name, project.topic, project.current_step, project.status, project.script_generated ? 1 : 0);
     });
 
-    it('should set script_generated flag to true', async () => {
+    it('[2.4-INT-009] should set script_generated flag to true', async () => {
       const request = new Request(
         `http://localhost:3000/api/projects/${testProjectId}/generate-script`,
         { method: 'POST' }
@@ -267,7 +284,7 @@ describe('POST /api/projects/[id]/generate-script', () => {
       expect(project?.script_generated).toBe(true);
     });
 
-    it('should update current_step to "voiceover"', async () => {
+    it('[2.4-INT-010] should update current_step to "voiceover"', async () => {
       const request = new Request(
         `http://localhost:3000/api/projects/${testProjectId}/generate-script`,
         { method: 'POST' }
@@ -283,8 +300,8 @@ describe('POST /api/projects/[id]/generate-script', () => {
     });
   });
 
-  describe('Error Handling', () => {
-    it('should return 404 when project not found', async () => {
+  describe('[P1] Error Handling', () => {
+    it('[2.4-INT-011] should return 404 when project not found', async () => {
       const nonExistentId = '99999999-9999-9999-9999-999999999999';
       const request = new Request(
         `http://localhost:3000/api/projects/${nonExistentId}/generate-script`,
@@ -301,8 +318,7 @@ describe('POST /api/projects/[id]/generate-script', () => {
       expect(data.error).toContain('not found');
     });
 
-    it('should return 400 when topic is missing', async () => {
-      // Create project without topic
+it('[2.4-INT-012] should return 400 when topic is missing', async () => {      // Create project without topic
       db.prepare(`
         INSERT INTO projects (id, name, topic, current_step, status)
         VALUES (?, ?, ?, ?, ?)
@@ -323,8 +339,7 @@ describe('POST /api/projects/[id]/generate-script', () => {
       expect(data.error).toContain('Topic not confirmed');
     });
 
-    it('should return 500 when script generation fails', async () => {
-      // Mock script generator to fail
+it('[2.4-INT-013] should return 500 when script generation fails', async () => {      // Mock script generator to fail
       vi.mocked(scriptGenerator.generateScriptWithRetry).mockRejectedValue(
         new scriptGenerator.ScriptGenerationError(
           'Generation failed',
@@ -355,7 +370,7 @@ describe('POST /api/projects/[id]/generate-script', () => {
       expect(data.details.length).toBeGreaterThan(0);
     });
 
-    it('should return 400 when project ID is missing', async () => {
+    it('[2.4-INT-014] should return 400 when project ID is missing', async () => {
       const request = new Request(
         `http://localhost:3000/api/projects//generate-script`,
         { method: 'POST' }
@@ -371,15 +386,23 @@ describe('POST /api/projects/[id]/generate-script', () => {
     });
   });
 
-  describe('Response Format', () => {
+  describe('[P2] Response Format', () => {
     beforeEach(() => {
+      // Use factory for consistent test data
+      const project = createTestProject({
+        id: testProjectId,
+        topic: 'Test topic',
+        current_step: 'script',
+        status: 'draft',
+      });
+
       db.prepare(`
-        INSERT INTO projects (id, name, topic, current_step, status)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(testProjectId, 'Test Project', 'Test topic', 'script', 'draft');
+        INSERT INTO projects (id, name, topic, current_step, status, script_generated)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(project.id, project.name, project.topic, project.current_step, project.status, project.script_generated ? 1 : 0);
     });
 
-    it('should return standard success response format', async () => {
+    it('[2.4-INT-015] should return standard success response format', async () => {
       const request = new Request(
         `http://localhost:3000/api/projects/${testProjectId}/generate-script`,
         { method: 'POST' }
@@ -398,7 +421,7 @@ describe('POST /api/projects/[id]/generate-script', () => {
       expect(data.data).toHaveProperty('attempts');
     });
 
-    it('should include all scene fields in response', async () => {
+    it('[2.4-INT-016] should include all scene fields in response', async () => {
       const request = new Request(
         `http://localhost:3000/api/projects/${testProjectId}/generate-script`,
         { method: 'POST' }

@@ -22,10 +22,10 @@ import {
   TONE_INSTRUCTIONS
 } from '@/lib/llm/tone-mapper';
 
-describe('Tone Mapper - Unit Tests', () => {
-  describe('AC7: Topic-Appropriate Tone Determination', () => {
+describe('[P2] Tone Mapper - Unit Tests', () => {
+  describe('[P2] AC7: Topic-Appropriate Tone Determination', () => {
     describe('Educational Topics', () => {
-      it('should detect educational tone for "How quantum computing works"', () => {
+      it('[2.4-UNIT-001] should detect educational tone for "How quantum computing works"', () => {
         // Given: Educational topic
         const topic = 'How quantum computing works';
         // When: Determining tone
@@ -35,7 +35,7 @@ describe('Tone Mapper - Unit Tests', () => {
         expect(result.confidence).toBeGreaterThan(0.5);
       });
 
-      it('should detect educational tone for science topics', () => {
+      it('[2.4-UNIT-002] should detect educational tone for science topics', () => {
         const topics = [
           'The science behind photosynthesis',
           'Understanding machine learning',
@@ -48,7 +48,7 @@ describe('Tone Mapper - Unit Tests', () => {
         });
       });
 
-      it('should detect educational tone for tutorial topics', () => {
+      it('[2.4-UNIT-003] should detect educational tone for tutorial topics', () => {
         const topic = 'Tutorial: How to build a website';
         const result = determineTone(topic);
         expect(result.tone).toBe('educational');
@@ -57,14 +57,14 @@ describe('Tone Mapper - Unit Tests', () => {
     });
 
     describe('Entertaining Topics', () => {
-      it('should detect entertaining tone for funny content', () => {
+      it('[2.4-UNIT-004] should detect entertaining tone for funny content', () => {
         const topic = 'Funniest cat videos compilation';
         const result = determineTone(topic);
         expect(result.tone).toBe('entertaining');
         expect(result.confidence).toBeGreaterThan(0.5);
       });
 
-      it('should detect entertaining tone for entertainment topics', () => {
+      it('[2.4-UNIT-005] should detect entertaining tone for entertainment topics', () => {
         const topics = [
           'Top 10 movie plot twists',
           'Celebrity pranks caught on camera',
@@ -79,14 +79,14 @@ describe('Tone Mapper - Unit Tests', () => {
     });
 
     describe('Dramatic Topics', () => {
-      it('should detect dramatic tone for mystery content', () => {
+      it('[2.4-UNIT-006] should detect dramatic tone for mystery content', () => {
         const topic = 'The unsolved mystery of flight MH370';
         const result = determineTone(topic);
         expect(result.tone).toBe('dramatic');
         expect(result.confidence).toBeGreaterThan(0.5);
       });
 
-      it('should detect dramatic tone for crime topics', () => {
+      it('[2.4-UNIT-007] should detect dramatic tone for crime topics', () => {
         const topics = [
           'Investigation into serial killer patterns',
           'War crimes tribunal evidence',
@@ -101,14 +101,14 @@ describe('Tone Mapper - Unit Tests', () => {
     });
 
     describe('Casual Topics', () => {
-      it('should detect casual tone for lifestyle content', () => {
+      it('[2.4-UNIT-008] should detect casual tone for lifestyle content', () => {
         const topic = 'My daily morning routine';
         const result = determineTone(topic);
         expect(result.tone).toBe('casual');
         expect(result.confidence).toBeGreaterThan(0);
       });
 
-      it('should detect casual tone for everyday topics', () => {
+      it('[2.4-UNIT-009] should detect casual tone for everyday topics', () => {
         const topics = [
           'Simple cooking tips for beginners',
           'Lifestyle hacks for busy people',
@@ -122,14 +122,14 @@ describe('Tone Mapper - Unit Tests', () => {
     });
 
     describe('Formal Topics', () => {
-      it('should detect formal tone for business content', () => {
+      it('[2.4-UNIT-010] should detect formal tone for business content', () => {
         const topic = 'Corporate finance strategies for Q4';
         const result = determineTone(topic);
         expect(result.tone).toBe('formal');
         expect(result.confidence).toBeGreaterThan(0.5);
       });
 
-      it('should detect formal tone for professional topics', () => {
+      it('[2.4-UNIT-011] should detect formal tone for professional topics', () => {
         const topics = [
           'Legal implications of AI regulation',
           'Economic policy analysis',
@@ -144,14 +144,14 @@ describe('Tone Mapper - Unit Tests', () => {
     });
 
     describe('Inspirational Topics', () => {
-      it('should detect inspirational tone for motivational content', () => {
+      it('[2.4-UNIT-012] should detect inspirational tone for motivational content', () => {
         const topic = 'How I overcame adversity to achieve my dreams';
         const result = determineTone(topic);
         expect(result.tone).toBe('inspirational');
         expect(result.confidence).toBeGreaterThan(0.5);
       });
 
-      it('should detect inspirational tone for success stories', () => {
+      it('[2.4-UNIT-013] should detect inspirational tone for success stories', () => {
         const topics = [
           'Journey from failure to success',
           'Motivational speech about perseverance',
@@ -166,8 +166,8 @@ describe('Tone Mapper - Unit Tests', () => {
     });
   });
 
-  describe('AC12: Handle Various Topic Types', () => {
-    it('should handle ambiguous topics with default tone', () => {
+  describe('[P2] AC12: Handle Various Topic Types', () => {
+    it('[2.4-UNIT-014] should handle ambiguous topics with default tone', () => {
       // Given: Generic topic with no strong indicators
       const topic = 'Something interesting';
       // When: Determining tone
@@ -177,7 +177,7 @@ describe('Tone Mapper - Unit Tests', () => {
       expect(result.confidence).toBeGreaterThanOrEqual(0);
     });
 
-    it('should handle mixed-tone topics', () => {
+    it('[2.4-UNIT-015] should handle mixed-tone topics', () => {
       // Given: Topic with multiple tone indicators
       const topic = 'Educational documentary about mysterious crimes';
       // When: Determining tone
@@ -187,7 +187,7 @@ describe('Tone Mapper - Unit Tests', () => {
       expect(result.reasoning).toContain('keywords');
     });
 
-    it('should handle case-insensitive matching', () => {
+    it('[2.4-UNIT-016] should handle case-insensitive matching', () => {
       // Given: Topics with different casing
       const topic1 = 'How to LEARN Science';
       const topic2 = 'how to learn science';
@@ -198,7 +198,7 @@ describe('Tone Mapper - Unit Tests', () => {
       expect(result1.tone).toBe(result2.tone);
     });
 
-    it('should provide confidence scores', () => {
+    it('[2.4-UNIT-017] should provide confidence scores', () => {
       // Given: Topic with clear tone
       const topic = 'Learn machine learning fundamentals';
       // When: Determining tone
@@ -208,7 +208,7 @@ describe('Tone Mapper - Unit Tests', () => {
       expect(result.confidence).toBeLessThanOrEqual(1);
     });
 
-    it('should provide reasoning for tone selection', () => {
+    it('[2.4-UNIT-018] should provide reasoning for tone selection', () => {
       // Given: Any topic
       const topic = 'Science tutorial';
       // When: Determining tone
@@ -219,8 +219,8 @@ describe('Tone Mapper - Unit Tests', () => {
     });
   });
 
-  describe('Tone Instructions', () => {
-    it('should provide instructions for all tone types', () => {
+  describe('[P2] Tone Instructions', () => {
+    it('[2.4-UNIT-019] should provide instructions for all tone types', () => {
       // Given: All supported tones
       const tones: ScriptTone[] = [
         'educational',
@@ -240,27 +240,27 @@ describe('Tone Mapper - Unit Tests', () => {
       });
     });
 
-    it('should include specific guidance in educational instructions', () => {
+    it('[2.4-UNIT-020] should include specific guidance in educational instructions', () => {
       const instructions = getToneInstructions('educational');
       expect(instructions).toContain('Clear');
       expect(instructions).toContain('examples');
     });
 
-    it('should include specific guidance in entertaining instructions', () => {
+    it('[2.4-UNIT-021] should include specific guidance in entertaining instructions', () => {
       const instructions = getToneInstructions('entertaining');
       expect(instructions).toContain('humor');
       expect(instructions).toContain('Engaging');
     });
 
-    it('should include specific guidance in dramatic instructions', () => {
+    it('[2.4-UNIT-022] should include specific guidance in dramatic instructions', () => {
       const instructions = getToneInstructions('dramatic');
       expect(instructions).toContain('tension');
       expect(instructions).toContain('Suspenseful');
     });
   });
 
-  describe('Edge Cases', () => {
-    it('should handle empty topic string', () => {
+  describe('[P3] Edge Cases', () => {
+    it('[2.4-UNIT-023] should handle empty topic string', () => {
       // Given: Empty topic
       const topic = '';
       // When: Determining tone
@@ -270,7 +270,7 @@ describe('Tone Mapper - Unit Tests', () => {
       expect(result.reasoning).toContain('No strong tone indicators');
     });
 
-    it('should handle very long topics', () => {
+    it('[2.4-UNIT-024] should handle very long topics', () => {
       // Given: Very long topic string
       const topic = 'This is a very long educational topic about how to learn science and understand complex concepts with tutorial examples and teaching methods'.repeat(5);
       // When: Determining tone
@@ -279,7 +279,7 @@ describe('Tone Mapper - Unit Tests', () => {
       expect(result.tone).toBe('educational');
     });
 
-    it('should handle topics with special characters', () => {
+    it('[2.4-UNIT-025] should handle topics with special characters', () => {
       // Given: Topic with special characters
       const topic = 'How to learn #science & #technology (2025)';
       // When: Determining tone
