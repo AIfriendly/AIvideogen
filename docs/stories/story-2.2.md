@@ -1,11 +1,13 @@
 # Story 2.2: Database Schema Updates for Content Generation
 
 **Epic:** Epic 2 - Content Generation Pipeline + Voice Selection
-**Status:** Ready
+**Status:** Implemented
 **Ready for Development:** 2025-11-07
+**Implementation Completed:** 2025-11-07
 **Approved By:** Architect (Winston)
 **Created:** 2025-11-07
 **Owner:** Dev Agent
+**Git Commit:** 104f5d8
 
 ## Goal
 

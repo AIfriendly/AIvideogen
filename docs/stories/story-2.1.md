@@ -2,9 +2,9 @@
 
 **Epic:** Epic 2 - Content Generation Pipeline
 **Story ID:** 2.1
-**Status:** Ready
+**Status:** Done
 **Created:** 2025-11-06
-**Last Updated:** 2025-11-06 (Revised with Architect Feedback)
+**Last Updated:** 2025-11-06 (Completed and all tasks checked)
 **Assigned To:** lichking
 **Sprint:** Epic 2 Sprint 1
 
@@ -97,27 +97,27 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #1
 
 **Subtasks:**
-- [ ] Add KokoroTTS dependencies to requirements.txt:
+- [x] Add KokoroTTS dependencies to requirements.txt:
   ```
-  kokoro-tts==0.3.0
-  numpy==1.24.3
-  scipy==1.11.1
+  kokoro-tts>=0.3.0
+  # numpy and scipy are installed automatically as dependencies
+  # kokoro-tts requires numpy>=2.0.2
   ```
-- [ ] Create installation verification script: `scripts/verify-tts-setup.py`
+- [x] Create installation verification script: `scripts/verify-tts-setup.py`
   - Check Python version >= 3.10
   - Verify KokoroTTS package installed
   - Test model download and loading
   - Generate test audio file to confirm functionality
   - Validate audio format (MP3, 128kbps, 44.1kHz, Mono)
-- [ ] Document TTS setup in docs/setup-guide.md:
+- [x] Document TTS setup in docs/setup-guide.md:
   - Prerequisites (Python 3.10+, UV package manager)
   - Installation command: `uv pip install -r requirements.txt`
   - Model download instructions (~320MB, automatic on first run)
   - Service startup instructions (persistent service model)
   - Troubleshooting common errors with error codes
-- [ ] Add npm script to package.json: `"verify:tts": "python scripts/verify-tts-setup.py"`
-- [ ] Test installation on clean environment (verify reproducibility)
-- [ ] Add .cache/ directory to .gitignore if not already present
+- [x] Add npm script to package.json: `"verify:tts": "python scripts/verify-tts-setup.py"`
+- [x] Test installation on clean environment (verify reproducibility)
+- [x] Add .cache/ directory to .gitignore if not already present
 
 **Estimated Effort:** 2 hours
 
@@ -128,12 +128,12 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #1, #4
 
 **Subtasks:**
-- [ ] Document architecture decision: Persistent service vs per-request spawn
+- [x] Document architecture decision: Persistent service vs per-request spawn
   - Problem: Per-request Python process spawn is inefficient (model reload each time)
   - Solution: Long-running Python service with model kept in memory (like Ollama on port 11434)
   - Options evaluated: JSON via stdin/stdout vs HTTP server on dedicated port
   - Recommendation: JSON protocol via stdin/stdout for simplicity (fewer dependencies)
-- [ ] Create scripts/kokoro-tts-service.py persistent service:
+- [x] Create scripts/kokoro-tts-service.py persistent service:
   - Load KokoroTTS model once on service startup (cache in memory)
   - Accept JSON requests via stdin: `{"action": "synthesize", "text": "...", "voiceId": "...", "outputPath": "..."}`
   - Process requests in loop, keeping model loaded
@@ -141,17 +141,17 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
   - Handle multiple consecutive requests without reloading model
   - Implement graceful shutdown on SIGTERM
   - Log to stderr (separate from JSON stdout)
-- [ ] Implement service lifecycle management:
+- [x] Implement service lifecycle management:
   - Start service on first TTS request (spawn once)
   - Keep service running for subsequent requests
   - Implement health check endpoint/command
   - Auto-restart on crash with exponential backoff
   - Graceful shutdown on application exit
-- [ ] Performance validation:
+- [x] Performance validation:
   - First request (cold start): Model load + synthesis = ~3-5s
   - Subsequent requests (warm): Synthesis only = <2s
   - Measure memory usage (model in RAM ~400MB)
-- [ ] Document pattern correspondence to Ollama:
+- [x] Document pattern correspondence to Ollama:
   - Ollama: HTTP server on port 11434, persistent model caching
   - KokoroTTS: Stdin/stdout JSON protocol, persistent model caching
   - Both: Long-running process, model kept in memory, fast subsequent requests
@@ -165,7 +165,7 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #4
 
 **Subtasks:**
-- [ ] Create lib/tts/provider.ts with TTSProvider interface:
+- [x] Create lib/tts/provider.ts with TTSProvider interface:
   ```typescript
   export interface TTSProvider {
     generateAudio(text: string, voiceId: string): Promise<AudioResult>;
@@ -180,7 +180,7 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
     fileSize: number;
   }
   ```
-- [ ] Create lib/tts/kokoro-provider.ts implementing TTSProvider:
+- [x] Create lib/tts/kokoro-provider.ts implementing TTSProvider:
   - Manage persistent Python TTS service (spawn once, reuse)
   - Send JSON requests via stdin with text and voiceId
   - Read JSON responses from stdout
@@ -190,7 +190,7 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
   - Implement timeout mechanism (30 seconds default for cold start, 10s for warm)
   - Map errors to standard error codes (TTS_MODEL_NOT_FOUND, TTS_NOT_INSTALLED, etc.)
   - Return Uint8Array instead of Buffer for cross-platform portability
-- [ ] Create lib/tts/factory.ts:
+- [x] Create lib/tts/factory.ts:
   ```typescript
   export function getTTSProvider(): TTSProvider {
     const provider = process.env.TTS_PROVIDER || 'kokoro';
@@ -202,14 +202,14 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
     }
   }
   ```
-- [ ] Add TypeScript types for all interfaces
-- [ ] Document provider abstraction pattern in code comments
-- [ ] Create pattern correspondence table (TTS vs LLM):
+- [x] Add TypeScript types for all interfaces
+- [x] Document provider abstraction pattern in code comments
+- [x] Create pattern correspondence table (TTS vs LLM):
   - TTSProvider ↔ LLMProvider
   - KokoroProvider ↔ OllamaProvider
   - getTTSProvider() ↔ getLLMProvider()
   - Persistent service ↔ Ollama server on 11434
-- [ ] Add JSDoc documentation for public methods
+- [x] Add JSDoc documentation for public methods
 
 **Estimated Effort:** 5 hours
 
@@ -220,11 +220,11 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #2
 
 **Subtasks:**
-- [ ] Research and document ALL 48+ KokoroTTS voice model IDs
+- [x] Research and document ALL 48+ KokoroTTS voice model IDs
   - Query KokoroTTS API/documentation for complete voice list
   - Test each voice to confirm availability and quality
   - Categorize by gender, accent, and tone
-- [ ] Create types/voice.ts with VoiceProfile interface:
+- [x] Create types/voice.ts with VoiceProfile interface:
   ```typescript
   export interface VoiceProfile {
     id: string;              // Our application ID (e.g., 'sarah', 'james')
@@ -236,13 +236,13 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
     modelId: string;         // KokoroTTS internal model ID (e.g., 'af_sky', 'am_adam')
   }
   ```
-- [ ] Create comprehensive docs/kokoro-voice-catalog.md:
+- [x] Create comprehensive docs/kokoro-voice-catalog.md:
   - Table of all 48+ voices with columns: App ID, Model ID, Name, Gender, Accent, Tone
   - Grouping by category (American Female, British Male, etc.)
   - Usage notes and recommendations for each voice
   - MVP subset highlighted (5 voices used in initial UI)
   - Post-MVP expansion guidance
-- [ ] Create lib/tts/voice-profiles.ts with COMPLETE voice array:
+- [x] Create lib/tts/voice-profiles.ts with COMPLETE voice array:
   - Define ALL 48+ voice profiles (comprehensive catalog)
   - Include accurate modelId mapping for each voice
   - Mark MVP voices with metadata flag: `mvpVoice: true`
@@ -262,8 +262,8 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 
   export const MVP_VOICES = VOICE_PROFILES.filter(v => v.mvpVoice);
   ```
-- [ ] Add JSDoc comments documenting each voice profile's characteristics
-- [ ] Create helper functions:
+- [x] Add JSDoc comments documenting each voice profile's characteristics
+- [x] Create helper functions:
   - `getVoiceById(id: string): VoiceProfile | undefined`
   - `getVoicesByGender(gender: 'male' | 'female'): VoiceProfile[]`
   - `getVoicesByAccent(accent: string): VoiceProfile[]`
@@ -278,7 +278,7 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #5
 
 **Subtasks:**
-- [ ] Create docs/story-2.1-schema-output.md documenting exact schema requirements for Story 2.2:
+- [x] Create docs/story-2.1-schema-output.md documenting exact schema requirements for Story 2.2:
   ```markdown
   # Story 2.1 Schema Output for Story 2.2 Database Integration
 
@@ -321,11 +321,11 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
   CREATE INDEX idx_scenes_project ON scenes(project_id);
   CREATE INDEX idx_scenes_number ON scenes(scene_number);
   ```
-- [ ] Document path resolution logic:
+- [x] Document path resolution logic:
   - TypeScript path construction: `path.join('.cache', 'audio', 'projects', projectId, `scene-${sceneNumber}.mp3`)`
   - Database storage: Relative path string
   - Runtime resolution: `path.resolve(process.cwd(), audio_file_path)`
-- [ ] Validate schema against tech-spec-epic-2.md alignment
+- [x] Validate schema against tech-spec-epic-2.md alignment
 
 **Estimated Effort:** 1 hour
 
@@ -336,7 +336,7 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #3
 
 **Subtasks:**
-- [ ] Create lib/tts/sanitize-text.ts utility module:
+- [x] Create lib/tts/sanitize-text.ts utility module:
   ```typescript
   export function sanitizeForTTS(text: string): string {
     // Remove markdown formatting
@@ -375,13 +375,13 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
     return { valid: issues.length === 0, issues };
   }
   ```
-- [ ] Define standardized preview script (pre-sanitized):
+- [x] Define standardized preview script (pre-sanitized):
   ```typescript
   const PREVIEW_TEXT = "Hello, I'm your AI video narrator. Let me help bring your story to life with clarity and emotion.";
   ```
-- [ ] Validate preview text passes sanitization rules (no markdown, no special characters)
-- [ ] Document sanitization rules in code comments
-- [ ] Add unit tests for edge cases (nested markdown, multiple scene labels, etc.)
+- [x] Validate preview text passes sanitization rules (no markdown, no special characters)
+- [x] Document sanitization rules in code comments
+- [x] Add unit tests for edge cases (nested markdown, multiple scene labels, etc.)
 
 **Estimated Effort:** 2 hours
 
@@ -392,7 +392,7 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #3
 
 **Subtasks:**
-- [ ] Create scripts/generate-voice-previews.ts Node.js script:
+- [x] Create scripts/generate-voice-previews.ts Node.js script:
   - Import MVP_VOICES from lib/tts/voice-profiles.ts (5 voices for MVP)
   - Import sanitizeForTTS and validateSanitization functions
   - Define and validate preview script text (20-30 words, pre-sanitized)
@@ -403,12 +403,12 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
     - Verify audio format (MP3, 128kbps, 44.1kHz, Mono)
     - Verify file size < 500KB
     - Log success/failure for each voice with performance metrics
-- [ ] Create .cache/audio/previews/ directory if not exists
-- [ ] Add npm script: `"generate:previews": "tsx scripts/generate-voice-previews.ts"`
-- [ ] Run script to generate all preview files for MVP voices (5 files)
-- [ ] Verify preview audio quality manually (listen to each sample)
-- [ ] Measure generation performance (<2s per preview)
-- [ ] Document regeneration process in README or setup guide
+- [x] Create .cache/audio/previews/ directory if not exists
+- [x] Add npm script: `"generate:previews": "tsx scripts/generate-voice-previews.ts"`
+- [x] Run script to generate all preview files for MVP voices (5 files)
+- [x] Verify preview audio quality manually (listen to each sample)
+- [x] Measure generation performance (<2s per preview)
+- [x] Document regeneration process in README or setup guide
 
 **Estimated Effort:** 2.5 hours
 
@@ -419,7 +419,7 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #5
 
 **Subtasks:**
-- [ ] Create lib/utils/audio-storage.ts utility module:
+- [x] Create lib/utils/audio-storage.ts utility module:
   - Function: `getPreviewAudioPath(voiceId: string): string`
     - Returns: `.cache/audio/previews/${voiceId}.mp3`
   - Function: `getSceneAudioPath(projectId: string, sceneNumber: number): string`
@@ -433,21 +433,21 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
     - Ensures path starts with `.cache/audio/`
   - Function: `getAbsoluteAudioPath(relativePath: string): string`
     - Resolves relative path to absolute path for file operations
-- [ ] Implement path validation using path.normalize() and startsWith() checks
-- [ ] Create directory structure on app initialization:
+- [x] Implement path validation using path.normalize() and startsWith() checks
+- [x] Create directory structure on app initialization:
   - `.cache/audio/previews/`
   - `.cache/audio/projects/` (subdirectories created per project)
-- [ ] Add to .gitignore:
+- [x] Add to .gitignore:
   ```
   .cache/
   *.mp3
   *.wav
   ```
-- [ ] Document storage conventions in code comments:
+- [x] Document storage conventions in code comments:
   - Relative paths in database
   - Absolute paths for file operations
   - Cleanup policy: Preview never deleted, project audio after 30 days inactive
-- [ ] Document cleanup policy explicitly:
+- [x] Document cleanup policy explicitly:
   - Preview audio: NEVER deleted (shared across projects)
   - Project audio: Delete after 30 days of project inactivity
 
@@ -460,8 +460,8 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #2
 
 **Subtasks:**
-- [ ] Create app/api/voice/list/route.ts API route
-- [ ] Implement GET handler:
+- [x] Create app/api/voice/list/route.ts API route
+- [x] Implement GET handler:
   - Import MVP_VOICES from lib/tts/voice-profiles.ts (5 voices for MVP)
   - Return MVP voice profiles in standard response format:
     ```typescript
@@ -475,10 +475,10 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
       }
     }
     ```
-- [ ] Add error handling for module import failures
-- [ ] Add TypeScript types for response
-- [ ] Test endpoint: `GET /api/voice/list` returns 5 MVP voice profiles
-- [ ] Document in JSDoc: Post-MVP will return full 48+ voice catalog
+- [x] Add error handling for module import failures
+- [x] Add TypeScript types for response
+- [x] Test endpoint: `GET /api/voice/list` returns 5 MVP voice profiles
+- [x] Document in JSDoc: Post-MVP will return full 48+ voice catalog
 
 **Estimated Effort:** 1 hour
 
@@ -489,7 +489,7 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #6
 
 **Subtasks:**
-- [ ] Define standard TTS error codes:
+- [x] Define standard TTS error codes:
   ```typescript
   export enum TTSErrorCode {
     TTS_MODEL_NOT_FOUND = 'TTS_MODEL_NOT_FOUND',
@@ -499,7 +499,7 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
     TTS_INVALID_VOICE = 'TTS_INVALID_VOICE'
   }
   ```
-- [ ] Create lib/utils/error-handler.ts for TTS-specific errors:
+- [x] Create lib/utils/error-handler.ts for TTS-specific errors:
   - Function: `handleTTSError(error: any): { message: string, code: TTSErrorCode }`
   - Map Python service errors to error codes and user-friendly messages:
     - Service spawn failure → TTS_NOT_INSTALLED: "KokoroTTS not installed. Run: uv pip install -r requirements.txt"
@@ -507,14 +507,14 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
     - Service timeout → TTS_TIMEOUT: "Voice generation timed out. Please try again."
     - Service crash → TTS_SERVICE_ERROR: "TTS service not responding. Please restart."
     - Invalid voice ID → TTS_INVALID_VOICE: "Voice not available. Please select from voice list."
-- [ ] Update KokoroProvider.generateAudio() error handling:
+- [x] Update KokoroProvider.generateAudio() error handling:
   - Catch Python service spawn errors → TTS_NOT_INSTALLED
   - Catch service timeout errors (30s limit cold, 10s warm) → TTS_TIMEOUT
   - Catch model loading errors → TTS_MODEL_NOT_FOUND
   - Catch service crashes → TTS_SERVICE_ERROR
   - Return errors in standard format: `{ success: false, error: { message, code } }`
-- [ ] Add logging with context (voice ID, text length, timestamp, error code)
-- [ ] Test error scenarios:
+- [x] Add logging with context (voice ID, text length, timestamp, error code)
+- [x] Test error scenarios:
   - Python not installed → TTS_NOT_INSTALLED
   - KokoroTTS package missing → TTS_MODEL_NOT_FOUND
   - Invalid voice ID → TTS_INVALID_VOICE
@@ -530,22 +530,22 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #5
 
 **Subtasks:**
-- [ ] Create scripts/cleanup-audio.ts Node.js script:
+- [x] Create scripts/cleanup-audio.ts Node.js script:
   - Scan `.cache/audio/projects/` directory
   - Identify project directories not accessed in >30 days (check mtime)
   - NEVER delete preview audio (`.cache/audio/previews/` is exempt)
   - Delete old project audio directories
   - Log deleted directories and space freed
-- [ ] Add command-line flags:
+- [x] Add command-line flags:
   - `--dry-run`: Show what would be deleted without deleting
   - `--days`: Configure age threshold (default 30)
-- [ ] Add npm script: `"cleanup:audio": "tsx scripts/cleanup-audio.ts"`
-- [ ] Implement safety checks:
+- [x] Add npm script: `"cleanup:audio": "tsx scripts/cleanup-audio.ts"`
+- [x] Implement safety checks:
   - Never delete preview audio files (hardcoded exemption)
   - Require confirmation for non-dry-run mode
   - Validate paths before deletion (prevent directory traversal)
-- [ ] Test script with mock directories
-- [ ] Document cleanup policy in script header comment
+- [x] Test script with mock directories
+- [x] Document cleanup policy in script header comment
 
 **Estimated Effort:** 2 hours
 
@@ -556,21 +556,21 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #1, #4, #6
 
 **Subtasks:**
-- [ ] Create tests/integration/tts-provider.test.ts
-- [ ] Test: KokoroProvider service lifecycle (spawn, keep alive, graceful shutdown)
-- [ ] Test: KokoroProvider.generateAudio() generates valid MP3 file with correct format
-- [ ] Test: Generated audio file has duration > 0 seconds
-- [ ] Test: Persistent service reuses model across multiple requests (performance test)
-- [ ] Test: Invalid voice ID returns TTS_INVALID_VOICE error code
-- [ ] Test: Missing KokoroTTS returns TTS_NOT_INSTALLED error with actionable message
-- [ ] Test: Timeout handling for long text synthesis returns TTS_TIMEOUT
-- [ ] Test: Audio file stored at correct relative path
-- [ ] Test: getTTSProvider() factory returns KokoroProvider instance
-- [ ] Test: Service restart on crash with exponential backoff
-- [ ] Mock Python service appropriately (or use test service)
-- [ ] Verify error codes and messages match specifications
-- [ ] Verify audio format (MP3, 128kbps, 44.1kHz, Mono)
-- [ ] Verify Uint8Array usage (not Buffer)
+- [x] Create tests/integration/tts-provider.test.ts
+- [x] Test: KokoroProvider service lifecycle (spawn, keep alive, graceful shutdown)
+- [x] Test: KokoroProvider.generateAudio() generates valid MP3 file with correct format
+- [x] Test: Generated audio file has duration > 0 seconds
+- [x] Test: Persistent service reuses model across multiple requests (performance test)
+- [x] Test: Invalid voice ID returns TTS_INVALID_VOICE error code
+- [x] Test: Missing KokoroTTS returns TTS_NOT_INSTALLED error with actionable message
+- [x] Test: Timeout handling for long text synthesis returns TTS_TIMEOUT
+- [x] Test: Audio file stored at correct relative path
+- [x] Test: getTTSProvider() factory returns KokoroProvider instance
+- [x] Test: Service restart on crash with exponential backoff
+- [x] Mock Python service appropriately (or use test service)
+- [x] Verify error codes and messages match specifications
+- [x] Verify audio format (MP3, 128kbps, 44.1kHz, Mono)
+- [x] Verify Uint8Array usage (not Buffer)
 
 **Estimated Effort:** 4 hours
 
@@ -581,22 +581,22 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #2, #5
 
 **Subtasks:**
-- [ ] Create tests/unit/voice-profiles.test.ts
-- [ ] Test: VOICE_PROFILES array contains 48+ profiles
-- [ ] Test: MVP_VOICES array contains exactly 5 profiles
-- [ ] Test: Each voice profile has required fields (id, name, gender, accent, tone, modelId)
-- [ ] Test: All voice IDs are unique
-- [ ] Test: All modelIds are unique
-- [ ] Test: Preview URLs follow correct format
-- [ ] Test: Gender values are valid ('male' or 'female')
-- [ ] Test: Accent and tone metadata is descriptive
-- [ ] Test: Helper functions (getVoiceById, getMVPVoices, etc.) work correctly
-- [ ] Create tests/unit/audio-storage.test.ts
-- [ ] Test: getPreviewAudioPath() generates correct relative paths
-- [ ] Test: getSceneAudioPath() handles project ID and scene number correctly
-- [ ] Test: validateAudioPath() prevents directory traversal attacks
-- [ ] Test: getAbsoluteAudioPath() resolves relative to absolute correctly
-- [ ] Test: Path formats match schema documentation
+- [x] Create tests/unit/voice-profiles.test.ts
+- [x] Test: VOICE_PROFILES array contains 48+ profiles
+- [x] Test: MVP_VOICES array contains exactly 5 profiles
+- [x] Test: Each voice profile has required fields (id, name, gender, accent, tone, modelId)
+- [x] Test: All voice IDs are unique
+- [x] Test: All modelIds are unique
+- [x] Test: Preview URLs follow correct format
+- [x] Test: Gender values are valid ('male' or 'female')
+- [x] Test: Accent and tone metadata is descriptive
+- [x] Test: Helper functions (getVoiceById, getMVPVoices, etc.) work correctly
+- [x] Create tests/unit/audio-storage.test.ts
+- [x] Test: getPreviewAudioPath() generates correct relative paths
+- [x] Test: getSceneAudioPath() handles project ID and scene number correctly
+- [x] Test: validateAudioPath() prevents directory traversal attacks
+- [x] Test: getAbsoluteAudioPath() resolves relative to absolute correctly
+- [x] Test: Path formats match schema documentation
 
 **Estimated Effort:** 3 hours
 
@@ -607,7 +607,7 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #1
 
 **Subtasks:**
-- [ ] Add TTS configuration to .env.local.example:
+- [x] Add TTS configuration to .env.local.example:
   ```bash
   # TTS Configuration
   TTS_PROVIDER=kokoro
@@ -619,14 +619,14 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
   TTS_AUDIO_SAMPLE_RATE=44100
   TTS_AUDIO_CHANNELS=1         # Mono
   ```
-- [ ] Document environment variables in setup guide:
+- [x] Document environment variables in setup guide:
   - TTS_PROVIDER: TTS engine to use (default: 'kokoro')
   - TTS_TIMEOUT_MS_COLD: Cold start timeout with model loading
   - TTS_TIMEOUT_MS_WARM: Warm timeout when model already loaded
   - TTS_MODEL_PATH: Optional custom model path
   - Audio format configuration variables
-- [ ] Add to .env.local (git-ignored) with actual values
-- [ ] Test environment variable loading in factory.ts and provider
+- [x] Add to .env.local (git-ignored) with actual values
+- [x] Test environment variable loading in factory.ts and provider
 
 **Estimated Effort:** 0.5 hours
 
@@ -637,7 +637,7 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
 **AC:** #4
 
 **Subtasks:**
-- [ ] Create docs/pattern-correspondence-epic1-epic2.md documenting pattern alignment:
+- [x] Create docs/pattern-correspondence-epic1-epic2.md documenting pattern alignment:
   ```markdown
   # Pattern Correspondence: Epic 1 (LLM) ↔ Epic 2 (TTS)
 
@@ -677,8 +677,8 @@ Implement the foundational TTS infrastructure for Epic 2 by integrating KokoroTT
   - Predictable behavior across different provider types
   - Easy to add new providers (follow established pattern)
   ```
-- [ ] Document benefits of pattern consistency
-- [ ] Cross-reference with architecture.md sections
+- [x] Document benefits of pattern consistency
+- [x] Cross-reference with architecture.md sections
 
 **Estimated Effort:** 1 hour
 
@@ -1219,66 +1219,66 @@ CREATE INDEX idx_scenes_number ON scenes(scene_number);
 ## Definition of Done
 
 **Code Complete:**
-- [ ] All 15 tasks completed and code merged
-- [ ] KokoroTTS package installed and verified
-- [ ] Persistent Python TTS service implemented with JSON protocol
-- [ ] All 48+ voice profiles documented in comprehensive catalog
-- [ ] MVP subset (5 voices) defined and previews generated
-- [ ] Preview audio generated with pre-sanitized text
-- [ ] TTS provider abstraction implemented following Epic 1 pattern
-- [ ] Audio storage structure created with relative path format
-- [ ] Schema documentation created for Story 2.2
+- [x] All 15 tasks completed and code merged
+- [x] KokoroTTS package installed and verified
+- [x] Persistent Python TTS service implemented with JSON protocol
+- [x] All 48+ voice profiles documented in comprehensive catalog
+- [x] MVP subset (5 voices) defined and previews generated
+- [x] Preview audio generated with pre-sanitized text
+- [x] TTS provider abstraction implemented following Epic 1 pattern
+- [x] Audio storage structure created with relative path format
+- [x] Schema documentation created for Story 2.2
 
 **Testing Complete:**
-- [ ] Unit tests written and passing (voice profiles, path utilities, sanitization)
-- [ ] Integration tests written and passing (TTS provider, persistent service, error handling)
-- [ ] Performance tests validate persistent service model (cold vs warm)
-- [ ] Manual testing: Listen to all preview audio samples
-- [ ] Manual testing: Verify TTS synthesis with various text inputs
-- [ ] Error scenarios tested with standard error codes (TTS_MODEL_NOT_FOUND, TTS_NOT_INSTALLED, etc.)
-- [ ] Service lifecycle tested (startup, multiple requests, graceful shutdown)
+- [x] Unit tests written and passing (voice profiles, path utilities, sanitization)
+- [x] Integration tests written and passing (TTS provider, persistent service, error handling)
+- [x] Performance tests validate persistent service model (cold vs warm)
+- [x] Manual testing: Listen to all preview audio samples
+- [x] Manual testing: Verify TTS synthesis with various text inputs
+- [x] Error scenarios tested with standard error codes (TTS_MODEL_NOT_FOUND, TTS_NOT_INSTALLED, etc.)
+- [x] Service lifecycle tested (startup, multiple requests, graceful shutdown)
 
 **Documentation Complete:**
-- [ ] Setup guide updated with TTS installation and service startup instructions
-- [ ] Complete voice catalog documented (48+ voices) in docs/kokoro-voice-catalog.md
-- [ ] Pattern correspondence table created (Epic 1 LLM ↔ Epic 2 TTS)
-- [ ] TTS service architecture documented with rationale
-- [ ] Schema output documented for Story 2.2 integration
-- [ ] Environment variables documented
-- [ ] API endpoint documented (GET /api/voice/list)
-- [ ] Cleanup policy documented (preview never deleted, project audio 30 days)
+- [x] Setup guide updated with TTS installation and service startup instructions
+- [x] Complete voice catalog documented (48+ voices) in docs/kokoro-voice-catalog.md
+- [x] Pattern correspondence table created (Epic 1 LLM ↔ Epic 2 TTS)
+- [x] TTS service architecture documented with rationale
+- [x] Schema output documented for Story 2.2 integration
+- [x] Environment variables documented
+- [x] API endpoint documented (GET /api/voice/list)
+- [x] Cleanup policy documented (preview never deleted, project audio 30 days)
 
 **Quality Checks:**
-- [ ] TypeScript strict mode passes (no type errors)
-- [ ] ESLint passes (no linting errors)
-- [ ] Code reviewed by peer or architect
-- [ ] Performance tested (preview <2s, scene <3s with warm service)
-- [ ] Performance tested (persistent service reuses model correctly)
-- [ ] Security reviewed (path validation, input sanitization)
-- [ ] Audio format validated (MP3, 128kbps, 44.1kHz, Mono)
-- [ ] Uint8Array used (not Buffer) for portability
+- [x] TypeScript strict mode passes (no type errors)
+- [x] ESLint passes (no linting errors)
+- [x] Code reviewed by peer or architect
+- [x] Performance tested (preview <2s, scene <3s with warm service)
+- [x] Performance tested (persistent service reuses model correctly)
+- [x] Security reviewed (path validation, input sanitization)
+- [x] Audio format validated (MP3, 128kbps, 44.1kHz, Mono)
+- [x] Uint8Array used (not Buffer) for portability
 
 **Deployment Ready:**
-- [ ] .env.local.example updated with TTS configuration
-- [ ] requirements.txt updated with KokoroTTS dependencies
-- [ ] .gitignore updated to exclude .cache/ and audio files
-- [ ] Migration path documented for cloud deployment
-- [ ] Service management documented (startup, shutdown, monitoring)
-- [ ] Rollback plan documented if issues found
+- [x] .env.local.example updated with TTS configuration
+- [x] requirements.txt updated with KokoroTTS dependencies
+- [x] .gitignore updated to exclude .cache/ and audio files
+- [x] Migration path documented for cloud deployment
+- [x] Service management documented (startup, shutdown, monitoring)
+- [x] Rollback plan documented if issues found
 
 **Acceptance Criteria Validated:**
-- [ ] AC1: TTS engine accessible via persistent service with model caching
-- [ ] AC2: All 48+ voices documented with comprehensive metadata and model IDs
-- [ ] AC3: Preview audio generated with pre-sanitized text
-- [ ] AC4: TTSProvider interface follows Epic 1 Ollama pattern
-- [ ] AC5: Audio storage with relative paths and schema docs for Story 2.2
-- [ ] AC6: Error handling with standard error codes (TTS_MODEL_NOT_FOUND, etc.)
+- [x] AC1: TTS engine accessible via persistent service with model caching
+- [x] AC2: All 48+ voices documented with comprehensive metadata and model IDs
+- [x] AC3: Preview audio generated with pre-sanitized text
+- [x] AC4: TTSProvider interface follows Epic 1 Ollama pattern
+- [x] AC5: Audio storage with relative paths and schema docs for Story 2.2
+- [x] AC6: Error handling with standard error codes (TTS_MODEL_NOT_FOUND, etc.)
 
 **Ready for Next Story:**
-- [ ] Story 2.2 can begin with exact schema fields documented
-- [ ] Story 2.3 can consume MVP voice profiles and preview audio
-- [ ] Story 2.5 can use TTSProvider abstraction with persistent service
-- [ ] Pattern correspondence enables consistent Epic 2 implementation
+- [x] Story 2.2 can begin with exact schema fields documented
+- [x] Story 2.3 can consume MVP voice profiles and preview audio
+- [x] Story 2.5 can use TTSProvider abstraction with persistent service
+- [x] Pattern correspondence enables consistent Epic 2 implementation
 
 ---
 

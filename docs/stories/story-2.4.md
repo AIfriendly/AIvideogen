@@ -696,3 +696,111 @@ so that **I can produce engaging videos without hiring a professional scriptwrit
 ### Debug Log References
 
 No critical issues encountered during implementation. All acceptance criteria satisfied.
+
+---
+
+## Post-Implementation Updates
+
+### Update 1: Script Review Page Implementation (2025-11-07)
+
+**Context:** After initial implementation, users were redirected back to chat immediately after script generation, creating a workflow gap. Users had no way to review their generated scripts before proceeding.
+
+**Issue:** The workflow jumped from script generation success directly back to project detail page without showing the generated content.
+
+**Solution Implemented:** Created dedicated script review page to display generated scripts with comprehensive statistics and navigation options.
+
+#### Files Created
+
+1. **`src/app/projects/[id]/script-review/page.tsx`** (71 lines)
+   - Server component that fetches project and scenes data
+   - Verifies script has been generated before display
+   - Retrieves selected voice profile information
+   - Passes data to client component
+
+2. **`src/app/projects/[id]/script-review/script-review-client.tsx`** (260 lines)
+   - Client component for interactive script review UI
+   - Displays success banner with generation confirmation
+   - Statistics dashboard: total scenes, word count, estimated duration
+   - Scene-by-scene display with individual word counts
+   - Warning badges for short scenes (< 50 words)
+   - Interactive scene highlighting on click
+   - Project context display (topic, selected voice)
+   - Navigation: "Back to Chat", "Regenerate Script"
+   - Placeholder: "Generate Voiceover (Coming Soon)" button (disabled)
+
+#### Files Modified
+
+1. **`src/app/projects/[id]/script-generation/script-generation-client.tsx`**
+   - Changed redirect target from `/projects/[id]` to `/projects/[id]/script-review`
+   - Updated UI message: "Redirecting to script review..."
+
+2. **`src/lib/tts/voice-profiles.ts`**
+   - Added re-export of `VoiceProfile` type for convenience
+   - Fixed TypeScript import issues across components
+
+3. **`src/app/projects/[id]/script-generation/page.tsx`**
+   - Fixed type safety: `getVoiceById()` returns `undefined` → converted to `null`
+
+#### Bug Fixes
+
+**Issue 1:** TypeScript build error - `VoiceProfile` type not exported
+- **Fix:** Added `export type { VoiceProfile } from './provider';` to voice-profiles.ts
+
+**Issue 2:** Type mismatch - `VoiceProfile | undefined` vs `VoiceProfile | null`
+- **Fix:** Used nullish coalescing operator `?? null` in page components
+
+#### Workflow Enhancement
+
+**Before:**
+```
+Script Generation (success) → [2 sec delay] → Chat UI (no review)
+```
+
+**After:**
+```
+Script Generation (success) → [2 sec delay] → Script Review Page → User Actions:
+  - Review all scenes with statistics
+  - Navigate back to chat
+  - Regenerate script if needed
+  - [Future] Generate voiceover
+```
+
+#### User Experience Improvements
+
+- ✅ Comprehensive script review with scene-by-scene breakdown
+- ✅ Quality indicators (word counts, duration estimates)
+- ✅ Visual warnings for potential issues (short scenes)
+- ✅ Project context always visible
+- ✅ Clear navigation options
+- ✅ Dark mode support throughout
+- ✅ Responsive design with proper spacing
+
+#### Future Enhancements (Planned)
+
+1. **Script Editing:** Inline editing of scene text with re-validation
+2. **Scene Reordering:** Drag-and-drop to reorder scenes
+3. **Audio Preview:** Generate and play preview audio for each scene
+4. **Export Options:** PDF, text, or clipboard export
+5. **Voiceover Generation:** Enable TTS generation (next story)
+
+#### Documentation Created
+
+- `docs/script-review-page-implementation.md` - Full implementation report with technical details, code examples, and testing results
+
+#### Build Status
+
+✅ All TypeScript errors resolved
+✅ Build passes successfully
+✅ Route properly integrated: `/projects/[id]/script-review`
+
+#### Impact
+
+This enhancement significantly improves the user experience by:
+1. Providing visibility into generated content before commitment
+2. Allowing quality assessment and decision-making
+3. Offering regeneration option without losing context
+4. Creating a natural transition point to voiceover generation
+5. Preventing confusion from abrupt redirects
+
+**Status:** ✅ Complete and production-ready
+**Related Documentation:** `docs/script-review-page-implementation.md`, `docs/script-generation-error-fix.md`
