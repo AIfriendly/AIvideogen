@@ -208,6 +208,7 @@ export function updateProject(
     name?: string;
     topic?: string;
     currentStep?: string;
+    config_json?: string;
   }
 ): void {
   try {
@@ -230,6 +231,11 @@ export function updateProject(
     if (updates.currentStep !== undefined) {
       fields.push('current_step = ?');
       values.push(updates.currentStep);
+    }
+
+    if (updates.config_json !== undefined) {
+      fields.push('config_json = ?');
+      values.push(updates.config_json);
     }
 
     // Always update last_active

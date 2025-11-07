@@ -23,6 +23,7 @@ import {
   createScenes,
   markScriptGenerated,
   updateProject,
+  deleteScenesByProjectId,
 } from '@/lib/db/queries';
 import { initializeDatabase } from '@/lib/db/init';
 import { generateScriptWithRetry, ScriptGenerationError } from '@/lib/llm/script-generator';
@@ -141,14 +142,17 @@ export async function POST(
     if (project.config_json) {
       try {
         projectConfig = JSON.parse(project.config_json);
+        console.log(`[Script Generation API] Using project config:`, projectConfig);
       } catch {
         // Ignore invalid JSON, proceed with defaults
         console.warn(`[Script Generation API] Invalid config_json for project ${projectId}`);
       }
+    } else {
+      console.log(`[Script Generation API] No config_json found, using defaults (3-5 scenes)`);
     }
 
     // Call business logic layer for script generation with retry
-    console.log(`[Script Generation API] Calling script generator...`);
+    console.log(`[Script Generation API] Calling script generator with config:`, projectConfig);
     let result;
     try {
       result = await generateScriptWithRetry(sanitizedTopic, projectConfig);
@@ -187,6 +191,12 @@ export async function POST(
       audio_file_path: null,
       duration: scene.estimatedDuration || null,
     }));
+
+    // If project already has scenes (regenerating), delete old scenes first
+    if (project.script_generated) {
+      console.log(`[Script Generation API] Deleting existing scenes for regeneration...`);
+      deleteScenesByProjectId(projectId);
+    }
 
     console.log(`[Script Generation API] Saving ${dbScenes.length} scenes to database...`);
 
