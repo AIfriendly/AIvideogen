@@ -24,7 +24,7 @@ vi.mock('@/lib/llm/factory', () => ({
   }),
 }));
 
-describe('1.7-INT: Topic Confirmation Workflow - Integration Tests', () => {
+describe('Topic Confirmation Workflow - Integration Tests', () => {
   const testProjectId = 'test-project-123';
 
   beforeEach(() => {
@@ -38,8 +38,8 @@ describe('1.7-INT: Topic Confirmation Workflow - Integration Tests', () => {
     `).run(testProjectId, 'New Project', 'topic', 'draft');
   });
 
-  describe('[P0] AC1 & AC2: Topic Detection and Dialog Display', () => {
-    it('1.7-INT-001 [P0]: should detect topic and trigger dialog when video creation command issued', async () => {
+  describe('AC1 & AC2: Topic Detection and Dialog Display', () => {
+    it('should detect topic and trigger dialog when video creation command issued', async () => {
       const requestBody = {
         projectId: testProjectId,
         message: 'Make a video about Mars colonization',
@@ -60,7 +60,7 @@ describe('1.7-INT: Topic Confirmation Workflow - Integration Tests', () => {
       expect(data.data.extractedTopic).toBe('Mars colonization');
     });
 
-    it('1.7-INT-002 [P0]: should not detect topic for non-video-creation messages', async () => {
+    it('should not detect topic for non-video-creation messages', async () => {
       const requestBody = {
         projectId: testProjectId,
         message: 'Hello, how are you?',
@@ -81,7 +81,7 @@ describe('1.7-INT: Topic Confirmation Workflow - Integration Tests', () => {
       expect(data.data.extractedTopic).toBeUndefined();
     });
 
-    it('1.7-INT-003 [P0]: should extract topic from conversation context', async () => {
+    it('should extract topic from conversation context', async () => {
       // Add some conversation history
       db.prepare(`
         INSERT INTO messages (id, project_id, role, content, timestamp)
@@ -112,8 +112,8 @@ describe('1.7-INT: Topic Confirmation Workflow - Integration Tests', () => {
     });
   });
 
-  describe('[P0] AC3: Confirm Topic', () => {
-    it('1.7-INT-004 [P0]: should update database when topic confirmed via PUT endpoint', async () => {
+  describe('AC3: Confirm Topic', () => {
+    it('should update database when topic confirmed via PUT endpoint', async () => {
       const updateBody = {
         topic: 'Mars colonization',
         name: 'Mars colonization',
@@ -151,7 +151,7 @@ describe('1.7-INT: Topic Confirmation Workflow - Integration Tests', () => {
       expect(project.current_step).toBe('voice');
     });
 
-    it('1.7-INT-005 [P2]: should truncate long topic for project name', async () => {
+    it('should truncate long topic for project name', async () => {
       const longTopic = 'A very long topic about space exploration and the future of humanity in the cosmos that exceeds fifty characters';
       const expectedName = longTopic.substring(0, 50).replace(/\s+\S*$/, ''); // Truncate to last word
 
@@ -182,8 +182,8 @@ describe('1.7-INT: Topic Confirmation Workflow - Integration Tests', () => {
     });
   });
 
-  describe('[P0] TopicConfirmation Component Integration', () => {
-    it('1.7-INT-006 [P0]: should handle confirmation workflow through API', async () => {
+  describe('TopicConfirmation Component Integration', () => {
+    it('should handle confirmation workflow through API', async () => {
       // Simulate user confirming a topic through API calls
       // 1. Chat detects topic
       const chatRequest = new Request('http://localhost:3000/api/chat', {
@@ -235,8 +235,8 @@ describe('1.7-INT: Topic Confirmation Workflow - Integration Tests', () => {
     });
   });
 
-  describe('[P1] AC4: Edit Workflow', () => {
-    it('1.7-INT-007 [P1]: should not update database topic when user chooses to edit', async () => {
+  describe('AC4: Edit Workflow', () => {
+    it('should not update database topic when user chooses to edit', async () => {
       // Simulate topic detection
       const chatRequest = new Request('http://localhost:3000/api/chat', {
         method: 'POST',
@@ -261,8 +261,8 @@ describe('1.7-INT: Topic Confirmation Workflow - Integration Tests', () => {
     });
   });
 
-  describe('[P1] Error Handling', () => {
-    it('1.7-INT-008 [P1]: should handle API errors during confirmation gracefully', async () => {
+  describe('Error Handling', () => {
+    it('should handle API errors during confirmation gracefully', async () => {
       // Create request with invalid project ID
       const updateBody = {
         topic: 'Test Topic',
@@ -291,8 +291,8 @@ describe('1.7-INT: Topic Confirmation Workflow - Integration Tests', () => {
     });
   });
 
-  describe('[P2] Multiple Refinement Cycles', () => {
-    it('1.7-INT-009 [P2]: should allow edit -> refine -> new command -> confirm workflow', async () => {
+  describe('Multiple Refinement Cycles', () => {
+    it('should allow edit -> refine -> new command -> confirm workflow', async () => {
       // First message
       let requestBody = {
         projectId: testProjectId,

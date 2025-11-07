@@ -73,3 +73,75 @@ export function messageRowToMessage(row: MessageRow): Message {
     timestamp: row.timestamp,
   };
 }
+
+/**
+ * Scene entity from scenes table
+ * Stores individual script segments with their associated audio files
+ */
+export interface Scene {
+  id: string;
+  projectId: string;        // Maps to project_id column
+  sceneNumber: number;      // Maps to scene_number column
+  text: string;
+  sanitizedText: string | null;  // Maps to sanitized_text column
+  audioFilePath: string | null;  // Maps to audio_file_path column
+  duration: number | null;
+  createdAt: string;        // Maps to created_at column (ISO 8601 timestamp)
+  updatedAt: string;        // Maps to updated_at column (ISO 8601 timestamp)
+}
+
+/**
+ * Raw database row for scenes table (snake_case)
+ */
+export interface SceneRow {
+  id: string;
+  project_id: string;
+  scene_number: number;
+  text: string;
+  sanitized_text: string | null;
+  audio_file_path: string | null;
+  duration: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Data for inserting a new scene
+ */
+export interface SceneInsert {
+  id?: string;  // Auto-generated if not provided
+  projectId: string;
+  sceneNumber: number;
+  text: string;
+  sanitizedText?: string | null;
+  audioFilePath?: string | null;
+  duration?: number | null;
+}
+
+/**
+ * Data for updating an existing scene
+ */
+export interface SceneUpdate {
+  text?: string;
+  sanitizedText?: string | null;
+  audioFilePath?: string | null;
+  duration?: number | null;
+  updatedAt?: string;
+}
+
+/**
+ * Helper function to convert SceneRow (snake_case) to Scene (camelCase)
+ */
+export function sceneRowToScene(row: SceneRow): Scene {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    sceneNumber: row.scene_number,
+    text: row.text,
+    sanitizedText: row.sanitized_text,
+    audioFilePath: row.audio_file_path,
+    duration: row.duration,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}

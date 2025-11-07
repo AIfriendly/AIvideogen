@@ -149,8 +149,6 @@ export function TopicConfirmation({
     >
       <DialogContent
         className="sm:max-w-[500px]"
-        aria-labelledby="topic-confirmation-title"
-        aria-describedby="topic-confirmation-description"
         onPointerDownOutside={(e) => {
           // Prevent backdrop click dismissal
           e.preventDefault();
@@ -161,13 +159,10 @@ export function TopicConfirmation({
         }}
       >
         <DialogHeader>
-          <DialogTitle
-            id="topic-confirmation-title"
-            className="text-2xl font-semibold"
-          >
+          <DialogTitle className="text-2xl font-semibold">
             Confirm Video Topic
           </DialogTitle>
-          <DialogDescription id="topic-confirmation-description">
+          <DialogDescription>
             Review the topic extracted from your conversation. Click Confirm to
             proceed to voice selection, or Edit to refine the topic through
             continued conversation.

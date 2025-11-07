@@ -52,3 +52,27 @@ CREATE TABLE IF NOT EXISTS messages (
 -- Indexes on messages for performance
 CREATE INDEX IF NOT EXISTS idx_messages_project ON messages(project_id);
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
+
+-- ============================================================================
+-- Epic 2: Content Generation Pipeline
+-- ============================================================================
+
+-- Scenes Table
+-- Stores individual script segments with their associated audio files
+CREATE TABLE IF NOT EXISTS scenes (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  scene_number INTEGER NOT NULL,
+  text TEXT NOT NULL,              -- Original script text from LLM
+  sanitized_text TEXT,             -- Cleaned text for TTS input
+  audio_file_path TEXT,            -- Path to generated MP3 file
+  duration REAL,                   -- Duration in seconds
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  UNIQUE(project_id, scene_number)
+);
+
+-- Indexes on scenes for performance
+CREATE INDEX IF NOT EXISTS idx_scenes_project ON scenes(project_id);
+CREATE INDEX IF NOT EXISTS idx_scenes_number ON scenes(scene_number);

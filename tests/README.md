@@ -1,33 +1,50 @@
-# Story 1.5 Critical Tests
+# Test Suite - AI Video Generator
 
-**Test Coverage:** Critical paths only (~40-50% coverage)
-**Estimated Time:** 2-3 days
-**Test Count:** 6 critical tests (15-20 test cases)
+**Coverage:** P0 Critical Tests + Story 1.5 Tests + Story 1.6 Security/Regression
+**Priority:** Security-first, regression prevention, functional coverage
 
 ---
 
 ## 🎯 What's Tested
 
-### ✅ Critical Test Coverage
+### ✅ P0 Critical Tests (Run on Every Commit)
 
-1. **1.5-UNIT-010: UUID Fallback** - Browser compatibility
-2. **1.5-INT-005: Error Code Mapping** - User-friendly errors
-3. **1.5-INT-003: 30s Timeout** - Request abortion
-4. **1.5-COMP-008: 5000 Char Validation** - Input limits
-5. **1.5-INT-002: State Persistence** - Per-project isolation
-6. **1.5-E2E-003: Project Isolation** - No conversation mixing
+**Security Tests (Story 1.6):**
+1. **1.6-API-SEC-001**: SQL injection protection (project name)
+2. **1.6-API-SEC-002**: XSS protection (project name)
+3. **1.6-API-SEC-003**: SQL injection protection (UUID parameter)
+4. **1.6-API-SEC-004**: CSRF protection (future E2E)
+5. **1.6-API-SEC-005**: Authorization bypass prevention (future)
+
+**Regression Tests (Story 1.6):**
+6. **1.6-E2E-404-001**: New Chat flow (prevents R-008: 404 bug)
+
+**Story 1.5 Critical Tests:**
+7. **1.5-UNIT-010**: UUID Fallback - Browser compatibility
+8. **1.5-INT-005**: Error Code Mapping - User-friendly errors
+9. **1.5-INT-003**: 30s Timeout - Request abortion
+10. **1.5-COMP-008**: 5000 Char Validation - Input limits
+11. **1.5-INT-002**: State Persistence - Per-project isolation
+12. **1.5-E2E-003**: Project Isolation - No conversation mixing
 
 ---
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### Run P0 Critical Tests
 
 ```bash
-npm install --save-dev vitest @vitest/ui @testing-library/react @testing-library/jest-dom @testing-library/user-event jsdom @vitejs/plugin-react
+# Run all P0 tests (security + regression)
+npm run test:p0
+
+# Run security tests only
+npm run test:security
+
+# Run regression tests only
+npm run test:regression
 ```
 
-### 2. Run Tests
+### Run All Tests
 
 ```bash
 # Run all tests
