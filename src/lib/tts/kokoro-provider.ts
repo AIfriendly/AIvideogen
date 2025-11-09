@@ -246,7 +246,8 @@ export class KokoroProvider implements TTSProvider {
             if (status.status === 'ready') {
               clearTimeout(timeout);
               this.serviceReady = true;
-              this.service!.stderr!.off('data', onStderr);
+              // DON'T remove stderr listener - keep logging for debugging
+              // this.service!.stderr!.off('data', onStderr);
               resolve();
               return;
             } else if (status.status === 'error') {
