@@ -30,18 +30,21 @@ function isValidSceneNumber(sceneNumber: string): boolean {
  * Validate audio file path security
  */
 function isValidAudioPath(audioPath: string): boolean {
+  // Normalize path separators to forward slashes for validation (Windows compatibility)
+  const normalizedPath = audioPath.replace(/\\/g, '/');
+
   // Must start with .cache/audio/projects/
-  if (!audioPath.startsWith('.cache/audio/projects/')) {
+  if (!normalizedPath.startsWith('.cache/audio/projects/')) {
     return false;
   }
 
   // Must end with .mp3
-  if (!audioPath.endsWith('.mp3')) {
+  if (!normalizedPath.endsWith('.mp3')) {
     return false;
   }
 
   // Must not contain directory traversal attempts
-  if (audioPath.includes('..')) {
+  if (normalizedPath.includes('..')) {
     return false;
   }
 
