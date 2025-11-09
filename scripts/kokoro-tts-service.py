@@ -58,6 +58,13 @@ import signal
 from pathlib import Path
 from typing import Dict, Any
 
+# Fix Windows encoding issue: Force UTF-8 for stdout
+# This prevents UnicodeEncodeError when kokoro_tts spinner uses Braille characters
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', line_buffering=True)
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', line_buffering=True)
+
 # Logging helper (stderr only, separate from JSON stdout)
 def log(level: str, message: str):
     """Log to stderr with timestamp"""
@@ -70,7 +77,9 @@ def signal_handler(signum, frame):
     log("INFO", f"Received signal {signum}, shutting down gracefully...")
     sys.exit(0)
 
-signal.signal(signal.SIGTERM, signal_handler)
+# SIGTERM is not supported on Windows, only set it on Unix systems
+if hasattr(signal, 'SIGTERM'):
+    signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
 def main():
@@ -83,11 +92,10 @@ def main():
     log("INFO", "Loading KokoroTTS model (82M parameters, ~320MB)...")
 
     try:
-        # Import and load model (THIS HAPPENS ONCE - PERSISTENT CACHING)
-        from kokoro_tts import KokoroTTS
-        model = KokoroTTS()
+        # Import KokoroTTS functions
+        from kokoro_tts import convert_text_to_audio
 
-        log("INFO", "Model loaded successfully into memory")
+        log("INFO", "KokoroTTS functions loaded successfully")
 
         # Notify parent process that we're ready
         status_ready = {"status": "ready", "model": "kokoro-82m"}
@@ -146,7 +154,7 @@ def main():
             action = request.get("action")
 
             if action == "synthesize":
-                handle_synthesize(model, request)
+                handle_synthesize(request)
 
             elif action == "ping":
                 # Health check
@@ -191,7 +199,7 @@ def main():
 
     log("INFO", f"TTS Service shutting down after processing {request_count} requests")
 
-def handle_synthesize(model, request: Dict[str, Any]):
+def handle_synthesize(request: Dict[str, Any]):
     """
     Handle synthesize request
 
@@ -203,6 +211,10 @@ def handle_synthesize(model, request: Dict[str, Any]):
       "outputPath": ".cache/audio/test.mp3"
     }
     """
+    import tempfile
+    from mutagen.mp3 import MP3
+    from kokoro_tts import convert_text_to_audio
+
     try:
         # Extract parameters
         text = request.get("text", "")
@@ -223,22 +235,46 @@ def handle_synthesize(model, request: Dict[str, Any]):
         output_file = Path(output_path)
         output_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Synthesize audio (MODEL ALREADY LOADED - FAST!)
-        # Note: Actual KokoroTTS API may differ - adjust as needed
-        audio = model.synthesize(text, voice=voice_id)
+        # Write text to temporary file (required by convert_text_to_audio API)
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as temp_text:
+            temp_text.write(text)
+            temp_text_path = temp_text.name
 
-        # Save to file
-        audio.save(
-            str(output_file),
-            format='mp3',
-            bitrate=128,
-            sample_rate=44100,
-            channels=1
-        )
+        try:
+            # Suppress stdout during TTS generation to prevent kokoro_tts spinner
+            # from writing to stdout (which is reserved for JSON responses only)
+            old_stdout = sys.stdout
+            sys.stdout = open(os.devnull, 'w')
 
-        # Get file stats
+            try:
+                # Synthesize audio using convert_text_to_audio
+                convert_text_to_audio(
+                    input_file=temp_text_path,
+                    output_file=str(output_file),
+                    voice=voice_id,
+                    speed=1.0,
+                    format='mp3'
+                )
+            finally:
+                # Close devnull and restore stdout
+                if sys.stdout != old_stdout:
+                    sys.stdout.close()
+                sys.stdout = old_stdout
+        finally:
+            # Clean up temp file
+            if os.path.exists(temp_text_path):
+                os.unlink(temp_text_path)
+
+        # Get file stats and duration
         file_size = output_file.stat().st_size
-        duration = getattr(audio, 'duration', 0.0)
+
+        # Calculate duration from MP3 file
+        try:
+            audio_info = MP3(str(output_file))
+            duration = audio_info.info.length
+        except:
+            # Fallback: estimate duration from file size (128kbps MP3)
+            duration = (file_size * 8) / (128 * 1024)
 
         log("INFO", f"Audio generated: {duration:.2f}s, {file_size} bytes")
 
