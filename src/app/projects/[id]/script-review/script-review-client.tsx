@@ -11,7 +11,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { VoiceProfile } from '@/lib/tts/voice-profiles';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Volume2, ArrowLeft, FileText } from 'lucide-react';
+import { CheckCircle, Volume2, ArrowLeft, FileText, ArrowRight } from 'lucide-react';
+import AudioPlayer from '@/components/ui/audio-player';
 
 interface Scene {
   id: string;
@@ -43,9 +44,22 @@ export default function ScriptReviewClient({
   const router = useRouter();
   const [selectedScene, setSelectedScene] = useState<number | null>(null);
 
+  // Check if all scenes have audio
+  const allScenesHaveAudio = scenes.every((scene) => scene.audio_file_path !== null);
+
   // Calculate word count for a scene
   const getWordCount = (text: string): number => {
     return text.trim().split(/\s+/).length;
+  };
+
+  // Navigate to voiceover generation page
+  const handleGenerateVoiceover = () => {
+    router.push(`/projects/${projectId}/voiceover`);
+  };
+
+  // Navigate to visual sourcing page
+  const handleContinueToVisualSourcing = () => {
+    router.push(`/projects/${projectId}/visual-sourcing`);
   };
 
   // Calculate total word count
@@ -208,6 +222,9 @@ export default function ScriptReviewClient({
                   <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
                     {scene.text}
                   </p>
+                  {scene.audio_file_path && (
+                    <AudioPlayer projectId={projectId} sceneNumber={scene.scene_number} />
+                  )}
                 </div>
               );
             })}
@@ -222,15 +239,29 @@ export default function ScriptReviewClient({
               <Button
                 size="lg"
                 className="w-full"
-                disabled
+                onClick={handleGenerateVoiceover}
               >
                 <Volume2 className="w-4 h-4 mr-2" />
-                Generate Voiceover (Coming Soon)
+                Generate Voiceover
               </Button>
               <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
-                Voiceover generation will be available in a future update.
-                Your script has been saved and is ready for the next step.
+                Click to generate professional audio narration for all scenes.
               </p>
+              {allScenesHaveAudio && (
+                <>
+                  <Button
+                    size="lg"
+                    className="w-full"
+                    onClick={handleContinueToVisualSourcing}
+                  >
+                    <ArrowRight className="w-4 h-4 mr-2" />
+                    Continue to Visual Sourcing
+                  </Button>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
+                    All scenes have audio. Proceed to the next step.
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
