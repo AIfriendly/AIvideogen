@@ -14,24 +14,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeDatabase } from '@/lib/db/init';
+import { getProgress } from '@/lib/stores/voiceover-progress-cache';
 
 // Initialize database on first import (idempotent)
-initializeDatabase();
-
-/**
- * In-memory progress tracking (shared with generation endpoint)
- * This would ideally be a Redis cache in production
- */
-const progressMap = new Map<
-  string,
-  {
-    currentScene: number;
-    totalScenes: number;
-    status: 'generating' | 'complete' | 'error';
-    error?: string;
-    sceneNumber?: number;
-  }
->();
+await initializeDatabase();
 
 /**
  * GET /api/projects/[id]/voiceover-progress
@@ -95,8 +81,8 @@ export async function GET(
   try {
     const { id: projectId } = await params;
 
-    // Get progress from map
-    const progress = progressMap.get(projectId);
+    // Get progress from cache
+    const progress = getProgress(projectId);
 
     if (!progress) {
       // No progress data means generation hasn't started or was cleaned up
@@ -111,21 +97,14 @@ export async function GET(
       });
     }
 
-    // Calculate progress percentage
-    const progressPercent =
-      progress.totalScenes > 0
-        ? Math.round((progress.currentScene / progress.totalScenes) * 100)
-        : 0;
-
     return NextResponse.json({
       success: true,
       data: {
         status: progress.status,
         currentScene: progress.currentScene,
         totalScenes: progress.totalScenes,
-        progress: progressPercent,
-        sceneNumber: progress.sceneNumber,
-        error: progress.error,
+        progress: progress.progress,
+        error: progress.errorMessage,
       },
     });
   } catch (error) {
@@ -140,8 +119,3 @@ export async function GET(
     );
   }
 }
-
-/**
- * Export progress map for sharing with generation endpoint
- */
-export { progressMap };

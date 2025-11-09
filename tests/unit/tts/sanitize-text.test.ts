@@ -12,17 +12,17 @@
  * @module tests/unit/tts/sanitize-text.test
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import {
   sanitizeForTTS,
   validateSanitization,
   PREVIEW_TEXT
 } from '@/lib/tts/sanitize-text';
 
-describe('Text Sanitization - Unit Tests', () => {
-  describe('AC3: Text Sanitization for TTS', () => {
-    describe('Markdown Formatting Removal', () => {
-      it('should remove bold markdown formatting', () => {
+describe('2.5-UNIT Text Sanitization - Unit Tests', () => {
+  describe('AC2-AC3: Text Sanitization for TTS [P0]', () => {
+    describe('Markdown Formatting Removal [P1]', () => {
+      it('[2.5-UNIT-001] [P1] should remove bold markdown formatting', () => {
         // Given: Text with bold markdown
         const input = '**Bold text** and normal text **more bold**';
         // When: Sanitizing for TTS
@@ -32,7 +32,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result).not.toContain('**');
       });
 
-      it('should remove italic markdown formatting', () => {
+      it('[2.5-UNIT-002] [P1] should remove italic markdown formatting', () => {
         // Given: Text with italic markdown (both * and _)
         const input1 = '*Italic text* and normal text *more italic*';
         const input2 = '_Italic text_ and normal text _more italic_';
@@ -46,7 +46,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result2).not.toContain('_');
       });
 
-      it('should remove underline markdown formatting', () => {
+      it('[2.5-UNIT-003] [P1] should remove underline markdown formatting', () => {
         // Given: Text with underline markdown
         const input = '__Underlined text__ and normal';
         // When: Sanitizing for TTS
@@ -56,7 +56,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result).not.toContain('__');
       });
 
-      it('should remove code markdown formatting', () => {
+      it('[2.5-UNIT-004] [P1] should remove code markdown formatting', () => {
         // Given: Text with code backticks
         const input = 'Here is `inline code` in the text';
         // When: Sanitizing for TTS
@@ -66,7 +66,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result).not.toContain('`');
       });
 
-      it('should remove strikethrough markdown formatting', () => {
+      it('[2.5-UNIT-005] [P1] should remove strikethrough markdown formatting', () => {
         // Given: Text with strikethrough
         const input = '~~Strikethrough text~~ and normal';
         // When: Sanitizing for TTS
@@ -76,7 +76,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result).not.toContain('~~');
       });
 
-      it('should remove markdown headers', () => {
+      it('[2.5-UNIT-006] [P1] should remove markdown headers', () => {
         // Given: Text with various header levels
         const input = '# Header 1\n## Header 2\n### Header 3\nNormal text';
         // When: Sanitizing for TTS
@@ -86,7 +86,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result).not.toContain('#');
       });
 
-      it('should handle nested markdown formatting', () => {
+      it('[2.5-UNIT-007] [P1] should handle nested markdown formatting', () => {
         // Given: Text with nested markdown
         const input = '**Bold with *italic* inside** and __underline with `code`__';
         // When: Sanitizing for TTS
@@ -97,8 +97,8 @@ describe('Text Sanitization - Unit Tests', () => {
       });
     });
 
-    describe('Scene Label Removal', () => {
-      it('should remove "Scene X:" labels', () => {
+    describe('Scene Label Removal [P1]', () => {
+      it('[2.5-UNIT-008] [P1] should remove "Scene X:" labels', () => {
         // Given: Text with scene labels
         const inputs = [
           'Scene 1: The beginning of the story',
@@ -116,7 +116,7 @@ describe('Text Sanitization - Unit Tests', () => {
         results.forEach(r => expect(r).not.toMatch(/scene\s+\d+/i));
       });
 
-      it('should remove "Title:" labels', () => {
+      it('[2.5-UNIT-009] [P1] should remove "Title:" labels', () => {
         // Given: Text with title labels
         const inputs = [
           'Title: My Great Story',
@@ -132,7 +132,7 @@ describe('Text Sanitization - Unit Tests', () => {
         results.forEach(r => expect(r).not.toMatch(/title:/i));
       });
 
-      it('should handle multiple scene labels in text', () => {
+      it('[2.5-UNIT-010] [P1] should handle multiple scene labels in text', () => {
         // Given: Text with multiple scene labels
         const input = 'Scene 1: First part\nScene 2: Second part\nScene 3: Third part';
         // When: Sanitizing
@@ -143,8 +143,8 @@ describe('Text Sanitization - Unit Tests', () => {
       });
     });
 
-    describe('Stage Direction Removal', () => {
-      it('should remove stage directions in square brackets', () => {
+    describe('Stage Direction Removal [P1]', () => {
+      it('[2.5-UNIT-011] [P1] should remove stage directions in square brackets', () => {
         // Given: Text with stage directions
         const input = 'He walked [slowly] to the door [opens door] and left.';
         // When: Sanitizing for TTS
@@ -155,7 +155,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result).not.toContain(']');
       });
 
-      it('should handle nested brackets', () => {
+      it('[2.5-UNIT-012] [P2] should handle nested brackets', () => {
         // Given: Text with nested brackets
         const input = 'The actor [turns to audience [smiling]] speaks.';
         // When: Sanitizing for TTS
@@ -164,7 +164,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result).toBe('The actor speaks.');
       });
 
-      it('should handle multiple stage directions', () => {
+      it('[2.5-UNIT-013] [P1] should handle multiple stage directions', () => {
         // Given: Text with multiple stage directions
         const input = '[Enter stage left] Hello [waves] there [exits]';
         // When: Sanitizing for TTS
@@ -174,8 +174,8 @@ describe('Text Sanitization - Unit Tests', () => {
       });
     });
 
-    describe('Whitespace Handling', () => {
-      it('should collapse multiple spaces to single space', () => {
+    describe('Whitespace Handling [P1]', () => {
+      it('[2.5-UNIT-014] [P1] should collapse multiple spaces to single space', () => {
         // Given: Text with multiple spaces
         const input = 'Text  with   multiple    spaces';
         // When: Sanitizing for TTS
@@ -184,7 +184,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result).toBe('Text with multiple spaces');
       });
 
-      it('should collapse multiple newlines to single space', () => {
+      it('[2.5-UNIT-015] [P1] should collapse multiple newlines to single space', () => {
         // Given: Text with multiple newlines
         const input = 'First line\n\n\nSecond line\n\nThird line';
         // When: Sanitizing for TTS
@@ -193,7 +193,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result).toBe('First line Second line Third line');
       });
 
-      it('should handle tabs and mixed whitespace', () => {
+      it('[2.5-UNIT-016] [P2] should handle tabs and mixed whitespace', () => {
         // Given: Text with tabs and mixed whitespace
         const input = 'Text\twith\t\ttabs\n\nand  spaces';
         // When: Sanitizing for TTS
@@ -202,7 +202,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result).toBe('Text with tabs and spaces');
       });
 
-      it('should trim leading and trailing whitespace', () => {
+      it('[2.5-UNIT-017] [P1] should trim leading and trailing whitespace', () => {
         // Given: Text with leading/trailing whitespace
         const input = '  \n\t  Trimmed text  \n\t  ';
         // When: Sanitizing for TTS
@@ -212,8 +212,8 @@ describe('Text Sanitization - Unit Tests', () => {
       });
     });
 
-    describe('Complex Sanitization Scenarios', () => {
-      it('should handle realistic script text', () => {
+    describe('Complex Sanitization Scenarios [P0]', () => {
+      it('[2.5-UNIT-018] [P0] should handle realistic script text', () => {
         // Given: Realistic script with mixed formatting
         const input = `
           # Scene 1: The Introduction
@@ -232,7 +232,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result).toBe('The Introduction Narrator: Welcome to our story. This is a tale about adventure and discovery. Let\'s begin our journey together.');
       });
 
-      it('should handle empty or whitespace-only input', () => {
+      it('[2.5-UNIT-019] [P2] should handle empty or whitespace-only input', () => {
         // Given: Various empty inputs
         const inputs = ['', '   ', '\n\n\n', '\t\t'];
         // When: Sanitizing each
@@ -241,7 +241,7 @@ describe('Text Sanitization - Unit Tests', () => {
         results.forEach(r => expect(r).toBe(''));
       });
 
-      it('should preserve punctuation and special characters', () => {
+      it('[2.5-UNIT-020] [P1] should preserve punctuation and special characters', () => {
         // Given: Text with punctuation
         const input = 'Hello! How are you? I\'m fine, thanks. Cost: $19.99 (on sale!)';
         // When: Sanitizing for TTS
@@ -250,7 +250,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result).toBe('Hello! How are you? I\'m fine, thanks. Cost: $19.99 (on sale!)');
       });
 
-      it('should handle unicode and international characters', () => {
+      it('[2.5-UNIT-021] [P2] should handle unicode and international characters', () => {
         // Given: Text with unicode
         const input = 'Hello 你好 مرحبا שלום здравствуйте';
         // When: Sanitizing for TTS
@@ -261,9 +261,9 @@ describe('Text Sanitization - Unit Tests', () => {
     });
   });
 
-  describe('Sanitization Validation', () => {
-    describe('validateSanitization function', () => {
-      it('should validate clean text as valid', () => {
+  describe('Sanitization Validation [P1]', () => {
+    describe('validateSanitization function [P1]', () => {
+      it('[2.5-UNIT-022] [P1] should validate clean text as valid', () => {
         // Given: Clean text
         const input = 'This is perfectly clean text for TTS.';
         // When: Validating sanitization
@@ -273,7 +273,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result.issues).toHaveLength(0);
       });
 
-      it('should detect asterisk markdown', () => {
+      it('[2.5-UNIT-023] [P1] should detect asterisk markdown', () => {
         // Given: Text with asterisks
         const input = 'Text with *asterisk* markdown';
         // When: Validating sanitization
@@ -283,7 +283,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result.issues).toContain('Contains asterisk');
       });
 
-      it('should detect hash symbols', () => {
+      it('[2.5-UNIT-024] [P1] should detect hash symbols', () => {
         // Given: Text with hash
         const input = '# Header text';
         // When: Validating sanitization
@@ -293,7 +293,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result.issues).toContain('Contains hash symbol');
       });
 
-      it('should detect underscore markdown', () => {
+      it('[2.5-UNIT-025] [P1] should detect underscore markdown', () => {
         // Given: Text with underscores
         const input = 'Text with _underscore_ markdown';
         // When: Validating sanitization
@@ -303,7 +303,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result.issues).toContain('Contains underscore');
       });
 
-      it('should detect scene labels', () => {
+      it('[2.5-UNIT-026] [P1] should detect scene labels', () => {
         // Given: Text with scene label
         const input = 'Scene 1: Beginning';
         // When: Validating sanitization
@@ -313,7 +313,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(result.issues).toContain('Contains scene label');
       });
 
-      it('should detect multiple issues', () => {
+      it('[2.5-UNIT-027] [P1] should detect multiple issues', () => {
         // Given: Text with multiple issues
         const input = '# Scene 1: **Bold** text with _italic_';
         // When: Validating sanitization
@@ -328,8 +328,8 @@ describe('Text Sanitization - Unit Tests', () => {
       });
     });
 
-    describe('Preview Text Validation', () => {
-      it('should have pre-sanitized preview text constant', () => {
+    describe('Preview Text Validation [P1]', () => {
+      it('[2.5-UNIT-028] [P1] should have pre-sanitized preview text constant', () => {
         // Given: PREVIEW_TEXT constant
         // When: Checking if it exists and is clean
         // Then: Should be defined and valid
@@ -338,7 +338,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(PREVIEW_TEXT.length).toBeGreaterThan(0);
       });
 
-      it('should have valid preview text that passes sanitization', () => {
+      it('[2.5-UNIT-029] [P1] should have valid preview text that passes sanitization', () => {
         // Given: The preview text constant
         // When: Validating it
         const validation = validateSanitization(PREVIEW_TEXT);
@@ -347,7 +347,7 @@ describe('Text Sanitization - Unit Tests', () => {
         expect(validation.issues).toHaveLength(0);
       });
 
-      it('should not change preview text when sanitized', () => {
+      it('[2.5-UNIT-030] [P1] should not change preview text when sanitized', () => {
         // Given: Pre-sanitized preview text
         // When: Running through sanitization
         const sanitized = sanitizeForTTS(PREVIEW_TEXT);
@@ -357,8 +357,8 @@ describe('Text Sanitization - Unit Tests', () => {
     });
   });
 
-  describe('Edge Cases and Error Handling', () => {
-    it('should handle very long text', () => {
+  describe('Edge Cases and Error Handling [P2]', () => {
+    it('[2.5-UNIT-031] [P2] should handle very long text', () => {
       // Given: Very long text (over 5000 chars)
       const longText = 'Lorem ipsum '.repeat(500);
       // When: Sanitizing
@@ -368,7 +368,7 @@ describe('Text Sanitization - Unit Tests', () => {
       expect(result.length).toBeGreaterThan(0);
     });
 
-    it('should handle text with only markdown', () => {
+    it('[2.5-UNIT-032] [P2] should handle text with only markdown', () => {
       // Given: Text that is only markdown
       const input = '**********';
       // When: Sanitizing
@@ -377,7 +377,7 @@ describe('Text Sanitization - Unit Tests', () => {
       expect(result).toBe('');
     });
 
-    it('should handle text with only stage directions', () => {
+    it('[2.5-UNIT-033] [P2] should handle text with only stage directions', () => {
       // Given: Text that is only stage directions
       const input = '[Enter] [Exit] [Pause]';
       // When: Sanitizing
@@ -386,7 +386,7 @@ describe('Text Sanitization - Unit Tests', () => {
       expect(result).toBe('');
     });
 
-    it('should be idempotent (same result when applied twice)', () => {
+    it('[2.5-UNIT-034] [P2] should be idempotent (same result when applied twice)', () => {
       // Given: Text with markdown
       const input = '**Bold** and *italic* Scene 1: Test [stage]';
       // When: Sanitizing twice
@@ -396,7 +396,7 @@ describe('Text Sanitization - Unit Tests', () => {
       expect(twice).toBe(once);
     });
 
-    it('should handle null or undefined gracefully', () => {
+    it('[2.5-UNIT-035] [P2] should handle null or undefined gracefully', () => {
       // Given: Invalid inputs
       // When/Then: Should handle gracefully
       expect(() => sanitizeForTTS(null as any)).not.toThrow();

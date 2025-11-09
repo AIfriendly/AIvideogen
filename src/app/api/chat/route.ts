@@ -47,6 +47,9 @@ import { generateProjectName } from '@/lib/utils/generate-project-name';
 import { extractTopicFromConversation } from '@/lib/conversation/topic-extraction';
 import { Message } from '@/types/api';
 
+// Remove timeout limit for LLM operations
+export const maxDuration = 1200; // 20 minutes for long-form content generation
+
 // Initialize database on first import (idempotent - safe to call multiple times)
 initializeDatabase();
 

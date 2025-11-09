@@ -17,30 +17,18 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getProject, getScenesByProjectId } from '@/lib/db/queries';
+import { getProject, getScenesByProjectId, updateProject } from '@/lib/db/queries';
 import { initializeDatabase } from '@/lib/db/init';
+import { generateVoiceoversWithProgress } from '@/lib/tts/voiceover-generator';
 import {
-  generateVoiceoversWithProgress,
-  validateVoiceoverPrerequisites,
-} from '@/lib/tts/voiceover-generator';
+  setProgress,
+  updateProgress as updateProgressCache,
+  completeProgress,
+  failProgress,
+} from '@/lib/stores/voiceover-progress-cache';
 
 // Initialize database on first import (idempotent)
-initializeDatabase();
-
-/**
- * In-memory progress tracking
- * Maps projectId -> { currentScene, totalScenes, status, error }
- */
-const progressMap = new Map<
-  string,
-  {
-    currentScene: number;
-    totalScenes: number;
-    status: 'generating' | 'complete' | 'error';
-    error?: string;
-    sceneNumber?: number;
-  }
->();
+await initializeDatabase();
 
 /**
  * POST /api/projects/[id]/generate-voiceovers
@@ -114,12 +102,13 @@ export async function POST(
 
     console.log(`[Voiceover Generation API] Starting generation for project: ${projectId}`);
 
-    // Validate project ID is provided
-    if (!projectId) {
+    // Validate project ID format (UUID v4) - Security: Prevent path traversal
+    const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!projectId || !uuidV4Regex.test(projectId)) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Project ID is required',
+          error: 'Invalid project ID format. Project ID must be a valid UUID v4.',
           code: 'INVALID_PROJECT_ID',
         },
         { status: 400 }
@@ -140,25 +129,25 @@ export async function POST(
       );
     }
 
-    // Validate prerequisites (script generated, voice selected)
-    try {
-      validateVoiceoverPrerequisites(project);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorCode = errorMessage;
-
-      let userMessage = 'Prerequisites not met';
-      if (errorCode === 'SCRIPT_NOT_GENERATED') {
-        userMessage = 'Script must be generated before voiceovers';
-      } else if (errorCode === 'VOICE_NOT_SELECTED') {
-        userMessage = 'Voice must be selected before voiceovers';
-      }
-
+    // Validate prerequisites: script generated
+    if (!project.script_generated) {
       return NextResponse.json(
         {
           success: false,
-          error: userMessage,
-          code: errorCode,
+          error: 'Script must be generated before voiceovers',
+          code: 'SCRIPT_NOT_GENERATED',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate prerequisites: voice selected
+    if (!project.voice_id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Voice must be selected before voiceovers',
+          code: 'VOICE_NOT_SELECTED',
         },
         { status: 400 }
       );
@@ -183,32 +172,32 @@ export async function POST(
     );
 
     // Initialize progress tracking
-    progressMap.set(projectId, {
+    setProgress(projectId, {
+      projectId,
+      status: 'generating',
       currentScene: 0,
       totalScenes: scenes.length,
-      status: 'generating',
+      progress: 0,
+      startedAt: new Date(),
     });
 
     // Generate voiceovers with progress tracking
     const result = await generateVoiceoversWithProgress(
       projectId,
-      project.voice_id!,
-      (currentScene, totalScenes, sceneNumber) => {
-        // Update progress map
-        progressMap.set(projectId, {
-          currentScene,
-          totalScenes,
-          status: 'generating',
-          sceneNumber,
-        });
+      scenes,
+      project.voice_id,
+      (currentScene, totalScenes) => {
+        // Update progress cache
+        updateProgressCache(projectId, currentScene, totalScenes);
       }
     );
 
     // Mark generation as complete
-    progressMap.set(projectId, {
-      currentScene: scenes.length,
-      totalScenes: scenes.length,
-      status: 'complete',
+    completeProgress(projectId);
+
+    // Update project workflow state
+    updateProject(projectId, {
+      current_step: 'visual-sourcing',
     });
 
     // Load updated scenes with audio paths
@@ -257,16 +246,11 @@ export async function POST(
       errorCode = 'DATABASE_ERROR';
     }
 
-    // Update progress map to error state
+    // Update progress cache to error state
     try {
-      const match = request.url.match(/\/projects\/([^/]+)\/generate-voiceovers/);
-      if (match && match[1]) {
-        progressMap.set(match[1], {
-          currentScene: 0,
-          totalScenes: 0,
-          status: 'error',
-          error: errorMessage,
-        });
+      const { id: projectId } = await params;
+      if (projectId) {
+        failProgress(projectId, errorMessage);
       }
     } catch (err) {
       // Ignore error in error handler
@@ -282,8 +266,3 @@ export async function POST(
     );
   }
 }
-
-/**
- * Export progress map for use in progress endpoint
- */
-export { progressMap };

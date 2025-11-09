@@ -1,75 +1,56 @@
 /**
- * Voiceover Generation Store
+ * Voiceover Store (Zustand)
  *
- * Manages state for voiceover generation workflow including:
- * - Generation status (idle, generating, complete, error)
- * - Progress tracking (current scene, total scenes)
- * - Error messages
+ * Client-side state management for voiceover generation UI.
+ * Tracks generation status, progress, and errors.
  *
- * @module lib/stores/voiceover-store
+ * Story 2.5: Voiceover Generation for Scenes
  */
 
 import { create } from 'zustand';
 
 /**
- * Generation status values
- */
-export type GenerationStatus = 'idle' | 'generating' | 'complete' | 'error';
-
-/**
- * Voiceover store state
+ * Voiceover store state interface
  */
 interface VoiceoverState {
-  /** Current generation status */
-  generationStatus: GenerationStatus;
-
-  /** Current scene being processed (1-indexed) */
+  // Generation state
+  generationStatus: 'idle' | 'generating' | 'complete' | 'error';
   currentScene: number | null;
-
-  /** Total number of scenes to process */
   totalScenes: number;
-
-  /** Progress percentage (0-100) */
-  progress: number;
-
-  /** Error message if status is 'error' */
+  progress: number; // 0-100
   errorMessage: string | null;
 
-  /** Scene number being processed */
-  currentSceneNumber: number | null;
-
-  /** Actions */
+  // Actions
   startGeneration: (totalScenes: number) => void;
-  updateProgress: (currentScene: number, totalScenes: number, sceneNumber: number) => void;
+  updateProgress: (currentScene: number, totalScenes: number) => void;
   completeGeneration: () => void;
   setError: (message: string) => void;
   resetState: () => void;
 }
 
 /**
- * Initial state values
+ * Initial state
  */
 const initialState = {
-  generationStatus: 'idle' as GenerationStatus,
+  generationStatus: 'idle' as const,
   currentScene: null,
   totalScenes: 0,
   progress: 0,
   errorMessage: null,
-  currentSceneNumber: null,
 };
 
 /**
- * Voiceover generation store
+ * Voiceover store hook
  *
- * Usage:
+ * @example
  * ```typescript
- * const { generationStatus, progress, startGeneration } = useVoiceoverStore();
+ * const { generationStatus, startGeneration, updateProgress } = useVoiceoverStore();
  *
  * // Start generation
  * startGeneration(5);
  *
  * // Update progress
- * updateProgress(3, 5, 3);
+ * updateProgress(3, 5); // 60%
  *
  * // Complete generation
  * completeGeneration();
@@ -80,58 +61,58 @@ export const useVoiceoverStore = create<VoiceoverState>((set) => ({
 
   /**
    * Start voiceover generation
-   *
-   * @param totalScenes - Total number of scenes to process
+   * @param totalScenes - Total number of scenes to generate
    */
-  startGeneration: (totalScenes: number) =>
+  startGeneration: (totalScenes: number) => {
     set({
       generationStatus: 'generating',
       currentScene: 0,
       totalScenes,
       progress: 0,
       errorMessage: null,
-      currentSceneNumber: null,
-    }),
+    });
+  },
 
   /**
    * Update generation progress
-   *
-   * @param currentScene - Current scene index (1-indexed)
+   * @param currentScene - Current scene being processed (1-indexed)
    * @param totalScenes - Total number of scenes
-   * @param sceneNumber - Scene number being processed
    */
-  updateProgress: (currentScene: number, totalScenes: number, sceneNumber: number) => {
-    const progress = totalScenes > 0 ? Math.round((currentScene / totalScenes) * 100) : 0;
+  updateProgress: (currentScene: number, totalScenes: number) => {
+    const progress = Math.round((currentScene / totalScenes) * 100);
     set({
       currentScene,
       totalScenes,
       progress,
-      currentSceneNumber: sceneNumber,
+      generationStatus: 'generating',
     });
   },
 
   /**
    * Mark generation as complete
    */
-  completeGeneration: () =>
+  completeGeneration: () => {
     set({
       generationStatus: 'complete',
       progress: 100,
-    }),
+    });
+  },
 
   /**
    * Set error state
-   *
-   * @param message - Error message
+   * @param message - Error message to display
    */
-  setError: (message: string) =>
+  setError: (message: string) => {
     set({
       generationStatus: 'error',
       errorMessage: message,
-    }),
+    });
+  },
 
   /**
-   * Reset to initial state
+   * Reset store to initial state
    */
-  resetState: () => set(initialState),
+  resetState: () => {
+    set(initialState);
+  },
 }));

@@ -81,9 +81,9 @@ export function ChatInterface({ projectId }: ChatInterfaceProps) {
     };
     addMessage(userMessage);
 
-    // AbortController with 30s timeout (Critical Requirement #3: 30s Timeout)
+    // AbortController with 20 minute timeout for LLM script generation
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 1200000); // 20 minutes
 
     try {
       setLoading(true);
@@ -130,7 +130,7 @@ export function ChatInterface({ projectId }: ChatInterfaceProps) {
 
       // Handle timeout errors specifically (Critical Requirement #3: Timeout Error Handling)
       if (err instanceof Error && err.name === 'AbortError') {
-        setError('Request timed out after 30 seconds. Please try again.');
+        setError('Request timed out after 20 minutes. Please try again.');
       } else {
         setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       }

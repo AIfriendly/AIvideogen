@@ -56,7 +56,6 @@ export function VoiceoverGenerator({ projectId, sceneCount }: VoiceoverGenerator
     totalScenes,
     progress,
     errorMessage,
-    currentSceneNumber,
     startGeneration,
     updateProgress,
     completeGeneration,
@@ -74,10 +73,10 @@ export function VoiceoverGenerator({ projectId, sceneCount }: VoiceoverGenerator
 
       const data = await response.json();
       if (data.success && data.data) {
-        const { status, currentScene, totalScenes, sceneNumber, error: progressError } = data.data;
+        const { status, currentScene, totalScenes, error: progressError } = data.data;
 
         if (status === 'generating') {
-          updateProgress(currentScene, totalScenes, sceneNumber || 0);
+          updateProgress(currentScene, totalScenes);
         } else if (status === 'complete') {
           completeGeneration();
           setIsGenerating(false);
@@ -169,7 +168,7 @@ export function VoiceoverGenerator({ projectId, sceneCount }: VoiceoverGenerator
           <CardHeader>
             <CardTitle>Generating Voiceovers</CardTitle>
             <CardDescription>
-              Processing scene {currentSceneNumber || currentScene} of {totalScenes}
+              Processing scene {currentScene} of {totalScenes}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

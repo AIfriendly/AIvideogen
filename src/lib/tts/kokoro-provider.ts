@@ -106,6 +106,15 @@ export class KokoroProvider implements TTSProvider {
     'kokoro-tts-service.py'
   );
 
+  // Python interpreter path (use venv to access installed packages)
+  private readonly pythonPath = resolve(
+    process.cwd(),
+    '..',
+    '.venv',
+    'Scripts',
+    'python.exe'
+  );
+
   /**
    * Ensure the TTS service is running and ready
    *
@@ -144,7 +153,7 @@ export class KokoroProvider implements TTSProvider {
     try {
       // Spawn Python service
       console.log('[TTS] Starting KokoroTTS service...');
-      this.service = spawn('python', [this.servicePath], {
+      this.service = spawn(this.pythonPath, [this.servicePath], {
         stdio: ['pipe', 'pipe', 'pipe'], // stdin, stdout, stderr
       });
 
@@ -184,6 +193,11 @@ export class KokoroProvider implements TTSProvider {
    *
    * The service communicates status via stderr (separate from JSON stdout).
    * We wait for {"status": "ready"} message to confirm model is loaded.
+   *
+   * Implementation uses line buffering to handle:
+   * - Multiple messages in one buffer
+   * - Partial messages across buffer chunks
+   * - Mixed JSON status messages and plain text logs
    */
   private async waitForServiceReady(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -207,38 +221,55 @@ export class KokoroProvider implements TTSProvider {
         return;
       }
 
+      // Line buffer to accumulate partial lines
+      let lineBuffer = '';
+
       // Listen for status messages on stderr
       const onStderr = (data: Buffer) => {
-        const message = data.toString().trim();
+        // Append new data to buffer
+        lineBuffer += data.toString();
 
-        // Try to parse as JSON status message
-        try {
-          const status: TTSStatusMessage = JSON.parse(message);
+        // Process all complete lines (terminated by \n)
+        let newlineIndex: number;
+        while ((newlineIndex = lineBuffer.indexOf('\n')) !== -1) {
+          // Extract complete line
+          const line = lineBuffer.substring(0, newlineIndex).trim();
+          lineBuffer = lineBuffer.substring(newlineIndex + 1);
 
-          if (status.status === 'ready') {
-            clearTimeout(timeout);
-            this.serviceReady = true;
-            this.service!.stderr!.off('data', onStderr);
-            resolve();
-          } else if (status.status === 'error') {
-            clearTimeout(timeout);
-            this.service!.stderr!.off('data', onStderr);
+          // Skip empty lines
+          if (!line) continue;
 
-            // Map error codes
-            const errorCode =
-              status.code === 'TTS_NOT_INSTALLED'
-                ? TTSErrorCode.TTS_NOT_INSTALLED
-                : status.code === 'TTS_MODEL_NOT_FOUND'
-                  ? TTSErrorCode.TTS_MODEL_NOT_FOUND
-                  : TTSErrorCode.TTS_SERVICE_ERROR;
+          // Try to parse as JSON status message
+          try {
+            const status: TTSStatusMessage = JSON.parse(line);
 
-            reject(new TTSError(errorCode, status.message || 'Service error'));
-          } else if (status.status === 'loading') {
-            console.log('[TTS]', status.message || 'Loading model...');
+            if (status.status === 'ready') {
+              clearTimeout(timeout);
+              this.serviceReady = true;
+              this.service!.stderr!.off('data', onStderr);
+              resolve();
+              return;
+            } else if (status.status === 'error') {
+              clearTimeout(timeout);
+              this.service!.stderr!.off('data', onStderr);
+
+              // Map error codes
+              const errorCode =
+                status.code === 'TTS_NOT_INSTALLED'
+                  ? TTSErrorCode.TTS_NOT_INSTALLED
+                  : status.code === 'TTS_MODEL_NOT_FOUND'
+                    ? TTSErrorCode.TTS_MODEL_NOT_FOUND
+                    : TTSErrorCode.TTS_SERVICE_ERROR;
+
+              reject(new TTSError(errorCode, status.message || 'Service error'));
+              return;
+            } else if (status.status === 'loading') {
+              console.log('[TTS]', status.message || 'Loading model...');
+            }
+          } catch {
+            // Not JSON, just log as regular stderr output
+            console.log('[TTS]', line);
           }
-        } catch {
-          // Not JSON, just log as regular stderr output
-          console.log('[TTS]', message);
         }
       };
 

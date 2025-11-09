@@ -1,0 +1,35 @@
+{
+  "timestamp": "2025-11-08T09:22:21.144Z",
+  "projectId": "f2990fff-c48e-48b7-8ca4-984ef2e284c1",
+  "results": {
+    "passed": 1,
+    "failed": 4,
+    "tests": [
+      {
+        "name": "Create project",
+        "passed": true,
+        "details": "Project ID: f2990fff-c48e-48b7-8ca4-984ef2e284c1"
+      },
+      {
+        "name": "Generate script",
+        "passed": false,
+        "details": "Script generation failed"
+      },
+      {
+        "name": "Select voice",
+        "passed": false,
+        "details": "Invalid voice ID: af_sarah"
+      },
+      {
+        "name": "Prerequisite validation",
+        "passed": false,
+        "details": "Should have rejected invalid request"
+      },
+      {
+        "name": "Voiceover generation API",
+        "passed": false,
+        "details": "Generation failed"
+      }
+    ]
+  }
+}

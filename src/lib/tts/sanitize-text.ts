@@ -1,265 +1,143 @@
 /**
- * Text Sanitization for TTS Generation
+ * Text Sanitization Module for TTS Audio Generation
  *
- * This module provides utilities to clean text before sending to TTS engine.
- * Removes markdown formatting, scene labels, stage directions, and other
- * non-speakable content that would cause TTS to sound unnatural.
+ * Removes non-speakable content from scene text before TTS generation:
+ * - Markdown formatting (*, #, _, `, **)
+ * - Scene labels ("Scene 1:", "Title:", "Narrator:")
+ * - Stage directions [in brackets]
+ * - Excess whitespace and newlines
  *
- * @module lib/tts/sanitize-text
+ * Ensures generated audio contains ONLY clean narration without artifacts.
  */
 
-/**
- * Sanitization result with validation feedback
- */
 export interface SanitizationResult {
-  /** Whether the text passes sanitization validation */
-  valid: boolean;
-  /** List of issues found (empty if valid) */
-  issues: string[];
+  sanitized: string;
+  originalLength: number;
+  sanitizedLength: number;
+  removedElements: string[];
 }
 
 /**
- * Sanitize text for TTS generation
+ * Sanitizes text for TTS generation by removing all non-speakable elements
  *
- * Removes:
- * - Markdown formatting (bold, italic, code, etc.)
- * - Markdown headers (###, ##, #)
- * - Scene labels ("Scene 1:", "Title:")
- * - Stage directions ([action], [emotion], etc.)
- * - Multiple consecutive whitespace
- *
- * Preserves:
- * - Punctuation (periods, commas, exclamation marks, etc.)
- * - Line breaks (collapsed to single space)
- * - Numbers and alphanumeric content
- *
- * @param text - Text to sanitize
- * @returns Sanitized text safe for TTS
+ * @param text - Raw scene text that may contain markdown, labels, or formatting
+ * @returns SanitizationResult with cleaned text and metadata
  *
  * @example
  * ```typescript
- * const input = "**Scene 1:** This is *important* text.";
- * const output = sanitizeForTTS(input);
- * // Result: "This is important text."
+ * const result = sanitizeForTTS("**Scene 1:** [music] Welcome\n\nto the *show*");
+ * // result.sanitized === "Welcome to the show"
  * ```
  */
-export function sanitizeForTTS(text: string): string {
-  if (!text || typeof text !== 'string') {
-    return '';
-  }
+export function sanitizeForTTS(text: string): SanitizationResult {
+  const originalLength = text.length;
+  const removedElements: string[] = [];
 
   let sanitized = text;
 
-  // ============================================
-  // Remove Markdown Formatting
-  // ============================================
+  // Step 1: Remove scene labels (must be at start of lines)
+  // Patterns: "Scene 1:", "Title:", "Narrator:", "[Audio]:", "[VO]:", "[Voiceover]:"
+  const sceneLabelRegex = /^(Scene \d+|Title|Narrator|\[.*?\]):\s*/gim;
+  const sceneLabelMatches = sanitized.match(sceneLabelRegex);
+  if (sceneLabelMatches) {
+    sceneLabelMatches.forEach(match => removedElements.push(match.trim()));
+    sanitized = sanitized.replace(sceneLabelRegex, '');
+  }
 
-  // Bold: **text** or __text__
-  sanitized = sanitized.replace(/\*\*(.+?)\*\*/g, '$1');
-  sanitized = sanitized.replace(/__(.+?)__/g, '$1');
+  // Step 2: Remove stage directions [in brackets]
+  const stageDirectionRegex = /\[.*?\]/g;
+  const stageDirectionMatches = sanitized.match(stageDirectionRegex);
+  if (stageDirectionMatches) {
+    stageDirectionMatches.forEach(match => removedElements.push(match));
+    sanitized = sanitized.replace(stageDirectionRegex, '');
+  }
 
-  // Italic: *text* or _text_
-  sanitized = sanitized.replace(/\*(.+?)\*/g, '$1');
-  sanitized = sanitized.replace(/_(.+?)_/g, '$1');
+  // Step 3: Remove markdown emphasis patterns (preserve content)
+  // Remove **bold** → bold, *italic* → italic, __underline__ → underline, ~~strikethrough~~ → strikethrough
+  sanitized = sanitized.replace(/\*\*([^*]+)\*\*/g, '$1'); // **bold**
+  sanitized = sanitized.replace(/\*([^*]+)\*/g, '$1'); // *italic*
+  sanitized = sanitized.replace(/__([^_]+)__/g, '$1'); // __underline__
+  sanitized = sanitized.replace(/~~([^~]+)~~/g, '$1'); // ~~strikethrough~~
 
-  // Code: `text`
-  sanitized = sanitized.replace(/`(.+?)`/g, '$1');
+  // Step 4: Remove markdown headings (### Title → Title)
+  const headingRegex = /^#{1,6}\s+/gm;
+  const headingMatches = sanitized.match(headingRegex);
+  if (headingMatches) {
+    headingMatches.forEach(match => removedElements.push(match.trim()));
+    sanitized = sanitized.replace(headingRegex, '');
+  }
 
-  // Strikethrough: ~~text~~
-  sanitized = sanitized.replace(/~~(.+?)~~/g, '$1');
+  // Step 5: Remove inline code backticks (`code` → code)
+  sanitized = sanitized.replace(/`([^`]+)`/g, '$1');
 
-  // ============================================
-  // Remove Markdown Headers
-  // ============================================
+  // Step 6: Remove remaining markdown characters (standalone)
+  const standaloneMarkdownRegex = /[*#_`~]/g;
+  sanitized = sanitized.replace(standaloneMarkdownRegex, '');
 
-  // Remove header markers: # Header, ## Header, etc.
-  sanitized = sanitized.replace(/^#+\s+/gm, '');
-
-  // ============================================
-  // Remove Scene Labels
-  // ============================================
-
-  // "Scene 1:", "Scene 2:", etc. (case insensitive)
-  sanitized = sanitized.replace(/^Scene\s+\d+:?\s*/gmi, '');
-
-  // "Title:", "Intro:", etc.
-  sanitized = sanitized.replace(/^Title:?\s*/gmi, '');
-  sanitized = sanitized.replace(/^Intro:?\s*/gmi, '');
-  sanitized = sanitized.replace(/^Outro:?\s*/gmi, '');
-
-  // ============================================
-  // Remove Stage Directions
-  // ============================================
-
-  // [action], [emotion], [pause], etc.
-  sanitized = sanitized.replace(/\[([^\]]+)\]/g, '');
-
-  // ============================================
-  // Remove URLs
-  // ============================================
-
-  // HTTP(S) URLs
-  sanitized = sanitized.replace(/https?:\/\/[^\s]+/g, '');
-
-  // ============================================
-  // Collapse Whitespace
-  // ============================================
-
-  // Replace multiple spaces with single space
+  // Step 7: Normalize whitespace
+  // Collapse multiple newlines to single space
+  sanitized = sanitized.replace(/\n\s*\n+/g, ' ');
+  // Collapse single newlines to space
+  sanitized = sanitized.replace(/\n/g, ' ');
+  // Collapse multiple spaces to single space
   sanitized = sanitized.replace(/\s+/g, ' ');
-
-  // Replace multiple line breaks with single line break
-  sanitized = sanitized.replace(/\n+/g, '\n');
-
-  // Trim leading/trailing whitespace
+  // Trim leading and trailing whitespace
   sanitized = sanitized.trim();
 
-  return sanitized;
-}
-
-/**
- * Validate text after sanitization
- *
- * Checks for common issues that might remain after sanitization:
- * - Markdown formatting characters (* # _ `)
- * - Scene labels (Scene 1, Scene 2, etc.)
- * - Stage directions ([...])
- * - URLs
- *
- * @param text - Text to validate (should be already sanitized)
- * @returns Validation result with list of issues
- *
- * @example
- * ```typescript
- * const text = "This is clean text.";
- * const result = validateSanitization(text);
- * // Result: { valid: true, issues: [] }
- *
- * const badText = "This has *markdown*.";
- * const result2 = validateSanitization(badText);
- * // Result: { valid: false, issues: ['Contains asterisk'] }
- * ```
- */
-export function validateSanitization(text: string): SanitizationResult {
-  const issues: string[] = [];
-
-  // Check for markdown formatting characters
-  if (text.includes('*')) {
-    issues.push('Contains asterisk (markdown formatting)');
-  }
-  if (text.includes('#')) {
-    issues.push('Contains hash symbol (markdown header)');
-  }
-  if (text.includes('_') && /_\w+_/.test(text)) {
-    issues.push('Contains underscore (markdown formatting)');
-  }
-  if (text.includes('`')) {
-    issues.push('Contains backtick (code formatting)');
-  }
-
-  // Check for scene labels
-  if (/Scene\s+\d+/i.test(text)) {
-    issues.push('Contains scene label (Scene N)');
-  }
-
-  // Check for stage directions
-  if (text.includes('[') && text.includes(']')) {
-    issues.push('Contains stage directions [...]');
-  }
-
-  // Check for URLs
-  if (/https?:\/\//i.test(text)) {
-    issues.push('Contains URL');
-  }
-
-  // Check for excessive whitespace
-  if (/\s{2,}/.test(text)) {
-    issues.push('Contains multiple consecutive spaces');
-  }
+  const sanitizedLength = sanitized.length;
 
   return {
-    valid: issues.length === 0,
-    issues,
+    sanitized,
+    originalLength,
+    sanitizedLength,
+    removedElements: [...new Set(removedElements)] // Remove duplicates
   };
 }
 
 /**
- * Pre-sanitized preview text for voice samples
+ * Validates that sanitized text contains no non-speakable artifacts
  *
- * This text is used to generate preview audio for all voice profiles.
- * It is pre-sanitized to ensure consistent, high-quality preview samples.
- *
- * Requirements:
- * - No markdown formatting
- * - No special characters
- * - Clear, natural speech
- * - 20-30 words (optimal for preview length)
- * - Representative of typical narration
- */
-export const PREVIEW_TEXT =
-  "Hello, I'm your AI video narrator. Let me help bring your story to life with clarity and emotion.";
-
-/**
- * Validate that preview text is properly sanitized
- *
- * This is a safety check to ensure PREVIEW_TEXT constant hasn't been
- * accidentally modified with non-speakable content.
- *
- * @returns Validation result
- */
-export function validatePreviewText(): SanitizationResult {
-  return validateSanitization(PREVIEW_TEXT);
-}
-
-/**
- * Sanitize and validate text in one step
- *
- * Convenience function that sanitizes text and returns both the
- * sanitized text and validation result.
- *
- * @param text - Text to sanitize
- * @returns Object with sanitized text and validation result
+ * @param text - Text to validate
+ * @returns true if text is clean, false if artifacts detected
  *
  * @example
  * ```typescript
- * const { sanitized, validation } = sanitizeAndValidate("**Scene 1:** Hello");
- * console.log(sanitized);  // "Hello"
- * console.log(validation.valid);  // true
+ * validateSanitized("Clean text."); // true
+ * validateSanitized("Text with *asterisk*"); // false
+ * validateSanitized("[Stage direction] text"); // false
  * ```
  */
-export function sanitizeAndValidate(text: string): {
-  sanitized: string;
-  validation: SanitizationResult;
-} {
-  const sanitized = sanitizeForTTS(text);
-  const validation = validateSanitization(sanitized);
-  return { sanitized, validation };
+export function validateSanitized(text: string): boolean {
+  // Check for remaining markdown characters
+  if (/[*#_`~]/.test(text)) {
+    return false;
+  }
+
+  // Check for remaining scene labels at start of string or after newlines
+  if (/^(Scene \d+|Title|Narrator|\[.*?\]):/im.test(text)) {
+    return false;
+  }
+
+  // Check for remaining stage directions
+  if (/\[.*?\]/.test(text)) {
+    return false;
+  }
+
+  // Check for excessive whitespace (multiple spaces or newlines)
+  if (/\s{2,}/.test(text)) {
+    return false;
+  }
+
+  // Text is clean
+  return true;
 }
 
 /**
- * Estimate speech duration from text
+ * Batch sanitization for multiple scene texts
  *
- * Rough estimate based on average speaking rate:
- * - Average: 150 words per minute
- * - Narration: ~130 words per minute (slower for clarity)
- *
- * Note: Actual duration will vary based on voice, punctuation, and content.
- * Use actual TTS-generated duration for accuracy.
- *
- * @param text - Text to estimate duration for
- * @returns Estimated duration in seconds
- *
- * @example
- * ```typescript
- * const text = "This is a test sentence with several words.";
- * const duration = estimateSpeechDuration(text);
- * // Result: ~2-3 seconds
- * ```
+ * @param texts - Array of scene texts to sanitize
+ * @returns Array of SanitizationResult objects
  */
-export function estimateSpeechDuration(text: string): number {
-  const words = text.trim().split(/\s+/).length;
-  const wordsPerMinute = 130; // Narration speed
-  const minutes = words / wordsPerMinute;
-  const seconds = minutes * 60;
-  return Math.round(seconds * 10) / 10; // Round to 1 decimal place
+export function sanitizeBatch(texts: string[]): SanitizationResult[] {
+  return texts.map(text => sanitizeForTTS(text));
 }

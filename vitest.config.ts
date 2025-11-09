@@ -8,6 +8,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./tests/setup.ts'],
+    testTimeout: 60000, // 60 seconds for TTS cold start (30s) + generation time
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

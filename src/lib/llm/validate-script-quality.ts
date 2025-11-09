@@ -13,6 +13,7 @@ import { BANNED_PHRASES } from './prompts/script-generation-prompt';
 export interface Scene {
   sceneNumber: number;
   text: string;
+  wordCount?: number; // Optional: LLM's self-reported word count
   estimatedDuration?: number;
 }
 
@@ -28,8 +29,9 @@ export interface ValidationResult {
 
 /**
  * Markdown and formatting characters that should not appear in TTS-ready text
+ * Note: Parentheses are allowed as they're normal punctuation
  */
-const MARKDOWN_CHARACTERS = ['*', '#', '_', '~~', '`', '[', ']', '(', ')'];
+const MARKDOWN_CHARACTERS = ['*', '#', '_', '~~', '`', '[', ']'];
 
 /**
  * Meta-labels that indicate non-narration text
@@ -60,34 +62,67 @@ const GENERIC_OPENINGS = [
  * Validate script quality against professional standards
  *
  * @param scenes - Array of scenes to validate
+ * @param targetTotalWords - Optional target total word count for duration-based validation
  * @returns ValidationResult with pass/fail status and detailed issues
  */
-export function validateScriptQuality(scenes: Scene[]): ValidationResult {
+export function validateScriptQuality(
+  scenes: Scene[],
+  targetTotalWords?: number
+): ValidationResult {
   const issues: string[] = [];
   const suggestions: string[] = [];
   let score = 100;
 
-  // Validation 1: Check scene count (must be 3-7 scenes)
+  // Validation 1: Check scene count (minimum 3 scenes, no maximum)
   if (scenes.length < 3) {
     issues.push(`Too few scenes: ${scenes.length} (minimum 3 required)`);
     score -= 30;
-  } else if (scenes.length > 7) {
-    issues.push(`Too many scenes: ${scenes.length} (maximum 7 recommended)`);
-    score -= 15;
   }
+  // No maximum scene limit - scene count should be driven by content/duration needs
 
   // Validation 2: Check each scene
   for (const scene of scenes) {
     const scenePrefix = `Scene ${scene.sceneNumber}`;
 
-    // Check scene text length (50-200 words)
-    const wordCount = scene.text.trim().split(/\s+/).length;
-    if (wordCount < 50) {
-      issues.push(`${scenePrefix}: Too short (${wordCount} words, minimum 50)`);
+    // Calculate actual word count
+    const actualWordCount = scene.text.trim().split(/\s+/).length;
+
+    // Check if LLM provided word count and compare with actual
+    if (scene.wordCount !== undefined) {
+      const reportedCount = scene.wordCount;
+      const difference = Math.abs(actualWordCount - reportedCount);
+
+      // If LLM's count is way off (>10% error), flag it
+      if (difference > Math.max(5, actualWordCount * 0.1)) {
+        suggestions.push(
+          `${scenePrefix}: Word count mismatch (reported ${reportedCount}, actual ${actualWordCount}) - count more carefully`
+        );
+        score -= 5;
+      }
+
+      // If LLM reported high count but actual is low, penalize heavily
+      if (reportedCount >= 60 && actualWordCount < 50) {
+        issues.push(`${scenePrefix}: Claimed ${reportedCount} words but only has ${actualWordCount}`);
+        score -= 20;
+      }
+    } else {
+      // LLM didn't provide wordCount - warn them
+      suggestions.push(`${scenePrefix}: Missing wordCount field in JSON`);
+      score -= 5;
+    }
+
+    // Check scene text length (40-250 words) using actual count
+    // Minimum lowered to 40 for llama3.2's limitations
+    // Maximum increased to 250 to support longer videos (15-20 min)
+    const MIN_SCENE_WORDS = 40;
+    const MAX_SCENE_WORDS = 250;
+
+    if (actualWordCount < MIN_SCENE_WORDS) {
+      issues.push(`${scenePrefix}: Too short (${actualWordCount} words, minimum ${MIN_SCENE_WORDS})`);
       // Deduct more points for very short scenes
-      score -= wordCount < 10 ? 40 : 20;
-    } else if (wordCount > 200) {
-      issues.push(`${scenePrefix}: Too long (${wordCount} words, maximum 200)`);
+      score -= actualWordCount < 10 ? 40 : 20;
+    } else if (actualWordCount > MAX_SCENE_WORDS) {
+      issues.push(`${scenePrefix}: Too long (${actualWordCount} words, maximum ${MAX_SCENE_WORDS})`);
       score -= 10;
     }
 
@@ -95,6 +130,36 @@ export function validateScriptQuality(scenes: Scene[]): ValidationResult {
     if (!scene.text.trim()) {
       issues.push(`${scenePrefix}: Empty scene text`);
       score -= 20;
+    }
+  }
+
+  // Validation 2b: Check total word count if target is provided (duration-based validation)
+  if (targetTotalWords && targetTotalWords > 0) {
+    const totalActualWords = scenes.reduce((sum, scene) => {
+      return sum + scene.text.trim().split(/\s+/).length;
+    }, 0);
+
+    const tolerance = 0.15; // Allow 15% variance
+    const minWords = Math.floor(targetTotalWords * (1 - tolerance));
+    const maxWords = Math.ceil(targetTotalWords * (1 + tolerance));
+
+    if (totalActualWords < minWords) {
+      issues.push(
+        `Total word count too low: ${totalActualWords} words (target ${targetTotalWords}, minimum ${minWords})`
+      );
+      suggestions.push(
+        `Add more detail to scenes to reach target duration. Need ${minWords - totalActualWords} more words.`
+      );
+      score -= 25;
+    } else if (totalActualWords > maxWords) {
+      issues.push(
+        `Total word count too high: ${totalActualWords} words (target ${targetTotalWords}, maximum ${maxWords})`
+      );
+      suggestions.push(`Reduce verbosity to stay within target duration.`);
+      score -= 15;
+    } else {
+      // Total word count is within acceptable range - give bonus points
+      score += 10;
     }
   }
 

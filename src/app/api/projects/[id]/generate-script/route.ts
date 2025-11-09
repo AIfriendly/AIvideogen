@@ -29,6 +29,9 @@ import { initializeDatabase } from '@/lib/db/init';
 import { generateScriptWithRetry, ScriptGenerationError } from '@/lib/llm/script-generator';
 import { sanitizeTopicInput } from '@/lib/llm/sanitize-text';
 
+// Remove timeout limit for script generation (can take 2-5 minutes with retries)
+export const maxDuration = 1200; // 20 minutes for long scripts with multiple retries
+
 // Initialize database on first import (idempotent)
 initializeDatabase();
 

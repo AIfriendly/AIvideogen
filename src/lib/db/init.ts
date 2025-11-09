@@ -10,6 +10,13 @@ import path from 'path';
 import db from './client';
 
 /**
+ * Global singleton flag to ensure initialization runs only once
+ * Prevents duplicate migrations on module re-imports
+ */
+let isInitialized = false;
+let initializationPromise: Promise<void> | null = null;
+
+/**
  * Migration tracking table
  * Stores which migrations have been applied
  */
@@ -71,37 +78,58 @@ async function runMigrations(): Promise<void> {
 /**
  * Initialize the database schema by executing schema.sql
  * and running any pending migrations.
- * This function is idempotent - safe to call multiple times
+ * This function is idempotent - safe to call multiple times.
+ * Uses singleton pattern to ensure initialization runs only once globally.
  */
 export async function initializeDatabase(): Promise<void> {
-  try {
-    // Read schema.sql file - try multiple paths for different build environments
-    let schema: string;
-    let schemaPath: string;
-
-    // Try path relative to source directory first (development)
-    try {
-      schemaPath = path.join(process.cwd(), 'src', 'lib', 'db', 'schema.sql');
-      schema = readFileSync(schemaPath, 'utf-8');
-    } catch {
-      // Try path relative to __dirname (production build)
-      schemaPath = path.join(__dirname, 'schema.sql');
-      schema = readFileSync(schemaPath, 'utf-8');
-    }
-
-    // Execute the schema SQL to create tables and indexes
-    db.exec(schema);
-
-    console.log('Database schema initialized successfully');
-
-    // Run migrations
-    await runMigrations();
-
-    console.log('Database initialization completed successfully');
-  } catch (error) {
-    console.error('Failed to initialize database:', error);
-    throw new Error(
-      `Database initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
+  // Return immediately if already initialized
+  if (isInitialized) {
+    return;
   }
+
+  // If initialization is in progress, wait for it to complete
+  if (initializationPromise) {
+    return initializationPromise;
+  }
+
+  // Start initialization and store the promise
+  initializationPromise = (async () => {
+    try {
+      // Read schema.sql file - try multiple paths for different build environments
+      let schema: string;
+      let schemaPath: string;
+
+      // Try path relative to source directory first (development)
+      try {
+        schemaPath = path.join(process.cwd(), 'src', 'lib', 'db', 'schema.sql');
+        schema = readFileSync(schemaPath, 'utf-8');
+      } catch {
+        // Try path relative to __dirname (production build)
+        schemaPath = path.join(__dirname, 'schema.sql');
+        schema = readFileSync(schemaPath, 'utf-8');
+      }
+
+      // Execute the schema SQL to create tables and indexes
+      db.exec(schema);
+
+      console.log('Database schema initialized successfully');
+
+      // Run migrations
+      await runMigrations();
+
+      console.log('Database initialization completed successfully');
+
+      // Mark as initialized
+      isInitialized = true;
+    } catch (error) {
+      console.error('Failed to initialize database:', error);
+      // Reset on error so retry is possible
+      initializationPromise = null;
+      throw new Error(
+        `Database initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  })();
+
+  return initializationPromise;
 }

@@ -13,7 +13,9 @@ import { spawn } from 'child_process';
 import { mkdirSync, existsSync, statSync } from 'fs';
 import { join, resolve } from 'path';
 import { MVP_VOICES } from '../src/lib/tts/voice-profiles';
-import { PREVIEW_TEXT } from '../src/lib/tts/sanitize-text';
+
+// Preview text for voice samples
+const PREVIEW_TEXT = 'Welcome to the BMAD AI video generator. This is a sample of the voice you have selected.';
 
 // Ensure preview directory exists
 const previewDir = resolve(process.cwd(), '.cache', 'audio', 'previews');

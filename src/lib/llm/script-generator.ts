@@ -41,9 +41,27 @@ export class ScriptGenerationError extends Error {
  * Parse LLM response and extract scenes
  */
 function parseScriptResponse(response: string): Scene[] {
+  // Clean up response - strip common preambles that LLMs add
+  let cleanedResponse = response.trim();
+
+  // Remove common preambles like "Here is...", "Here's...", etc.
+  const preamblePatterns = [
+    /^Here is (?:a |the |my )?(?:script|professional script|video script)[^\n]*\n*/i,
+    /^Here's (?:a |the |my )?(?:script|professional script|video script)[^\n]*\n*/i,
+    /^I've (?:created|generated|written) (?:a |the )?(?:script|professional script)[^\n]*\n*/i,
+    /^Below is (?:a |the |my )?(?:script|professional script)[^\n]*\n*/i,
+  ];
+
+  for (const pattern of preamblePatterns) {
+    cleanedResponse = cleanedResponse.replace(pattern, '');
+  }
+
+  // Trim again after removing preamble
+  cleanedResponse = cleanedResponse.trim();
+
   try {
     // Try to parse as JSON
-    const parsed = JSON.parse(response);
+    const parsed = JSON.parse(cleanedResponse);
 
     // Validate structure
     if (!parsed.scenes || !Array.isArray(parsed.scenes)) {
@@ -63,10 +81,23 @@ function parseScriptResponse(response: string): Scene[] {
     return parsed.scenes as Scene[];
   } catch (error) {
     // If JSON parsing fails, try to extract JSON from markdown code blocks
-    const jsonMatch = response.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+    const jsonMatch = cleanedResponse.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[1]);
+        if (parsed.scenes && Array.isArray(parsed.scenes)) {
+          return parsed.scenes as Scene[];
+        }
+      } catch {
+        // Fall through to error
+      }
+    }
+
+    // Try to find JSON object even if there's text before/after
+    const jsonObjectMatch = cleanedResponse.match(/\{[\s\S]*"scenes"[\s\S]*\}/);
+    if (jsonObjectMatch) {
+      try {
+        const parsed = JSON.parse(jsonObjectMatch[0]);
         if (parsed.scenes && Array.isArray(parsed.scenes)) {
           return parsed.scenes as Scene[];
         }
@@ -123,13 +154,56 @@ export async function generateScriptWithRetry(
     try {
       console.log(`[Script Generation] Attempt ${attempt}/${maxAttempts} for topic: "${topic}"`);
 
+      // Optimize scene count for llama3.2's capabilities
+      // Target: 80-120 words/scene (sweet spot for llama3.2)
+      // Calculate optimal scene count based on total words, cap at 20 scenes
+      let optimizedConfig = projectConfig;
+      if (projectConfig?.estimatedWords) {
+        const totalWords = projectConfig.estimatedWords;
+        const requestedSceneCount = projectConfig.sceneCount || Math.ceil(totalWords / 100);
+
+        // Calculate optimal scene count for 80-120 words per scene
+        const MIN_WORDS_PER_SCENE = 80;
+        const MAX_WORDS_PER_SCENE = 120;
+        const TARGET_WORDS_PER_SCENE = 100;
+        const MAX_SCENES = 20; // llama3.2 context limit
+
+        // Calculate optimal scene count
+        let optimalSceneCount = Math.round(totalWords / TARGET_WORDS_PER_SCENE);
+
+        // Ensure we stay within min/max bounds
+        const minScenes = Math.ceil(totalWords / MAX_WORDS_PER_SCENE);
+        const maxScenes = Math.min(MAX_SCENES, Math.floor(totalWords / MIN_WORDS_PER_SCENE));
+
+        optimalSceneCount = Math.max(minScenes, Math.min(maxScenes, optimalSceneCount));
+
+        // Only optimize if different from requested
+        if (optimalSceneCount !== requestedSceneCount) {
+          optimizedConfig = {
+            ...projectConfig,
+            sceneCount: optimalSceneCount,
+            estimatedWords: totalWords, // Keep total words the same
+          };
+
+          console.log(
+            `[Script Generation] Optimizing for LLM: ${requestedSceneCount} scenes → ${optimalSceneCount} scenes ` +
+            `(${Math.round(totalWords / optimalSceneCount)} words/scene target, total ${totalWords} words)`
+          );
+        } else {
+          console.log(
+            `[Script Generation] Using requested ${requestedSceneCount} scenes ` +
+            `(${Math.round(totalWords / requestedSceneCount)} words/scene target, total ${totalWords} words)`
+          );
+        }
+      }
+
       // Generate appropriate prompt based on attempt number
       let prompt: string;
       if (attempt === 1) {
-        prompt = generateScriptPrompt(topic, projectConfig);
+        prompt = generateScriptPrompt(topic, optimizedConfig);
       } else {
         const previousIssues = lastValidationResult?.issues || [];
-        prompt = generateEnhancedPrompt(topic, attempt, previousIssues, projectConfig);
+        prompt = generateEnhancedPrompt(topic, attempt, previousIssues, optimizedConfig);
       }
 
       // Call LLM
@@ -146,8 +220,11 @@ export async function generateScriptWithRetry(
 
       console.log(`[Script Generation] Parsed ${scenes.length} scenes, validating quality...`);
 
+      // Extract target total words from projectConfig for duration-based validation
+      const targetTotalWords = projectConfig?.estimatedWords || undefined;
+
       // Validate quality
-      const validation = validateScriptQuality(scenes);
+      const validation = validateScriptQuality(scenes, targetTotalWords);
       lastValidationResult = validation;
 
       console.log(

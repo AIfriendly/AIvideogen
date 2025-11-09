@@ -310,13 +310,14 @@ describe('Script Quality Validation - Unit Tests', () => {
       expect(result.issues.some(issue => issue.includes('Too few scenes'))).toBe(true);
     });
 
-    it('should warn about too many scenes', () => {
+    it('should accept any number of scenes (dynamic scene count)', () => {
       const scenes: Scene[] = Array.from({ length: 8 }, (_, i) => ({
         sceneNumber: i + 1,
         text: "This is a scene with enough words to meet the minimum requirement of fifty words that are needed for proper validation and testing purposes."
       }));
       const result = validateScriptQuality(scenes);
-      expect(result.issues.some(issue => issue.includes('Too many scenes'))).toBe(true);
+      // No maximum scene limit - should not have "too many scenes" issue
+      expect(result.issues.some(issue => issue.includes('Too many scenes'))).toBe(false);
     });
 
     it('should accept 3-5 scenes', () => {
@@ -381,20 +382,20 @@ describe('Script Quality Validation - Unit Tests', () => {
       const scenes: Scene[] = [
         {
           sceneNumber: 1,
-          text: "An octopus can unscrew a jar from the inside. Not because someone taught it - because it figured it out. These creatures solve puzzles that stump most animals."
+          text: "An octopus can unscrew a jar from the inside. Not because someone taught it - because it figured it out on its own through experimentation. These eight-armed creatures solve puzzles that stump most animals, navigate complex mazes, and even recognize individual human faces. Scientists are only beginning to understand why their intelligence is so remarkable and unique in the animal kingdom, with capabilities that challenge our definitions of consciousness."
         },
         {
           sceneNumber: 2,
-          text: "Unlike humans, octopuses distribute their neurons across their body. Two-thirds of their brain cells live in their arms, letting each arm think independently."
+          text: "Unlike humans who centralize thinking in one brain, octopuses distribute their neurons across their entire body in a network. Two-thirds of their five hundred million brain cells actually live in their arms, letting each arm think independently and make decisions. It's like having eight mini-brains working together simultaneously, each one capable of solving problems on its own without any central coordination from the main brain located in the head."
         },
         {
           sceneNumber: 3,
-          text: "This unique intelligence enables extraordinary feats. They camouflage instantly, mimicking textures and colors. They escape locked tanks and use tools."
+          text: "This unique distributed intelligence architecture enables extraordinary feats that seem almost impossible to believe. They can camouflage in milliseconds, mimicking not just colors but complex textures and patterns perfectly. They escape from locked tanks using problem solving and planning. One species even collects coconut shells from the ocean floor and assembles them into portable shelters for later use, demonstrating forward thinking, tool use, and sophisticated planning abilities that rival many vertebrates."
         }
       ];
       const result = validateScriptQuality(scenes);
       expect(result.score).toBeGreaterThanOrEqual(70); // Pass threshold
-      expect(result.passed).toBe(false); // Too short scenes
+      expect(result.passed).toBe(true); // Proper length scenes with professional quality
     });
 
     it('should deduct points for each issue type', () => {

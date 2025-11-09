@@ -29,7 +29,28 @@ export class OllamaProvider implements LLMProvider {
    * @param model - The model name to use (default: llama3.2)
    */
   constructor(baseUrl: string = 'http://localhost:11434', model: string = 'llama3.2') {
-    this.ollama = new Ollama({ host: baseUrl });
+    // Remove timeout limit - allow unlimited time for large models like llama3:latest
+    // Use custom fetch with no timeout (default is 30 seconds)
+    this.ollama = new Ollama({
+      host: baseUrl,
+      fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        // Use AbortSignal.timeout with very long duration (20 minutes)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200000); // 20 minutes in ms
+
+        try {
+          const response = await fetch(input, {
+            ...init,
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          return response;
+        } catch (error) {
+          clearTimeout(timeoutId);
+          throw error;
+        }
+      },
+    });
     this.model = model;
     this.baseUrl = baseUrl;
   }
@@ -97,14 +118,15 @@ Please pull the model:
     }
 
     // Timeout errors
-    if (error.message?.includes('timeout') || error.code === 'ETIMEDOUT') {
+    if (error.message?.includes('timeout') || error.message?.includes('aborted') || error.code === 'ETIMEDOUT') {
       return new Error(
-        `Ollama request timed out after 30 seconds.
+        `Ollama request timed out after 20 minutes.
 
-The model may be loading or the request is too complex. Try:
-1. Wait for model to finish loading
-2. Simplify your message
-3. Check system resources (CPU/RAM)`
+The model may be overloaded or your system resources are exhausted. Try:
+1. Close other applications to free up RAM/CPU
+2. Use a smaller model (llama3.2 instead of llama3:latest)
+3. Reduce script length (shorter video duration)
+4. Restart Ollama service: 'ollama serve'`
       );
     }
 
