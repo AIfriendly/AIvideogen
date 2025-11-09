@@ -23,8 +23,8 @@ PHASE_4_COMPLETE: false
 
 TODO_STORY: -
 IN_PROGRESS_STORY: -
-DONE_STORY: 2.1, 2.2, 2.3, 2.4, 2.5
-BACKLOG_STORY: 2.6
+DONE_STORY: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6
+BACKLOG_STORY: -
 
 ## Epic 1 Status
 
@@ -34,18 +34,18 @@ ALL_STORIES_DONE: 7/7
 
 ## Epic 2 Status
 
-EPIC_2_IN_PROGRESS: true
+EPIC_2_COMPLETE: true
+EPIC_2_COMPLETION_DATE: 2025-11-09
 EPIC_2_STORIES_TOTAL: 6
-EPIC_2_STORIES_DONE: 2.1, 2.2, 2.3, 2.4, 2.5
-EPIC_2_STORIES_READY: -
-EPIC_2_STORIES_TODO: 2.6
+EPIC_2_STORIES_DONE: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6
+ALL_STORIES_DONE: 6/6
 
 ## Next Action
 
-NEXT_ACTION: Manually test Story 2.5, then implement Story 2.6 - Video Assembly
-NEXT_COMMAND: Test voiceover generation, then run complete-story for Story 2.6
-NEXT_AGENT: sm (manual testing), then sm (for Story 2.6)
-NEXT_EPIC: Epic 2 - Content Generation Pipeline (final story)
+NEXT_ACTION: Manually test Story 2.6 script & voiceover preview integration, then prepare Epic 3 - Visual Sourcing
+NEXT_COMMAND: Test script review workflow with audio players, then start Epic 3 planning
+NEXT_AGENT: sm (manual testing), then architect (Epic 3 tech spec)
+NEXT_EPIC: Epic 3 - Visual Content Sourcing (YouTube API)
 
 ## Workflow Sequence (Epic 2)
 
@@ -64,9 +64,12 @@ NEXT_EPIC: Epic 2 - Content Generation Pipeline (final story)
    - Save audio files
    - Text sanitization
    - Progress tracking
-5. Video Assembly (Story 2.6) → TODO
-   - Combine scenes into final video
+5. Script & Voiceover Preview (Story 2.6) → DONE
+   - Script review with audio players
+   - Audio serving API endpoint
+   - Navigate to voiceover generation
+   - Continue to visual sourcing workflow
 
 ---
 
-_Last Updated: 2025-11-09 (Story 2.5 implemented and deployed)_
+_Last Updated: 2025-11-09 (Story 2.6 implemented and deployed - Epic 2 COMPLETE)_
