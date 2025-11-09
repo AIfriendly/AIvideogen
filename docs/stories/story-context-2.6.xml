@@ -1,0 +1,1142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML for Story 2.6: Script & Voiceover Preview Integration
+
+  Epic: Epic 2 - Content Generation Pipeline
+  Story ID: 2.6
+  Status: Ready for Implementation
+  Generated: 2025-11-09
+  Workflow: BMAD Story Context Assembly (v6.0.0)
+
+  This context file provides all necessary information for implementing
+  Story 2.6, including story requirements, acceptance criteria, relevant
+  code from Stories 2.4 and 2.5, database schema, and architecture patterns.
+-->
+
+<story-context>
+  <metadata>
+    <story-id>2.6</story-id>
+    <epic-id>2</epic-id>
+    <title>Script &amp; Voiceover Preview Integration</title>
+    <status>Ready</status>
+    <created>2025-11-09</created>
+    <assigned-to>Dev Agent</assigned-to>
+    <sprint>Epic 2 Sprint 2</sprint>
+    <context-generated>2025-11-09</context-generated>
+    <workflow-version>6.0.0</workflow-version>
+  </metadata>
+
+  <story-overview>
+    <goal>Enhance script review page to integrate voiceover generation workflow and display audio previews for completed scenes</goal>
+
+    <description>
+      Enhance the existing script-review-client.tsx component to enable the voiceover generation
+      workflow button (currently disabled on line 222), provide navigation to the voiceover
+      generation page (Story 2.5), and display audio players for scenes that have completed
+      voiceover generation. This story creates a seamless integration between script review and
+      voiceover generation by enabling users to trigger voiceover generation from the script
+      review page, navigate to the dedicated voiceover page for generation monitoring, and return
+      to script review to preview the generated audio alongside the script text. The enhancement
+      adds conditional audio player rendering for scenes with audio_file_path, implements a secure
+      audio serving API endpoint, and creates a reusable AudioPlayer component that streams audio
+      files from the .cache directory through a validated API route.
+    </description>
+
+    <business-value>
+      <value>Completes Epic 2's content generation pipeline with unified review interface</value>
+      <value>Enables users to trigger and monitor voiceover generation workflow</value>
+      <value>Provides audio preview capability for quality validation</value>
+      <value>Establishes secure audio serving architecture for future features</value>
+      <value>Reduces workflow friction with intuitive button navigation</value>
+      <value>Supports incremental scene preview (show audio as scenes complete)</value>
+      <value>Validates voice quality before proceeding to visual sourcing</value>
+    </business-value>
+  </story-overview>
+
+  <user-story>
+    As a **video creator**,
+    I want **to generate voiceovers from the script review page and preview the audio alongside the script**,
+    so that **I can validate content quality and make informed decisions before proceeding to visual sourcing**.
+  </user-story>
+
+  <acceptance-criteria>
+    <criterion id="AC-1">
+      <title>"Generate Voiceover" button enabled on script review page</title>
+      <given>User is on script-review page with generated script</given>
+      <when>Page loads</when>
+      <then>
+        <assertion>"Generate Voiceover" button is displayed and enabled (not disabled)</assertion>
+        <assertion>Button label is "Generate Voiceover" (not "Coming Soon")</assertion>
+        <assertion>Button click navigates to /projects/{projectId}/voiceover page</assertion>
+      </then>
+    </criterion>
+
+    <criterion id="AC-2">
+      <title>Navigation to voiceover generation page</title>
+      <given>User clicks "Generate Voiceover" button</given>
+      <when>Button is clicked</when>
+      <then>
+        <assertion>User is navigated to /projects/{projectId}/voiceover page</assertion>
+        <assertion>Voiceover generation page displays (Story 2.5 component)</assertion>
+        <assertion>User can start voiceover generation from that page</assertion>
+      </then>
+    </criterion>
+
+    <criterion id="AC-3">
+      <title>Return to script review shows audio players for completed scenes</title>
+      <given>User has completed voiceover generation (all scenes have audio)</given>
+      <when>User navigates back to script-review page</when>
+      <then>
+        <assertion>Each scene card displays an audio player</assertion>
+        <assertion>Audio players are positioned below scene text</assertion>
+        <assertion>Players show play/pause controls and progress bar</assertion>
+      </then>
+    </criterion>
+
+    <criterion id="AC-4">
+      <title>Audio player renders conditionally based on audio_file_path</title>
+      <given>Scene has audio_file_path in database</given>
+      <when>Scene card is rendered</when>
+      <then>
+        <assertion>Audio player component is displayed for that scene</assertion>
+        <assertion>Audio player shows loading state initially</assertion>
+        <assertion>Audio loads from API endpoint</assertion>
+      </then>
+    </criterion>
+
+    <criterion id="AC-5">
+      <title>Audio served securely through API endpoint</title>
+      <given>Scene has audio_file_path</given>
+      <when>Audio player requests audio</when>
+      <then>
+        <assertion>Request goes to GET /api/projects/[id]/scenes/[sceneNumber]/audio</assertion>
+        <assertion>API endpoint validates path security (no directory traversal)</assertion>
+        <assertion>API streams audio file from .cache directory</assertion>
+        <assertion>Response includes correct Content-Type: audio/mpeg header</assertion>
+      </then>
+    </criterion>
+
+    <criterion id="AC-6">
+      <title>Audio player displays error state if audio not available</title>
+      <given>Scene card renders audio player</given>
+      <when>Audio file cannot be loaded (404, network error)</when>
+      <then>
+        <assertion>Error message displays: "Audio not available"</assertion>
+        <assertion>Error state is visually distinct from loading state</assertion>
+        <assertion>Scene text remains visible and readable</assertion>
+      </then>
+    </criterion>
+
+    <criterion id="AC-7">
+      <title>Partial voiceover completion supported</title>
+      <given>Some scenes have audio_file_path, others do not</given>
+      <when>User views script-review page</when>
+      <then>
+        <assertion>Scenes with audio show audio players</assertion>
+        <assertion>Scenes without audio show no audio player</assertion>
+        <assertion>User can play completed audio while generation continues</assertion>
+      </then>
+    </criterion>
+
+    <criterion id="AC-8">
+      <title>Continue button logic respects voiceover completion</title>
+      <given>User is on script-review page</given>
+      <when>All scenes have audio_file_path</when>
+      <then>
+        <assertion>"Continue to Visual Sourcing" button becomes enabled</assertion>
+        <assertion>Button remains disabled if any scenes lack audio</assertion>
+        <assertion>Clicking enabled button advances workflow to 'visual-sourcing'</assertion>
+      </then>
+    </criterion>
+
+    <criterion id="AC-9">
+      <title>Audio player component is reusable</title>
+      <given>AudioPlayer component is created</given>
+      <when>Component is used in scene card</when>
+      <then>
+        <assertion>Component accepts projectId and sceneNumber as props</assertion>
+        <assertion>Component handles loading, playing, error states internally</assertion>
+        <assertion>Component can be reused in other parts of application</assertion>
+      </then>
+    </criterion>
+
+    <criterion id="AC-10">
+      <title>API endpoint validates security requirements</title>
+      <given>Audio API endpoint receives request</given>
+      <when>Endpoint validates request parameters</when>
+      <then>
+        <assertion>projectId is validated as UUID format</assertion>
+        <assertion>sceneNumber is validated as positive integer</assertion>
+        <assertion>audio_file_path is verified to start with .cache/audio/projects/</assertion>
+        <assertion>Path traversal attempts (..) are rejected with 400 error</assertion>
+      </then>
+    </criterion>
+  </acceptance-criteria>
+
+  <tasks>
+    <task id="1" priority="high">
+      <title>Enhance ScriptReviewClient Component to Enable Voiceover Button</title>
+      <file>ai-video-generator/src/app/projects/[id]/script-review/script-review-client.tsx</file>
+      <acceptance-criteria>AC-1, AC-2, AC-7</acceptance-criteria>
+
+      <subtasks>
+        <subtask id="1.1">
+          Update "Generate Voiceover" button (line 222):
+          - Remove `disabled` prop from button
+          - Change label from "Generate Voiceover (Coming Soon)" to "Generate Voiceover"
+          - Add `onClick` handler to navigate to voiceover page
+          - Keep icon: &lt;Volume2 className="w-4 h-4 mr-2" /&gt;
+        </subtask>
+
+        <subtask id="1.2">
+          Implement navigation handler:
+          - Use `router.push()` from `useRouter()` hook (already imported)
+          - Navigate to: `/projects/${projectId}/voiceover`
+          - No need to pass scene data (voiceover page loads from database)
+        </subtask>
+
+        <subtask id="1.3">
+          Update help text below button:
+          - Change from: "Voiceover generation will be available in a future update."
+          - Change to: "Click to generate professional audio narration for all scenes."
+          - Keep styling consistent with existing text
+        </subtask>
+
+        <subtask id="1.4">
+          Add conditional rendering for scenes with audio:
+          - Import AudioPlayer component (from Task 4)
+          - In scene card map loop (line 174), check if `scene.audio_file_path` exists
+          - If exists, render AudioPlayer component below scene text
+          - Position audio player after scene text paragraph (line 208-210)
+        </subtask>
+
+        <subtask id="1.5">
+          Implement "Continue to Visual Sourcing" button logic:
+          - Add state to track if all scenes have audio
+          - Calculate: `const allScenesHaveAudio = scenes.every(s =&gt; s.audio_file_path !== null)`
+          - Add new button: "Continue to Visual Sourcing" below existing actions
+          - Button enabled only if `allScenesHaveAudio === true`
+          - Button navigates to placeholder page (e.g., `/projects/${projectId}/visual-sourcing`)
+          - Button should be primary style (not outlined)
+        </subtask>
+      </subtasks>
+    </task>
+
+    <task id="2" priority="high">
+      <title>Create Audio Serving API Endpoint</title>
+      <file>ai-video-generator/src/app/api/projects/[id]/scenes/[sceneNumber]/audio/route.ts</file>
+      <acceptance-criteria>AC-5, AC-10</acceptance-criteria>
+
+      <subtasks>
+        <subtask id="2.1">Create directory structure and file</subtask>
+        <subtask id="2.2">Import required dependencies (NextResponse, queries, fs, path)</subtask>
+        <subtask id="2.3">Create GET endpoint handler with proper parameter types</subtask>
+        <subtask id="2.4">Validate request parameters (UUID, positive integer)</subtask>
+        <subtask id="2.5">Load scene from database using getSceneByProjectAndSceneNumber()</subtask>
+        <subtask id="2.6">Validate audio file path security (starts with .cache, no .., ends with .mp3)</subtask>
+        <subtask id="2.7">Construct absolute file path using path.join and path.resolve</subtask>
+        <subtask id="2.8">Verify file exists on disk using fs.existsSync()</subtask>
+        <subtask id="2.9">Stream audio file with proper headers (Content-Type, Content-Length, Cache-Control)</subtask>
+        <subtask id="2.10">Handle errors with specific codes (400, 404, 500)</subtask>
+      </subtasks>
+    </task>
+
+    <task id="3" priority="medium">
+      <title>Add Database Query Function for Scene Lookup</title>
+      <file>ai-video-generator/src/lib/db/queries.ts</file>
+      <acceptance-criteria>AC-5</acceptance-criteria>
+
+      <subtasks>
+        <subtask id="3.1">
+          Add query function if not already present:
+          ```typescript
+          export function getSceneByProjectAndSceneNumber(
+            projectId: string,
+            sceneNumber: number
+          ): Scene | null {
+            const db = getDatabase();
+            const query = `
+              SELECT * FROM scenes
+              WHERE project_id = ? AND scene_number = ?
+              LIMIT 1
+            `;
+            const row = db.prepare(query).get(projectId, sceneNumber);
+            return row as Scene | null;
+          }
+          ```
+        </subtask>
+
+        <subtask id="3.2">
+          Export function in module exports with TypeScript type annotation and JSDoc comment
+        </subtask>
+      </subtasks>
+    </task>
+
+    <task id="4" priority="high">
+      <title>Create Reusable AudioPlayer Component</title>
+      <file>ai-video-generator/src/components/ui/audio-player.tsx</file>
+      <acceptance-criteria>AC-3, AC-4, AC-6, AC-9</acceptance-criteria>
+
+      <subtasks>
+        <subtask id="4.1">Create AudioPlayer component file with 'use client' directive</subtask>
+        <subtask id="4.2">Define component interface with projectId, sceneNumber, className props</subtask>
+        <subtask id="4.3">Implement AudioPlayer using HTML5 audio element with controls</subtask>
+        <subtask id="4.4">Add loading state with useState and skeleton loader</subtask>
+        <subtask id="4.5">Add error state with useState and error message display</subtask>
+        <subtask id="4.6">Implement component JSX with conditional rendering (loading, error, audio)</subtask>
+        <subtask id="4.7">Style audio controls with Tailwind classes for accessibility and design system consistency</subtask>
+      </subtasks>
+    </task>
+
+    <task id="5" priority="low">
+      <title>Update Scene Type Definition</title>
+      <file>ai-video-generator/src/app/projects/[id]/script-review/script-review-client.tsx</file>
+      <acceptance-criteria>AC-4</acceptance-criteria>
+
+      <subtasks>
+        <subtask id="5.1">
+          Verify Scene interface includes audio_file_path:
+          - Scene interface already defined on lines 16-26
+          - Confirm `audio_file_path: string | null` field exists (line 22)
+          - Confirm `duration: number | null` field exists (line 23)
+          - No changes needed if fields already present
+        </subtask>
+      </subtasks>
+    </task>
+
+    <task id="6" priority="medium">
+      <title>Add Integration Tests</title>
+      <file>ai-video-generator/tests/integration/script-voiceover-integration.test.ts</file>
+      <acceptance-criteria>All</acceptance-criteria>
+
+      <subtasks>
+        <subtask id="6.1">Test audio serving API endpoint (200, audio/mpeg, correct content)</subtask>
+        <subtask id="6.2">Test API security validation (invalid UUID, sceneNumber, traversal, 404)</subtask>
+        <subtask id="6.3">Test AudioPlayer component rendering (loading, success, error states)</subtask>
+        <subtask id="6.4">Test script review button integration (enabled, navigation)</subtask>
+        <subtask id="6.5">Test audio player conditional rendering (partial completion)</subtask>
+        <subtask id="6.6">Test "Continue to Visual Sourcing" button (disabled/enabled logic)</subtask>
+      </subtasks>
+    </task>
+
+    <task id="7" priority="medium">
+      <title>Add Unit Tests</title>
+      <file>ai-video-generator/tests/unit/components/audio-player.test.tsx</file>
+      <acceptance-criteria>AC-9, AC-10</acceptance-criteria>
+
+      <subtasks>
+        <subtask id="7.1">Test AudioPlayer component props (projectId, sceneNumber, className)</subtask>
+        <subtask id="7.2">Test loading state (skeleton display, clear on load)</subtask>
+        <subtask id="7.3">Test error state (error message, hide audio element)</subtask>
+        <subtask id="7.4">Test audio element attributes (controls, preload, src)</subtask>
+      </subtasks>
+    </task>
+
+    <task id="8" priority="low">
+      <title>Update Documentation</title>
+      <file>ai-video-generator/docs/components/audio-player.md</file>
+      <acceptance-criteria>All</acceptance-criteria>
+
+      <subtasks>
+        <subtask id="8.1">Create component documentation (purpose, props, usage example)</subtask>
+        <subtask id="8.2">Document API endpoint (request, response, errors)</subtask>
+        <subtask id="8.3">Update workflow documentation (script-review → voiceover → script-review)</subtask>
+      </subtasks>
+    </task>
+  </tasks>
+
+  <dependencies>
+    <requires>
+      <dependency>
+        <story-id>2.1</story-id>
+        <title>TTS Engine Integration</title>
+        <reason>Audio file generation</reason>
+      </dependency>
+
+      <dependency>
+        <story-id>2.2</story-id>
+        <title>Database Schema Updates</title>
+        <reason>scenes.audio_file_path field</reason>
+      </dependency>
+
+      <dependency>
+        <story-id>2.3</story-id>
+        <title>Voice Selection UI</title>
+        <reason>Workflow prerequisite</reason>
+      </dependency>
+
+      <dependency>
+        <story-id>2.4</story-id>
+        <title>Script Generation</title>
+        <reason>script-review page exists</reason>
+      </dependency>
+
+      <dependency>
+        <story-id>2.5</story-id>
+        <title>Voiceover Generation</title>
+        <reason>Audio files, VoiceoverGenerator component</reason>
+      </dependency>
+    </requires>
+
+    <blocks>
+      <dependency>
+        <epic-id>3</epic-id>
+        <title>Visual Sourcing</title>
+        <reason>Workflow transition point</reason>
+      </dependency>
+    </blocks>
+  </dependencies>
+
+  <relevant-code>
+    <file path="ai-video-generator/src/app/projects/[id]/script-review/script-review-client.tsx">
+      <description>
+        Existing script review client component that needs to be enhanced.
+        Contains the disabled "Generate Voiceover" button on line 222 that needs to be enabled.
+        Scene interface already includes audio_file_path and duration fields (lines 16-26).
+      </description>
+
+      <key-sections>
+        <section lines="16-26" description="Scene interface with audio_file_path and duration fields"/>
+        <section lines="222-232" description="Disabled Generate Voiceover button that needs to be enabled"/>
+        <section lines="174-213" description="Scene cards map loop where audio players need to be added"/>
+        <section lines="238-254" description="Actions section where Continue button should be added"/>
+      </key-sections>
+
+      <code><![CDATA[
+/**
+ * Script Review Client Component
+ *
+ * Displays generated scenes with word counts and provides navigation
+ * to next steps in the workflow.
+ */
+
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { VoiceProfile } from '@/lib/tts/voice-profiles';
+import { Button } from '@/components/ui/button';
+import { CheckCircle, Volume2, ArrowLeft, FileText } from 'lucide-react';
+
+interface Scene {
+  id: string;
+  project_id: string;
+  scene_number: number;
+  text: string;
+  sanitized_text: string | null;
+  audio_file_path: string | null;
+  duration: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ScriptReviewClientProps {
+  projectId: string;
+  projectName: string;
+  topic: string;
+  scenes: Scene[];
+  selectedVoice: VoiceProfile | null;
+}
+
+export default function ScriptReviewClient({
+  projectId,
+  projectName,
+  topic,
+  scenes,
+  selectedVoice,
+}: ScriptReviewClientProps) {
+  const router = useRouter();
+  const [selectedScene, setSelectedScene] = useState<number | null>(null);
+
+  // Calculate word count for a scene
+  const getWordCount = (text: string): number => {
+    return text.trim().split(/\s+/).length;
+  };
+
+  // Calculate total word count
+  const totalWords = scenes.reduce((sum, scene) => sum + getWordCount(scene.text), 0);
+
+  // Calculate estimated duration (150 words per minute average speaking rate)
+  const estimatedDuration = Math.ceil(totalWords / 150 * 60); // in seconds
+
+  const formatDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      {/* Header */}
+      <header className="border-b bg-background dark:bg-slate-900 sticky top-0 z-10">
+        <div className="container flex h-16 items-center gap-4 px-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push(`/projects/${projectId}`)}
+            className="mr-2"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Project
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {projectName}
+            </h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Script Review
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+            <span>Script Generated</span>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 p-8 bg-slate-50 dark:bg-slate-950">
+        <div className="max-w-5xl mx-auto space-y-6">
+          {/* Success Banner */}
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h2 className="font-semibold text-green-900 dark:text-green-100">
+                  Script Generated Successfully!
+                </h2>
+                <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                  Your video script has been generated with {scenes.length} scene{scenes.length !== 1 ? 's' : ''}.
+                  Review the content below before proceeding.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Script Statistics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm mb-1">
+                <FileText className="w-4 h-4" />
+                Total Scenes
+              </div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                {scenes.length}
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm mb-1">
+                <FileText className="w-4 h-4" />
+                Total Words
+              </div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                {totalWords}
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm mb-1">
+                <Volume2 className="w-4 h-4" />
+                Est. Duration
+              </div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                {formatDuration(estimatedDuration)}
+              </div>
+            </div>
+          </div>
+
+          {/* Project Info */}
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
+            <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4">
+              Project Information
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Topic:</p>
+                <p className="text-slate-900 dark:text-slate-100">{topic}</p>
+              </div>
+              {selectedVoice && (
+                <div>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Selected Voice:</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-slate-900 dark:text-slate-100">{selectedVoice.name}</p>
+                    <span className="text-sm text-slate-500">•</span>
+                    <span className="text-sm text-slate-600 dark:text-slate-400 capitalize">{selectedVoice.gender}</span>
+                    <span className="text-sm text-slate-500">•</span>
+                    <span className="text-sm text-slate-600 dark:text-slate-400 capitalize">{selectedVoice.accent}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Scenes List */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-lg">
+              Generated Script
+            </h3>
+            {scenes.map((scene) => {
+              const wordCount = getWordCount(scene.text);
+              const isShort = wordCount < 50;
+
+              return (
+                <div
+                  key={scene.id}
+                  className={`bg-white dark:bg-slate-800 border rounded-lg p-6 transition-all ${
+                    selectedScene === scene.scene_number
+                      ? 'border-primary ring-2 ring-primary/20'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                  onClick={() => setSelectedScene(scene.scene_number)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-primary/10 text-primary font-semibold text-lg rounded-full w-10 h-10 flex items-center justify-center">
+                        {scene.scene_number}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-slate-900 dark:text-slate-100">
+                          Scene {scene.scene_number}
+                        </h4>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          {wordCount} words
+                          {isShort && (
+                            <span className="ml-2 text-amber-600 dark:text-amber-400">
+                              (Short - may need editing)
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                    {scene.text}
+                  </p>
+                  {/* Audio player will be added here in Task 1.4 */}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Next Steps */}
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
+            <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4">
+              Next Steps
+            </h3>
+            <div className="space-y-3">
+              <Button
+                size="lg"
+                className="w-full"
+                disabled
+              >
+                <Volume2 className="w-4 h-4 mr-2" />
+                Generate Voiceover (Coming Soon)
+              </Button>
+              <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
+                Voiceover generation will be available in a future update.
+                Your script has been saved and is ready for the next step.
+              </p>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/projects/${projectId}`)}
+              className="flex-1"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Chat
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/projects/${projectId}/script-generation`)}
+              className="flex-1"
+            >
+              Regenerate Script
+            </Button>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+      ]]></code>
+    </file>
+
+    <file path="ai-video-generator/src/components/features/voiceover/VoiceoverGenerator.tsx">
+      <description>
+        VoiceoverGenerator component from Story 2.5 that the "Generate Voiceover"
+        button will navigate to. This component handles the actual voiceover generation
+        process with progress tracking.
+      </description>
+
+      <key-sections>
+        <section lines="21-24" description="Component props interface"/>
+        <section lines="118-148" description="handleGenerate function that calls API endpoint"/>
+        <section lines="164-180" description="Generating state with progress display"/>
+        <section lines="184-218" description="Complete state with summary"/>
+      </key-sections>
+    </file>
+
+    <file path="ai-video-generator/src/app/api/projects/[id]/generate-voiceovers/route.ts">
+      <description>
+        Voiceover generation API endpoint from Story 2.5. This endpoint is called by
+        the VoiceoverGenerator component. The script review page navigates to the page
+        that uses this component, and after generation completes, users can return to
+        script review to see audio players.
+      </description>
+
+      <key-sections>
+        <section lines="96-268" description="POST endpoint handler with validation and generation logic"/>
+        <section lines="157-168" description="Scene loading from database"/>
+        <section lines="199-201" description="Workflow state update to 'visual-sourcing'"/>
+      </key-sections>
+    </file>
+  </relevant-code>
+
+  <database-schema>
+    <table name="scenes">
+      <description>
+        Stores individual script segments with their associated audio files.
+        Created in Story 2.2, populated by Story 2.4 (script generation),
+        and audio fields populated by Story 2.5 (voiceover generation).
+      </description>
+
+      <sql><![CDATA[
+CREATE TABLE IF NOT EXISTS scenes (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  scene_number INTEGER NOT NULL,
+  text TEXT NOT NULL,              -- Original script text from LLM
+  sanitized_text TEXT,             -- Cleaned text for TTS input
+  audio_file_path TEXT,            -- Path to generated MP3 file
+  duration REAL,                   -- Duration in seconds
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  UNIQUE(project_id, scene_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_scenes_project ON scenes(project_id);
+CREATE INDEX IF NOT EXISTS idx_scenes_number ON scenes(scene_number);
+      ]]></sql>
+
+      <queries-needed>
+        <query name="getSceneByProjectAndSceneNumber">
+          <purpose>Load single scene by project and scene number for audio serving API</purpose>
+          <signature>getSceneByProjectAndSceneNumber(projectId: string, sceneNumber: number): Scene | null</signature>
+          <sql><![CDATA[
+SELECT * FROM scenes
+WHERE project_id = ? AND scene_number = ?
+LIMIT 1
+          ]]></sql>
+        </query>
+      </queries-needed>
+    </table>
+
+    <table name="projects">
+      <description>
+        Project table with Epic 2 fields for voice selection and workflow tracking.
+      </description>
+
+      <relevant-fields>
+        <field name="voice_id" type="TEXT">Selected TTS voice identifier (Story 2.3)</field>
+        <field name="script_generated" type="BOOLEAN">Script generation completion status (Story 2.4)</field>
+        <field name="voice_selected" type="BOOLEAN">Voice selection completion status (Story 2.3)</field>
+        <field name="total_duration" type="REAL">Aggregated duration of all scenes (Story 2.5)</field>
+        <field name="current_step" type="TEXT">Current workflow step (voice, script-generation, voiceover, visual-sourcing)</field>
+      </relevant-fields>
+    </table>
+  </database-schema>
+
+  <architecture-patterns>
+    <pattern name="Audio Serving Strategy">
+      <description>
+        API endpoint approach selected for security and flexibility.
+        Audio files stored in .cache directory are NOT publicly accessible.
+        API endpoint validates requests and streams files with proper security checks.
+      </description>
+
+      <implementation>
+        - Endpoint: GET /api/projects/[id]/scenes/[sceneNumber]/audio
+        - Validation: UUID format, positive integer, path security
+        - Security: No directory traversal, verify path starts with .cache/audio/projects/
+        - Streaming: Use fs.readFileSync for small files, return with proper headers
+        - Headers: Content-Type: audio/mpeg, Content-Length, Cache-Control: public, max-age=31536000
+      </implementation>
+
+      <alternatives-rejected>
+        - Serving .cache as static directory (exposes cache structure, security risk)
+        - Copying files to public directory (disk space waste, duplication)
+      </alternatives-rejected>
+    </pattern>
+
+    <pattern name="Component Enhancement vs Creation">
+      <description>
+        This story ENHANCES existing script-review-client.tsx (does NOT create new file).
+        Follows principle of modifying existing components rather than creating duplicates.
+      </description>
+
+      <implementation>
+        - Modify existing component at: src/app/projects/[id]/script-review/script-review-client.tsx
+        - Enable button (line 222): Remove disabled prop, add onClick handler
+        - Add audio players: Conditional rendering in scene card loop (line 174)
+        - Add continue button: In actions section (line 238)
+      </implementation>
+    </pattern>
+
+    <pattern name="Workflow State Transitions">
+      <description>
+        Correct workflow sequence for Epic 2.
+      </description>
+
+      <steps>
+        <step>voice: Voice selection page (Story 2.3)</step>
+        <step>script-generation: Script generation page (Story 2.4)</step>
+        <step>voiceover: Voiceover generation page (Story 2.5)</step>
+        <step>visual-sourcing: Visual sourcing (Epic 3 - placeholder)</step>
+      </steps>
+
+      <navigation-flow>
+        1. Script generation completes → current_step = 'voiceover' (Story 2.4)
+        2. User navigates to script-review page (can still access)
+        3. User clicks "Generate Voiceover" → navigates to /voiceover page
+        4. Voiceover generation completes → current_step = 'visual-sourcing' (Story 2.5)
+        5. User returns to script-review → sees audio players
+        6. User clicks "Continue to Visual Sourcing" → workflow advances (if not already)
+      </navigation-flow>
+    </pattern>
+
+    <pattern name="Reusable Component Design">
+      <description>
+        AudioPlayer component is standalone, reusable, and props-driven.
+      </description>
+
+      <implementation>
+        - Location: src/components/ui/audio-player.tsx
+        - Props: projectId (string), sceneNumber (number), className (optional string)
+        - State Management: Internal (loading, error, playback states)
+        - Rendering: Conditional (loading skeleton, error message, audio player)
+        - Styling: Tailwind classes for consistency with design system
+        - Accessibility: Keyboard navigation, proper ARIA attributes
+      </implementation>
+    </pattern>
+
+    <pattern name="Security Validation">
+      <description>
+        Multi-layer security validation for audio serving API.
+      </description>
+
+      <layers>
+        <layer name="Input Validation">
+          - UUID format validation (regex: /^[0-9a-f-]{36}$/i)
+          - Positive integer validation for sceneNumber
+          - Prevent SQL injection through parameterized queries
+        </layer>
+
+        <layer name="Path Security">
+          - Verify path starts with .cache/audio/projects/
+          - Reject paths containing .. (directory traversal)
+          - Verify path ends with .mp3
+          - Use path.resolve() to get absolute path
+          - Verify resolved path is within project root
+        </layer>
+
+        <layer name="File Access">
+          - Verify file exists before streaming (fs.existsSync)
+          - Read-only operations (no write access)
+          - Return 404 if file missing
+          - Log all access attempts for security auditing
+        </layer>
+      </layers>
+    </pattern>
+
+    <pattern name="Partial Completion Support">
+      <description>
+        System supports viewing script review page with partial voiceover completion.
+      </description>
+
+      <implementation>
+        - Check audio_file_path for each scene
+        - Render audio player only if audio_file_path is not null
+        - Allow user to play completed audio while generation continues
+        - "Continue" button disabled until all scenes have audio
+        - Calculate completion: scenes.every(s => s.audio_file_path !== null)
+      </implementation>
+    </pattern>
+  </architecture-patterns>
+
+  <integration-points>
+    <integration>
+      <title>Story 2.4 Integration</title>
+      <description>Enhances script-review-client.tsx created in Story 2.4</description>
+      <files>
+        <file>src/app/projects/[id]/script-review/script-review-client.tsx</file>
+        <file>src/app/projects/[id]/script-review/page.tsx</file>
+      </files>
+    </integration>
+
+    <integration>
+      <title>Story 2.5 Integration</title>
+      <description>Links to VoiceoverGenerator page and uses audio files generated by Story 2.5</description>
+      <navigation>
+        - Button navigates to: /projects/{projectId}/voiceover
+        - VoiceoverGenerator component located at: src/components/features/voiceover/VoiceoverGenerator.tsx
+        - Page component located at: src/app/projects/[id]/voiceover/page.tsx
+      </navigation>
+      <data-usage>
+        - Uses audio files saved to: .cache/audio/projects/{projectId}/scene-{number}.mp3
+        - Reads audio_file_path and duration from scenes table
+        - Checks current_step for workflow state
+      </data-usage>
+    </integration>
+
+    <integration>
+      <title>Epic 3 Placeholder</title>
+      <description>Provides navigation to Epic 3 (visual sourcing) placeholder</description>
+      <implementation>
+        - "Continue to Visual Sourcing" button navigates to: /projects/{projectId}/visual-sourcing
+        - Button enabled only when all scenes have audio_file_path
+        - Placeholder page will be created in Epic 3
+      </implementation>
+    </integration>
+  </integration-points>
+
+  <file-structure>
+    <enhanced-files>
+      <file>ai-video-generator/src/app/projects/[id]/script-review/script-review-client.tsx</file>
+      <file>ai-video-generator/src/lib/db/queries.ts</file>
+    </enhanced-files>
+
+    <new-files>
+      <file>ai-video-generator/src/components/ui/audio-player.tsx</file>
+      <file>ai-video-generator/src/app/api/projects/[id]/scenes/[sceneNumber]/audio/route.ts</file>
+    </new-files>
+
+    <test-files>
+      <file>ai-video-generator/tests/integration/script-voiceover-integration.test.ts</file>
+      <file>ai-video-generator/tests/unit/components/audio-player.test.tsx</file>
+    </test-files>
+
+    <documentation-files>
+      <file>ai-video-generator/docs/components/audio-player.md</file>
+    </documentation-files>
+  </file-structure>
+
+  <api-endpoints>
+    <endpoint>
+      <method>GET</method>
+      <path>/api/projects/[id]/scenes/[sceneNumber]/audio</path>
+      <description>Serve audio file for a specific scene</description>
+
+      <parameters>
+        <param name="id" type="path" required="true">Project UUID</param>
+        <param name="sceneNumber" type="path" required="true">Scene number (1-based integer)</param>
+      </parameters>
+
+      <responses>
+        <response status="200">
+          <description>Audio file stream</description>
+          <headers>
+            <header name="Content-Type">audio/mpeg</header>
+            <header name="Content-Length">{file size in bytes}</header>
+            <header name="Cache-Control">public, max-age=31536000</header>
+          </headers>
+          <body type="binary">Audio file stream</body>
+        </response>
+
+        <response status="400">
+          <description>Invalid parameters or security violation</description>
+          <body><![CDATA[
+{
+  "success": false,
+  "error": "Invalid parameters",
+  "code": "INVALID_PARAMETERS"
+}
+          ]]></body>
+        </response>
+
+        <response status="404">
+          <description>Scene or audio file not found</description>
+          <body><![CDATA[
+{
+  "success": false,
+  "error": "Scene not found or audio not available",
+  "code": "AUDIO_FILE_NOT_FOUND"
+}
+          ]]></body>
+        </response>
+
+        <response status="500">
+          <description>File read error or database error</description>
+          <body><![CDATA[
+{
+  "success": false,
+  "error": "Failed to read audio file",
+  "code": "FILE_READ_ERROR"
+}
+          ]]></body>
+        </response>
+      </responses>
+
+      <security>
+        <validation>UUID format validation for projectId</validation>
+        <validation>Positive integer validation for sceneNumber</validation>
+        <validation>Path must start with .cache/audio/projects/</validation>
+        <validation>Path cannot contain .. (directory traversal prevention)</validation>
+        <validation>Path must end with .mp3</validation>
+        <validation>Resolved path must be within project root</validation>
+      </security>
+    </endpoint>
+  </api-endpoints>
+
+  <testing-strategy>
+    <unit-tests>
+      <test>AudioPlayer component rendering (loading, error, success states)</test>
+      <test>Component props handling (projectId, sceneNumber, className)</test>
+      <test>Event handlers (onLoadedMetadata, onError)</test>
+      <test>Error message display</test>
+    </unit-tests>
+
+    <integration-tests>
+      <test>Audio serving API endpoint (success, 404, 400, 500)</test>
+      <test>Security validation (directory traversal, invalid parameters)</test>
+      <test>Script review button navigation</test>
+      <test>Audio player conditional rendering (partial completion)</test>
+      <test>"Continue to Visual Sourcing" button logic</test>
+    </integration-tests>
+
+    <manual-tests>
+      <test>Navigate through complete workflow: script-review → voiceover → script-review</test>
+      <test>Generate voiceovers for all scenes</test>
+      <test>Verify audio players display and play correctly</test>
+      <test>Test error scenarios (delete audio file, invalid path)</test>
+      <test>Test partial completion (some scenes with audio, some without)</test>
+      <test>Test button states (disabled when audio missing, enabled when complete)</test>
+    </manual-tests>
+  </testing-strategy>
+
+  <definition-of-done>
+    <criterion>ScriptReviewClient component enhanced with enabled voiceover button</criterion>
+    <criterion>"Generate Voiceover" button navigates to /voiceover page</criterion>
+    <criterion>Audio players render conditionally for scenes with audio_file_path</criterion>
+    <criterion>AudioPlayer component created as reusable component</criterion>
+    <criterion>Audio serving API endpoint created at /api/projects/[id]/scenes/[sceneNumber]/audio</criterion>
+    <criterion>API endpoint validates security requirements (path traversal, UUID format)</criterion>
+    <criterion>Database query function getSceneByProjectAndSceneNumber() added (if missing)</criterion>
+    <criterion>"Continue to Visual Sourcing" button added with enable logic</criterion>
+    <criterion>Button enabled only when all scenes have audio_file_path</criterion>
+    <criterion>Integration tests pass (6+ test scenarios)</criterion>
+    <criterion>Unit tests pass (4+ test cases for AudioPlayer)</criterion>
+    <criterion>Manual testing confirms audio playback works</criterion>
+    <criterion>Error states display correctly (404, network errors)</criterion>
+    <criterion>Partial completion supported (some scenes with audio, some without)</criterion>
+    <criterion>API endpoint streams audio files correctly</criterion>
+    <criterion>Cache-Control headers set for performance</criterion>
+    <criterion>Documentation updated with component usage and API endpoint</criterion>
+    <criterion>Code review completed by Architect</criterion>
+    <criterion>All acceptance criteria validated</criterion>
+    <criterion>Epic 2 complete and ready for Epic 3</criterion>
+  </definition-of-done>
+
+  <dev-notes>
+    <note category="critical">
+      This story ENHANCES existing script-review-client.tsx (does NOT create new file).
+      The component already exists from Story 2.4 and contains the disabled button that needs to be enabled.
+    </note>
+
+    <note category="architecture">
+      Audio serving uses API endpoint strategy (most secure) rather than serving .cache as static directory.
+      This prevents exposing cache structure and allows validation of every request.
+    </note>
+
+    <note category="workflow">
+      Correct workflow sequence: voice → script-generation → voiceover → visual-sourcing.
+      Script-review page is accessible when current_step is 'voiceover' or 'visual-sourcing'.
+    </note>
+
+    <note category="integration">
+      Button enables and redirects to separate /voiceover page (Story 2.5).
+      After generation completes, user returns to script-review to see audio players.
+      No duplicate polling logic needed - delegates to Story 2.5's VoiceoverGenerator.
+    </note>
+
+    <note category="security">
+      Path traversal prevention is critical:
+      - Validate path starts with .cache/audio/projects/
+      - Reject paths containing ..
+      - Use path.resolve() and verify final path is within project root
+      - Use path.join() instead of string concatenation
+    </note>
+
+    <note category="performance">
+      Audio loading optimization:
+      - Use preload="metadata" (load metadata only, not full file)
+      - Set Cache-Control header (browser caches audio files)
+      - Future: Implement Range requests for streaming large files
+    </note>
+
+    <note category="accessibility">
+      AudioPlayer component must be fully accessible:
+      - Keyboard navigation support
+      - Proper ARIA attributes
+      - Visual focus indicators
+      - Error states clearly communicated
+    </note>
+  </dev-notes>
+
+  <open-questions>
+    <question id="Q1">
+      <text>Should "Continue to Visual Sourcing" button link to functional page or show "Coming Soon" message?</text>
+      <recommendation>Placeholder page with message (Epic 3 not yet implemented)</recommendation>
+    </question>
+
+    <question id="Q2">
+      <text>Should audio player match existing component styles or have custom design?</text>
+      <recommendation>Match existing styles from Epic 1 for consistency</recommendation>
+    </question>
+
+    <question id="Q3">
+      <text>Should error state include retry button or just display message?</text>
+      <recommendation>Just message for MVP, retry for future enhancement</recommendation>
+    </question>
+
+    <question id="Q4">
+      <text>Should "Continue" button advance workflow or just navigate?</text>
+      <recommendation>Navigate only, workflow already advanced by Story 2.5</recommendation>
+    </question>
+  </open-questions>
+
+  <references>
+    <reference>
+      <source>docs/epics.md</source>
+      <lines>513-540</lines>
+      <description>Story 2.6 definition: Goal, tasks, acceptance criteria</description>
+    </reference>
+
+    <reference>
+      <source>docs/prd.md</source>
+      <section>Feature 1.4</section>
+      <description>Automated Voiceover requirements</description>
+    </reference>
+
+    <reference>
+      <source>Story 2.4</source>
+      <description>Script generation workflow, script-review page structure</description>
+    </reference>
+
+    <reference>
+      <source>Story 2.5</source>
+      <description>Voiceover generation workflow, audio file paths, VoiceoverGenerator component</description>
+    </reference>
+
+    <reference>
+      <source>Architect Feedback</source>
+      <date>2025-11-09</date>
+      <description>Critical issues and recommendations addressed in story definition</description>
+    </reference>
+  </references>
+</story-context>
