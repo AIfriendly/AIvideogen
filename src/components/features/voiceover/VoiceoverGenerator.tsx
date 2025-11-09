@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import AudioPlayer from '@/components/ui/audio-player';
 
 export interface VoiceoverGeneratorProps {
   projectId: string;
@@ -156,8 +157,8 @@ export function VoiceoverGenerator({ projectId, sceneCount }: VoiceoverGenerator
 
   // Handle continue
   const handleContinue = () => {
-    // Navigate to next step (placeholder for now)
-    router.push(`/projects/${projectId}`);
+    // Navigate to script review page to see audio alongside script
+    router.push(`/projects/${projectId}/script-review`);
   };
 
   // Render loading state
@@ -209,8 +210,34 @@ export function VoiceoverGenerator({ projectId, sceneCount }: VoiceoverGenerator
               </div>
             )}
 
+            {/* Audio Preview Section */}
+            {audioFiles.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium">Preview Generated Audio</h3>
+                <div className="space-y-2">
+                  {audioFiles.map((audio) => (
+                    <Card key={audio.sceneNumber}>
+                      <CardContent className="pt-4 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <p className="text-sm font-medium">Scene {audio.sceneNumber}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatDuration(audio.duration)}
+                          </p>
+                        </div>
+                        <AudioPlayer
+                          projectId={projectId}
+                          sceneNumber={audio.sceneNumber}
+                          className="w-full"
+                        />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <Button onClick={handleContinue} className="w-full">
-              Continue to Visual Sourcing
+              Continue to Script Review
             </Button>
           </CardContent>
         </Card>
