@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { VoiceProfile } from '@/lib/tts/voice-profiles';
 import { Button } from '@/components/ui/button';
@@ -54,13 +54,22 @@ export default function ScriptGenerationClient({
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Ref to prevent duplicate generation calls (React Strict Mode causes double-mount)
+  const generationInitiated = useRef(false);
+
   // Auto-start generation on mount (if not already generated)
   useEffect(() => {
+    // Prevent duplicate calls - check if already initiated
+    if (generationInitiated.current) {
+      return;
+    }
+
     if (!scriptGenerated && state === 'idle') {
+      generationInitiated.current = true;
       generateScript();
     } else if (scriptGenerated) {
-      // Already generated, redirect back to project detail page
-      router.push(`/projects/${projectId}`);
+      // Already generated, redirect to script review page
+      router.push(`/projects/${projectId}/script-review`);
     }
     // Note: Only run on mount and when scriptGenerated changes, not on every state change
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,6 +118,7 @@ export default function ScriptGenerationClient({
    * Retry script generation after error
    */
   const handleRetry = () => {
+    generationInitiated.current = false; // Reset flag to allow retry
     generateScript();
   };
 
