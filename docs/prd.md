@@ -322,7 +322,19 @@
 
 ### 2.6. LLM Configuration & System Prompts
 *   **Description:** Provide comprehensive control over LLM behavior and configuration:
-    *   **LLM Provider Configuration:** UI options to select from supported providers (local Ollama, OpenAI, Anthropic, Hugging Face), enter API keys, or specify custom endpoints. Enables "bring your own key" model for cloud providers.
+    *   **LLM Provider Configuration:** UI options to select from supported providers, enter API keys, or specify custom endpoints:
+        *   **Local Providers (FOSS):**
+            *   **Ollama** (Primary, FOSS-compliant) - Local deployment with Llama 3.2 or other open models
+        *   **Cloud Providers (Optional):**
+            *   **Google Gemini** (FREE tier available) - Gemini 2.5 Flash/Pro with 1,500 requests/day free
+            *   **OpenAI** (Post-MVP) - GPT models with API key
+            *   **Anthropic** (Post-MVP) - Claude models with API key
+            *   **Custom Endpoints** (Post-MVP) - Support for self-hosted or alternative APIs
+        *   **Implementation Notes:**
+            *   Provider abstraction layer (lib/llm/provider.ts) supports multiple backends
+            *   Configuration via .env.local: LLM_PROVIDER=ollama|gemini
+            *   Ollama remains primary per NFR 1 (FOSS requirement)
+            *   Gemini optional for users who prefer cloud-based free tier
     *   **System Prompt/Persona Configuration:** Allow users to customize the AI assistant's personality, tone, and behavior through configurable system prompts:
         *   **Preset Personas:** Built-in personas optimized for different video types:
             *   Creative Assistant (unrestricted, general brainstorming)
@@ -331,8 +343,12 @@
             *   Documentary Filmmaker (human stories, narrative arcs)
         *   **Custom Personas:** UI for creating and saving custom system prompts with full control over the assistant's behavior, restrictions, and goals.
         *   **Per-Project Personas:** Ability to override default persona on a per-project basis (e.g., use "Educational Designer" for science videos, "Viral Strategist" for entertainment content).
-    *   **Rationale:** Local Ollama deployment provides complete control over LLM behavior without external restrictions. System prompts ensure the assistant adapts to different creative workflows and content types.
-    *   **MVP Implementation:** Default "Creative Assistant" persona hardcoded. UI configuration added post-MVP.
+    *   **Rationale:** Local Ollama deployment provides complete control over LLM behavior without external restrictions. Gemini offers cloud-based alternative with generous free tier (1,500 requests/day). System prompts ensure the assistant adapts to different creative workflows and content types.
+    *   **MVP Implementation:**
+        *   Ollama (primary, FOSS) and Gemini (optional, cloud) providers implemented
+        *   Default "Creative Assistant" persona hardcoded
+        *   Provider selection via .env.local configuration
+        *   UI configuration for provider selection and custom personas added post-MVP
 
 ### 2.7. Topic Research & Web Search
 *   **Description:** Enhance the conversational AI agent (Epic 1) with real-time web search capability to research topics, verify current trends, and incorporate up-to-date information into brainstorming sessions. When discussing video topics, the assistant can search for recent developments, trending content, current events, and factual information to provide more relevant and timely suggestions.

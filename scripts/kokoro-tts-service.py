@@ -244,22 +244,43 @@ def handle_synthesize(request: Dict[str, Any]):
             # Suppress stdout during TTS generation to prevent kokoro_tts spinner
             # from writing to stdout (which is reserved for JSON responses only)
             old_stdout = sys.stdout
-            sys.stdout = open(os.devnull, 'w')
+            devnull_file = None
 
             try:
+                # Open devnull with explicit encoding for Windows compatibility
+                if sys.platform == 'win32':
+                    devnull_file = open(os.devnull, 'w', encoding='utf-8')
+                else:
+                    devnull_file = open(os.devnull, 'w')
+                sys.stdout = devnull_file
+
                 # Synthesize audio using convert_text_to_audio
-                convert_text_to_audio(
-                    input_file=temp_text_path,
-                    output_file=str(output_file),
-                    voice=voice_id,
-                    speed=1.0,
-                    format='mp3'
-                )
+                # Wrap in additional try-except to catch kokoro_tts internal errors
+                try:
+                    convert_text_to_audio(
+                        input_file=temp_text_path,
+                        output_file=str(output_file),
+                        voice=voice_id,
+                        speed=1.0,
+                        format='mp3'
+                    )
+                except SystemExit as e:
+                    # Catch sys.exit() calls from kokoro_tts library
+                    log("ERROR", f"KokoroTTS called sys.exit({e.code}). This is a library bug.")
+                    raise RuntimeError(f"KokoroTTS synthesis failed with exit code {e.code}")
+                except Exception as e:
+                    log("ERROR", f"KokoroTTS synthesis error: {type(e).__name__}: {str(e)}")
+                    raise
+
             finally:
-                # Close devnull and restore stdout
-                if sys.stdout != old_stdout:
-                    sys.stdout.close()
+                # Restore stdout before closing devnull
                 sys.stdout = old_stdout
+                # Close devnull file if it was opened
+                if devnull_file is not None:
+                    try:
+                        devnull_file.close()
+                    except Exception as e:
+                        log("WARN", f"Error closing devnull: {str(e)}")
         finally:
             # Clean up temp file
             if os.path.exists(temp_text_path):

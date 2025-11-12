@@ -14,9 +14,9 @@
 
 **Features Included:**
 - 1.1. Conversational AI Agent
-- 2.6. LLM Configuration & System Prompts (MVP: Default persona only; Post-MVP: UI configuration)
+- 2.6. LLM Configuration & System Prompts (MVP: Ollama + Gemini providers, Default persona; Post-MVP: UI configuration)
 
-**User Value:** Creators can explore ideas naturally and receive AI guidance to refine their video topics before production begins. The AI assistant adapts its personality and behavior to match different content creation workflows.
+**User Value:** Creators can explore ideas naturally and receive AI guidance to refine their video topics before production begins. The AI assistant adapts its personality and behavior to match different content creation workflows. Users can choose between local Ollama (FOSS) or cloud-based Gemini (free tier) providers.
 
 **Story Count Estimate:** 7 stories (MVP: Stories 1.1-1.7), +3 stories (Post-MVP UI)
 
@@ -44,8 +44,21 @@
 **Technical Implementation:**
 - System prompt prepended to all LLM chat requests
 - Stored as constant in `lib/llm/prompts/default-system-prompt.ts`
-- Passed through LLM provider abstraction layer
+- Passed through LLM provider abstraction layer (supports Ollama and Gemini)
 - Applied consistently across all conversations
+- Provider selection via .env.local: LLM_PROVIDER=ollama|gemini
+
+**LLM Provider Support (MVP):**
+- **Ollama (Primary, FOSS):** Local deployment with Llama 3.2 or other open models
+  - Fully complies with NFR 1 (FOSS requirement)
+  - Complete privacy and control
+  - No API costs or rate limits
+- **Google Gemini (Optional, Cloud):** Gemini 2.5 Flash/Pro with free tier
+  - 1,500 requests/day free tier
+  - 15 requests/minute rate limit
+  - No local setup required
+  - Models: gemini-2.5-flash, gemini-2.5-pro
+  - Note: Gemini 1.5 models deprecated (use 2.5 or 2.0 only)
 
 **Post-MVP Enhancement:**
 
@@ -103,16 +116,16 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 **Tasks:**
 - Initialize Next.js 15.5 with TypeScript, Tailwind CSS, ESLint, App Router
-- Install core dependencies: zustand@5.0.8, better-sqlite3@12.4.1, ollama@0.6.2
+- Install core dependencies: zustand@5.0.8, better-sqlite3@12.4.1, ollama@0.6.2, @google/generative-ai
 - Set up project structure (app/, components/, lib/, stores/, types/)
 - Configure environment variables (.env.local)
-- Verify Ollama is running at localhost:11434
+- Verify Ollama is running at localhost:11434 (primary) OR configure Gemini API key (optional)
 
 **Acceptance Criteria:**
 - Next.js development server runs successfully
 - All dependencies installed without errors
 - Project structure follows architecture.md patterns
-- Ollama connection can be verified
+- Either Ollama connection verified OR Gemini API key configured
 
 ---
 
@@ -140,20 +153,25 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 ---
 
 #### Story 1.3: LLM Provider Abstraction
-**Goal:** Implement LLM provider abstraction layer with Ollama integration
+**Goal:** Implement LLM provider abstraction layer with Ollama and Gemini integrations
 
 **Tasks:**
 - Create LLMProvider interface (lib/llm/provider.ts)
 - Implement OllamaProvider class (lib/llm/ollama-provider.ts)
+- Implement GeminiProvider class (lib/llm/gemini-provider.ts)
 - Create provider factory function (lib/llm/factory.ts)
 - Implement DEFAULT_SYSTEM_PROMPT (lib/llm/prompts/default-system-prompt.ts)
-- Add error handling for Ollama connection failures
+- Add error handling for connection failures (both providers)
+- Add Gemini-specific error handling (API key, quota, model not found, safety filters)
 
 **Acceptance Criteria:**
 - LLMProvider interface defines chat() method
 - OllamaProvider successfully calls Ollama API at localhost:11434
-- System prompt prepended to all chat requests
-- Factory returns OllamaProvider based on environment configuration
+- GeminiProvider successfully calls Gemini API with valid API key and model (gemini-2.5-flash)
+- System prompt prepended to all chat requests (both providers)
+- Factory returns correct provider based on LLM_PROVIDER environment variable
+- Error messages provide actionable guidance for troubleshooting
+- Model not found errors display correct available models (Gemini 2.5/2.0)
 - Connection errors handled gracefully with user-friendly messages
 
 **References:**

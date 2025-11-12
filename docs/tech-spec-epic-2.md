@@ -9,7 +9,13 @@ Status: Draft
 
 ## Overview
 
-Epic 2 implements the complete content generation pipeline for the AI Video Generator, encompassing voice selection, professional-quality script generation, and text-to-speech synthesis. Building on Epic 1's topic confirmation workflow, this epic transforms confirmed topics into production-ready audio-scripted content. The implementation leverages KokoroTTS for high-quality voice synthesis with 48+ voice options, Ollama/Llama 3.2 for intelligent script generation with professional scriptwriting standards, and a comprehensive text sanitization pipeline to ensure clean TTS output. The architecture follows a progressive enhancement pattern where users first select their preferred voice, then receive AI-generated scripts divided into scenes, and finally get MP3 voiceovers for each scene using their selected voice.
+Epic 2 implements the complete content generation pipeline for the AI Video Generator, encompassing voice selection, professional-quality script generation, and text-to-speech synthesis. Building on Epic 1's topic confirmation workflow, this epic transforms confirmed topics into production-ready audio-scripted content. The implementation leverages KokoroTTS for high-quality voice synthesis with 48+ voice options, flexible LLM provider support (Ollama/Llama 3.2 or Google Gemini 2.5) for intelligent script generation with professional scriptwriting standards, and a comprehensive text sanitization pipeline to ensure clean TTS output. The architecture follows a progressive enhancement pattern where users first select their preferred voice, then receive AI-generated scripts divided into scenes, and finally get MP3 voiceovers for each scene using their selected voice.
+
+**LLM Provider Options:**
+- **Primary (FOSS):** Ollama with Llama 3.2 (3B) - Local deployment, no API costs, complete privacy
+- **Optional (Cloud):** Google Gemini 2.5 Flash/Pro - Free tier (1,500 requests/day), no local setup
+- **Configuration:** Set via .env.local `LLM_PROVIDER=ollama|gemini`
+- **Compatibility:** Both providers implement same LLMProvider interface for seamless switching
 
 This epic represents a critical transformation point in the video creation workflow, where abstract ideas become concrete, narrated content ready for visual pairing. The system emphasizes professional quality output that sounds human-written and naturally spoken, avoiding robotic or AI-generated tells that would diminish viewer engagement.
 
@@ -237,7 +243,7 @@ interface QualityIssue {
    - Load topic from projects.topic field
    - Analyze topic for appropriate tone (documentary/educational/entertainment)
    - Generate prompt using script-generation-prompt.ts template
-   - Call Ollama/Llama 3.2 via LLM provider abstraction
+   - Call LLM (Ollama/Llama 3.2 or Gemini 2.5) via provider abstraction
    - Parse JSON response into scene array
    - Run quality validation (validate-script-quality.ts)
    - If validation fails: Retry with improved prompt (max 3 attempts)
@@ -286,7 +292,7 @@ interface QualityIssue {
 - **Script Length Limit:** Maximum 1200 words per scene to prevent resource exhaustion
 - **Voice ID Validation:** Only accept voice IDs from predefined whitelist
 - **SQL Injection Prevention:** Use parameterized queries for all database operations
-- **Local Processing:** All TTS and LLM processing happens locally (no external API calls)
+- **Local Processing:** TTS processing happens locally. LLM processing either local (Ollama) or cloud (Gemini with API key)
 - **No PII Storage:** Scripts and audio files contain no personally identifiable information
 - **CORS Configuration:** API endpoints restricted to same-origin requests only
 
@@ -296,7 +302,7 @@ interface QualityIssue {
 - **Partial Failure Handling:** Continue processing other scenes if one fails
 - **State Persistence:** All progress saved to SQLite database for crash recovery
 - **Graceful Degradation:** If TTS fails, still display script for manual review
-- **Connection Monitoring:** Check Ollama availability before script generation
+- **Connection Monitoring:** Check LLM provider availability before script generation (Ollama or Gemini)
 - **Resource Cleanup:** Automatic cleanup of temporary files after 24 hours
 - **Transaction Safety:** Database operations wrapped in transactions for consistency
 - **Idempotent Operations:** Regeneration requests safely overwrite existing content
@@ -317,7 +323,9 @@ interface QualityIssue {
 ## Dependencies and Integrations
 
 **External Dependencies:**
-- **Ollama Server:** v0.4.7+ running at localhost:11434 with Llama 3.2 (3B) model loaded
+- **LLM Provider (Choose One):**
+  - **Ollama Server (Primary, FOSS):** v0.4.7+ running at localhost:11434 with Llama 3.2 (3B) model loaded
+  - **Google Gemini (Optional, Cloud):** API key from Google AI Studio, supports Gemini 2.5 Flash/Pro
 - **KokoroTTS:** Python package v0.3.0+ with 82M parameter model downloaded (~320MB)
 - **FFmpeg:** v7.1.2+ for audio format conversion if needed
 - **Python Runtime:** 3.10+ for KokoroTTS execution via child_process
@@ -332,9 +340,10 @@ interface QualityIssue {
 **NPM Package Dependencies:**
 ```json
 {
-  "ollama": "^0.6.2",           // LLM client SDK
-  "uuid": "^11.0.4",             // Scene ID generation
-  "zod": "^3.24.1"               // API request/response validation
+  "ollama": "^0.6.2",                      // Ollama LLM client SDK (local)
+  "@google/generative-ai": "^0.21.0",     // Gemini LLM client SDK (cloud)
+  "uuid": "^11.0.4",                       // Scene ID generation
+  "zod": "^3.24.1"                         // API request/response validation
 }
 ```
 
@@ -423,19 +432,23 @@ scipy==1.11.1                   # Audio utilities
 **Risks:**
 - **Risk:** KokoroTTS model download size (320MB) may slow initial setup
   - *Mitigation:* Provide pre-download instructions and progress indicator
-- **Risk:** Ollama connection may timeout for long script generation
-  - *Mitigation:* Implement connection health checks and retry logic
+- **Risk:** LLM provider connection may timeout for long script generation
+  - *Mitigation:* Implement connection health checks and retry logic for both Ollama and Gemini
+- **Risk:** Gemini free tier rate limits (15 RPM, 1,500 RPD) may be exceeded during testing
+  - *Mitigation:* Implement rate limiting, caching, and fallback to Ollama
 - **Risk:** Parallel TTS generation may exhaust system resources
   - *Mitigation:* Limit concurrent generations to 5, queue remainder
 - **Risk:** Script quality validation may be too strict, rejecting good scripts
   - *Mitigation:* Tune validation thresholds based on testing feedback
 
 **Assumptions:**
-- **Assumption:** Users have Ollama running with Llama 3.2 model loaded
+- **Assumption:** Users have either Ollama running with Llama 3.2 OR valid Gemini API key
+  - Ollama is primary (FOSS-compliant), Gemini is optional cloud alternative
 - **Assumption:** System has sufficient disk space for audio files (~10MB per project)
 - **Assumption:** Python 3.10+ is installed for KokoroTTS execution
 - **Assumption:** Users prefer voice selection before script generation (not after)
 - **Assumption:** 3-5 scenes is optimal for MVP videos (not 10+)
+- **Assumption:** Gemini 2.5 models provide quality comparable to Llama 3.2 for script generation
 
 **Open Questions:**
 - **Question:** Should voice preview samples be pre-generated or generated on-demand?
