@@ -53,11 +53,13 @@ development_status:
   2-2-database-schema-updates: done
   2-3-voice-selection-ui-workflow: done
   2-4-llm-script-generation-professional-quality: done
-  2-5-voiceover-generation-for-scenes: ready-for-dev
+  2-5-voiceover-generation-for-scenes: done
+  2-6-script-voiceover-preview-integration: done
   epic-2-retrospective: optional
 
   # Epic 3: Visual Content Sourcing (YouTube API)
-  epic-3: backlog
+  epic-3: contexted
+  3-1-youtube-api-client-setup-configuration: ready-for-dev
   epic-3-retrospective: optional
 
   # Epic 4: Visual Curation Interface
