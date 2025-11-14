@@ -63,15 +63,20 @@ const GENERIC_OPENINGS = [
  *
  * @param scenes - Array of scenes to validate
  * @param targetTotalWords - Optional target total word count for duration-based validation
+ * @param targetSceneCount - Optional target scene count for calculating per-scene word limits
+ * @param attemptNumber - Optional attempt number (1, 2, 3) for escalating penalties on retries
  * @returns ValidationResult with pass/fail status and detailed issues
  */
 export function validateScriptQuality(
   scenes: Scene[],
-  targetTotalWords?: number
+  targetTotalWords?: number,
+  targetSceneCount?: number,
+  attemptNumber?: number
 ): ValidationResult {
   const issues: string[] = [];
   const suggestions: string[] = [];
   let score = 100;
+  let isBelowMinimum = false; // Track if script is critically short
 
   // Validation 1: Check scene count (minimum 3 scenes, no maximum)
   if (scenes.length < 3) {
@@ -80,86 +85,129 @@ export function validateScriptQuality(
   }
   // No maximum scene limit - scene count should be driven by content/duration needs
 
+  // Per-scene validation: Use VERY lenient limits
+  // Philosophy: The total word count determines video duration, not individual scenes.
+  // Per-scene checks should only catch truly broken output (empty or gibberish scenes).
+  // LLMs often generate scenes of varying lengths (20-150 words), and that's acceptable.
+  let MIN_SCENE_WORDS: number;
+  let MAX_SCENE_WORDS: number;
+
+  if (targetTotalWords && targetTotalWords > 0 && targetSceneCount && targetSceneCount > 0) {
+    // Calculate expected words per scene for informational purposes only
+    const expectedWordsPerScene = targetTotalWords / targetSceneCount;
+
+    // MINIMUM: Set very low (15 words) to only catch broken scenes
+    // Don't enforce relative minimums - let LLM generate short scenes if needed
+    MIN_SCENE_WORDS = 15;
+
+    // MAXIMUM: Allow up to 250% of expected to handle LLM variance
+    // Cap at 350 words to prevent extremely long monologues
+    MAX_SCENE_WORDS = Math.min(350, Math.ceil(expectedWordsPerScene * 2.5));
+
+    console.log(
+      `[Validation] Lenient scene limits: ${MIN_SCENE_WORDS}-${MAX_SCENE_WORDS} words ` +
+      `(expected ${Math.round(expectedWordsPerScene)} words/scene, but flexible for LLM variance)`
+    );
+  } else {
+    // Fallback defaults when no configuration provided
+    // Very lenient: 15-250 word range
+    MIN_SCENE_WORDS = 15;
+    MAX_SCENE_WORDS = 250;
+
+    console.log(
+      `[Validation] Using lenient scene limits: ${MIN_SCENE_WORDS}-${MAX_SCENE_WORDS} words ` +
+      `(flexible for LLM variance)`
+    );
+  }
+
   // Validation 2: Check each scene
+  // PHILOSOPHY: Accept any word count - only catch truly broken content (empty scenes)
   for (const scene of scenes) {
     const scenePrefix = `Scene ${scene.sceneNumber}`;
 
-    // Calculate actual word count
-    const actualWordCount = scene.text.trim().split(/\s+/).length;
-
-    // Check if LLM provided word count and compare with actual
-    if (scene.wordCount !== undefined) {
-      const reportedCount = scene.wordCount;
-      const difference = Math.abs(actualWordCount - reportedCount);
-
-      // If LLM's count is way off (>10% error), flag it
-      if (difference > Math.max(5, actualWordCount * 0.1)) {
-        suggestions.push(
-          `${scenePrefix}: Word count mismatch (reported ${reportedCount}, actual ${actualWordCount}) - count more carefully`
-        );
-        score -= 5;
-      }
-
-      // If LLM reported high count but actual is low, penalize heavily
-      if (reportedCount >= 60 && actualWordCount < 50) {
-        issues.push(`${scenePrefix}: Claimed ${reportedCount} words but only has ${actualWordCount}`);
-        score -= 20;
-      }
-    } else {
-      // LLM didn't provide wordCount - warn them
-      suggestions.push(`${scenePrefix}: Missing wordCount field in JSON`);
-      score -= 5;
-    }
-
-    // Check scene text length (40-250 words) using actual count
-    // Minimum lowered to 40 for llama3.2's limitations
-    // Maximum increased to 250 to support longer videos (15-20 min)
-    const MIN_SCENE_WORDS = 40;
-    const MAX_SCENE_WORDS = 250;
-
-    if (actualWordCount < MIN_SCENE_WORDS) {
-      issues.push(`${scenePrefix}: Too short (${actualWordCount} words, minimum ${MIN_SCENE_WORDS})`);
-      // Deduct more points for very short scenes
-      score -= actualWordCount < 10 ? 40 : 20;
-    } else if (actualWordCount > MAX_SCENE_WORDS) {
-      issues.push(`${scenePrefix}: Too long (${actualWordCount} words, maximum ${MAX_SCENE_WORDS})`);
-      score -= 10;
-    }
-
-    // Check for empty or whitespace-only text
+    // Check for empty or whitespace-only text (CRITICAL: truly broken content)
     if (!scene.text.trim()) {
       issues.push(`${scenePrefix}: Empty scene text`);
       score -= 20;
     }
+
+    // Informational logging only - no penalties for word count variance
+    const actualWordCount = scene.text.trim().split(/\s+/).length;
+    console.log(`[Validation] ${scenePrefix}: ${actualWordCount} words`);
   }
 
   // Validation 2b: Check total word count if target is provided (duration-based validation)
+  // PHILOSOPHY: Soft minimum threshold to ensure videos meet user expectations
+  // - Scripts must reach at least 60% of target to pass (prevents 2min videos when user wants 5min)
+  // - Retry attempts get harsher penalties to force improvement
+  // - No hard penalties for minor deviations (80-120% range gets bonus)
+  // - Informational suggestions for user awareness
   if (targetTotalWords && targetTotalWords > 0) {
     const totalActualWords = scenes.reduce((sum, scene) => {
       return sum + scene.text.trim().split(/\s+/).length;
     }, 0);
 
-    const tolerance = 0.15; // Allow 15% variance
-    const minWords = Math.floor(targetTotalWords * (1 - tolerance));
-    const maxWords = Math.ceil(targetTotalWords * (1 + tolerance));
+    // Calculate tolerances
+    const minTolerance = 0.60; // Minimum 60% of target to pass (increased from 50%)
+    const maxTolerance = 0.50; // Allow up to 50% over target
+    const minWords = Math.ceil(targetTotalWords * minTolerance);
+    const maxWords = Math.ceil(targetTotalWords * (1 + maxTolerance));
 
+    // Informational: Calculate how close we are to target
+    const percentOfTarget = Math.round((totalActualWords / targetTotalWords) * 100);
+
+    // Log word count
+    console.log(
+      `[Validation] Total words: ${totalActualWords} (target: ${targetTotalWords}, ${percentOfTarget}% of target, ` +
+      `minimum: ${minWords})`
+    );
+
+    // CRITICAL: Enforce minimum word count threshold
+    // If script is too short (< 60% of target), fail validation
+    // Escalate penalties on retry attempts to force improvement
     if (totalActualWords < minWords) {
+      isBelowMinimum = true; // Mark as critically short - will force fail
+
       issues.push(
-        `Total word count too low: ${totalActualWords} words (target ${targetTotalWords}, minimum ${minWords})`
+        `Script too short: ${totalActualWords} words (${percentOfTarget}% of target ${targetTotalWords}, ` +
+        `minimum ${minWords} required)`
       );
       suggestions.push(
-        `Add more detail to scenes to reach target duration. Need ${minWords - totalActualWords} more words.`
+        `Requested ${targetTotalWords} words for ${Math.round((targetTotalWords / 160) * 60)}s video, ` +
+        `but only got ${totalActualWords} words. Increase scene length to meet duration target.`
       );
-      score -= 25;
-    } else if (totalActualWords > maxWords) {
-      issues.push(
-        `Total word count too high: ${totalActualWords} words (target ${targetTotalWords}, maximum ${maxWords})`
-      );
-      suggestions.push(`Reduce verbosity to stay within target duration.`);
-      score -= 15;
-    } else {
-      // Total word count is within acceptable range - give bonus points
+
+      // Escalate penalty based on attempt number
+      let penalty = 30; // Base penalty for first attempt
+      if (attemptNumber && attemptNumber >= 2) {
+        penalty = 50; // Harsher penalty on retry attempts (forces score below 70)
+        console.log(`[Validation] Attempt ${attemptNumber} still below minimum - increased penalty -${penalty} points`);
+      } else {
+        console.log(`[Validation] Script below minimum threshold - penalty -${penalty} points`);
+      }
+
+      score -= penalty;
+    }
+    // Bonus for hitting target range (80-120%)
+    else if (totalActualWords >= targetTotalWords * 0.8 && totalActualWords <= targetTotalWords * 1.2) {
       score += 10;
+      console.log('[Validation] Script length within target range - bonus +10 points');
+    }
+    // Informational suggestion for moderately short scripts (60-80% of target)
+    else if (totalActualWords < targetTotalWords * 0.8) {
+      suggestions.push(
+        `Script is shorter than expected: ${totalActualWords} words (${percentOfTarget}% of target ${targetTotalWords}). ` +
+        `Video will be shorter than requested duration. Consider regenerating for longer content.`
+      );
+      console.log('[Validation] Script moderately short but acceptable (60-80% of target)');
+    }
+    // Informational suggestion for very long scripts (no penalty)
+    else if (totalActualWords > maxWords) {
+      suggestions.push(
+        `Script is longer than expected: ${totalActualWords} words (${percentOfTarget}% of target ${targetTotalWords}). ` +
+        `Video will be longer than requested duration.`
+      );
+      console.log('[Validation] Script exceeds maximum (150%+ of target)');
     }
   }
 
@@ -207,7 +255,13 @@ export function validateScriptQuality(
   score = Math.max(0, score);
 
   // Pass threshold: 70 or higher (allow some minor issues if score is still good)
-  const passed = score >= 70;
+  // CRITICAL: Force fail if below minimum word count, regardless of score
+  // This prevents edge cases where score = 70 exactly but script is too short
+  let passed = score >= 70;
+  if (isBelowMinimum) {
+    passed = false; // Force fail - script is critically short
+    console.log(`[Validation] ⚠️ FORCED FAIL: Script below minimum threshold (score=${score}, but below minimum)`);
+  }
 
   return {
     passed,

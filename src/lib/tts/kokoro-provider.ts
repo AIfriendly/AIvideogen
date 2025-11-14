@@ -19,8 +19,8 @@
  */
 
 import { spawn, ChildProcess } from 'child_process';
-import { readFileSync, existsSync } from 'fs';
-import { resolve, join } from 'path';
+import { readFileSync, existsSync, mkdirSync } from 'fs';
+import { resolve, join, dirname } from 'path';
 import type { TTSProvider, AudioResult, VoiceProfile } from './provider';
 import { TTSError, TTSErrorCode } from './provider';
 import { MVP_VOICES } from './voice-profiles';
@@ -91,22 +91,23 @@ export class KokoroProvider implements TTSProvider {
   private maxRestartAttempts: number = 3;
 
   // Timeouts (ms)
+  // Note: KokoroTTS synthesis takes ~27-30 seconds per scene based on production testing
   private readonly COLD_START_TIMEOUT = parseInt(
-    process.env.TTS_TIMEOUT_MS_COLD || '30000'
+    process.env.TTS_TIMEOUT_MS_COLD || '60000'  // 60s for cold start (model loading + first synthesis)
   );
   private readonly WARM_TIMEOUT = parseInt(
-    process.env.TTS_TIMEOUT_MS_WARM || '10000'
+    process.env.TTS_TIMEOUT_MS_WARM || '45000'  // 45s for warm requests (synthesis only, ~30s observed + buffer)
   );
 
-  // Service script path (relative to project root)
+  // Service script path (now inside project directory)
   private readonly servicePath = resolve(
     process.cwd(),
-    '..',
     'scripts',
     'kokoro-tts-service.py'
   );
 
   // Python interpreter path (use venv to access installed packages)
+  // Note: .venv is still in parent directory for now
   private readonly pythonPath = resolve(
     process.cwd(),
     '..',
@@ -153,8 +154,12 @@ export class KokoroProvider implements TTSProvider {
     try {
       // Spawn Python service
       console.log('[TTS] Starting KokoroTTS service...');
+      // Run service in models/ directory where model files (kokoro-v1.0.onnx, voices-v1.0.bin) are located
+      // The kokoro_tts library expects these files in its current working directory
+      const modelDirectory = resolve(process.cwd(), 'models');
       this.service = spawn(this.pythonPath, [this.servicePath], {
         stdio: ['pipe', 'pipe', 'pipe'], // stdin, stdout, stderr
+        cwd: modelDirectory, // Run service in models/ directory
       });
 
       // Setup error handlers
@@ -352,10 +357,21 @@ export class KokoroProvider implements TTSProvider {
     // Ensure service is running
     await this.ensureServiceRunning();
 
-    // Generate output path (will be passed to service)
+    // Generate output path (must be absolute since service runs in different CWD)
     // Note: Actual path generation should use audio-storage utility
-    // For now, using temporary path
-    const outputPath = join('.cache', 'audio', 'temp', `${Date.now()}.mp3`);
+    // For now, using temporary path relative to ai-video-generator directory
+    const outputPath = resolve(process.cwd(), '.cache', 'audio', 'temp', `${Date.now()}.mp3`);
+
+    // DEBUG: Log the path we're using
+    console.log(`[DEBUG TTS] Generated output path: ${outputPath}`);
+    console.log(`[DEBUG TTS] CWD: ${process.cwd()}`);
+
+    // Ensure output directory exists
+    const outputDir = dirname(outputPath);
+    if (!existsSync(outputDir)) {
+      mkdirSync(outputDir, { recursive: true });
+      console.log(`[DEBUG TTS] Created directory: ${outputDir}`);
+    }
 
     // Send synthesis request
     const request: TTSRequest = {
@@ -406,6 +422,13 @@ export class KokoroProvider implements TTSProvider {
           const response: TTSResponse = JSON.parse(data.toString());
 
           if (response.success) {
+            // DEBUG: Check if file exists before reading
+            console.log(`[DEBUG TTS] Response success, attempting to read file: ${outputPath}`);
+            console.log(`[DEBUG TTS] File exists check: ${existsSync(outputPath)}`);
+            if (existsSync(outputPath)) {
+              console.log(`[DEBUG TTS] File size: ${readFileSync(outputPath).length} bytes`);
+            }
+
             // Read audio file
             const audioBuffer = new Uint8Array(readFileSync(outputPath));
 

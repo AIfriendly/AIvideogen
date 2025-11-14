@@ -19,6 +19,16 @@ interface SettingsClientProps {
 }
 
 /**
+ * LLM generation rate: Production testing shows llama3.1 generates ~50% of requested word count
+ * (Initial assumption was 70%, but actual observed rate with 11 scenes was 43-53%)
+ * To compensate, we request 2.0x more words than the target duration requires
+ * Example: 5 min target (800 words) → request 1600 words → LLM generates ~800 actual words
+ *
+ * Multiplier increased from 1.43x (70% rate) to 2.0x (50% rate) based on real-world testing
+ */
+const LLM_PADDING_MULTIPLIER = 2.0;
+
+/**
  * Calculate recommended scene count based on target duration
  * Uses average of 60 seconds per scene (100 words at 150 WPM)
  */
@@ -58,8 +68,11 @@ export default function SettingsClient({
 
   // Calculate scene count based on duration
   const sceneCount = calculateSceneCount(duration);
-  const estimatedWords = sceneCount * 100; // Average 100 words per scene
-  const estimatedSeconds = Math.round((estimatedWords / 150) * 60); // 150 WPM
+  // Apply LLM padding multiplier (1.43x) to compensate for ~70% generation rate
+  // This ensures we get the desired duration (e.g., 5 min target → request 1144 words → get ~800 actual words)
+  const estimatedWordsRequest = Math.round(sceneCount * 100 * LLM_PADDING_MULTIPLIER); // What we request from LLM
+  const estimatedWords = Math.round(estimatedWordsRequest / LLM_PADDING_MULTIPLIER); // What we expect to actually get
+  const estimatedSeconds = Math.round((estimatedWords / 150) * 60); // Use actual expected output for time calc
 
   // Quick duration presets
   const presets = [1, 2, 3, 5, 10, 15, 20];
@@ -76,7 +89,7 @@ export default function SettingsClient({
       const config = {
         targetDuration: duration,
         sceneCount: sceneCount,
-        estimatedWords: estimatedWords,
+        estimatedWords: estimatedWordsRequest, // Use padded request (1.43x) to compensate for LLM ~70% generation rate
       };
 
       const response = await fetch(`/api/projects/${projectId}`, {
@@ -286,9 +299,9 @@ export default function SettingsClient({
             </h3>
             <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
               <li>• The system will generate approximately {sceneCount} scenes for a {formatDuration(duration)} video</li>
-              <li>• Each scene will be 50-200 words (optimal: 80-120 words)</li>
-              <li>• Actual duration may vary based on speaking pace and pauses</li>
-              <li>• You can regenerate scripts if the length doesn't match your needs</li>
+              <li>• Scene lengths vary naturally (20-150 words) - the total duration is what matters</li>
+              <li>• Actual duration may vary ±30% based on speaking pace, pauses, and content</li>
+              <li>• You can regenerate scripts if the length doesnt match your needs</li>
             </ul>
           </div>
 

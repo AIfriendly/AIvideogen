@@ -13,6 +13,7 @@ import {
   SCRIPT_GENERATION_SYSTEM_PROMPT
 } from './prompts/script-generation-prompt';
 import { validateScriptQuality, type Scene, type ValidationResult } from './validate-script-quality';
+import { jsonrepair } from 'jsonrepair';
 
 /**
  * Result of script generation with retry
@@ -60,8 +61,10 @@ function parseScriptResponse(response: string): Scene[] {
   cleanedResponse = cleanedResponse.trim();
 
   try {
-    // Try to parse as JSON
-    const parsed = JSON.parse(cleanedResponse);
+    // Try to repair and parse as JSON
+    // jsonrepair fixes common issues: missing commas, trailing commas, unclosed braces, etc.
+    const repairedResponse = jsonrepair(cleanedResponse);
+    const parsed = JSON.parse(repairedResponse);
 
     // Validate structure
     if (!parsed.scenes || !Array.isArray(parsed.scenes)) {
@@ -84,7 +87,8 @@ function parseScriptResponse(response: string): Scene[] {
     const jsonMatch = cleanedResponse.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
     if (jsonMatch) {
       try {
-        const parsed = JSON.parse(jsonMatch[1]);
+        const repairedJson = jsonrepair(jsonMatch[1]);
+        const parsed = JSON.parse(repairedJson);
         if (parsed.scenes && Array.isArray(parsed.scenes)) {
           return parsed.scenes as Scene[];
         }
@@ -97,7 +101,8 @@ function parseScriptResponse(response: string): Scene[] {
     const jsonObjectMatch = cleanedResponse.match(/\{[\s\S]*"scenes"[\s\S]*\}/);
     if (jsonObjectMatch) {
       try {
-        const parsed = JSON.parse(jsonObjectMatch[0]);
+        const repairedJson = jsonrepair(jsonObjectMatch[0]);
+        const parsed = JSON.parse(repairedJson);
         if (parsed.scenes && Array.isArray(parsed.scenes)) {
           return parsed.scenes as Scene[];
         }
@@ -144,7 +149,7 @@ function parseScriptResponse(response: string): Scene[] {
 export async function generateScriptWithRetry(
   topic: string,
   projectConfig?: any,
-  maxAttempts: number = 3
+  maxAttempts: number = 6
 ): Promise<ScriptGenerationResult> {
   const provider = createLLMProvider();
   let lastValidationResult: ValidationResult | null = null;
@@ -154,47 +159,21 @@ export async function generateScriptWithRetry(
     try {
       console.log(`[Script Generation] Attempt ${attempt}/${maxAttempts} for topic: "${topic}"`);
 
-      // Optimize scene count for llama3.2's capabilities
-      // Target: 80-120 words/scene (sweet spot for llama3.2)
-      // Calculate optimal scene count based on total words, cap at 20 scenes
-      let optimizedConfig = projectConfig;
-      if (projectConfig?.estimatedWords) {
+      // DISABLED: Scene optimization was making LLM generate shorter content
+      // Issue: Splitting into more scenes (8 → 11) made task more complex
+      // Result: LLM generated ~43% of target instead of ~70%
+      // Fix: Use user's requested scene count directly (simpler = better)
+      const optimizedConfig = projectConfig;
+
+      if (projectConfig?.estimatedWords && projectConfig?.sceneCount) {
         const totalWords = projectConfig.estimatedWords;
-        const requestedSceneCount = projectConfig.sceneCount || Math.ceil(totalWords / 100);
+        const sceneCount = projectConfig.sceneCount;
+        const wordsPerScene = Math.round(totalWords / sceneCount);
 
-        // Calculate optimal scene count for 80-120 words per scene
-        const MIN_WORDS_PER_SCENE = 80;
-        const MAX_WORDS_PER_SCENE = 120;
-        const TARGET_WORDS_PER_SCENE = 100;
-        const MAX_SCENES = 20; // llama3.2 context limit
-
-        // Calculate optimal scene count
-        let optimalSceneCount = Math.round(totalWords / TARGET_WORDS_PER_SCENE);
-
-        // Ensure we stay within min/max bounds
-        const minScenes = Math.ceil(totalWords / MAX_WORDS_PER_SCENE);
-        const maxScenes = Math.min(MAX_SCENES, Math.floor(totalWords / MIN_WORDS_PER_SCENE));
-
-        optimalSceneCount = Math.max(minScenes, Math.min(maxScenes, optimalSceneCount));
-
-        // Only optimize if different from requested
-        if (optimalSceneCount !== requestedSceneCount) {
-          optimizedConfig = {
-            ...projectConfig,
-            sceneCount: optimalSceneCount,
-            estimatedWords: totalWords, // Keep total words the same
-          };
-
-          console.log(
-            `[Script Generation] Optimizing for LLM: ${requestedSceneCount} scenes → ${optimalSceneCount} scenes ` +
-            `(${Math.round(totalWords / optimalSceneCount)} words/scene target, total ${totalWords} words)`
-          );
-        } else {
-          console.log(
-            `[Script Generation] Using requested ${requestedSceneCount} scenes ` +
-            `(${Math.round(totalWords / requestedSceneCount)} words/scene target, total ${totalWords} words)`
-          );
-        }
+        console.log(
+          `[Script Generation] Using requested ${sceneCount} scenes ` +
+          `(${wordsPerScene} words/scene target, total ${totalWords} words)`
+        );
       }
 
       // Generate appropriate prompt based on attempt number
@@ -206,31 +185,59 @@ export async function generateScriptWithRetry(
         prompt = generateEnhancedPrompt(topic, attempt, previousIssues, optimizedConfig);
       }
 
+      // DEBUG: Log prompt configuration details
+      console.log(`[DEBUG] Prompt config: Target ${optimizedConfig?.estimatedWords || 'N/A'} words, ` +
+                  `${optimizedConfig?.sceneCount || 'N/A'} scenes, ` +
+                  `${Math.round((optimizedConfig?.estimatedWords || 0) / (optimizedConfig?.sceneCount || 1))} words/scene`);
+
       // Call LLM
       const messages: Message[] = [
         { role: 'user', content: prompt }
       ];
 
       console.log(`[Script Generation] Calling LLM provider...`);
+      const startTime = Date.now();
       const response = await provider.chat(messages, SCRIPT_GENERATION_SYSTEM_PROMPT);
+      const llmDuration = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`[DEBUG] LLM response received in ${llmDuration}s, length: ${response.length} chars`);
 
       // Parse response
       console.log(`[Script Generation] Parsing LLM response...`);
       const scenes = parseScriptResponse(response);
 
+      // DEBUG: Calculate actual word counts from parsed scenes
+      const actualTotalWords = scenes.reduce((sum, scene) => {
+        return sum + scene.text.trim().split(/\s+/).length;
+      }, 0);
+      const targetWords = optimizedConfig?.estimatedWords || 0;
+      const percentOfTarget = targetWords > 0 ? Math.round((actualTotalWords / targetWords) * 100) : 0;
+
       console.log(`[Script Generation] Parsed ${scenes.length} scenes, validating quality...`);
+      console.log(`[DEBUG] LLM generated ${actualTotalWords} words (target: ${targetWords}, ${percentOfTarget}% of target)`);
 
-      // Extract target total words from projectConfig for duration-based validation
-      const targetTotalWords = projectConfig?.estimatedWords || undefined;
+      // Extract target total words and scene count from projectConfig for duration-based validation
+      // Use the optimized config (which may have adjusted scene count for LLM capabilities)
+      const targetTotalWords = optimizedConfig?.estimatedWords || undefined;
+      const targetSceneCount = optimizedConfig?.sceneCount || undefined;
 
-      // Validate quality
-      const validation = validateScriptQuality(scenes, targetTotalWords);
+      // Validate quality with dynamic word count limits and attempt number for penalty escalation
+      const validation = validateScriptQuality(scenes, targetTotalWords, targetSceneCount, attempt);
       lastValidationResult = validation;
 
       console.log(
         `[Script Generation] Validation score: ${validation.score}/100, ` +
         `passed: ${validation.passed}, issues: ${validation.issues.length}`
       );
+
+      // DEBUG: Show validation decision details
+      if (validation.issues.length > 0) {
+        console.log(`[DEBUG] Validation issues: ${validation.issues.join('; ')}`);
+      }
+      if (validation.passed) {
+        console.log(`[DEBUG] ✅ PASSED - Script accepted (${actualTotalWords} words, ${percentOfTarget}% of target)`);
+      } else {
+        console.log(`[DEBUG] ❌ FAILED - Will retry (${actualTotalWords} words, ${percentOfTarget}% of target, score ${validation.score}/100)`);
+      }
 
       if (validation.passed) {
         // Success!

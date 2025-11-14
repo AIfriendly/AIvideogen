@@ -1,0 +1,15 @@
+# AI Video Generator - Python Dependencies
+# Install with: uv pip install -r requirements.txt
+
+# YouTube video downloading
+yt-dlp>=2025.10.22
+
+# Text-to-Speech (KokoroTTS)
+# 82M parameter model with 48+ voice options (4.35 MOS score)
+kokoro-tts>=0.3.0
+mutagen>=1.47.0
+# Let kokoro-tts determine numpy version (requires numpy>=2.0.2)
+# scipy will be installed as a dependency of kokoro-tts
+
+# Note: FFmpeg must be installed separately as a system binary
+# Note: Ollama must be installed separately (already installed)

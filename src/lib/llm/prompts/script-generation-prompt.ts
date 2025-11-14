@@ -277,12 +277,17 @@ YOU MUST FIX THESE ISSUES OR YOU WILL FAIL AGAIN.
    - All strings in double quotes, numbers without quotes
    - Test your JSON is valid before submitting
 
-2. WORD COUNTING:
+2. WORD COUNTING (🚨 MOST IMPORTANT - THIS IS WHY YOU FAILED 🚨):
+   - 🎯 TARGET TOTAL: ${projectConfig?.estimatedWords || 450} words across ALL scenes
+   - 🎯 Per scene: ${Math.round((projectConfig?.estimatedWords || 450) / (projectConfig?.sceneCount || 4))} words each
+   - ⚠️ YOU MUST WRITE LONGER SCENES - Your previous attempt was TOO SHORT
+   - Each scene should be a FULL PARAGRAPH, not just 2-3 sentences
    - COUNT your actual words by splitting on spaces
    - If you write "An octopus can swim" that is 4 words
    - Set "wordCount" to ACTUAL count, not a guess
-   - MINIMUM 40 words per scene (actually count them!)
-   - TOTAL across all scenes: ${projectConfig?.estimatedWords || 450} words (±10%)
+   - MINIMUM 60 words per scene (NOT 40 - write MORE!)
+   - OPTIMAL: 80-120 words per scene for quality content
+   - 🚨 CRITICAL: Total must be ${projectConfig?.estimatedWords || 450} words minimum (within ±10%)
 
 3. BANNED PHRASES TO AVOID:
    - "imagine a world where"
@@ -321,14 +326,19 @@ IF YOU FAIL AGAIN, THE ENTIRE GENERATION FAILS. THIS IS YOUR LAST CHANCE.
    - Strings in quotes, numbers without quotes
    - NO newlines inside "text" values
 
-2. WORD COUNTING (CRITICAL):
-   - Write each scene to be AT LEAST 40 words
+2. WORD COUNTING (🚨🚨 THIS IS WHY YOU FAILED TWICE - FIX THIS NOW 🚨🚨):
+   - 🔴🔴 TARGET TOTAL: ${projectConfig?.estimatedWords || 450} words across ALL scenes
+   - 🔴🔴 Per scene target: ${Math.round((projectConfig?.estimatedWords || 450) / (projectConfig?.sceneCount || 4))} words each
+   - 🔴🔴 YOUR PREVIOUS ATTEMPTS WERE TOO SHORT - WRITE MUCH LONGER SCENES
+   - Each scene MUST be a FULL, DETAILED PARAGRAPH (3-5 sentences minimum)
+   - Write each scene to be AT LEAST 80 words (NOT 40 - that's TOO SHORT!)
    - COUNT the actual words: split on spaces and count
-   - Example: "The cat sat" = 3 words
+   - Example: "The cat sat" = 3 words (you need 80+ words per scene!)
    - Set "wordCount" to EXACT actual count
-   - TOTAL: ${projectConfig?.estimatedWords || 450} words across all scenes (±10%)
-   - If Scene 1 = 50 words, Scene 2 = 60 words, total = 110 words
-   - Keep writing scenes until TOTAL = ${projectConfig?.estimatedWords || 450}
+   - 🚨 TOTAL WORD COUNT: ${projectConfig?.estimatedWords || 450} words minimum (within ±10%)
+   - If Scene 1 = 95 words, Scene 2 = 102 words, Scene 3 = 88 words... total must = ${projectConfig?.estimatedWords || 450}
+   - 🔴 KEEP WRITING MORE WORDS until your total reaches ${projectConfig?.estimatedWords || 450} words
+   - DO NOT STOP at 200-300 words - you need ${projectConfig?.estimatedWords || 450} words TOTAL!
 
 3. NO BANNED PHRASES (CRITICAL):
    - NEVER use "imagine a world where"
