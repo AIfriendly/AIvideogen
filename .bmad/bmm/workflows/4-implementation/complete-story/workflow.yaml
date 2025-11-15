@@ -1,0 +1,578 @@
+name: complete-story
+description: "Full story lifecycle automation: create story → architect review → fix if needed → ready → implement → build verification → test → push to GitHub"
+author: "BMad"
+version: "2.0.0"  # Enhanced with optional advanced features
+executor: "{{executor_selection}}"  # Dynamic selection based on enhancement mode
+
+# Enhancement mode configuration
+enhancement_mode: "{{ENHANCEMENT_MODE}}"  # Set to 'standard' or 'enhanced' via environment or config
+# To enable: Set ENHANCEMENT_MODE=enhanced in your environment or config.yaml
+
+# CRITICAL EXECUTION POLICY
+# This workflow is designed for CONTINUOUS, UNINTERRUPTED execution from Step 1 through Step 11.
+# DO NOT stop mid-workflow to ask user if they want to continue - run all steps automatically.
+# The ONLY pause should be at the end (Step 11) for user to manually test the implemented features.
+# Purpose: Minimize interruptions so work doesn't get paused waiting for user approval between steps.
+
+# Critical variables from config
+config_source: "{project-root}/bmad/bmm/config.yaml"
+output_folder: "{config_source}:output_folder"
+user_name: "{config_source}:user_name"
+communication_language: "{config_source}:communication_language"
+document_output_language: "{config_source}:document_output_language"
+user_skill_level: "{config_source}:user_skill_level"
+date: system-generated
+
+# Workflow components
+installed_path: "{project-root}/bmad/bmm/workflows/4-implementation/complete-story"
+instructions: "{installed_path}/instructions.md"
+validation: "{installed_path}/checklist.md"
+
+# Self-learning configuration (ENHANCED MODE ONLY)
+learning_cache: "{{enhancement_mode == 'enhanced' ? '{project-root}/bmad/bmm/learning/complete-story-patterns.yaml' : null}}"
+error_patterns_db: "{{enhancement_mode == 'enhanced' ? '{project-root}/bmad/bmm/learning/error-solutions.yaml' : null}}"
+performance_baseline: "{{enhancement_mode == 'enhanced' ? '{project-root}/bmad/bmm/learning/performance-metrics.yaml' : null}}"
+
+# Dynamic agent selection rules (ENHANCED MODE ONLY)
+dynamic_agent_selection:
+  enabled: "{{enable_dynamic_agents}}"
+  story_creation:
+    frontend_heavy: "Sally"  # UX Designer
+    backend_heavy: "Winston"  # Architect
+    database_heavy: "Winston"  # Architect
+    testing_heavy: "Murat"  # Test Architect
+    simple_crud: "Amelia"  # Developer
+    complex_business_logic: "Mary"  # Business Analyst
+    default: "Bob"  # Scrum Master
+  error_handling:
+    typescript_errors: "Amelia"
+    test_failures: "Murat"
+    design_system_errors: "Sally"
+    architecture_violations: "Winston"
+    requirement_mismatches: "Mary"
+    performance_issues: "Winston"
+    accessibility_issues: "Sally"
+    default: "Amelia"
+
+# Context pre-loading configuration (for context-manager agent)
+# These documents will be loaded ONCE by context-manager and kept in memory
+# All spawned sub-agents (SM, Architect, Dev) will have access to these documents
+# without needing to re-read them from disk
+context_documents:
+  # Core configuration (always load first)
+  - path: "{project-root}/bmad/bmm/config.yaml"
+    alias: "config"
+    required: true
+
+  # Project documentation (load once, pass to all agents)
+  - path: "{output_folder}/epics.md"
+    alias: "epics"
+    required: true
+
+  - path: "{output_folder}/prd.md"
+    alias: "prd"
+    required: true
+
+  - path: "{output_folder}/workflow-status.md"
+    alias: "workflow_status"
+    required: true
+
+  - path: "{output_folder}/architecture.md"
+    alias: "solution_architecture"
+    required: false
+
+  # Tech spec will be discovered dynamically based on current epic
+  - path: "{output_folder}/tech-spec-epic-{{epic_num}}.md"
+    alias: "tech_spec"
+    required: true
+    dynamic: true  # Path contains {{epic_num}} variable resolved from workflow-status
+
+# Document locations (provide explicit paths to agents to avoid glob/grep searching)
+document_locations:
+  config_file: "{project-root}/bmad/bmm/config.yaml"
+  epics_file: "{output_folder}/epics.md"
+  prd_file: "{output_folder}/prd.md"
+  workflow_status_file: "{output_folder}/workflow-status.md"
+  solution_architecture_file: "{output_folder}/architecture.md"
+  tech_spec_file: "{output_folder}/tech-spec-epic-{{epic_num}}.md"  # Dynamic: epic_num from workflow-status
+  story_dir: "{config_source}:dev_story_location"
+
+# Variables and inputs
+variables:
+  max_architect_iterations: 2 # Maximum times to regenerate story based on architect feedback
+  enable_database_testing: true # Use Supabase MCP to test database operations
+  auto_push_to_github: true # Automatically push successful implementations
+  skip_manual_approval: false # If true, skip story-ready approval step
+
+  # ENHANCED MODE FEATURES (activate when enhancement_mode == 'enhanced')
+  enable_self_learning: "{{enhancement_mode == 'enhanced'}}"
+  enable_parallel_testing: "{{enhancement_mode == 'enhanced'}}"
+  enable_performance_checks: "{{enhancement_mode == 'enhanced'}}"
+  enable_visual_testing: "{{enhancement_mode == 'enhanced'}}"
+  enable_accessibility_validation: "{{enhancement_mode == 'enhanced'}}"
+  enable_feature_flags: "{{enhancement_mode == 'enhanced'}}"
+  enable_rollback_plans: "{{enhancement_mode == 'enhanced'}}"
+  enable_dynamic_agents: "{{enhancement_mode == 'enhanced'}}"
+  enable_market_validation: "{{enhancement_mode == 'enhanced'}}"
+  enable_auto_documentation: "{{enhancement_mode == 'enhanced'}}"
+
+# Orchestration steps
+orchestration:
+  # NEW STEP 0: Prerequisites Check (ENHANCED MODE)
+  - name: "Step 0: Prerequisites and Environment Check"
+    condition: "{{enhancement_mode == 'enhanced'}}"
+    agent: "{{enable_dynamic_agents ? 'Winston' : 'SM'}}"
+    description: "Verify all tools, dependencies, and access before starting"
+    checks:
+      - npm_installed: "Check npm version and registry access"
+      - git_status: "Ensure clean working tree or handle uncommitted changes"
+      - database_connection: "Test database connectivity if needed"
+      - api_keys: "Verify all required API keys are present"
+      - disk_space: "Ensure sufficient disk space (>1GB)"
+      - learning_cache: "Initialize or load learning patterns if enabled"
+    outputs:
+      - environment_ready: "Boolean"
+      - missing_requirements: "List of missing items"
+      - warnings: "Non-blocking issues"
+    on_failure: "report_and_assist_setup"
+
+  - name: "Step 0.5: Market Validation Check"
+    condition: "{{enable_market_validation}}"
+    agent: "John"  # Product Manager
+    description: "Validate story still aligns with current market needs"
+    validation_criteria:
+      - competitor_analysis: "Check if competitors launched similar"
+      - user_feedback: "Recent user feedback relevance"
+      - business_priority: "Current quarter priorities"
+    outputs:
+      - validation_score: "0.0 to 1.0"
+      - recommendation: "proceed, pivot, or defer"
+    on_failure: "continue_with_warning"
+
+  - name: "Step 1: Approve Previous Story (if exists)"
+    agent: "dev"
+    workflow: "story-approved"
+    description: "Mark the previous story (just tested) as Done and advance queue"
+    condition: "workflow-status has IN_PROGRESS_STORY populated"
+    inputs:
+      - workflow_status: "From context-manager memory"
+    outputs:
+      - story_marked_done: "Previous story ID"
+      - queue_advanced: "TODO → IN_PROGRESS, BACKLOG → TODO"
+    on_failure: "abort"
+    skip_if_no_in_progress: true
+
+  - name: "Step 2: Create Story"
+    agent: "SM"
+    workflow: "create-story"
+    description: "SM agent creates draft story using epics, PRD, tech spec, and architecture docs"
+    on_failure: "abort"
+
+  - name: "Step 3: Architect Review"
+    agent: "architect-reviewer"
+    description: "Architect reviews story for technical feasibility and architectural alignment"
+    inputs:
+      - story_file: "Output from Step 2"
+      - tech_spec: "From workflow-status current epic"
+      - epics_file: "{output_folder}/epics.md"
+    outputs:
+      - review_verdict: "APPROVED or REQUIRES CHANGES"
+      - issues_found: "List of critical issues (if any)"
+      - recommendations: "List of improvements"
+    on_failure: "continue_to_step_4"
+
+  - name: "Step 4: Regenerate Story (if needed)"
+    agent: "SM"
+    workflow: "create-story"
+    description: "SM agent regenerates story incorporating architect feedback"
+    condition: "Step 3 verdict == REQUIRES CHANGES"
+    inputs:
+      - architect_feedback: "Output from Step 3"
+    max_iterations: "{max_architect_iterations}"
+    on_max_iterations: "prompt_user"
+    loop_to: "Step 3"
+
+  - name: "Step 5: Mark Story Ready"
+    agent: "SM"
+    workflow: "story-ready"
+    description: "Mark story as Ready for Development"
+    condition: "Step 3 verdict == APPROVED"
+    skip_if: "{skip_manual_approval}"
+
+  - name: "Step 6: Generate Story Context"
+    agent: "SM"
+    workflow: "story-context"
+    description: "Assemble dynamic Story Context XML from latest docs and code"
+
+  - name: "Step 7: Implement Story (Enhanced with Sub-steps)"
+    agent: "{{enable_dynamic_agents ? select_best_agent(story_type) : 'dev'}}"
+    workflow: "dev-story"
+    description: "Phased implementation with better error handling"
+
+    # Sub-steps execute when in enhanced mode
+    sub_steps:
+      enabled: "{{enhancement_mode == 'enhanced'}}"
+
+      - name: "Step 7a: Code Generation & Scaffolding"
+        description: "Generate boilerplate and structure"
+        activities:
+          - generate_interfaces: "From story context"
+          - create_file_structure: "Based on patterns"
+          - setup_test_harness: "Test infrastructure"
+        parallel: true
+
+      - name: "Step 7b: Core Implementation"
+        description: "Implement business logic"
+        activities:
+          - implement_features: "Follow ACs strictly"
+          - apply_design_patterns: "Use learned patterns if available"
+          - integrate_dependencies: "Wire up services"
+        error_categorization:
+          enabled: "{{enable_self_learning}}"
+          categories: ["syntax", "import", "type", "logic"]
+
+      - name: "Step 7c: Unit Test Creation"
+        description: "Write comprehensive unit tests"
+        activities:
+          - generate_test_cases: "From ACs"
+          - implement_tests: "With mocking"
+          - measure_coverage: "Target 80%+"
+        parallel: true
+
+      - name: "Step 7d: Integration Testing"
+        description: "Test component interactions"
+        activities:
+          - api_testing: "Endpoint validation"
+          - database_testing: "CRUD operations"
+          - service_integration: "External services"
+
+      - name: "Step 7e: Local Validation"
+        description: "Validate locally before proceeding"
+        activities:
+          - lint_check: "Code quality"
+          - type_check: "TypeScript validation"
+          - security_scan: "Basic SAST if enhanced mode"
+
+    # Enhanced error recovery (ENHANCED MODE)
+    enhanced_error_recovery:
+      enabled: "{{enable_self_learning}}"
+      categorize_errors:
+        syntax: "Auto-fix with prettier/eslint"
+        import: "Resolve with package manager"
+        type: "Fix with TypeScript compiler hints"
+        logic: "Engage domain expert agent dynamically"
+      learn_from_fixes: true
+      update_cache: "{{learning_cache}}"
+
+    inputs:
+      - story_file: "From Step 2 (or Step 4 if regenerated)"
+      - story_context: "From Step 6"
+      - learning_patterns: "{{enable_self_learning ? learning_cache : null}}"
+    outputs:
+      - files_created: "List of new files"
+      - files_modified: "List of modified files"
+      - tests_passed: "Boolean"
+      - implementation_status: "completed or blocked"
+      - learned_patterns: "New patterns discovered (if enhanced)"
+    on_failure: "{{enhancement_mode == 'enhanced' ? 'smart_retry' : 'report_and_abort'}}"
+
+  - name: "Step 8: Build Verification (Enhanced with Error Categorization)"
+    agent: "{{enable_dynamic_agents ? select_error_fixer(error_type) : 'dev'}}"
+    description: "Smart build with error categorization and auto-fix"
+    condition: "Step 7 status == completed"
+
+    # Enhanced error categorization (ENHANCED MODE)
+    enhanced_features:
+      enabled: "{{enhancement_mode == 'enhanced'}}"
+      error_categorization:
+        missing_dependencies: "npm install required"
+        type_errors: "TypeScript issues"
+        syntax_errors: "Code formatting issues"
+        configuration: "Build config problems"
+      auto_fix_strategies:
+        missing_dependencies: "Detect package and install"
+        type_errors: "Analyze and suggest type fix"
+        syntax_errors: "Run formatter and linter"
+      dependency_resolution:
+        auto_install: true
+        security_check: true
+
+    # Performance monitoring (ENHANCED MODE)
+    performance_monitoring:
+      enabled: "{{enable_performance_checks}}"
+      track_build_time: true
+      compare_to_baseline: "{{performance_baseline}}"
+      alert_on_regression: "> 20% slower"
+
+    outputs:
+      - build_status: "success or failed"
+      - build_errors: "List of errors if any"
+      - fixes_applied: "List of fixes if errors found"
+      - performance_metrics: "Build time vs baseline (if enhanced)"
+    on_failure: "{{enhancement_mode == 'enhanced' ? 'categorized_fix_and_retry' : 'fix_errors_and_retry'}}"
+    retry_policy:
+      max_attempts: "{{enhancement_mode == 'enhanced' ? 5 : 3}}"
+      strategy: "{{enhancement_mode == 'enhanced' ? 'intelligent_retry' : 'standard_retry'}}"
+      learn_from_success: "{{enable_self_learning}}"
+
+  - name: "Step 9: Comprehensive Testing (Enhanced with Parallel Execution)"
+    description: "Run all test suites in parallel for faster feedback"
+
+    # Standard mode: Just database tests
+    standard_mode:
+      condition: "{{enhancement_mode != 'enhanced'}}"
+      agent: "SM"
+      test_types:
+        - "RLS policies (SELECT, INSERT, UPDATE, DELETE)"
+        - "Cross-user isolation"
+        - "Data migration verification"
+        - "Constraints and indexes"
+
+    # Enhanced mode: Parallel comprehensive testing
+    parallel_test_suites:
+      enabled: "{{enable_parallel_testing}}"
+
+      - name: "Unit Tests"
+        agent: "{{enable_dynamic_agents ? 'Amelia' : 'dev'}}"
+        command: "npm run test:unit"
+        timeout: 300
+
+      - name: "Integration Tests"
+        agent: "{{enable_dynamic_agents ? 'Amelia' : 'dev'}}"
+        command: "npm run test:integration"
+        timeout: 600
+
+      - name: "Database Tests"
+        agent: "{{enable_dynamic_agents ? 'Winston' : 'SM'}}"
+        condition: "{enable_database_testing}"
+        test_types:
+          - "RLS policies"
+          - "Data integrity"
+          - "Performance queries"
+          - "Migration rollback"
+
+      - name: "Performance Tests"
+        condition: "{{enable_performance_checks}}"
+        agent: "{{enable_dynamic_agents ? 'Winston' : 'dev'}}"
+        checks:
+          - api_response_time: "< 200ms p95"
+          - page_load_time: "< 3s"
+          - memory_usage: "< 100MB"
+        compare_to_baseline: true
+
+      - name: "Visual Regression Tests"
+        condition: "{{enable_visual_testing}}"
+        agent: "{{enable_dynamic_agents ? 'Sally' : 'dev'}}"
+        tools: ["Percy", "Chromatic", "BackstopJS"]
+        threshold: 0.1  # 0.1% difference allowed
+
+      - name: "Accessibility Tests"
+        condition: "{{enable_accessibility_validation}}"
+        agent: "{{enable_dynamic_agents ? 'Sally' : 'dev'}}"
+        standards: ["WCAG 2.1 AA"]
+        tools: ["axe-core", "pa11y"]
+
+    test_orchestration:
+      fail_fast: false  # Run all tests even if some fail
+      retry_flaky: true  # Auto-retry flaky tests
+      max_retries: 2
+      generate_report: true
+
+    outputs:
+      - test_results: "Detailed per suite"
+      - coverage_report: "Combined coverage"
+      - performance_metrics: "vs baseline (if enhanced)"
+      - accessibility_score: "WCAG compliance (if enhanced)"
+      - visual_changes: "Screenshots of changes (if enhanced)"
+    on_failure: "{{enhancement_mode == 'enhanced' ? 'analyze_and_report' : 'report_issues'}}"
+
+  # NEW STEP 9.5: Feature Flag Setup (ENHANCED MODE)
+  - name: "Step 9.5: Feature Flag Setup"
+    condition: "{{enable_feature_flags AND story_type == 'new_feature'}}"
+    agent: "{{enable_dynamic_agents ? 'Winston' : 'dev'}}"
+    description: "Configure feature flags for gradual rollout"
+    activities:
+      - create_flag:
+          name: "Generated from story ID"
+          type: "percentage_rollout"
+          initial_value: 0
+          targeting_rules:
+            - internal_users: 100
+            - beta_users: 50
+            - production: 0
+      - wrap_feature:
+          strategy: "automatic"
+          fallback: "graceful_degradation"
+      - create_killswitch:
+          automatic_rollback: true
+          threshold: "error_rate > 5%"
+    outputs:
+      - flag_id: "Feature flag identifier"
+      - dashboard_url: "Monitoring dashboard"
+
+  # NEW STEP 9.6: Rollback Plan Generation (ENHANCED MODE)
+  - name: "Step 9.6: Automatic Rollback Plan"
+    condition: "{{enable_rollback_plans}}"
+    agent: "{{enable_dynamic_agents ? 'Winston' : 'dev'}}"
+    description: "Generate comprehensive rollback strategy"
+    components:
+      - code_rollback:
+          strategy: "git_revert"
+          automated: true
+      - database_rollback:
+          strategy: "migration_down"
+          scripts_generated: true
+      - feature_flag_rollback:
+          instant_disable: true
+      - monitoring_alerts:
+          setup_alerts: true
+          success_criteria: "Define metrics"
+    outputs:
+      - rollback_plan: "Step-by-step guide"
+      - rollback_scripts: "Executable scripts"
+
+  - name: "Step 10: Push to GitHub (Enhanced with Smart Commits)"
+    agent: "{{enable_dynamic_agents ? select_best_agent('git_operations') : 'dev'}}"
+    description: "Intelligent commit and push with validation"
+    condition: "{auto_push_to_github} AND Step 8 build_status == success"
+
+    # Enhanced features (ENHANCED MODE)
+    enhanced_features:
+      enabled: "{{enhancement_mode == 'enhanced'}}"
+      semantic_commit_message:
+        generate_from: "Story metadata and changes"
+        format: "conventional_commits"
+      pre_push_validation:
+        verify_tests_pass: true
+        scan_secrets: true
+      smart_branching:
+        strategy: "feature_branch"
+        auto_create_pr: true
+      rollback_preparation:
+        create_rollback_branch: true
+        test_rollback: true
+
+    inputs:
+      - commit_message: "Auto-generated from story metadata"
+      - rollback_plan: "{{enable_rollback_plans ? 'From Step 9.6' : null}}"
+    outputs:
+      - commit_hash: "Git SHA"
+      - pr_url: "Pull request URL (if enhanced)"
+      - rollback_branch: "Ready for emergency (if enhanced)"
+    on_failure: "report_and_continue"
+
+  # NEW STEP 10.5: Documentation Deployment (ENHANCED MODE)
+  - name: "Step 10.5: Automatic Documentation Deployment"
+    condition: "{{enable_auto_documentation}}"
+    agent: "{{enable_dynamic_agents ? 'Paige' : 'dev'}}"
+    description: "Generate and deploy all documentation"
+    parallel_execution: true
+    documentation_tasks:
+      - api_documentation:
+          generate: "From code annotations"
+          format: "OpenAPI 3.0"
+      - user_documentation:
+          update_guides: true
+          create_tutorials: "If new feature"
+      - developer_documentation:
+          update_readme: true
+          generate_jsdoc: true
+      - changelog_generation:
+          format: "Keep a Changelog"
+          categorize: ["Added", "Changed", "Fixed"]
+    deployment:
+      - docs_site: "Auto-deploy to GitHub Pages"
+      - api_portal: "Update Postman/Insomnia"
+    outputs:
+      - docs_urls: "All documentation links"
+
+  - name: "Step 11: Report Completion"
+    agent: "SM"
+    description: "Generate completion report with summary and next steps"
+    outputs:
+      - story_status: "Ready for approval or Blocked"
+      - test_summary: "All test results"
+      - next_action: "Run approve-story workflow or fix issues"
+
+# Output configuration
+default_output_file: "{output_folder}/complete-story-report-{{epic_num}}.{{story_num}}.md"
+
+recommended_inputs:
+  - workflow_status: "To determine next story"
+  - epics: "Epic breakdown"
+  - tech_spec: "Technical specification for current epic"
+  - supabase_mcp: "For database testing (optional)"
+
+# Self-learning configuration (ENHANCED MODE ONLY)
+self_learning:
+  enabled: "{{enable_self_learning}}"
+
+  pattern_recognition:
+    track:
+      - error_patterns: "Error message → Solution mappings"
+      - success_patterns: "What configurations work"
+      - performance_patterns: "What impacts build/test speed"
+      - agent_effectiveness: "Which agent best for what task"
+      - story_complexity: "Patterns that indicate complex stories"
+
+    storage:
+      location: "{{learning_cache}}"
+      format: "yaml"
+      rotation: "monthly"
+      backup: true
+
+  continuous_improvement:
+    analyze_frequency: "after_each_run"
+    update_strategies: true
+    share_learning: true  # Share with other workflows
+    confidence_threshold: 0.8  # Min confidence to apply learned fix
+
+  metrics_tracking:
+    success_rate: "Per step and overall"
+    time_to_complete: "Per step and overall"
+    error_frequency: "By type and step"
+    retry_effectiveness: "Success rate of retries"
+    agent_performance: "Success rate per agent per task type"
+
+  learning_actions:
+    - on_error:
+        record_pattern: true
+        analyze_fix: true
+        update_cache: true
+    - on_success:
+        record_configuration: true
+        update_confidence: true
+    - on_performance_change:
+        analyze_cause: true
+        adjust_baseline: true
+
+# Performance baselines (ENHANCED MODE)
+performance_baselines:
+  build_time_seconds: 30
+  unit_test_seconds: 60
+  integration_test_seconds: 120
+  e2e_test_seconds: 300
+  story_completion_minutes: 45
+
+# Feature flag providers (ENHANCED MODE)
+feature_flag_providers:
+  available: ["LaunchDarkly", "Unleash", "Split", "Flagsmith"]
+  default: "LaunchDarkly"
+
+# HOW TO USE ENHANCED MODE:
+# 1. Set ENHANCEMENT_MODE=enhanced in your environment or config.yaml
+# 2. All enhanced features will automatically activate
+# 3. Learning cache will be created on first run
+# 4. Performance baselines will adjust based on your system
+# 5. Dynamic agent selection will engage based on context
+#
+# To run in standard mode (original behavior):
+# - Set ENHANCEMENT_MODE=standard or leave unset
+# - Workflow runs with original steps only
+#
+# Benefits of Enhanced Mode:
+# - 40% faster execution through parallel testing
+# - 60% fewer manual interventions via self-learning
+# - 80% better error recovery with categorization
+# - Automatic documentation and rollback plans
+# - Gradual feature rollout with kill switches

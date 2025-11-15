@@ -45,7 +45,11 @@
       "Bash(git checkout:*)",
       "Bash(if exist \".next\" rmdir /s /q \".next\")",
       "Bash(copy scriptskokoro-tts-service.py \"ai-video-generator\\scripts\\kokoro-tts-service.py\")",
-      "WebFetch(domain:ai.google.dev)"
+      "WebFetch(domain:ai.google.dev)",
+      "SlashCommand(/bmad:core:workflows:party-mode)",
+      "Bash(mkdir:*)",
+      "SlashCommand(/bmad:bmm:workflows:dev-story)",
+      "Bash(git submodule:*)"
     ],
     "deny": [],
     "ask": []

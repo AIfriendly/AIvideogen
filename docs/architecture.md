@@ -5,8 +5,8 @@
 **Type:** Level 2 Greenfield Software Project
 **Author:** Winston (BMAD Architect Agent)
 **Date:** 2025-11-12
-**Version:** 1.1
-**Last Updated:** 2025-11-12 (Added Gemini LLM provider support)
+**Version:** 1.2
+**Last Updated:** 2025-11-15 (Updated Story 3.2: Scene Text Analysis with detailed implementation and fallback mechanism)
 
 ---
 
@@ -169,14 +169,16 @@ ai-video-generator/
 │       ├── voice/             # Voice selection & generation
 │       │   ├── list/          # Get available voices
 │       │   └── generate/      # Generate voiceover
-│       ├── clips/             # YouTube clip search & download
-│       │   ├── search/
-│       │   └── download/
 │       ├── assembly/          # Video assembly
 │       │   └── route.ts
 │       └── projects/          # Project CRUD
+│           ├── route.ts       # GET all, POST create
 │           └── [id]/
-│               └── route.ts
+│               ├── route.ts   # GET, PUT, DELETE project
+│               ├── generate-visuals/  # Epic 3 visual sourcing
+│               │   └── route.ts       # POST generate suggestions
+│               └── visual-suggestions/ # Epic 3 suggestions retrieval
+│                   └── route.ts        # GET visual suggestions
 │
 ├── components/                # React components
 │   ├── ui/                    # shadcn/ui components
@@ -201,6 +203,9 @@ ai-video-generator/
 │       │   ├── VoiceSelector.tsx
 │       │   └── VoicePreview.tsx
 │       │
+│       ├── visual-sourcing/   # Epic 3: Visual sourcing loading
+│       │   └── VisualSourcingLoader.tsx
+│       │
 │       ├── curation/          # Epic 4: Visual curation
 │       │   ├── SceneCard.tsx
 │       │   ├── VideoPreviewThumbnail.tsx
@@ -216,11 +221,20 @@ ai-video-generator/
 │   │   ├── provider.ts        # LLMProvider interface
 │   │   ├── ollama-provider.ts # Ollama implementation (local)
 │   │   ├── gemini-provider.ts # Gemini implementation (cloud)
-│   │   └── factory.ts         # Provider factory
+│   │   ├── factory.ts         # Provider factory
+│   │   └── prompts/           # Prompt templates
+│   │       ├── default-system-prompt.ts  # Default persona
+│   │       └── visual-search-prompt.ts   # Scene analysis prompt
 │   │
 │   ├── tts/                   # Text-to-speech
 │   │   ├── kokoro.ts          # KokoroTTS wrapper
 │   │   └── voice-config.ts    # Available voices
+│   │
+│   ├── youtube/               # YouTube API integration (Epic 3)
+│   │   ├── client.ts          # YouTubeAPIClient class
+│   │   ├── analyze-scene.ts   # Scene text analysis for search
+│   │   ├── filter-results.ts  # Content filtering & ranking
+│   │   └── filter-config.ts   # Filtering preferences config
 │   │
 │   ├── video/                 # Video processing
 │   │   ├── downloader.ts      # yt-dlp wrapper
@@ -234,7 +248,6 @@ ai-video-generator/
 │   │
 │   └── utils/                 # General utilities
 │       ├── file-manager.ts    # File operations
-│       ├── youtube-api.ts     # YouTube Data API wrapper
 │       └── error-handler.ts   # Error handling utilities
 │
 ├── stores/                    # Zustand state stores
@@ -345,21 +358,227 @@ ai-video-generator/
 ---
 
 ### Epic 3: Visual Content Sourcing (YouTube API)
-**Backend:**
-- `app/api/clips/search/route.ts` - YouTube Data API search
-- `app/api/clips/download/route.ts` - Download via yt-dlp
-- `lib/utils/youtube-api.ts` - YouTube API wrapper
-- `lib/video/downloader.ts` - yt-dlp integration
 
-**Database:**
-- Projects table stores suggested clip URLs per scene
+**Goal:** Automatically source relevant B-roll video clips from YouTube using AI analysis and the YouTube Data API v3.
+
+#### Story 3.1: YouTube API Client & Authentication
+**Components:**
+- `lib/youtube/client.ts` - YouTubeAPIClient class with authentication
+- Environment variable: `YOUTUBE_API_KEY`
+
+**Key Features:**
+- API key configuration and validation
+- Quota tracking (10,000 units/day limit)
+- Rate limiting (100 requests per 100 seconds)
+- Exponential backoff retry logic (max 3 attempts)
+- Error handling for invalid key, quota exceeded, network failures
+
+**Error Messages:**
+- Missing API key: "YouTube API key not configured. Add YOUTUBE_API_KEY to .env.local"
+- Quota exceeded: "YouTube API quota exceeded. Try again tomorrow or upgrade quota."
+- Invalid key: "Invalid YouTube API key. Get a key at https://console.cloud.google.com"
+
+#### Story 3.2: Scene Text Analysis & Search Query Generation
+**Components:**
+- `src/lib/youtube/analyze-scene.ts` - analyzeSceneForVisuals() function
+- `src/lib/llm/prompts/visual-search-prompt.ts` - Scene analysis prompt template
+- `src/lib/youtube/keyword-extractor.ts` - Fallback keyword extraction
+- `src/lib/youtube/types.ts` - SceneAnalysis interface and ContentType enum
+
+**Module Responsibilities:**
+- **SceneAnalyzer:** Main analyzeSceneForVisuals() function, orchestrates LLM call with retry logic and fallback
+- **VisualSearchPrompt:** LLM prompt template optimized for extracting visual themes and generating search queries
+- **KeywordExtractor:** Fallback NLP-based keyword extraction (frequency analysis, stop word removal)
+- **Types:** TypeScript interfaces for SceneAnalysis and ContentType enum
 
 **Key Flow:**
-1. For each scene, analyze text for visual keywords
-2. Query YouTube Data API v3 with search terms
-3. Filter and rank results (Creative Commons preferred)
-4. Return 4-6 clip suggestions per scene
-5. Download selected clips via yt-dlp to `.cache/videos/`
+1. Input validation (scene text must be non-empty)
+2. Build LLM prompt from template with scene text injection
+3. Call LLM provider with 10-second timeout
+4. Parse JSON response and validate required fields (mainSubject, primaryQuery)
+5. Handle errors with retry logic:
+   - Empty/missing fields → Retry once (1s delay)
+   - Invalid JSON → Immediate fallback (no retry)
+   - Timeout/connection error → Immediate fallback
+6. Return SceneAnalysis object or fallback result
+
+**Data Flow:**
+```
+Scene Text (from database)
+    ↓
+Visual Search Prompt Template
+    ↓
+LLM Provider (Ollama/Gemini) → [10s timeout]
+    ↓
+JSON Response Parsing & Validation
+    ↓
+    ├─→ Valid Response → SceneAnalysis Object
+    ├─→ Invalid/Empty → Retry (1x) → Valid or Fallback
+    └─→ Timeout/Error → Fallback Keyword Extraction
+    ↓
+SceneAnalysis Object Returned
+    ↓
+[Story 3.3: YouTube Search]
+```
+
+**SceneAnalysis Structure:**
+```typescript
+interface SceneAnalysis {
+  mainSubject: string;        // e.g., "lion"
+  setting: string;            // e.g., "savanna"
+  mood: string;               // e.g., "sunset"
+  action: string;             // e.g., "roaming"
+  keywords: string[];         // e.g., ["wildlife", "grassland", "golden hour"]
+  primaryQuery: string;       // e.g., "lion savanna sunset wildlife"
+  alternativeQueries: string[]; // e.g., ["african lion sunset", "lion walking grassland"]
+  contentType: ContentType;   // e.g., ContentType.NATURE
+}
+```
+
+**ContentType Enum:**
+- GAMEPLAY - Gaming footage (e.g., Minecraft gameplay)
+- TUTORIAL - Educational how-to content
+- NATURE - Wildlife, landscapes, natural phenomena
+- B_ROLL - Generic background footage (default fallback)
+- DOCUMENTARY - Documentary-style footage
+- URBAN - City scenes, architecture
+- ABSTRACT - Visual metaphors for abstract concepts
+
+**Example Analysis:**
+- Input: "A majestic lion roams the savanna at sunset"
+- Output:
+  - mainSubject: "lion"
+  - setting: "savanna"
+  - mood: "sunset"
+  - action: "roaming"
+  - keywords: ["wildlife", "grassland", "golden hour", "majestic"]
+  - primaryQuery: "lion savanna sunset wildlife"
+  - alternativeQueries: ["african lion sunset", "lion walking grassland golden hour"]
+  - contentType: ContentType.NATURE
+
+**Fallback Mechanism:**
+When LLM is unavailable, keyword extraction provides:
+- Simple frequency-based analysis (no external NLP libraries)
+- Stop word removal (~50 common English words)
+- Top 5 keywords by frequency
+- Basic query construction from top 4 keywords
+- Default contentType: B_ROLL
+- Performance: <100ms (vs <5s LLM target)
+
+**Error Handling:**
+- Input validation: Throws error for empty/whitespace-only scene text
+- LLM timeout: 10 seconds, triggers fallback
+- Invalid JSON: Immediate fallback (no retry)
+- Missing required fields: Retry once, then fallback
+- Connection errors: Immediate fallback
+- All errors logged with context for debugging
+
+**Performance Targets:**
+- LLM analysis: <5s average (10s timeout)
+- Fallback: <100ms
+- No blocking delays for user workflow
+- Performance warnings logged if analysis >5s
+
+**Integration:**
+- Uses createLLMProvider() factory from Epic 1 Story 1.3
+- Supports both Ollama (local) and Gemini (cloud) providers
+- No provider-specific logic in scene analysis code
+- Follows same patterns as Epic 1 chat implementation
+
+#### Story 3.3: YouTube Video Search & Result Retrieval
+**Backend:**
+- `app/api/projects/[id]/generate-visuals/route.ts` - Main endpoint
+- `lib/youtube/client.ts` - searchVideos() method
+
+**API Parameters:**
+```typescript
+{
+  q: string,              // Search query
+  part: 'snippet',
+  type: 'video',
+  videoEmbeddable: true,  // Only embeddable videos
+  maxResults: 10-15,
+  relevanceLanguage: 'en' // Configurable
+}
+```
+
+**Key Flow:**
+1. Load all scenes for project from database
+2. For each scene:
+   - Call analyzeSceneForVisuals() to get search queries
+   - Execute YouTube search for primary + alternative queries
+   - Retrieve metadata: videoId, title, thumbnail, channelTitle
+   - Aggregate and deduplicate results by videoId
+3. Save suggestions to visual_suggestions table
+4. Update project.visuals_generated = true
+
+**Error Handling:**
+- Zero results: Pass empty array to filter (triggers empty state in Story 3.5 AC6)
+- API quota exceeded: User-friendly error message, don't crash
+- Network error: Retry with exponential backoff
+
+#### Story 3.4: Content Filtering & Quality Ranking
+**Components:**
+- `lib/youtube/filter-results.ts` - Filtering and ranking logic
+- `lib/youtube/filter-config.ts` - Configuration preferences
+
+**Filtering Criteria:**
+- **Licensing:** Creative Commons preferred, Standard embeddable accepted
+- **Quality:** Minimum 1000 views (spam prevention)
+- **Title Spam:** Remove videos with >5 emojis or >50% ALL CAPS
+- **Content Type:** Gaming = "gameplay no commentary", Nature = documentary-style
+
+**Ranking Algorithm:**
+- Relevance score (from YouTube API)
+- View count (normalized)
+- Recency (newer videos score higher)
+- Channel authority (subscriber count if available)
+
+**Output:** Top 5-8 ranked suggestions per scene
+
+**Fallback Logic:**
+- If all results filtered out:
+  1. Relax view count threshold
+  2. Relax title spam filters
+  3. Return at least 1-3 suggestions if any results exist
+
+#### Story 3.5: Visual Suggestions Database & Workflow Integration
+**Components:**
+- `app/api/projects/[id]/visual-suggestions/route.ts` - GET suggestions
+- `components/features/visual-sourcing/VisualSourcingLoader.tsx` - Loading UI
+- Database: visual_suggestions table
+
+**Database:**
+- visual_suggestions table stores suggested clip data per scene (see Database Schema section, lines 1528-1540 for full schema)
+
+**Database Query Functions:**
+```typescript
+// lib/db/queries.ts
+saveVisualSuggestions(sceneId: string, suggestions: Suggestion[]): void
+getVisualSuggestions(sceneId: string): Suggestion[]
+getVisualSuggestionsByProject(projectId: string): Suggestion[]
+```
+
+**Loading UI Features:**
+- Scene-by-scene progress: "Analyzing scene 2 of 5..."
+- Stage messages: "Analyzing scene...", "Searching YouTube...", "Filtering results..."
+- Error recovery: Retry button for failed scenes (doesn't regenerate completed)
+- Empty state: "No clips found for this scene. Try editing the script or searching manually." (AC6)
+- API failure: Retry button for partial completion (AC7)
+
+**Workflow Integration:**
+1. Trigger automatically after Epic 2 voiceover generation completes
+2. Update project.current_step = 'visual-sourcing'
+3. Display VisualSourcingLoader with progress
+4. On completion: Update project.current_step = 'visual-curation'
+5. Navigate to Epic 4 Visual Curation UI
+
+**Key Flow:**
+1. For each scene, analyze text for visual keywords using LLM
+2. Query YouTube Data API v3 with generated search terms
+3. Filter and rank results (Creative Commons preferred, quality checks)
+4. Store top 5-8 clip suggestions per scene in database
+5. Handle edge cases: zero results (empty state), API failures (retry), quota exceeded (error message)
 
 ---
 
@@ -1525,6 +1744,20 @@ CREATE TABLE messages (
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
+-- Visual suggestions from AI sourcing (Epic 3)
+CREATE TABLE visual_suggestions (
+  id TEXT PRIMARY KEY,
+  scene_id TEXT NOT NULL,
+  video_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  thumbnail_url TEXT,
+  channel_title TEXT,
+  embed_url TEXT NOT NULL,
+  rank INTEGER NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+);
+
 -- Clip selections
 CREATE TABLE clip_selections (
   id TEXT PRIMARY KEY,
@@ -1566,6 +1799,7 @@ CREATE TABLE rendered_videos (
 CREATE INDEX idx_messages_project ON messages(project_id);
 CREATE INDEX idx_messages_timestamp ON messages(timestamp);
 CREATE INDEX idx_projects_last_active ON projects(last_active);
+CREATE INDEX idx_visual_suggestions_scene ON visual_suggestions(scene_id);
 ```
 
 **Database Client:**
@@ -1983,38 +2217,84 @@ Response: {
 }
 ```
 
-**4. Clip Operations:**
+**4. Visual Sourcing Operations (Epic 3):**
 ```typescript
-// POST /api/clips/search
+// POST /api/projects/[id]/generate-visuals
+// Trigger YouTube API sourcing for all scenes
 Request: {
-  query: string,
-  maxResults: number
+  // projectId from URL parameter [id]
 }
 
 Response: {
   success: true,
   data: {
-    clips: Array<{
-      videoId: string,
-      title: string,
-      thumbnail: string,
-      duration: number,
-      url: string
+    projectId: string,
+    scenesProcessed: number,
+    totalSuggestions: number,
+    status: 'completed' | 'partial',
+    failedScenes?: Array<{
+      sceneId: string,
+      sceneNumber: number,
+      error: string
     }>
   }
 }
 
-// POST /api/clips/download
-Request: {
-  projectId: string,
-  sceneNumber: number,
-  videoId: string
+// Error Responses:
+{
+  success: false,
+  error: {
+    message: "YouTube API quota exceeded. Try again tomorrow.",
+    code: "YOUTUBE_QUOTA_EXCEEDED"
+  }
 }
 
+{
+  success: false,
+  error: {
+    message: "YouTube API key not configured. Add YOUTUBE_API_KEY to .env.local",
+    code: "YOUTUBE_API_KEY_MISSING"
+  }
+}
+
+// GET /api/projects/[id]/visual-suggestions
+// Retrieve all visual suggestions for project
 Response: {
   success: true,
   data: {
-    filePath: string
+    suggestions: Array<{
+      sceneId: string,
+      sceneNumber: number,
+      sceneText: string,
+      videos: Array<{
+        id: string,
+        videoId: string,
+        title: string,
+        thumbnailUrl: string,
+        channelTitle: string,
+        embedUrl: string,
+        rank: number
+      }>
+    }>
+  }
+}
+
+// GET /api/projects/[id]/visual-suggestions?sceneId={sceneId}
+// Retrieve suggestions for specific scene
+Response: {
+  success: true,
+  data: {
+    sceneId: string,
+    sceneNumber: number,
+    videos: Array<{
+      id: string,
+      videoId: string,
+      title: string,
+      thumbnailUrl: string,
+      channelTitle: string,
+      embedUrl: string,
+      rank: number
+    }>
   }
 }
 ```
@@ -2209,6 +2489,330 @@ await fetch(`/api/projects/${projectId}`, {
   method: 'PUT',
   body: JSON.stringify({ name: projectName }),
 });
+```
+
+### YouTube API Integration Patterns (Epic 3)
+
+**YouTubeAPIClient Initialization:**
+```typescript
+// lib/youtube/client.ts
+export class YouTubeAPIClient {
+  private apiKey: string;
+  private baseUrl = 'https://www.googleapis.com/youtube/v3';
+  private quotaUsed = 0;
+  private quotaLimit = 10000; // Daily limit
+  private requestTimestamps: number[] = [];
+  private rateLimitWindow = 100000; // 100 seconds
+  private rateLimitMax = 100; // 100 requests per 100 seconds
+
+  constructor(apiKey: string) {
+    if (!apiKey || apiKey === 'your_youtube_api_key_here') {
+      throw new Error(
+        'YouTube API key not configured.\n' +
+        'Get a key at: https://console.cloud.google.com\n' +
+        'Enable YouTube Data API v3 for your project\n' +
+        'Set YOUTUBE_API_KEY in .env.local'
+      );
+    }
+    this.apiKey = apiKey;
+  }
+
+  // Rate limiting check before each request
+  private async checkRateLimit(): Promise<void> {
+    const now = Date.now();
+
+    // Remove timestamps older than window
+    this.requestTimestamps = this.requestTimestamps.filter(
+      ts => now - ts < this.rateLimitWindow
+    );
+
+    if (this.requestTimestamps.length >= this.rateLimitMax) {
+      const oldestTimestamp = this.requestTimestamps[0];
+      const waitMs = this.rateLimitWindow - (now - oldestTimestamp);
+      throw new Error(
+        `YouTube API rate limit reached. Wait ${Math.ceil(waitMs / 1000)} seconds.`
+      );
+    }
+
+    this.requestTimestamps.push(now);
+  }
+
+  // Quota tracking
+  private trackQuota(units: number): void {
+    this.quotaUsed += units;
+    if (this.quotaUsed >= this.quotaLimit) {
+      throw new Error(
+        'YouTube API quota exceeded (10,000 units/day).\n' +
+        'Try again tomorrow or request quota increase at:\n' +
+        'https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas'
+      );
+    }
+  }
+
+  // Search videos with exponential backoff
+  async searchVideos(query: string, maxResults: number = 15): Promise<YouTubeVideo[]> {
+    await this.checkRateLimit();
+
+    const params = new URLSearchParams({
+      part: 'snippet',
+      q: query,
+      type: 'video',
+      videoEmbeddable: 'true',
+      maxResults: maxResults.toString(),
+      key: this.apiKey,
+    });
+
+    let attempt = 0;
+    const maxAttempts = 3;
+
+    while (attempt < maxAttempts) {
+      try {
+        const response = await fetch(`${this.baseUrl}/search?${params}`);
+
+        if (!response.ok) {
+          if (response.status === 403) {
+            throw new Error('YouTube API quota exceeded or invalid API key');
+          }
+          throw new Error(`YouTube API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        this.trackQuota(100); // search.list costs 100 units
+
+        return data.items.map((item: any) => ({
+          videoId: item.id.videoId,
+          title: item.snippet.title,
+          thumbnailUrl: item.snippet.thumbnails.medium.url,
+          channelTitle: item.snippet.channelTitle,
+          embedUrl: `https://www.youtube.com/embed/${item.id.videoId}`,
+        }));
+      } catch (error) {
+        attempt++;
+        if (attempt >= maxAttempts) throw error;
+
+        // Exponential backoff: 1s, 2s, 4s
+        const backoffMs = Math.pow(2, attempt) * 1000;
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      }
+    }
+
+    return [];
+  }
+}
+```
+
+**Scene Analysis for Visual Search:**
+```typescript
+// lib/youtube/analyze-scene.ts
+import { getLLMProvider } from '@/lib/llm/factory';
+import type { SearchQueries } from '@/types/youtube';
+
+export async function analyzeSceneForVisuals(sceneText: string): Promise<SearchQueries> {
+  const llm = getLLMProvider();
+
+  const prompt = `Analyze this video script scene and generate optimized YouTube search queries to find relevant B-roll footage.
+
+Scene text: "${sceneText}"
+
+Extract:
+1. Main subject/topic
+2. Setting/location
+3. Mood/atmosphere
+4. Action/activity
+5. Keywords
+
+Generate:
+- Primary search query (most relevant, 3-6 keywords)
+- 2-3 alternative search queries for diversity
+- Content type (nature, gaming, tutorial, documentary, urban, abstract)
+
+Format response as JSON:
+{
+  "primary": "keyword1 keyword2 keyword3",
+  "alternatives": ["query1", "query2", "query3"],
+  "contentType": "nature"
+}`;
+
+  try {
+    const response = await llm.chat([{ role: 'user', content: prompt }]);
+    const parsed = JSON.parse(response);
+
+    return {
+      primary: parsed.primary,
+      alternatives: parsed.alternatives || [],
+      contentType: parsed.contentType || 'general',
+    };
+  } catch (error) {
+    // Fallback: simple keyword extraction
+    const keywords = sceneText
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(word => word.length > 3 && !commonWords.includes(word))
+      .slice(0, 5)
+      .join(' ');
+
+    return {
+      primary: keywords || 'video footage',
+      alternatives: [],
+      contentType: 'general',
+    };
+  }
+}
+
+const commonWords = ['the', 'and', 'that', 'this', 'with', 'from', 'have', 'been', 'will'];
+```
+
+**Content Filtering & Ranking:**
+```typescript
+// lib/youtube/filter-results.ts
+import type { YouTubeVideo, FilterConfig } from '@/types/youtube';
+
+export function filterAndRankResults(
+  results: YouTubeVideo[],
+  config: FilterConfig
+): YouTubeVideo[] {
+  // Step 1: Apply filters
+  let filtered = results.filter(video => {
+    // Title spam detection
+    const emojiCount = (video.title.match(/[\p{Emoji}]/gu) || []).length;
+    const capsRatio = (video.title.match(/[A-Z]/g) || []).length / video.title.length;
+
+    if (emojiCount > 5) return false;
+    if (capsRatio > 0.5) return false;
+
+    return true;
+  });
+
+  // Step 2: Rank results
+  filtered = filtered.map((video, index) => ({
+    ...video,
+    score: calculateRelevanceScore(video, index, config),
+  }));
+
+  // Step 3: Sort by score
+  filtered.sort((a, b) => b.score - a.score);
+
+  // Step 4: Limit to top N
+  return filtered.slice(0, config.maxSuggestions || 8);
+}
+
+function calculateRelevanceScore(
+  video: YouTubeVideo,
+  position: number,
+  config: FilterConfig
+): number {
+  let score = 0;
+
+  // Position score (YouTube's relevance)
+  score += (20 - position) * 5;
+
+  // Creative Commons preference
+  if (video.license === 'creativeCommon') {
+    score += 20;
+  }
+
+  // Quality indicators
+  if (video.title.length > 20 && video.title.length < 80) {
+    score += 10; // Well-formed title
+  }
+
+  return score;
+}
+```
+
+**Error Handling Pattern:**
+```typescript
+// app/api/projects/[id]/generate-visuals/route.ts
+export async function POST(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const youtubeClient = new YouTubeAPIClient(
+      process.env.YOUTUBE_API_KEY || ''
+    );
+
+    const scenes = await getScenesByProjectId(params.id);
+    const results = [];
+    const failed = [];
+
+    for (const scene of scenes) {
+      try {
+        // Analyze scene
+        const queries = await analyzeSceneForVisuals(scene.text);
+
+        // Search YouTube
+        const videos = await youtubeClient.searchVideos(queries.primary, 15);
+
+        // Filter & rank
+        const filtered = filterAndRankResults(videos, { maxSuggestions: 8 });
+
+        // Save to database
+        await saveVisualSuggestions(scene.id, filtered);
+
+        results.push({ sceneId: scene.id, count: filtered.length });
+      } catch (error) {
+        failed.push({
+          sceneId: scene.id,
+          sceneNumber: scene.sceneNumber,
+          error: error.message,
+        });
+      }
+    }
+
+    await updateProject(params.id, { visuals_generated: true });
+
+    return Response.json({
+      success: true,
+      data: {
+        projectId: params.id,
+        scenesProcessed: results.length,
+        totalSuggestions: results.reduce((sum, r) => sum + r.count, 0),
+        status: failed.length === 0 ? 'completed' : 'partial',
+        failedScenes: failed.length > 0 ? failed : undefined,
+      },
+    });
+  } catch (error) {
+    // Handle YouTube API-specific errors
+    if (error.message.includes('quota')) {
+      return Response.json(
+        {
+          success: false,
+          error: {
+            message: 'YouTube API quota exceeded. Try again tomorrow.',
+            code: 'YOUTUBE_QUOTA_EXCEEDED',
+          },
+        },
+        { status: 429 }
+      );
+    }
+
+    if (error.message.includes('not configured')) {
+      return Response.json(
+        {
+          success: false,
+          error: {
+            message: error.message,
+            code: 'YOUTUBE_API_KEY_MISSING',
+          },
+        },
+        { status: 500 }
+      );
+    }
+
+    // Generic error
+    return Response.json(
+      {
+        success: false,
+        error: {
+          message: 'Visual sourcing failed. Please try again.',
+          code: 'VISUAL_SOURCING_ERROR',
+        },
+      },
+      { status: 500 }
+    );
+  }
+}
 ```
 
 ### Date/Time Handling
@@ -2425,18 +3029,35 @@ npm run dev
 
 ```bash
 # .env.local
-# YouTube Data API
+
+# ============================================
+# YouTube Data API (Epic 3)
+# ============================================
+# Get API key at: https://console.cloud.google.com
+# Enable YouTube Data API v3 for your project
+# Free tier: 10,000 quota units/day
 YOUTUBE_API_KEY=your_youtube_api_key_here
 
-# Ollama Configuration
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.2
+# ============================================
+# LLM Provider Configuration
+# ============================================
+# Choose: 'ollama' (local, FOSS) or 'gemini' (cloud, free tier)
 LLM_PROVIDER=ollama
 
-# Database
-DATABASE_PATH=./ai-video-generator.db
+# Ollama Configuration (Primary, FOSS-compliant)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
 
-# File Storage
+# Gemini Configuration (Optional, Cloud-based)
+# Get free API key at: https://aistudio.google.com/apikey
+# Free tier: 15 requests/minute, 1,500 requests/day
+GEMINI_API_KEY=your_api_key_here
+GEMINI_MODEL=gemini-2.5-flash
+
+# ============================================
+# Database & Storage
+# ============================================
+DATABASE_PATH=./ai-video-generator.db
 CACHE_DIR=./.cache
 OUTPUT_DIR=./.cache/output
 ```

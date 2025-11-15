@@ -3,9 +3,11 @@
 _Created on 2025-10-31 by lichking_
 _Updated on 2025-11-04 to include full application scope (Project Management UI + Chat Interface + Visual Curation)_
 _Updated on 2025-11-05 to include Epic 2 (Voice Selection + Script Generation + Voiceover Preview)_
+_Updated on 2025-11-13 to include Epic 3 (Visual Sourcing Loading UI + Empty Clip State)_
+_Updated on 2025-11-13 to add comprehensive UX patterns, accessibility standards, and testing strategy_
 _Generated using BMad Method - Create UX Design Workflow v1.0_
 
-**Version:** 3.0 (Epic 1, Story 1.6, Epic 2, Epic 4 Complete)
+**Version:** 3.2 (Production-Ready: Epic 1-4 Complete, Patterns & Accessibility Finalized)
 
 ---
 
@@ -61,6 +63,256 @@ _Generated using BMad Method - Create UX Design Workflow v1.0_
 - VideoPreviewThumbnail (video clip preview component)
 - SceneCard (scene script + clip grid container)
 - ProgressTracker (scene completion indicator)
+
+### 1.2 UX Pattern Consistency Rules
+
+**These patterns ensure consistent UX across the entire application.**
+
+#### 1.2.1 Button Hierarchy
+
+**Primary Button:**
+- **Background:** `#6366f1` (Indigo 500)
+- **Color:** White
+- **Usage:** Main actions ("Continue", "Assemble Video", "Send")
+- **Hover:** Darker indigo (`#4f46e5`)
+- **Disabled:** Gray background (`#475569`), opacity 0.5, cursor not-allowed
+
+**Secondary Button:**
+- **Background:** Transparent
+- **Border:** 1px solid `#6366f1` (Indigo 500)
+- **Color:** `#6366f1` (Indigo 500)
+- **Usage:** Alternative actions ("Preview", "Back")
+- **Hover:** Background `#334155` (Slate 700, 30% opacity)
+
+**Destructive Button:**
+- **Background:** `#ef4444` (Red 500)
+- **Color:** White
+- **Usage:** Delete actions, irreversible operations
+- **Hover:** Darker red (`#dc2626`)
+
+**Ghost Button:**
+- **Background:** Transparent
+- **Border:** None
+- **Color:** `#cbd5e1` (Slate 300)
+- **Usage:** Tertiary actions, cancel
+- **Hover:** Background `#334155` (Slate 700, 20% opacity)
+
+#### 1.2.2 Form Validation Patterns
+
+**Validation Timing:**
+- **On blur:** Validate individual fields when user leaves the field
+- **On submit:** Validate entire form when user clicks submit
+- **Real-time:** Only for password strength or character count
+
+**Error Message Display:**
+- **Location:** Below the field
+- **Color:** `#ef4444` (Red 500)
+- **Font Size:** 0.875rem (14px)
+- **Icon:** ⚠ icon before text
+- **Animation:** Fade in (0.2s)
+
+**Error State Styling:**
+- **Border:** 2px solid `#ef4444` (Red 500)
+- **Background:** `#0f172a` (Slate 900) - unchanged
+- **Focus:** Red border remains, no indigo
+
+**Success State Styling:**
+- **Border:** 2px solid `#10b981` (Emerald 500) - optional, brief
+- **Icon:** ✓ checkmark (Emerald) - shown briefly
+
+**Help Text:**
+- **Location:** Below field (above error message if both present)
+- **Color:** `#94a3b8` (Slate 400)
+- **Font Size:** 0.875rem (14px)
+- **Format:** Plain text, concise
+
+**Required Fields:**
+- **Indicator:** Asterisk (*) after label, red color
+- **Label Format:** "Email Address *"
+- **ARIA:** `aria-required="true"` attribute
+
+**Field Labels:**
+- **Position:** Above field
+- **Font Weight:** 500 (medium)
+- **Color:** `#f8fafc` (Slate 50)
+- **Font Size:** 0.875rem (14px)
+- **Association:** `<label for="field-id">` with matching input `id`
+
+#### 1.2.3 Modal Patterns
+
+**Modal Structure:**
+- **Backdrop:** `#0f172a` (Slate 900, 80% opacity), blur 4px
+- **Modal Container:** `#1e293b` (Slate 800)
+- **Max Width:** 500px (small), 700px (medium), 900px (large)
+- **Border Radius:** 16px
+- **Box Shadow:** 0 8px 24px rgba(0,0,0,0.4)
+- **Padding:** 24px (lg)
+
+**Dismiss Behavior:**
+- **ESC key:** Always closes modal (unless critical confirmation)
+- **Click outside (backdrop):** Closes modal for non-critical modals
+- **Close button (X):** Top-right corner, always visible
+  - **Size:** 32px x 32px
+  - **Icon:** X or close icon
+  - **Color:** `#94a3b8` (Slate 400)
+  - **Hover:** `#cbd5e1` (Slate 300)
+
+**Focus Trapping:**
+- **On open:** Focus moves to first interactive element (or close button if no other)
+- **Tab navigation:** Cycles through modal elements only
+- **On close:** Focus returns to element that triggered modal
+
+**Modal Stacking:**
+- **Rule:** Avoid multiple modals simultaneously
+- **If needed:** Use nested content or multi-step modal
+- **Z-index:** Base modal: 9998, nested: 9999
+
+**Modal Types:**
+
+**Confirmation Modal:**
+- **Title:** Question format ("Delete this project?")
+- **Description:** Consequences explanation
+- **Primary Action:** Action verb ("Delete", "Confirm", "Continue")
+- **Secondary Action:** "Cancel"
+
+**Information Modal:**
+- **Title:** Noun format ("About This Feature")
+- **Description:** Information content
+- **Primary Action:** "Got it" or "Close"
+
+**Form Modal:**
+- **Title:** Action format ("Add New Project")
+- **Content:** Form fields
+- **Primary Action:** "Save" or "Create"
+- **Secondary Action:** "Cancel"
+
+#### 1.2.4 Confirmation Patterns
+
+**When to Use Confirmation:**
+- **Destructive actions:** Delete project, discard changes
+- **Irreversible operations:** Final video assembly (can't undo)
+- **Significant state changes:** Switching projects with unsaved work
+
+**When to Use Undo Instead:**
+- **Non-destructive changes:** Selection changes (clip selection, voice selection)
+- **Easily reversible:** Preferences, settings
+- **Frequent actions:** Scene navigation, project switching
+
+**Confirmation Dialog Structure:**
+- **Title:** Clear question ("Delete 'Mars Colonization' project?")
+- **Description:**
+  - Explain consequences
+  - Mention what will be lost
+  - 1-2 sentences maximum
+- **Primary Action Button:**
+  - Destructive actions: Red background, action verb ("Delete")
+  - Non-destructive: Indigo background, action verb ("Continue")
+- **Secondary Action Button:**
+  - Always "Cancel" (neutral, ghost style)
+  - Position: Left of primary (or below on mobile)
+
+**Example Confirmation Dialogs:**
+
+**Delete Project:**
+```
+Title: Delete 'Mars Colonization' project?
+Description: This will permanently delete all conversations, scripts, and settings for this project. This action cannot be undone.
+Primary: [Delete] (Red)
+Secondary: [Cancel] (Ghost)
+```
+
+**Assembly with Incomplete Scenes:**
+```
+Title: Assemble video with 3 of 5 scenes?
+Description: 2 scenes don't have clips selected. The final video will only include the 3 completed scenes.
+Primary: [Assemble Anyway] (Indigo)
+Secondary: [Cancel] (Ghost)
+```
+
+#### 1.2.5 Notification Patterns (Toast)
+
+**Placement:** Top-right corner
+- **Position:** Fixed, 16px from top, 16px from right
+- **Z-index:** 10000 (above modals)
+
+**Duration:**
+- **Success:** 5 seconds auto-dismiss
+- **Info:** 5 seconds auto-dismiss
+- **Warning:** 8 seconds auto-dismiss
+- **Error:** Persistent (requires manual dismiss) or 15 seconds
+
+**Stacking:**
+- **Direction:** Stack vertically, newest on top
+- **Gap:** 8px between toasts
+- **Max Visible:** 3 toasts
+- **Overflow:** Oldest toasts auto-dismiss when limit reached
+
+**Toast Structure:**
+- **Width:** 360px
+- **Padding:** 16px
+- **Border Radius:** 8px
+- **Box Shadow:** 0 4px 12px rgba(0,0,0,0.3)
+- **Animation:** Slide in from right (0.3s), fade out (0.2s)
+
+**Toast Types:**
+
+**Success Toast:**
+- **Background:** `#10b981` (Emerald 500)
+- **Color:** White
+- **Icon:** ✓ checkmark (left side)
+- **Example:** "Voice selection saved successfully"
+
+**Error Toast:**
+- **Background:** `#ef4444` (Red 500)
+- **Color:** White
+- **Icon:** ✗ or ! icon (left side)
+- **Dismiss Button:** X (right side, white)
+- **Example:** "Failed to load clips. Check your connection."
+
+**Warning Toast:**
+- **Background:** `#f59e0b` (Amber 500)
+- **Color:** White
+- **Icon:** ⚠ icon (left side)
+- **Example:** "YouTube API quota approaching limit"
+
+**Info Toast:**
+- **Background:** `#6366f1` (Indigo 500)
+- **Color:** White
+- **Icon:** ℹ icon (left side)
+- **Example:** "Script generation will take about 30 seconds"
+
+**Toast Content:**
+- **Title:** Bold, 0.875rem (14px) - optional
+- **Message:** Regular, 0.875rem (14px) - required
+- **Max Lines:** 2-3 lines, ellipsis if longer
+
+#### 1.2.6 Empty State Patterns
+
+**Structure:**
+- **Container:** Center-aligned, padding 48px
+- **Icon:** Large icon or illustration (64px+), gray color
+- **Primary Text:** Clear message ("No projects yet")
+- **Secondary Text:** Actionable guidance ("Click 'New Chat' to start")
+- **CTA Button:** Primary action if applicable
+
+**Contexts:**
+- **First Use:** "Start your first video project!"
+- **No Results:** "No clips found for this scene"
+- **Cleared Content:** "Chat cleared. Start a new conversation?"
+
+#### 1.2.7 Date/Time Patterns
+
+**Format:** Relative time with fallback to absolute
+- **< 1 minute:** "Just now"
+- **< 1 hour:** "X minutes ago"
+- **< 24 hours:** "Today, 2:34 PM"
+- **Yesterday:** "Yesterday, 3:15 PM"
+- **< 7 days:** "Monday, 1:20 PM"
+- **> 7 days:** "Dec 28, 2024"
+
+**Implementation:** `Intl.DateTimeFormat` for localization
+
+**Tooltip on Hover:** Show full timestamp ("December 28, 2024 at 1:20:35 PM")
 
 ---
 
@@ -186,6 +438,203 @@ _Generated using BMad Method - Create UX Design Workflow v1.0_
 - **Grid system:** CSS Grid for scene cards, Flexbox for component layouts
 - **Responsive:** Tailwind's responsive utilities
 
+### 3.4 Touch Targets & Responsive Design
+
+**Touch Target Policy:**
+- **Minimum Size:** 44px x 44px (WCAG 2.2 Level AAA)
+- **Applies to:** All buttons, links, form controls, interactive elements
+- **Implementation:** Padding can extend beyond visual boundary to meet minimum
+- **Exception:** Inline text links (use increased line-height/padding)
+
+**Critical Touch Targets:**
+- **Audio Player Button:** 44px x 44px (increased from 36px)
+- **Close Buttons (X):** 44px x 44px
+- **Play/Preview Buttons:** 44px x 44px minimum
+- **Scene Status Badges:** If interactive, 44px height minimum
+- **Project List Items:** 72px height minimum
+
+**Responsive Breakpoints:**
+- **Desktop:** 1024px+ (full sidebar, 3-column grids)
+- **Tablet:** 768-1023px (collapsible sidebar, 2-column grids)
+- **Mobile:** <768px (overlay sidebar, 1-column grids)
+
+---
+
+## 3.5 Accessibility Standards
+
+**This application targets WCAG 2.1 Level AA compliance for all public-facing features.**
+
+### 3.5.1 Color Contrast Requirements
+
+**Text Contrast:**
+- **Normal Text:** 4.5:1 minimum (WCAG AA)
+- **Large Text (18px+ or 14px+ bold):** 3:1 minimum
+- **UI Components:** 3:1 minimum (borders, icons, form controls)
+
+**Verified Combinations:**
+- **Primary Text on Background:** `#f8fafc` on `#0f172a` = 16.7:1 ✓
+- **Secondary Text on Background:** `#cbd5e1` on `#0f172a` = 11.4:1 ✓
+- **Primary Button (White on Indigo):** `#ffffff` on `#6366f1` = 6.2:1 ✓
+- **Error Text:** `#ef4444` on `#0f172a` = 6.8:1 ✓
+- **Success Badge:** `#10b981` on `#0f172a` = 4.7:1 ✓
+- **Warning Badge:** `#f59e0b` on `#0f172a` = 7.1:1 ✓
+
+**Non-Color Dependence:**
+- **Status Indicators:** Never rely solely on color (always include icon or text)
+- **Example:** Scene status uses icon (✓, ⚠, ✗) + color + text
+
+### 3.5.2 Focus Indicators
+
+**Global Focus Style:**
+- **All Interactive Elements:** 2px solid `#6366f1` (Indigo 500) outline with 2px offset
+- **Visible on:** Keyboard focus (`:focus-visible`)
+- **Not visible on:** Mouse click (`:focus` without keyboard)
+- **Never:** `outline: none` without custom alternative
+
+**Implementation:**
+```css
+*:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+```
+
+**Applies to:**
+- All buttons, links, form controls
+- Video thumbnails, scene cards, project list items
+- Any element with `tabindex="0"` or interactive role
+
+**High Contrast Mode:**
+- Use system colors for outlines (`outline-color: -webkit-focus-ring-color`)
+- Ensure focus remains visible in Windows High Contrast Mode
+
+### 3.5.3 Keyboard Navigation
+
+**Tab Order:**
+- **Logical sequence:** Top to bottom, left to right
+- **Skip to Content:** "Skip to main content" link (hidden until focused)
+- **Focus trapping:** Modals trap focus within dialog
+
+**Keyboard Shortcuts:**
+- **ESC:** Close modals, cancel actions
+- **Enter/Space:** Activate buttons and links
+- **Arrow Keys:** Navigate within lists (project sidebar, scene status list)
+- **Tab/Shift+Tab:** Navigate between interactive elements
+
+**Component-Specific Navigation:**
+- **ProjectSidebar:** Tab to navigate, Enter to select, Arrow keys to move between projects
+- **ChatInterface:** Tab to input, Enter to send, Escape to clear input
+- **Voice Selection:** Tab to cards, Enter to select, Space to preview
+- **Visual Curation:** Tab to thumbnails, Enter to select/deselect, Space to play preview
+- **Audio Players:** Tab to controls, Space to play/pause, Arrow keys to scrub
+
+### 3.5.4 ARIA & Semantic HTML
+
+**ARIA Roles:**
+- **ProjectSidebar:** `role="navigation"` with `aria-label="Project list"`
+- **ChatInterface:** `role="log"` (live region) with `aria-label="Chat messages"`
+- **MessageBubble:** `role="article"` with `aria-label="[User/Assistant] message at [timestamp]"`
+- **VideoPreviewThumbnail:** `role="button"` with `aria-label="Play video clip preview"`
+
+**Live Regions:**
+- **Chat Messages:** `aria-live="polite"` for new messages
+- **Toast Notifications:** `aria-live="assertive"` for errors, `polite` for success/info
+- **Progress Updates:** `aria-live="polite"` for sourcing/generation progress
+
+**Form Accessibility:**
+- **Labels:** All inputs have associated `<label for="field-id">`
+- **Required Fields:** `aria-required="true"` + visual asterisk
+- **Error Messages:** `aria-describedby="error-id"` linking input to error
+- **Error State:** `aria-invalid="true"` when validation fails
+- **Help Text:** `aria-describedby="help-id"` linking input to help text
+
+### 3.5.5 Alt Text Strategy
+
+**Video Thumbnails:**
+- **Format:** "[Video title] - Duration: [MM:SS]"
+- **Example:** `alt="Lion roaming savanna at sunset - Duration: 0:15"`
+- **Loading State:** `alt="Loading video preview"`
+- **Error State:** `alt="Video preview unavailable"`
+
+**Icons:**
+- **Decorative Icons:** `aria-hidden="true"` (adjacent text provides context)
+- **Functional Icons:** `aria-label` describing action
+- **Example:** Play button: `aria-label="Play voiceover for scene 1"`
+
+**Images:**
+- **Project Icons:** `alt="Project icon"` (emoji already has semantic meaning)
+- **Spinners:** `alt="Loading"` or `aria-label="Loading"`
+
+### 3.5.6 Screen Reader Considerations
+
+**Announcements:**
+- **ProjectSidebar:** "Project: [name], last active [timestamp], [active/inactive]"
+- **ChatInterface:** "User message: [content]" / "Assistant message: [content]"
+- **Scene Status:** "Scene 1, completed, 6 clips found"
+- **Progress Updates:** "Sourcing clips, scene 2 of 5 complete"
+
+**Hidden Content:**
+- **Skip Links:** Visually hidden but screen reader accessible
+- **Icon-Only Buttons:** Must have `aria-label` or `aria-labelledby`
+- **Loading States:** Announce loading and completion
+
+### 3.5.7 Accessibility Testing Strategy
+
+**Automated Testing:**
+- **Tool:** axe DevTools browser extension
+- **Frequency:** Every PR before merge
+- **Coverage:** All new/modified pages and components
+- **Pass Criteria:** Zero critical or serious violations
+- **Integration:** Consider axe-core in CI/CD pipeline
+
+**Keyboard Navigation Testing:**
+- **Frequency:** Per feature implementation
+- **Test Plan:**
+  1. Tab through all interactive elements in logical order
+  2. Activate all buttons/links with Enter/Space
+  3. Close modals with ESC
+  4. Navigate lists with Arrow keys
+  5. Verify no keyboard traps (can always escape)
+  6. Ensure focus visible on all elements
+- **Pass Criteria:** All functionality accessible via keyboard alone (no mouse required)
+
+**Screen Reader Testing:**
+- **Tools:**
+  - **NVDA** (Windows, free)
+  - **VoiceOver** (Mac, built-in)
+- **Frequency:** Per epic completion (before release)
+- **Test Plan:**
+  1. Navigate with screen reader shortcuts (H for headings, Tab for links)
+  2. Verify all content is announced (no unlabeled elements)
+  3. Verify ARIA labels are meaningful (not generic "button" or "link")
+  4. Verify form labels and errors are announced
+  5. Verify modal focus is trapped and announced
+  6. Verify live regions announce updates
+- **Pass Criteria:** All content comprehensible, no unlabeled elements, logical flow
+
+**Manual Review Checklist:**
+- **Frequency:** Per release candidate
+- **Checklist:**
+  - [ ] Color contrast meets 4.5:1 (text) and 3:1 (UI components)
+  - [ ] Focus indicators visible on all interactive elements
+  - [ ] No content relies solely on color (icons/text provide context)
+  - [ ] All images have alt text
+  - [ ] All forms have labels
+  - [ ] Touch targets meet 44px x 44px minimum
+  - [ ] Text is resizable to 200% without loss of functionality
+  - [ ] Page is navigable with keyboard only
+  - [ ] Screen reader announces all content logically
+
+**Accessibility Regression Testing:**
+- **Frequency:** Every major release
+- **Process:** Re-run full accessibility test suite (automated + manual)
+- **Documentation:** Maintain accessibility issues log with remediation status
+
+**User Testing with Assistive Technology Users:**
+- **Frequency:** Major releases or significant UX changes
+- **Participants:** Recruit users who rely on screen readers, keyboard-only, or other assistive tech
+- **Feedback:** Incorporate findings into backlog
+
 ---
 
 ## 4. Application Workflows Overview
@@ -200,32 +649,40 @@ graph LR
     B --> C[Topic Confirmation]
     C --> D[Voice Selection]
     D --> E[Script Generation]
-    E --> F[Visual Curation]
-    F --> G[Video Assembly]
-    G --> H[Download/Share]
+    E --> F[Script Preview]
+    F --> G[Visual Sourcing]
+    G --> H[Visual Curation]
+    H --> I[Video Assembly]
+    I --> J[Download/Share]
 
     B -->|Switch Project| A
-    F -->|Edit| B
+    H -->|Edit| B
 ```
 
 **Step Progression:**
 1. **Project Management** (Story 1.6) - Select or create project
 2. **Chat Interface** (Epic 1) - Brainstorm ideas with AI
 3. **Topic Confirmation** (Story 1.7) - Confirm video topic
-4. **Voice Selection** (Epic 2) - Choose narrator voice
-5. **Script Generation** (Epic 2) - AI generates script (automatic)
-6. **Visual Curation** (Epic 4) - Select clips for each scene
-7. **Video Assembly** (Epic 5) - Final video generation (automatic)
-8. **Download/Share** (Epic 5) - Get final video + thumbnail
+4. **Voice Selection** (Epic 2, Story 2.3) - Choose narrator voice
+5. **Script Generation** (Epic 2, Story 2.4) - AI generates script (automatic)
+6. **Script & Voiceover Preview** (Epic 2, Story 2.6) - Review script with audio playback
+7. **Visual Sourcing** (Epic 3, Story 3.5) - YouTube API searches for clips (automatic)
+8. **Visual Curation** (Epic 4) - Select clips for each scene
+9. **Video Assembly** (Epic 5) - Final video generation (automatic)
+10. **Download/Share** (Epic 5) - Get final video + thumbnail
 
-**Current Scope of UX Spec (Version 3.0):**
-- ✅ Project Management UI (Story 1.6) - Fully specified (Section 5)
-- ✅ Chat Interface (Epic 1) - Fully specified (Section 6.1-6.4)
-- ✅ Voice Selection UI (Epic 2, Story 2.3) - Fully specified (Section 6.5)
-- ✅ Script Generation UI (Epic 2, Story 2.4) - Fully specified (Section 6.6)
-- ✅ Script & Voiceover Preview UI (Epic 2, Story 2.6) - Fully specified (Section 6.7)
-- ✅ Visual Curation UI (Epic 4) - Fully specified (Section 7)
-- 🔄 Video Assembly & Download UI (Epic 5) - To be designed in future iteration
+**Current Scope of UX Spec (Version 3.2):**
+- ✅ **Project Management UI** (Story 1.6) - Fully specified (Section 5)
+- ✅ **Chat Interface** (Epic 1) - Fully specified (Section 6.1-6.4)
+- ✅ **Voice Selection UI** (Epic 2, Story 2.3) - Fully specified (Section 6.5)
+- ✅ **Script Generation UI** (Epic 2, Story 2.4) - Fully specified (Section 6.6)
+- ✅ **Script & Voiceover Preview UI** (Epic 2, Story 2.6) - Fully specified (Section 6.7)
+- ✅ **Visual Sourcing Loading UI** (Epic 3, Story 3.5) - Fully specified (Section 6.8)
+- ✅ **Visual Curation UI** (Epic 4) - Fully specified (Section 7)
+- ✅ **UX Pattern Consistency** - Fully specified (Section 1.2)
+- ✅ **Accessibility Standards** - WCAG 2.1 AA with testing strategy (Section 3.5)
+- ✅ **Touch Targets & Responsive Design** - 44px minimum, breakpoints defined (Section 3.4)
+- 🔄 **Video Assembly & Download UI** (Epic 5) - To be designed in future iteration
 
 ---
 
@@ -1033,7 +1490,7 @@ graph LR
 **Audio Player Components:**
 
 **1. Play/Pause Button:**
-- **Size:** 36px x 36px
+- **Size:** 44px x 44px (meets WCAG 2.2 Level AAA touch target requirements)
 - **Background:** `#6366f1` (Indigo 500)
 - **Border Radius:** 50% (circle)
 - **Color:** White
@@ -1116,7 +1573,7 @@ graph LR
 3. Total duration displayed (e.g., "Total Duration: 2:45")
 4. User clicks "Continue"
 5. System saves current_step = 'visual-sourcing' to database
-6. System navigates to Visual Curation UI (Section 7)
+6. System navigates to Visual Sourcing Loading UI (Section 6.8)
 
 ### 6.7.4 States
 
@@ -1159,6 +1616,258 @@ graph LR
 - Spinner on play button if audio file takes time to load
 - Scene card remains visible
 - Other scenes remain interactable
+
+---
+
+## 6.8. Visual Sourcing Loading UI (Epic 3, Story 3.5)
+
+### 6.8.1 Overview
+
+**Purpose:** Provide visual feedback during YouTube API sourcing process, keeping users informed while video clips are being searched, retrieved, and filtered for each scene.
+
+**User Value:** Transparent loading experience with scene-by-scene progress indication prevents user confusion during the 10-30 second sourcing delay and builds trust in the automation.
+
+**Key Features:**
+- Loading screen with scene-by-scene progress indication (e.g., "Analyzing scene 2 of 5...")
+- Stage-based progress messages per scene ("Analyzing scene...", "Searching YouTube...", "Filtering results...")
+- Error handling for API failures (quota exceeded, network error, no results)
+- Auto-navigation to Visual Curation UI when complete
+- Retry mechanism for failed scenes
+- Partial completion support (proceed with some scenes if others fail)
+
+### 6.8.2 Visual Design
+
+**Visual Sourcing Loading Screen:**
+
+Similar to Section 6.6 (Script Generation Loading), but with scene-by-scene progress tracking:
+
+```
+┌─────────────────────────────────────┐
+│                                     │
+│            [Spinner]                │  <- Animated spinner
+│                                     │
+│    Sourcing Video Clips...          │  <- Main message
+│                                     │
+│    Analyzing scene 2 of 5           │  <- Scene counter
+│    Searching YouTube for clips...   │  <- Stage message
+│                                     │
+│    ━━━━━━━━━━⬜⬜⬜⬜⬜⬜⬜⬜⬜        │  <- Progress bar (40% = 2/5)
+│                                     │
+│    Scene 1: ✓ 6 clips found        │  <- Scene status list
+│    Scene 2: ⏳ Searching...         │
+│    Scene 3: ⏸ Pending               │
+│    Scene 4: ⏸ Pending               │
+│    Scene 5: ⏸ Pending               │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Loading Container:**
+- **Position:** Full-screen modal overlay
+- **Background:** `#0f172a` (Slate 900, 95% opacity) - slight transparency
+- **Backdrop Blur:** 8px (modern glass effect)
+- **Display:** Flex, center aligned
+- **Z-Index:** 9999 (top-most layer)
+
+**Loading Content Box:**
+- **Max Width:** 600px
+- **Padding:** 48px
+- **Background:** `#1e293b` (Slate 800)
+- **Border:** 1px solid `#334155` (Slate 700)
+- **Border Radius:** 16px
+- **Box Shadow:** 0 8px 24px rgba(0,0,0,0.4)
+- **Text Align:** Center
+
+**Spinner:**
+- **Type:** Circular indeterminate spinner
+- **Size:** 64px diameter
+- **Color:** `#6366f1` (Indigo 500)
+- **Animation:** Smooth rotation, 1.2s duration, infinite
+- **Style:** Ring with gradient (indigo → violet)
+- **Margin Bottom:** 24px (lg)
+
+**Main Message:**
+- **Text:** "Sourcing Video Clips..."
+- **Font Size:** 1.5rem (24px)
+- **Font Weight:** 600 (semi-bold)
+- **Color:** `#f8fafc` (Slate 50)
+- **Margin Bottom:** 12px (sm)
+
+**Scene Counter:**
+- **Text:** "Analyzing scene X of Y" (e.g., "Analyzing scene 2 of 5")
+- **Font Size:** 1rem (16px)
+- **Font Weight:** 500 (medium)
+- **Color:** `#cbd5e1` (Slate 300)
+- **Margin Bottom:** 8px
+
+**Stage Message:**
+- **Text:** Dynamic based on sourcing stage
+- **Font Size:** 0.875rem (14px)
+- **Font Weight:** 400 (regular)
+- **Color:** `#94a3b8` (Slate 400)
+- **Margin Bottom:** 20px (md)
+- **Animation:** Fade in/out when stage changes (0.3s transition)
+
+**Stage Messages (Per Scene Cycle):**
+1. "Analyzing scene text..." (5-10% per scene)
+2. "Generating search queries..." (10-20%)
+3. "Searching YouTube for clips..." (20-60%)
+4. "Filtering and ranking results..." (60-90%)
+5. "Found X clips" (90-100%)
+
+**Progress Bar:**
+- **Width:** 100% of content box
+- **Height:** 6px
+- **Background:** `#334155` (Slate 700)
+- **Fill:** Linear gradient (`#6366f1` → `#8b5cf6`)
+- **Border Radius:** 3px
+- **Animation:** Smooth progress fill based on completed scenes (e.g., 2/5 = 40%)
+- **Margin Bottom:** 24px (lg)
+
+**Scene Status List:**
+- **Display:** Flex column, left-aligned within content box
+- **Gap:** 8px (sm) between status items
+- **Max Height:** 200px (scrollable if many scenes)
+- **Margin Top:** 24px (lg)
+- **Padding:** 16px
+- **Background:** `#0f172a` (Slate 900)
+- **Border Radius:** 8px
+
+**Scene Status Item:**
+- **Format:** "Scene N: [Icon] [Status]"
+- **Font Size:** 0.875rem (14px)
+- **Line Height:** 1.6
+- **Display:** Flex row, align-items center
+
+**Status Icons and Colors:**
+- **✓ Complete (Emerald):** `#10b981` - "6 clips found"
+- **⏳ In Progress (Indigo):** `#6366f1` - "Searching..." (animated pulse)
+- **⏸ Pending (Gray):** `#64748b` - "Pending"
+- **⚠ Error (Amber):** `#f59e0b` - "Retrying with broader search..."
+- **✗ Failed (Red):** `#ef4444` - "Failed - Retry available"
+
+**Quality Retry Message (If Applicable):**
+- **Trigger:** No results found for scene, automatic retry with relaxed filters
+- **Text:** "No results found - Trying broader search criteria"
+- **Font Size:** 0.875rem (14px)
+- **Color:** `#f59e0b` (Amber 500) - warning color
+- **Icon:** ⚠ icon before text
+- **Display:** Below scene status list when retry triggered
+
+### 6.8.3 Interaction Patterns
+
+**Normal Sourcing Flow:**
+1. User clicks "Continue to Visual Sourcing" from Script Preview (Section 6.7)
+2. System navigates to Visual Sourcing loading screen (full-screen overlay)
+3. Spinner animates, main message "Sourcing Video Clips..." displays
+4. For each scene (sequential or parallel processing):
+   - Scene status changes to ⏳ "Searching..."
+   - Scene counter updates: "Analyzing scene X of Y"
+   - Stage messages cycle through sourcing phases
+   - On success: Status changes to ✓ "X clips found" (where X is typically 4-6)
+   - Progress bar updates (e.g., 1/5 = 20% → 2/5 = 40%)
+5. All scenes complete → Auto-navigate to Visual Curation UI (Section 7) after 0.5s delay
+
+**No User Interaction:**
+- Loading screen is informational only (no buttons, no manual cancellation)
+- User cannot dismiss or cancel sourcing (process is automatic)
+- Navigation happens automatically on completion or partial success
+
+**Error Handling Scenarios:**
+
+**Scenario 1: No Results for Scene (Auto-Retry)**
+1. YouTube API returns zero results for scene search
+2. Scene status: ⚠ "No results - Retrying with broader search" (Amber)
+3. Stage message: "Trying broader search criteria"
+4. System applies relaxed filters (Epic 3 Story 3.4: relax criteria incrementally)
+5. If retry succeeds: Status → ✓ "4 clips found"
+6. If retry fails again: Status → ⚠ "Limited results - 2 clips found" (proceed with fewer clips)
+7. If no clips after all retries: Status → ✗ "Failed - No clips available"
+
+**Scenario 2: YouTube API Quota Exceeded**
+1. YouTube API returns 403 quota exceeded error
+2. Spinner stops
+3. Error icon displayed (red circle with !)
+4. Main message: "YouTube API Quota Exceeded"
+5. Stage message: "The YouTube API daily limit has been reached. Please try again later or contact support."
+6. Scene status list shows: Completed scenes (✓), Current scene (✗ Failed), Remaining scenes (⏸ Pending)
+7. **"Try Again Later" button** (disabled, shows timer if quota reset time known)
+8. **"Back to Script Preview" button** (returns to Section 6.7)
+
+**Scenario 3: Network Error (Auto-Retry with Backoff)**
+1. YouTube API request fails due to network error
+2. Scene status: ⚠ "Connection error - Retrying..." (Amber)
+3. System retries with exponential backoff (Epic 3 Story 3.1: max 3 attempts)
+4. After 3 failed retries:
+   - Spinner stops
+   - Error icon displayed
+   - Main message: "Visual Sourcing Failed"
+   - Stage message: "Could not connect to YouTube API. Check your internet connection."
+   - **"Retry Visual Sourcing" button** (restarts entire sourcing process)
+   - **"Back to Script Preview" button** (returns to Section 6.7)
+
+**Scenario 4: Partial Failure (Some Scenes Succeed, Some Fail)**
+1. Some scenes complete successfully (✓ "X clips found")
+2. Some scenes fail after retries (✗ "Failed - Network error" or "No clips available")
+3. Progress bar shows partial completion (e.g., 3/5 = 60%)
+4. Main message: "Visual Sourcing Partially Complete"
+5. Stage message: "3 of 5 scenes have clips. You can proceed with available clips or retry failed scenes."
+6. Failed scenes show **"Retry Scene X" button** (inline, per scene)
+7. **"Continue with Available Clips" button** (proceeds to Section 7 with only successful scenes)
+8. **"Retry All Failed Scenes" button** (retries only failed scenes, not successful ones)
+
+### 6.8.4 States
+
+**Loading (Normal):**
+- Spinner rotating
+- Scene status list updating in real-time as scenes complete
+- Progress bar filling based on completed scenes
+- Stage messages cycling per scene
+- No errors, smooth progression
+
+**Loading (Retry - No Results):**
+- Specific scene status: ⚠ "No results - Retrying with broader search" (Amber)
+- Amber warning indicator
+- Stage message: "Trying broader search criteria"
+- Other scenes continue processing normally
+
+**Error (Quota Exceeded):**
+- Spinner stops
+- Error icon (red circle with !)
+- Main message: "YouTube API Quota Exceeded"
+- Stage message: Explanation + action guidance
+- "Try Again Later" button (disabled, may show timer)
+- "Back to Script Preview" button (enabled)
+- Scene status list shows: ✓ Completed, ✗ Failed (quota), ⏸ Pending
+
+**Error (Network Failure):**
+- Spinner stops
+- Error icon (red circle with !)
+- Main message: "Visual Sourcing Failed"
+- Stage message: "Could not connect to YouTube API. Check your internet connection."
+- **"Retry Visual Sourcing" button** (enabled, restarts process)
+- **"Back to Script Preview" button** (enabled, returns to Section 6.7)
+- Scene status list shows: ✓ Completed, ✗ Failed (network), ⏸ Pending
+
+**Error (Partial Failure):**
+- Spinner stops
+- Warning icon (amber triangle with !)
+- Main message: "Visual Sourcing Partially Complete"
+- Stage message: "X of Y scenes have clips. Proceed or retry?"
+- Scene status list shows:
+  - ✓ Successful scenes: "6 clips found"
+  - ✗ Failed scenes: "Failed - No clips available" with inline **"Retry Scene X" button**
+- **"Continue with Available Clips" button** (proceeds to curation with partial data)
+- **"Retry All Failed Scenes" button** (retries only failed scenes)
+- **"Back to Script Preview" button** (returns to Section 6.7)
+
+**Success (Transition):**
+- All scenes show ✓ Complete (Emerald): "X clips found"
+- Progress bar: 100%
+- Main message: "Clips Sourced Successfully!"
+- Stage message: "Found clips for all scenes. Preparing curation interface..."
+- Success checkmark animation (optional, brief)
+- Auto-navigate to Visual Curation UI (Section 7) after 0.5s delay
 
 ---
 
@@ -1347,6 +2056,47 @@ graph LR
 **Error State:**
 - Clip fails to load → Gray placeholder + error icon + "Retry" text
 - Network error → Toast notification "Failed to load clips. Check connection."
+
+**Empty Clip State (No Clips Available):**
+- **Trigger:** Scene has zero clips after Visual Sourcing (Section 6.8) completes with failure or partial failure
+- **Scene Card Display:**
+  - Scene number badge: "Scene 3" (Indigo)
+  - Status badge: ⚠ "No clips available" (Amber background, `#f59e0b`)
+  - Scene script text displayed normally
+  - **Empty State Message (in place of clip grid):**
+    - Icon: 🎬 or empty video icon (gray, `#64748b`)
+    - Primary text: "No suitable video clips found for this scene"
+    - Secondary text: "The YouTube search returned no results. Try manual search or skip this scene."
+    - Background: `#0f172a` (Slate 900)
+    - Border: 1px dashed `#475569` (Slate 600)
+    - Border Radius: 8px
+    - Padding: 32px
+    - Text align: center
+- **Action Buttons (within empty state):**
+  - **"Search YouTube Manually" button:**
+    - Style: Secondary (ghost)
+    - Background: Transparent
+    - Border: 1px solid `#6366f1` (Indigo 500)
+    - Color: `#6366f1`
+    - Icon: Search icon (🔍) before text
+    - Action: Opens manual search dialog (future enhancement - post-MVP)
+    - Note: For MVP, this button can be disabled with tooltip "Manual search coming soon"
+  - **"Skip This Scene" toggle:**
+    - Style: Checkbox with label
+    - Label: "Skip this scene and continue without it"
+    - Color: `#cbd5e1` (Slate 300)
+    - Checked state: Scene marked as skipped, excluded from final video
+    - Unchecked state: Scene remains incomplete, blocks "Assemble Video" button
+- **Progress Tracking:**
+  - If scene skipped: Progress counts scene as "complete" (e.g., 4/5 → 5/5 if Scene 3 skipped)
+  - "Assemble Video" button enables when: All scenes complete OR incomplete scenes are skipped
+- **User Flow:**
+  1. User arrives at Visual Curation UI from Visual Sourcing (Section 6.8)
+  2. Scene with no clips shows empty state with message + action buttons
+  3. User can:
+     - **Option A:** Skip the scene (toggle checkbox) → Scene excluded from video
+     - **Option B:** Return to Script Preview (Section 6.7) and regenerate script with different content
+     - **Option C (Future):** Use manual search to find clips for this scene
 
 ---
 

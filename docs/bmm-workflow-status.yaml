@@ -71,12 +71,12 @@ epics:
     status: "in-progress"
     description: "Visual Content Sourcing (YouTube API)"
     stories_total: 5
-    stories_done: ""
-    stories_in_progress: ""
-    stories_in_review: "3.1"
-    next_step: "Review Story 3.1, then implement Story 3.2 - Scene Analysis for Visual Themes"
+    stories_done: "3.1"
+    stories_in_progress: "3.2"
+    stories_in_review: ""
+    next_step: "Implement Story 3.2 - Scene Text Analysis & Search Query Generation"
 
 # Next Action
-next_action: "Review Story 3.1 implementation or proceed to Story 3.2"
-next_command: "Run code-review workflow on Story 3.1 or start Story 3.2 development"
-next_agent: "dev"
+next_action: "Create and implement Story 3.2 - Scene Text Analysis & Search Query Generation"
+next_command: "Run complete-story workflow for Story 3.2"
+next_agent: "SM"

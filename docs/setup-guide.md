@@ -8,8 +8,9 @@ This guide covers the setup and installation of the AI Video Generator, includin
 2. [System Requirements](#system-requirements)
 3. [Installation Steps](#installation-steps)
 4. [TTS Setup (Epic 2)](#tts-setup-epic-2)
-5. [Verification](#verification)
-6. [Troubleshooting](#troubleshooting)
+5. [YouTube API Setup (Epic 3)](#youtube-api-setup-epic-3)
+6. [Verification](#verification)
+7. [Troubleshooting](#troubleshooting)
 
 ## Prerequisites
 
@@ -190,6 +191,146 @@ All audio format:
 - **Bitrate:** 128kbps
 - **Sample Rate:** 44.1kHz
 - **Channels:** Mono
+
+## YouTube API Setup (Epic 3)
+
+### Overview
+
+The YouTube API integration enables automatic sourcing of B-roll footage from YouTube's content library. This requires a free YouTube Data API v3 key from Google Cloud Console.
+
+**Key Features:**
+- Search YouTube for relevant video clips based on scene analysis
+- Quota management (10,000 units per day on free tier)
+- Rate limiting (100 requests per 100 seconds)
+- Automatic retry with exponential backoff
+- Content filtering and quality ranking
+
+### Acquiring a YouTube API Key
+
+#### Step 1: Create Google Cloud Project
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Sign in with your Google account
+3. Click "Select a project" at the top
+4. Click "New Project"
+5. Enter project name: "AI Video Generator" (or your preference)
+6. Click "Create"
+7. Wait for project creation (usually <30 seconds)
+
+#### Step 2: Enable YouTube Data API v3
+
+1. Select your newly created project
+2. Navigate to "APIs & Services" > "Library"
+3. Search for "YouTube Data API v3"
+4. Click on "YouTube Data API v3" from search results
+5. Click "Enable" button
+6. Wait for API to be enabled (usually instant)
+
+#### Step 3: Create API Credentials
+
+1. Navigate to "APIs & Services" > "Credentials"
+2. Click "Create Credentials" at the top
+3. Select "API Key" from the dropdown
+4. Your API key will be generated and displayed
+5. **IMPORTANT:** Click "Restrict Key" (do not skip this step)
+
+#### Step 4: Restrict API Key (Security Best Practice)
+
+1. In the "API restrictions" section:
+   - Select "Restrict key"
+   - Check only "YouTube Data API v3"
+   - Leave all other APIs unchecked
+2. (Optional) In "Application restrictions":
+   - For development: Select "None"
+   - For production: Select "HTTP referrers" and add your domain
+3. Click "Save"
+4. Copy your API key to clipboard
+
+#### Step 5: Add API Key to Environment
+
+1. Open `.env.local` in your project
+2. Find the line: `YOUTUBE_API_KEY=your_api_key_here`
+3. Replace `your_api_key_here` with your actual API key
+4. Save the file
+5. **NEVER commit** `.env.local` to version control (it's already in `.gitignore`)
+
+Example:
+```bash
+# YouTube Data API v3 API Key (Required for Epic 3)
+YOUTUBE_API_KEY=AIzaSyBxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+### Understanding YouTube API Quotas
+
+YouTube Data API v3 uses a quota system:
+
+- **Free Tier Quota:** 10,000 units per day
+- **Search Request Cost:** 100 units per search
+- **Maximum Searches:** ~100 searches per day (10,000 / 100)
+- **Quota Reset:** Midnight Pacific Time daily
+
+**Quota Usage Example:**
+- Project with 5 scenes: 5 searches = 500 units
+- 20 such projects per day = 10,000 units (full quota)
+
+**Quota Management Features:**
+- Automatic quota tracking across app restarts
+- Warning at 80% usage (8,000 units)
+- Graceful error when quota exceeded
+- Clear error message with reset time
+
+### Testing Your API Key
+
+After adding your API key to `.env.local`:
+
+```bash
+cd ai-video-generator
+npm run validate:env
+```
+
+Expected output:
+```
+✅ YouTube Configuration - OK
+```
+
+If you see errors:
+```
+❌ YouTube Configuration - ERRORS:
+   YOUTUBE_API_KEY not configured
+   → Get API key from: https://console.cloud.google.com/apis/credentials
+```
+
+Then verify:
+1. API key is copied correctly (no extra spaces)
+2. API key is not still `your_api_key_here`
+3. `.env.local` file is saved
+4. You're in the correct directory
+
+### Rate Limiting
+
+YouTube API enforces rate limits:
+- **Rate Limit:** 100 requests per 100 seconds (1 request/second average)
+- **Burst Allowance:** Up to 100 requests immediately
+- **Automatic Handling:** App queues excess requests automatically
+- **No Action Required:** Rate limiting is transparent to users
+
+### Security Best Practices
+
+**DO:**
+- ✅ Keep API key in `.env.local` only
+- ✅ Restrict API key to YouTube Data API v3 only
+- ✅ Rotate API key if accidentally exposed
+- ✅ Use HTTP referrer restrictions in production
+
+**DON'T:**
+- ❌ Commit API key to Git
+- ❌ Share API key publicly
+- ❌ Use same API key across multiple projects
+- ❌ Leave API key unrestricted
+
+### Troubleshooting YouTube API
+
+See [Troubleshooting YouTube API](#youtube-api-issues) section below for common issues and solutions.
 
 ## Verification
 
@@ -423,6 +564,68 @@ PORT=3001 npm run dev
 # Ollama (default: 11434)
 # Edit OLLAMA_HOST in .env.local if running on different port
 ```
+
+### YouTube API Issues
+
+#### Error: YOUTUBE_API_KEY_NOT_CONFIGURED
+```
+YouTube API key not configured. Add YOUTUBE_API_KEY to .env.local
+```
+**Solution:**
+1. Follow [YouTube API Setup](#youtube-api-setup-epic-3) above
+2. Get API key from Google Cloud Console
+3. Add to `.env.local`: `YOUTUBE_API_KEY=your_actual_key`
+4. Restart application
+
+#### Error: YOUTUBE_API_KEY_INVALID
+```
+YouTube API key is invalid. Verify key in Google Cloud Console.
+```
+**Solution:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Verify API key exists and is active
+3. Check API key restrictions (should allow YouTube Data API v3)
+4. Try regenerating API key if needed
+5. Update `.env.local` with new key
+
+#### Error: YOUTUBE_QUOTA_EXCEEDED
+```
+YouTube API daily quota exceeded (10,000 units). Quota resets at midnight PT.
+```
+**Solution:**
+- Wait until midnight Pacific Time for quota to reset
+- Check current quota usage: `npm run test:youtube -- --quota`
+- Consider optimizing searches (fewer scenes, more targeted queries)
+- For production: Request quota increase from Google Cloud Console
+
+#### Error: YOUTUBE_RATE_LIMITED
+```
+YouTube API rate limit reached (100 requests per 100 seconds).
+```
+**Solution:**
+- Application automatically retries with delay
+- No action required (wait a few seconds)
+- If persistent, reduce concurrent requests
+
+#### Error: YOUTUBE_NETWORK_ERROR
+```
+Failed to connect to YouTube API. Check internet connection.
+```
+**Solution:**
+- Verify internet connection
+- Check firewall settings (allow HTTPS to googleapis.com)
+- Try accessing https://www.googleapis.com/youtube/v3/ in browser
+- Check for proxy/VPN interfering with requests
+
+#### Invalid API Key Format Warning
+```
+⚠️ YOUTUBE_API_KEY format appears invalid (expected 39+ alphanumeric characters)
+```
+**Solution:**
+- Verify API key was copied completely (no truncation)
+- Remove any extra spaces before/after key
+- Ensure key is on single line in `.env.local`
+- Check for invisible characters (re-type key manually)
 
 ## Next Steps
 

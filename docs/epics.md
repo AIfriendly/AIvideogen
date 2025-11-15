@@ -589,6 +589,202 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 ---
 
+### Epic 3 Stories
+
+#### Story 3.1: YouTube API Client Setup & Configuration
+**Goal:** Set up YouTube Data API v3 client with authentication and quota management infrastructure
+
+**Tasks:**
+- Obtain YouTube Data API v3 credentials (API key)
+- Install googleapis library (@google/googleapis or similar)
+- Create YouTubeAPIClient class (lib/youtube/client.ts)
+- Implement API key configuration via environment variables
+- Add quota tracking and rate limiting logic
+- Implement exponential backoff for rate limit handling
+- Create error handling for API failures (quota exceeded, invalid key, network errors)
+- Add logging for API requests and quota usage
+
+**Acceptance Criteria:**
+- YouTubeAPIClient successfully initializes with valid API key from environment variable
+- API client can make authenticated requests to YouTube Data API v3
+- Quota tracking counts requests against daily limit (10,000 units default)
+- Rate limiter prevents exceeding 100 requests per 100 seconds
+- Exponential backoff retries failed requests (max 3 attempts)
+- Error messages provide actionable guidance (e.g., "API key invalid - check YOUTUBE_API_KEY in .env.local")
+- Logging captures request count, quota usage, and errors for debugging
+- **Test Case:** When YOUTUBE_API_KEY is missing or empty in environment variables, system displays actionable error message: "YouTube API key not configured. Add YOUTUBE_API_KEY to .env.local" and prevents API calls
+
+**References:**
+- PRD Feature 1.5 (AI-Powered Visual Sourcing) lines 179-209
+- PRD Feature 1.5 AC3 (API Error Handling) lines 206-209
+- Epic 3 Technical Approach lines 571-575
+
+---
+
+#### Story 3.2: Scene Text Analysis & Search Query Generation
+**Goal:** Analyze script scene text using LLM to extract visual themes and generate optimized YouTube search queries
+
+**Tasks:**
+- Create scene analysis prompt template (lib/llm/prompts/visual-search-prompt.ts)
+- Design prompt to extract: main subject, setting, mood, action, keywords
+- Implement query generation strategy:
+  - Primary search query (most relevant)
+  - Alternative search queries (2-3 variations for diversity)
+  - Content type hints (gameplay, tutorial, nature, b-roll, etc.)
+- Create analyzeSceneForVisuals() function (lib/youtube/analyze-scene.ts)
+- Call LLM provider with scene text and analysis prompt
+- Parse LLM response and extract search queries
+- Validate search queries (non-empty, relevant keywords)
+- Add fallback logic for LLM failures (use simple keyword extraction)
+
+**Acceptance Criteria:**
+- Given scene text "A majestic lion roams the savanna at sunset", system generates:
+  - Primary query: "lion savanna sunset wildlife"
+  - Alternative queries: ["african lion sunset", "lion walking grassland golden hour"]
+  - Content type: "nature documentary"
+- Search queries are relevant to scene content and optimized for YouTube search
+- LLM analysis completes within 5 seconds per scene
+- System handles various scene types: nature, gaming, tutorials, urban, abstract concepts
+- Fallback keyword extraction works when LLM unavailable (extracts nouns/verbs from scene text)
+- Invalid or empty LLM responses trigger fallback or retry
+
+**References:**
+- PRD Feature 1.5 (Visual Sourcing) lines 186-189
+- PRD Feature 1.5 AC1 (Visual Suggestion) lines 197-201
+- Epic 1 Story 1.3 (LLM Provider pattern) lines 155-180
+
+---
+
+#### Story 3.3: YouTube Video Search & Result Retrieval
+**Goal:** Query YouTube API with generated search terms and retrieve relevant video clip suggestions
+
+**Tasks:**
+- Implement searchVideos() function in YouTubeAPIClient (lib/youtube/client.ts)
+- Build YouTube Data API search.list request with parameters:
+  - q (search query)
+  - part: snippet
+  - type: video
+  - videoEmbeddable: true
+  - maxResults: 10-15 per query
+  - relevanceLanguage: en (configurable)
+- Execute search for primary query and alternative queries
+- Retrieve video metadata: videoId, title, thumbnail, channelTitle, duration (if available)
+- Aggregate results from multiple queries (deduplicate by videoId)
+- Sort results by relevance score
+- Create POST /api/projects/[id]/generate-visuals endpoint
+- Load all scenes for project from database
+- For each scene: analyze text → generate queries → search YouTube → store suggestions
+- Save video suggestions to database (new visual_suggestions table)
+- Handle API errors gracefully (quota exceeded, invalid query, no results)
+
+**Acceptance Criteria:**
+- searchVideos() accepts search query and returns array of video results with metadata
+- Each result includes: videoId, title, thumbnailUrl, channelTitle, embedUrl
+- Search returns 10-15 relevant videos per query
+- Results are embeddable (videoEmbeddable=true filter applied)
+- Duplicate videos removed when aggregating multiple query results
+- POST /api/projects/[id]/generate-visuals endpoint processes all scenes successfully
+- Video suggestions saved to database with scene_id association
+- API quota errors display user-friendly message and don't crash endpoint
+- No results for query returns empty array (not error)
+- **Test Case:** When YouTube returns 0 results for a search query, system passes empty array to Story 3.4 filter (which triggers fallback or empty state in Story 3.5 AC6)
+
+**References:**
+- PRD Feature 1.5 (Visual Sourcing) lines 179-209
+- PRD Feature 1.5 AC1 (Visual Suggestion) lines 197-201
+- PRD Feature 1.5 AC2 (Data Structure) lines 202-205
+- YouTube Data API v3 documentation (search.list method)
+
+---
+
+#### Story 3.4: Content Filtering & Quality Ranking
+**Goal:** Filter and rank YouTube search results to prioritize high-quality, appropriate content
+
+**Tasks:**
+- Implement content filtering logic (lib/youtube/filter-results.ts)
+- Filter by licensing preference:
+  - Priority 1: Creative Commons licensed videos
+  - Priority 2: Standard YouTube license (embeddable)
+- Filter by content quality indicators:
+  - Minimum view count threshold (configurable, default 1000)
+  - Exclude videos with excessive title spam (ALL CAPS, excessive emojis)
+  - Exclude explicit content (use YouTube API contentDetails.contentRating if available)
+- Implement ranking algorithm:
+  - Relevance score (from YouTube API)
+  - View count (normalized)
+  - Recency (newer videos score higher)
+  - Channel authority (subscriber count if available)
+- Support content-type specific filtering:
+  - Gaming: filter for "gameplay", "no commentary" keywords
+  - Tutorials: prioritize educational channels
+  - Nature: prioritize documentary-style content
+- Limit final suggestions to 5-8 videos per scene (top-ranked)
+- Add configuration options for filtering preferences (lib/youtube/filter-config.ts)
+
+**Acceptance Criteria:**
+- Creative Commons videos ranked higher than standard license (when available)
+- Videos with <1000 views filtered out (spam prevention)
+- Title spam detection removes videos with >5 emojis or >50% ALL CAPS
+- Ranking algorithm produces diverse, high-quality suggestions
+- Gaming content filtering successfully identifies "gameplay only" videos
+- Final suggestions limited to 5-8 top-ranked videos per scene
+- Filtering preferences configurable via filter-config.ts
+- Edge case: If no videos pass filters, relax criteria incrementally (remove view count threshold, then title filters)
+- **Test Case:** When all results fail initial filters (e.g., all videos <1000 views), system relaxes view count threshold first, then title spam filters, ensuring at least 1-3 suggestions returned if any results exist from Story 3.3
+
+**References:**
+- PRD Feature 1.5 (Visual Sourcing) lines 191-192
+- PRD Feature 2.2 (Advanced Content Filtering) lines 312-313
+- Epic 3 Technical Approach lines 573-575
+
+---
+
+#### Story 3.5: Visual Suggestions Database & Workflow Integration
+**Goal:** Store visual suggestions in database and integrate visual sourcing step into project workflow
+
+**Tasks:**
+- Create visual_suggestions table in database:
+  - id (primary key)
+  - scene_id (foreign key to scenes table)
+  - video_id (YouTube video ID)
+  - title, thumbnail_url, channel_title, embed_url
+  - rank (suggestion ranking 1-8)
+  - created_at timestamp
+- Add index on visual_suggestions(scene_id)
+- Implement database query functions (lib/db/queries.ts):
+  - saveVisualSuggestions(sceneId, suggestions[])
+  - getVisualSuggestions(sceneId)
+  - getVisualSuggestionsByProject(projectId)
+- Update projects table: Add visuals_generated boolean flag
+- Update POST /api/projects/[id]/generate-visuals to save suggestions to database
+- Implement GET /api/projects/[id]/visual-suggestions endpoint to retrieve suggestions
+- Create VisualSourcing.tsx loading screen component
+- Trigger visual sourcing automatically after voiceover generation completes (Epic 2 Story 2.5)
+- Update projects.current_step = 'visual-curation' after visual sourcing completes
+- Display progress indicator during visual sourcing (X/Y scenes analyzed)
+- Add error recovery for partial completion
+
+**Acceptance Criteria:**
+- visual_suggestions table created with all required fields and foreign key constraints
+- Index on scene_id improves query performance
+- saveVisualSuggestions() stores 5-8 suggestions per scene with ranking
+- getVisualSuggestions(sceneId) retrieves suggestions ordered by rank
+- projects.visuals_generated flag updated on completion
+- VisualSourcing loading screen displays during visual generation process
+- Progress indicator shows "Analyzing scene 2/5..." dynamically
+- After Epic 2 Story 2.5 completion, visual sourcing triggers automatically
+- projects.current_step advances to 'visual-curation' enabling Epic 4 UI
+- Partial failures allow resume (don't regenerate completed scenes)
+- **AC6:** If YouTube returns 0 results for a scene, UI displays empty state with guidance message (e.g., "No clips found for this scene. Try editing the script or searching manually.")
+- **AC7:** If API fails during visual sourcing, UI provides 'Retry' button to re-attempt visual sourcing for failed scenes without regenerating completed scenes
+
+**References:**
+- PRD Feature 1.5 AC2 (Data Structure) lines 202-205
+- Story 3.4 (visual_suggestions table schema) lines 743-756
+- Epic 2 Story 2.6 (UI workflow integration) lines 530-558
+
+---
+
 ## Epic 4: Visual Curation Interface
 
 **Goal:** Provide an intuitive UI for creators to review scripts, preview suggested clips, and finalize visual selections.

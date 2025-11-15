@@ -16,5 +16,8 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@googleapis/youtube": "^17.0.0"
+  }
 }
