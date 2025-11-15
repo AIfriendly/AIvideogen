@@ -1,33 +1,117 @@
 /**
- * YouTube API Type Definitions
+ * Content type classification for YouTube search filtering
  *
- * Type interfaces for YouTube Data API v3 integration, including video results,
- * search options, quota tracking, and error handling.
+ * Different content types require different search strategies and filtering rules:
+ * - GAMEPLAY: Gaming footage and gameplay videos
+ * - TUTORIAL: Educational and how-to content
+ * - NATURE: Wildlife, landscapes, and natural phenomena
+ * - B_ROLL: Generic background footage and b-roll clips
+ * - DOCUMENTARY: Documentary-style footage and narration
+ * - URBAN: City scenes, architecture, and urban environments
+ * - ABSTRACT: Abstract concepts translated to visual metaphors
  */
+export enum ContentType {
+  GAMEPLAY = 'gameplay',
+  TUTORIAL = 'tutorial',
+  NATURE = 'nature',
+  B_ROLL = 'b-roll',
+  DOCUMENTARY = 'documentary',
+  URBAN = 'urban',
+  ABSTRACT = 'abstract'
+}
+
+/**
+ * Scene analysis result containing visual themes and YouTube search queries
+ *
+ * This interface represents the output of LLM-based scene analysis, extracting
+ * visual elements from script text and generating optimized YouTube search queries.
+ *
+ * @example
+ * ```typescript
+ * const analysis: SceneAnalysis = {
+ *   mainSubject: 'lion',
+ *   setting: 'savanna',
+ *   mood: 'sunset',
+ *   action: 'roaming',
+ *   keywords: ['wildlife', 'grassland', 'golden hour', 'majestic'],
+ *   primaryQuery: 'lion savanna sunset wildlife',
+ *   alternativeQueries: [
+ *     'african lion sunset',
+ *     'lion walking grassland golden hour'
+ *   ],
+ *   contentType: ContentType.NATURE
+ * };
+ * ```
+ */
+export interface SceneAnalysis {
+  /**
+   * Primary visual subject (e.g., "lion", "player", "chef")
+   * The main focus of the scene that should appear in search results
+   */
+  mainSubject: string;
+
+  /**
+   * Location or environment (e.g., "savanna", "dark forest", "kitchen")
+   * The setting where the scene takes place
+   */
+  setting: string;
+
+  /**
+   * Atmosphere or tone (e.g., "sunset", "peaceful", "neon lights")
+   * The mood, lighting, or emotional quality of the scene
+   */
+  mood: string;
+
+  /**
+   * Key action or movement (e.g., "roaming", "navigating", "mixing")
+   * What is happening in the scene, the primary activity
+   */
+  action: string;
+
+  /**
+   * Additional relevant keywords for search diversification
+   * Concrete visual elements that enhance search query effectiveness
+   */
+  keywords: string[];
+
+  /**
+   * Primary YouTube search query (4-6 keywords)
+   * The most relevant search query optimized for YouTube's algorithm
+   * Format: "{main_subject} {setting} {mood/time} {action}"
+   */
+  primaryQuery: string;
+
+  /**
+   * Alternative search query variations (2-3 queries)
+   * Different keyword combinations, synonyms, or focus shifts
+   * to increase result diversity and reduce over-reliance on single query
+   */
+  alternativeQueries: string[];
+
+  /**
+   * Scene category for specialized filtering
+   * Used by Story 3.4 filtering logic to apply content-type-specific ranking rules
+   */
+  contentType: ContentType;
+}
+
+// ============================================================================
+// Story 3.1: YouTube API Client Types
+// ============================================================================
 
 /**
  * Video search result from YouTube API
  */
 export interface VideoResult {
-  /** YouTube video ID (e.g., "dQw4w9WgXcQ") */
   videoId: string;
-  /** Video title */
   title: string;
-  /** Thumbnail image URL (high quality) */
   thumbnailUrl: string;
-  /** YouTube channel name */
   channelTitle: string;
-  /** Embeddable video URL for iframe */
   embedUrl: string;
-  /** ISO 8601 publish date (e.g., "2009-10-25T06:57:33Z") */
   publishedAt: string;
-  /** Video description */
   description: string;
-  /** View count (optional, requires additional API call) */
   viewCount?: number;
-  /** Like count (optional, requires additional API call) */
   likeCount?: number;
-  /** Video duration in ISO 8601 format (optional, e.g., "PT4M33S") */
   duration?: string;
 }
 
@@ -35,15 +119,10 @@ export interface VideoResult {
  * Search options for YouTube video queries
  */
 export interface SearchOptions {
-  /** Maximum number of results (1-50, default: 10) */
   maxResults?: number;
-  /** Relevance language code (default: 'en') */
   relevanceLanguage?: string;
-  /** Only return embeddable videos (default: true) */
   videoEmbeddable?: boolean;
-  /** Filter by video duration */
   videoDuration?: 'short' | 'medium' | 'long';
-  /** Sort order for results */
   order?: 'relevance' | 'date' | 'viewCount' | 'rating';
 }
 
@@ -51,13 +130,9 @@ export interface SearchOptions {
  * Quota usage tracking information
  */
 export interface QuotaUsage {
-  /** Quota units used today */
   used: number;
-  /** Total daily quota limit */
   limit: number;
-  /** Remaining quota units */
   remaining: number;
-  /** Time when quota resets (midnight Pacific Time) */
   resetTime: Date;
 }
 
@@ -65,36 +140,19 @@ export interface QuotaUsage {
  * YouTube API error codes
  */
 export enum YouTubeErrorCode {
-  /** API key not configured in environment variables */
   API_KEY_NOT_CONFIGURED = 'YOUTUBE_API_KEY_NOT_CONFIGURED',
-  /** API key is invalid or unauthorized */
   API_KEY_INVALID = 'YOUTUBE_API_KEY_INVALID',
-  /** Daily quota limit exceeded */
   QUOTA_EXCEEDED = 'YOUTUBE_QUOTA_EXCEEDED',
-  /** Rate limit reached (too many requests) */
   RATE_LIMITED = 'YOUTUBE_RATE_LIMITED',
-  /** Network or connectivity error */
   NETWORK_ERROR = 'YOUTUBE_NETWORK_ERROR',
-  /** Invalid request parameters */
   INVALID_REQUEST = 'YOUTUBE_INVALID_REQUEST',
-  /** YouTube API service unavailable */
   SERVICE_UNAVAILABLE = 'YOUTUBE_SERVICE_UNAVAILABLE'
 }
 
 /**
  * Custom error class for YouTube API errors
- *
- * Provides structured error information with actionable error codes
- * and optional context for debugging.
  */
 export class YouTubeError extends Error {
-  /**
-   * Create a YouTube API error
-   *
-   * @param code - Error code from YouTubeErrorCode enum
-   * @param message - Human-readable error message with actionable guidance
-   * @param context - Optional context object with additional error details
-   */
   constructor(
     public code: YouTubeErrorCode,
     message: string,
@@ -103,15 +161,11 @@ export class YouTubeError extends Error {
     super(message);
     this.name = 'YouTubeError';
 
-    // Maintain proper stack trace for debugging (V8 engines only)
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, YouTubeError);
     }
   }
 
-  /**
-   * Convert error to JSON for logging/serialization
-   */
   toJSON(): object {
     return {
       name: this.name,
