@@ -44,7 +44,11 @@ yarn-error.log*
 next-env.d.ts
 
 # ai-video-generator specific
-/.cache
+/.cache/*
+!/.cache/audio
+/.cache/audio/**/*.mp3
+/.cache/audio/**/*.wav
+!/.cache/audio/**/.gitkeep
 /data
 /venv
 /models
