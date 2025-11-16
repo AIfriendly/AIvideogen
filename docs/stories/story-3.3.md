@@ -5,7 +5,7 @@
 - **Title:** YouTube Video Search & Result Retrieval
 - **Goal:** Query YouTube API with generated search terms and retrieve relevant video clip suggestions
 - **Epic:** Epic 3 - Visual Content Sourcing (YouTube API)
-- **Status:** Ready
+- **Status:** Ready for review
 - **Dependencies:**
   - Story 3.1 (YouTube API Client Setup & Configuration) - COMPLETED
   - Story 3.2 (Scene Text Analysis & Search Query Generation) - COMPLETED
