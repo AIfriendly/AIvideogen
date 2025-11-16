@@ -7,14 +7,16 @@
  * 1. Validates project exists and has completed prerequisites
  * 2. Loads all scenes for the project
  * 3. For each scene: analyzes text, generates search queries, searches YouTube
- * 4. Saves visual suggestions to database with ranking
- * 5. Updates project.visuals_generated flag
+ * 4. **NEW (Story 3.4):** Filters and ranks results by duration, quality, and content type
+ * 5. Saves filtered visual suggestions to database with ranking
+ * 6. Updates project.visuals_generated flag
  *
  * Standard response format:
- * Success: { success: true, scenesProcessed: number, suggestionsGenerated: number, errors?: string[] }
+ * Success: { success: true, scenesProcessed: number, suggestionsGenerated: number, filteringStats?: object, errors?: string[] }
  * Error: { success: false, error: string }
  *
  * Story 3.3: YouTube Video Search & Result Retrieval
+ * Story 3.4: Content Filtering & Quality Ranking
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -29,6 +31,7 @@ import { initializeDatabase } from '@/lib/db/init';
 import { YouTubeAPIClient } from '@/lib/youtube/client';
 import { analyzeSceneForVisuals } from '@/lib/youtube/analyze-scene';
 import { YouTubeError, YouTubeErrorCode } from '@/lib/youtube/types';
+import { filterAndRankResults } from '@/lib/youtube/filter-results';
 
 // Initialize database on first import (idempotent)
 await initializeDatabase();
@@ -91,19 +94,43 @@ export async function POST(
 
         // Step 2: Search YouTube with multiple queries
         const queries = [analysis.primaryQuery, ...analysis.alternativeQueries];
-        const searchResults = await youtubeClient.searchWithMultipleQueries(queries, {
-          maxResults: 10,
+        const rawResults = await youtubeClient.searchWithMultipleQueries(queries, {
+          maxResults: 15, // Increased from 10 to get more candidates for filtering
           videoEmbeddable: true,
           relevanceLanguage: 'en',
           order: 'relevance'
         });
 
-        console.log(`[Visual Generation] Scene ${scene.scene_number} search complete: ${searchResults.length} results found`);
+        console.log(`[Visual Generation] Scene ${scene.scene_number} search complete: ${rawResults.length} raw results found`);
 
-        // Step 3: Save suggestions to database with ranking
-        if (searchResults.length > 0) {
+        // Step 3: NEW (Story 3.4) - Apply filtering and ranking
+        let filteredResults;
+        try {
+          // Validate scene duration exists
+          if (!scene.duration || scene.duration <= 0) {
+            console.warn(`[Visual Generation] Scene ${scene.scene_number} has invalid duration (${scene.duration}), skipping filtering`);
+            filteredResults = rawResults.slice(0, 8); // Just take top 8 raw results
+          } else {
+            filteredResults = filterAndRankResults(
+              rawResults,
+              scene.duration, // Scene voiceover duration in seconds
+              analysis.contentType,
+              { sceneDuration: scene.duration }
+            );
+            console.log(`[Visual Generation] Scene ${scene.scene_number} filtering complete: ${filteredResults.length} filtered results (from ${rawResults.length} raw)`);
+          }
+        } catch (filterError: any) {
+          // If filtering fails, fall back to raw results
+          console.error(`[Visual Generation] Scene ${scene.scene_number} filtering error:`, filterError);
+          filteredResults = rawResults.slice(0, 8);
+          errors.push(`Scene ${scene.scene_number} filtering failed: ${filterError.message}`);
+        }
+
+        // Step 4: Save FILTERED suggestions to database with ranking
+        if (filteredResults.length > 0) {
           // Convert VideoResult to VideoResultForSave format
-          const suggestionsToSave: VideoResultForSave[] = searchResults.map(result => ({
+          // Note: We don't include qualityScore in the saved data (internal ranking metric only)
+          const suggestionsToSave: VideoResultForSave[] = filteredResults.map(result => ({
             videoId: result.videoId,
             title: result.title,
             thumbnailUrl: result.thumbnailUrl,
@@ -114,11 +141,11 @@ export async function POST(
 
           const savedSuggestions = saveVisualSuggestions(scene.id, suggestionsToSave);
           suggestionsGenerated += savedSuggestions.length;
-          console.log(`[Visual Generation] Scene ${scene.scene_number}: Saved ${savedSuggestions.length} suggestions`);
+          console.log(`[Visual Generation] Scene ${scene.scene_number}: Saved ${savedSuggestions.length} filtered suggestions`);
         } else {
-          // Zero results - save empty array (valid outcome)
+          // Zero results after filtering - save empty array (valid outcome)
           saveVisualSuggestions(scene.id, []);
-          console.log(`[Visual Generation] Scene ${scene.scene_number}: No results found (empty suggestions saved)`);
+          console.log(`[Visual Generation] Scene ${scene.scene_number}: No results after filtering (empty suggestions saved)`);
         }
 
         scenesProcessed++;
