@@ -1,0 +1,904 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <story-metadata>
+    <story-id>3.4</story-id>
+    <story-title>Content Filtering &amp; Quality Ranking</story-title>
+    <epic-id>3</epic-id>
+    <epic-title>Visual Content Sourcing (YouTube API)</epic-title>
+    <dependencies>
+      <dependency>Story 3.1 (YouTube API Client Setup &amp; Configuration) - COMPLETED</dependency>
+      <dependency>Story 3.2 (Scene Text Analysis &amp; Search Query Generation) - COMPLETED</dependency>
+      <dependency>Story 3.3 (YouTube Video Search &amp; Result Retrieval) - COMPLETED</dependency>
+    </dependencies>
+    <status>Ready</status>
+  </story-metadata>
+
+  <!-- ========================================
+       PRD CONTEXT - Feature 1.5: AI-Powered Visual Sourcing
+       ======================================== -->
+  <prd-context>
+    <feature-id>1.5</feature-id>
+    <feature-name>AI-Powered Visual Sourcing</feature-name>
+    <feature-description>
+      The system analyzes the script for each scene and sources a list of relevant B-roll video clips
+      from YouTube using the YouTube Data API v3. Videos are intelligently filtered by duration to ensure
+      they're appropriate for the scene length, and default video segments are automatically downloaded
+      to enable instant preview without manual segment selection.
+    </feature-description>
+
+    <functional-requirements>
+      <requirement>
+        Duration Filtering: The system must filter video results based on a 1x-3x duration ratio relative
+        to the scene's voiceover duration.
+      </requirement>
+      <requirement>
+        The system must enforce a 5-minute (300 second) maximum duration cap regardless of scene length.
+      </requirement>
+      <requirement>
+        Examples: 10s scene accepts 10s-30s videos; 90s scene accepts 90s-270s videos; 120s scene accepts
+        120s-300s videos (capped at 5 min).
+      </requirement>
+      <requirement>
+        The system must relax duration thresholds as a fallback if insufficient results are found with
+        strict filtering.
+      </requirement>
+      <requirement>
+        The system shall implement appropriate filtering (e.g., Creative Commons licensing when possible,
+        content type, duration).
+      </requirement>
+    </functional-requirements>
+
+    <acceptance-criteria>
+      <criterion id="AC4">
+        Duration Filtering: Given a scene with a 30-second voiceover, when the visual sourcing retrieves
+        YouTube videos, then only videos between 30 seconds (1x) and 90 seconds (3x) must be included in
+        the suggestions.
+      </criterion>
+      <criterion id="AC5">
+        Duration Cap Enforcement: Given a scene with a 180-second (3-minute) voiceover, when duration
+        filtering is applied, then the maximum accepted video duration must be 300 seconds (5 minutes),
+        NOT 540 seconds (3x ratio).
+      </criterion>
+    </acceptance-criteria>
+  </prd-context>
+
+  <!-- ========================================
+       ARCHITECTURE CONTEXT - Epic 3 Components
+       ======================================== -->
+  <architecture-context>
+    <epic-id>3</epic-id>
+    <epic-name>Visual Content Sourcing (YouTube API)</epic-name>
+
+    <story-3.4-components>
+      <component name="ContentFilter" file="lib/youtube/filter-results.ts">
+        <responsibility>Filter and rank YouTube search results by quality, spam, and duration</responsibility>
+        <inputs>
+          <input>Raw video results from Story 3.3</input>
+          <input>Scene duration in seconds</input>
+          <input>Filter configuration</input>
+        </inputs>
+        <outputs>
+          <output>Ranked suggestions (5-8 per scene)</output>
+        </outputs>
+      </component>
+
+      <component name="FilterConfiguration" file="lib/youtube/filter-config.ts">
+        <responsibility>Provide filtering preferences configuration</responsibility>
+        <exports>
+          <export>DEFAULT_FILTER_CONFIG constant</export>
+          <export>getFilterConfig() function</export>
+        </exports>
+      </component>
+    </story-3.4-components>
+
+    <duration-filtering-logic>
+      <purpose>Filter YouTube videos to ensure they are appropriate length for scene voiceovers (not too short, not too long).</purpose>
+      <filtering-rules>
+        <rule>Minimum duration: 1x scene voiceover duration (e.g., 10s scene → minimum 10s video)</rule>
+        <rule>Maximum duration: 3x scene voiceover duration OR 5 minutes (300s), whichever is smaller</rule>
+        <rationale>Videos too short lack content; videos too long waste download time and editing effort</rationale>
+      </filtering-rules>
+
+      <implementation-formula>
+        <![CDATA[
+const minDuration = sceneDuration; // 1x ratio
+const maxDuration = Math.min(sceneDuration * 3, 300); // 3x or 5 min max
+
+return results.filter(video => {
+  const duration = video.durationSeconds;
+  return duration >= minDuration && duration <= maxDuration;
+});
+        ]]>
+      </implementation-formula>
+
+      <duration-examples>
+        <example scene="10s" min="10s" max="30s" note="3x ratio applies" />
+        <example scene="90s" min="90s" max="270s" note="4.5 min, 3x applies" />
+        <example scene="120s" min="120s" max="300s" note="5 min cap enforced, NOT 360s" />
+        <example scene="180s" min="180s" max="300s" note="5 min cap enforced, NOT 540s" />
+        <example scene="400s" min="400s" max="none" note="Ignore 3x ratio for very long scenes, only enforce minimum" />
+      </duration-examples>
+
+      <fallback-logic>
+        <tier level="1" name="Strict Filtering">
+          <filters>Duration 1x-3x + 5-min cap, Title quality, Content type</filters>
+          <success-condition>Results ≥ 3 videos</success-condition>
+        </tier>
+        <tier level="2" name="Relax Duration to 1x-5x">
+          <filters>Duration 1x-5x (keep 5-min cap), Title quality, Content type</filters>
+          <success-condition>Results ≥ 3 videos</success-condition>
+        </tier>
+        <tier level="3" name="Remove Duration Cap">
+          <filters>Duration 1x minimum only (no cap), Title quality, Content type</filters>
+          <success-condition>Results ≥ 3 videos</success-condition>
+        </tier>
+        <tier level="4" name="Relax Title Quality">
+          <filters>Duration 1x minimum only, Content type (skip title spam filter)</filters>
+          <success-condition>Results ≥ 3 videos</success-condition>
+        </tier>
+        <tier level="5" name="Remove All Quality Filters">
+          <filters>Duration 1x minimum only (ranking based on duration match)</filters>
+          <success-condition>Return top 3 or all available</success-condition>
+        </tier>
+      </fallback-logic>
+    </duration-filtering-logic>
+
+    <performance-targets>
+      <target name="Duration filtering" value="&lt; 50ms" scope="per scene" />
+      <target name="Total filtering time" value="&lt; 50ms" scope="15 results to 5-8 filtered" />
+      <note>Filtering is O(n) time complexity (linear), negligible compared to YouTube API latency (500-2000ms)</note>
+    </performance-targets>
+  </architecture-context>
+
+  <!-- ========================================
+       TECH SPEC CONTEXT - Epic 3 Detailed Design
+       ======================================== -->
+  <tech-spec-context>
+    <epic-id>3</epic-id>
+    <document>docs/sprint-artifacts/tech-spec-epic-3.md</document>
+
+    <filter-configuration-interface>
+      <![CDATA[
+interface FilterConfig {
+  minViewCount: number;          // Default 1000 (REMOVED for MVP - Story 3.3 doesn't provide view count)
+  maxTitleEmojis: number;        // Default 5
+  maxTitleCapsPercent: number;   // Default 0.5 (50%)
+  preferCreativeCommons: boolean;// Default true (REMOVED for MVP - requires videos.list with part=status)
+  durationRatioMin: number;      // Default 1 (1x scene duration)
+  durationRatioMax: number;      // Default 3 (3x scene duration)
+  maxDurationSeconds: number;    // Default 300 (5 minutes absolute cap)
+  contentTypeFilters: Map<ContentType, FilterRules>;
+}
+      ]]>
+    </filter-configuration-interface>
+
+    <ranking-algorithm-simplified-mvp>
+      <description>
+        SIMPLIFIED FOR MVP: Ranking based on duration preference only (not view count/recency).
+        Original story design required view count, upload date, channel subscriber count for ranking.
+        PROBLEM: Story 3.3 does not provide these fields (only videoId, title, thumbnailUrl, channelTitle,
+        embedUrl, duration). Fetching these fields requires additional YouTube API calls (videos.list with
+        part=statistics) → Quota cost + latency.
+      </description>
+
+      <mvp-solution>
+        <![CDATA[
+// Calculate quality score for each video
+function rankVideos(results: VideoResult[], sceneDuration: number): RankedVideo[] {
+  return results.map(video => {
+    // 1. Duration Match Score (60% weight)
+    const idealDuration = sceneDuration * 1.5; // Prefer videos at 1.5x scene duration
+    const durationMatch = 1 / (1 + Math.abs(video.duration - idealDuration) / idealDuration);
+
+    // 2. Relevance Score (40% weight) - use existing rank from Story 3.3
+    const relevance = 1 / video.rank; // Rank 1 = 1.0, Rank 2 = 0.5, Rank 10 = 0.1
+
+    // Weighted total
+    const qualityScore = (durationMatch * 0.6) + (relevance * 0.4);
+
+    return { ...video, qualityScore };
+  })
+  .sort((a, b) => b.qualityScore - a.qualityScore) // Sort by score descending
+  .slice(0, 8); // Limit to top 8
+}
+        ]]>
+      </mvp-solution>
+
+      <post-mvp-enhancement>
+        Add view count normalization, recency scoring based on upload date, and channel authority scoring
+        based on subscriber count after Epic 3 completion. Update weight distribution to include new factors.
+      </post-mvp-enhancement>
+    </ranking-algorithm-simplified-mvp>
+
+    <data-dependencies-resolved>
+      <issue type="BLOCKING" status="RESOLVED">
+        <problem>
+          View count filtering originally planned in this story.
+          REMOVED: Story 3.3 does not provide view count, upload date, or channel subscriber count.
+          These fields require additional YouTube API calls (videos.list with part=statistics).
+        </problem>
+        <mvp-solution>
+          Simplify ranking to duration-based only. Skip view count filtering entirely.
+        </mvp-solution>
+        <technical-note>
+          View count and recency ranking deferred to post-MVP Epic 3 enhancement.
+        </technical-note>
+      </issue>
+
+      <issue type="BLOCKING" status="RESOLVED">
+        <problem>
+          License filtering originally planned in this story.
+          REMOVED: License information not available in Story 3.3 search results.
+          Requires videos.list API call with part=status to get license field.
+        </problem>
+        <mvp-solution>
+          Remove license filtering entirely for MVP.
+        </mvp-solution>
+        <technical-note>
+          License filtering deferred to post-MVP.
+        </technical-note>
+      </issue>
+    </data-dependencies-resolved>
+
+    <content-type-filtering>
+      <description>
+        Apply type-specific filtering rules based on ContentType from SceneAnalysis (Story 3.2).
+      </description>
+
+      <content-types>
+        <type enum="GAMEPLAY">
+          <prioritize>gameplay, no commentary, walkthrough, playthrough</prioritize>
+          <filter-out>tutorial, review, reaction</filter-out>
+        </type>
+        <type enum="TUTORIAL">
+          <prioritize>tutorial, how to, guide, learn</prioritize>
+          <filter-out>gameplay, review, vlog</filter-out>
+        </type>
+        <type enum="NATURE">
+          <prioritize>wildlife, nature, documentary, 4k, hd</prioritize>
+          <filter-out>vlog, compilation, funny</filter-out>
+        </type>
+        <type enum="B_ROLL">
+          <prioritize>No specific filtering (accept all)</prioritize>
+          <filter-out>Use general quality filters only</filter-out>
+        </type>
+        <type enum="DOCUMENTARY">
+          <prioritize>documentary, story, history</prioritize>
+          <filter-out>trailer, review, reaction</filter-out>
+        </type>
+        <type enum="URBAN">
+          <prioritize>city, urban, architecture, time lapse</prioritize>
+          <filter-out>vlog, travel</filter-out>
+        </type>
+        <type enum="ABSTRACT">
+          <prioritize>animation, abstract, visual</prioritize>
+          <filter-out>tutorial, gameplay</filter-out>
+        </type>
+      </content-types>
+
+      <scoring-system>
+        Use keyword scoring system (add +1 for each positive keyword, -1 for each negative).
+        Filter out videos with negative score. Return filtered and re-ranked array.
+      </scoring-system>
+    </content-type-filtering>
+  </tech-spec-context>
+
+  <!-- ========================================
+       EPICS CONTEXT - Story 3.4 Details
+       ======================================== -->
+  <epics-context>
+    <epic-id>3</epic-id>
+    <epic-name>Visual Content Sourcing (YouTube API)</epic-name>
+    <story-id>3.4</story-id>
+    <story-title>Content Filtering &amp; Quality Ranking</story-title>
+
+    <story-goal>
+      Filter and rank YouTube search results to prioritize high-quality, appropriate content with duration
+      filtering to ensure videos are suitable for scene length
+    </story-goal>
+
+    <technical-approach>
+      <duration-filtering>
+        PRIMARY FILTER: Duration filtering applied FIRST before all other filters.
+        Filter videos based on 1x-3x duration ratio relative to scene voiceover duration.
+        Apply 5-minute (300 second) maximum duration cap regardless of scene length.
+        Examples: 10s scene accepts 10s-30s videos; 90s scene accepts 90s-270s videos; 120s scene accepts
+        120s-300s (NOT 360s).
+      </duration-filtering>
+
+      <quality-filtering>
+        Title spam detection removes videos with &gt;5 emojis or &gt;50% ALL CAPS.
+        Content-type specific filtering for gaming, tutorials, nature, etc.
+        NOTE: View count filtering and license filtering REMOVED for MVP (data not available from Story 3.3).
+      </quality-filtering>
+
+      <ranking-algorithm>
+        SIMPLIFIED MVP: Duration match score prioritizes videos closer to 1.5x scene duration.
+        Relevance score from YouTube API used in ranking.
+        Formula: qualityScore = (durationMatch * 0.6) + (relevance * 0.4).
+        NOTE: View count normalization and recency ranking REMOVED for MVP (deferred to post-MVP).
+      </ranking-algorithm>
+
+      <fallback-logic>
+        Enhanced from 3-tier (tech spec) to 5-tier for better robustness.
+        Tier 1: Strict (1x-3x + 5-min cap + all quality filters).
+        Tier 2: Relax duration to 1x-5x, keep 5-min cap.
+        Tier 3: Remove cap, accept videos ≥1x scene duration.
+        Tier 4: Relax title quality filters.
+        Tier 5: Remove all quality filters, return best available.
+      </fallback-logic>
+    </technical-approach>
+
+    <acceptance-criteria>
+      <criterion id="AC1">
+        Duration Filtering Applied First: filterByDuration() is the PRIMARY filter, applied before all other
+        filters. Given scene with 30s voiceover, only videos 30s-90s (1x-3x) pass duration filter.
+      </criterion>
+      <criterion id="AC2">
+        ISO 8601 Duration Parsing: Duration parsing correctly converts "PT1M30S" to 90 seconds. Duration
+        field stored as integer seconds in database. (Already implemented in Story 3.3)
+      </criterion>
+      <criterion id="AC3">
+        Quality Filtering Applied: Title spam detection removes videos with &gt;5 emojis or &gt;50% ALL CAPS.
+        Quality filters applied after duration filtering.
+      </criterion>
+      <criterion id="AC4">
+        Ranking Algorithm Produces Quality Suggestions: Videos sorted by qualityScore descending (highest
+        first). Duration match score prioritizes videos closer to 1.5x scene duration. Final suggestions
+        limited to 5-8 top-ranked videos per scene.
+      </criterion>
+      <criterion id="AC5">
+        Content-Type Specific Filtering: Gaming content filtering successfully identifies "gameplay only"
+        videos. All ContentType enum values verified from Story 3.2 implementation.
+      </criterion>
+      <criterion id="AC6">
+        Filtering Preferences Configurable: Configuration includes maxEmojis, maxCapsPercentage, duration
+        ratios, max suggestions. Configuration exported as singleton constant.
+      </criterion>
+      <criterion id="AC7">
+        Multi-Tier Fallback Logic: 5 tiers implemented with progressive constraint relaxation. Fallback
+        logic ensures at least 1-3 suggestions returned if ANY results exist from Story 3.3.
+      </criterion>
+      <criterion id="AC8">
+        Integration with Story 3.3: filterAndRankResults() integrated into POST /api/projects/[id]/generate-visuals
+        endpoint. Filtered results saved to database (not raw results).
+      </criterion>
+    </acceptance-criteria>
+  </epics-context>
+
+  <!-- ========================================
+       EXISTING CODE - Story 3.1: YouTubeAPIClient
+       ======================================== -->
+  <existing-code-story-3.1>
+    <file>ai-video-generator/src/lib/youtube/client.ts</file>
+    <class-name>YouTubeAPIClient</class-name>
+
+    <interface-methods>
+      <method name="searchVideos">
+        <signature>async searchVideos(query: string, options?: SearchOptions): Promise&lt;VideoResult[]&gt;</signature>
+        <description>
+          Performs a YouTube search with the given query and options, handling quota tracking, rate limiting,
+          and automatic retries. Retrieves video durations from the YouTube API and converts them to seconds.
+        </description>
+        <returns>Array of video results with duration in seconds</returns>
+      </method>
+
+      <method name="searchWithMultipleQueries">
+        <signature>async searchWithMultipleQueries(queries: string[], options?: SearchOptions): Promise&lt;VideoResult[]&gt;</signature>
+        <description>
+          Executes searches for primary and alternative queries, aggregates results, and deduplicates by
+          videoId while preserving relevance ordering.
+        </description>
+        <returns>Deduplicated array of video results</returns>
+      </method>
+
+      <method name="getQuotaUsage">
+        <signature>getQuotaUsage(): QuotaUsage</signature>
+        <description>Get current quota usage information</description>
+        <returns>Quota usage details including used, limit, remaining, and reset time</returns>
+      </method>
+
+      <method name="isQuotaExceeded">
+        <signature>isQuotaExceeded(): boolean</signature>
+        <description>Check if quota is exceeded</description>
+        <returns>True if quota limit reached, false otherwise</returns>
+      </method>
+    </interface-methods>
+
+    <key-features>
+      <feature>API key authentication via environment variable YOUTUBE_API_KEY</feature>
+      <feature>Quota tracking (10,000 units/day limit)</feature>
+      <feature>Rate limiting (100 requests per 100 seconds)</feature>
+      <feature>Exponential backoff retry logic (max 3 attempts)</feature>
+      <feature>Duration enrichment via videos.list API call</feature>
+      <feature>ISO 8601 duration parsing to seconds</feature>
+    </key-features>
+
+    <videoResult-interface>
+      <![CDATA[
+interface VideoResult {
+  videoId: string;
+  title: string;
+  thumbnailUrl: string;
+  channelTitle: string;
+  embedUrl: string;
+  publishedAt: string;
+  description: string;
+  viewCount?: number;        // NOT PROVIDED by Story 3.3 (requires additional API call)
+  likeCount?: number;        // NOT PROVIDED by Story 3.3 (requires additional API call)
+  duration?: string;         // PROVIDED by Story 3.3 (enriched via videos.list)
+}
+      ]]>
+    </videoResult-interface>
+
+    <duration-parsing-method>
+      <![CDATA[
+/**
+ * Parse ISO 8601 duration format to seconds
+ *
+ * Converts YouTube API duration format (e.g., "PT4M13S") to total seconds.
+ *
+ * @example
+ * parseISO8601Duration("PT4M13S") // returns 253
+ * parseISO8601Duration("PT1H30M") // returns 5400
+ * parseISO8601Duration("PT45S") // returns 45
+ */
+private parseISO8601Duration(iso8601Duration: string): number {
+  const match = iso8601Duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 0;
+
+  const hours = parseInt(match[1] || '0', 10);
+  const minutes = parseInt(match[2] || '0', 10);
+  const seconds = parseInt(match[3] || '0', 10);
+
+  return hours * 3600 + minutes * 60 + seconds;
+}
+      ]]>
+    </duration-parsing-method>
+  </existing-code-story-3.1>
+
+  <!-- ========================================
+       EXISTING CODE - Story 3.2: SceneAnalysis
+       ======================================== -->
+  <existing-code-story-3.2>
+    <file>ai-video-generator/src/lib/youtube/types.ts</file>
+    <file>ai-video-generator/src/lib/youtube/analyze-scene.ts</file>
+
+    <contentType-enum>
+      <![CDATA[
+export enum ContentType {
+  GAMEPLAY = 'gameplay',
+  TUTORIAL = 'tutorial',
+  NATURE = 'nature',
+  B_ROLL = 'b-roll',
+  DOCUMENTARY = 'documentary',
+  URBAN = 'urban',
+  ABSTRACT = 'abstract'
+}
+      ]]>
+    </contentType-enum>
+
+    <sceneAnalysis-interface>
+      <![CDATA[
+export interface SceneAnalysis {
+  mainSubject: string;        // Primary visual subject (e.g., "lion", "player", "chef")
+  setting: string;            // Location or environment (e.g., "savanna", "dark forest", "kitchen")
+  mood: string;               // Atmosphere or tone (e.g., "sunset", "peaceful", "neon lights")
+  action: string;             // Key action or movement (e.g., "roaming", "navigating", "mixing")
+  keywords: string[];         // Additional relevant keywords for search diversification
+  primaryQuery: string;       // Primary YouTube search query (4-6 keywords)
+  alternativeQueries: string[]; // Alternative search query variations (2-3 queries)
+  contentType: ContentType;   // Scene category for specialized filtering
+}
+      ]]>
+    </sceneAnalysis-interface>
+
+    <analyzeSceneForVisuals-function>
+      <signature>async analyzeSceneForVisuals(sceneText: string): Promise&lt;SceneAnalysis&gt;</signature>
+      <description>
+        Analyze scene text to extract visual themes and generate YouTube search queries.
+        This function leverages the LLM provider to perform intelligent scene analysis, extracting visual
+        elements (subject, setting, mood, action) and generating optimized search queries for YouTube.
+      </description>
+      <error-handling>
+        <case>LLM connection failure → Immediate fallback</case>
+        <case>LLM timeout (&gt;10s) → Immediate fallback</case>
+        <case>Empty response → Retry once (1s delay) → Fallback if retry fails</case>
+        <case>Invalid JSON → Immediate fallback (no retry)</case>
+        <case>Missing required fields → Retry once → Fallback if retry fails</case>
+      </error-handling>
+      <returns>SceneAnalysis object with queries and metadata</returns>
+    </analyzeSceneForVisuals-function>
+
+    <usage-example>
+      <![CDATA[
+const analysis = await analyzeSceneForVisuals(
+  "A majestic lion roams the savanna at sunset"
+);
+
+console.log(analysis.primaryQuery);
+// Output: "lion savanna sunset wildlife"
+
+console.log(analysis.alternativeQueries);
+// Output: ["african lion sunset", "lion walking grassland golden hour"]
+
+console.log(analysis.contentType);
+// Output: ContentType.NATURE
+      ]]>
+    </usage-example>
+  </existing-code-story-3.2>
+
+  <!-- ========================================
+       EXISTING CODE - Story 3.3: Video Search
+       ======================================== -->
+  <existing-code-story-3.3>
+    <file>ai-video-generator/src/lib/youtube/client.ts</file>
+
+    <searchWithMultipleQueries-method>
+      <description>
+        Search for videos using multiple queries and deduplicate results.
+        Executes searches for primary and alternative queries, aggregates results, and deduplicates by
+        videoId while preserving relevance ordering.
+      </description>
+
+      <workflow>
+        <step>1. Validate queries array (at least one query required)</step>
+        <step>2. Execute primary query (required - failure is fatal)</step>
+        <step>3. Execute alternative queries (optional - failures logged but not fatal)</step>
+        <step>4. Aggregate all results</step>
+        <step>5. Deduplicate by videoId (keep first occurrence)</step>
+        <step>6. Return deduplicated results array</step>
+      </workflow>
+
+      <key-behavior>
+        Primary query failure throws error.
+        Alternative query failures are logged but don't stop the process.
+        Results include duration field (enriched via videos.list in Story 3.3).
+      </key-behavior>
+    </searchWithMultipleQueries-method>
+
+    <videoResult-with-duration>
+      <![CDATA[
+// VideoResult from Story 3.3 includes duration field
+interface VideoResult {
+  videoId: string;
+  title: string;
+  thumbnailUrl: string;
+  channelTitle: string;
+  embedUrl: string;
+  publishedAt: string;
+  description: string;
+  duration?: string;  // ISO 8601 format converted to seconds, stored as string
+  // Note: viewCount and likeCount NOT available (requires additional API call)
+}
+
+// Duration is already parsed from ISO 8601 to seconds in Story 3.3
+// Example: "PT4M13S" → 253 seconds → stored as "253"
+      ]]>
+    </videoResult-with-duration>
+
+    <integration-endpoint>
+      <file>app/api/projects/[id]/generate-visuals/route.ts</file>
+      <current-flow>
+        <step>1. Load scenes from database</step>
+        <step>2. For each scene: Analyze scene → generate queries (Story 3.2)</step>
+        <step>3. Search YouTube → get raw results (Story 3.3)</step>
+        <step>4. Save ALL results to database with rank</step>
+        <step>5. Return success</step>
+      </current-flow>
+
+      <story-3.4-update>
+        <step>3. Search YouTube → get raw results (10-15 per scene)</step>
+        <step>4. NEW: Apply filterAndRankResults() to filter and rank</step>
+        <step>5. Save FILTERED results to database (5-8 per scene)</step>
+      </story-3.4-update>
+    </integration-endpoint>
+  </existing-code-story-3.3>
+
+  <!-- ========================================
+       DATABASE SCHEMA - Scenes & Visual Suggestions
+       ======================================== -->
+  <database-schema>
+    <table name="scenes">
+      <description>Stores individual script segments with their associated audio files</description>
+      <columns>
+        <column name="id" type="TEXT PRIMARY KEY" />
+        <column name="project_id" type="TEXT NOT NULL" constraint="FOREIGN KEY → projects(id)" />
+        <column name="scene_number" type="INTEGER NOT NULL" />
+        <column name="text" type="TEXT NOT NULL" description="Original script text from LLM" />
+        <column name="sanitized_text" type="TEXT" description="Cleaned text for TTS input" />
+        <column name="audio_file_path" type="TEXT" description="Path to generated MP3 file" />
+        <column name="duration" type="REAL" description="Duration in seconds (voiceover duration)" />
+        <column name="created_at" type="TEXT DEFAULT (datetime('now'))" />
+        <column name="updated_at" type="TEXT DEFAULT (datetime('now'))" />
+      </columns>
+      <constraints>
+        <unique>project_id, scene_number</unique>
+      </constraints>
+      <indexes>
+        <index name="idx_scenes_project" columns="project_id" />
+        <index name="idx_scenes_number" columns="scene_number" />
+      </indexes>
+    </table>
+
+    <table name="visual_suggestions">
+      <description>Stores YouTube video suggestions for each scene with ranking and duration</description>
+      <columns>
+        <column name="id" type="TEXT PRIMARY KEY" />
+        <column name="scene_id" type="TEXT NOT NULL" constraint="FOREIGN KEY → scenes(id)" />
+        <column name="video_id" type="TEXT NOT NULL" description="YouTube video ID" />
+        <column name="title" type="TEXT NOT NULL" description="Video title" />
+        <column name="thumbnail_url" type="TEXT" description="Thumbnail image URL" />
+        <column name="channel_title" type="TEXT" description="YouTube channel name" />
+        <column name="embed_url" type="TEXT NOT NULL" description="Embeddable video URL" />
+        <column name="rank" type="INTEGER NOT NULL" description="Suggestion ranking (1-8 after filtering)" />
+        <column name="duration" type="INTEGER" description="Video duration in seconds (from Story 3.4)" />
+        <column name="default_segment_path" type="TEXT" description="Path to downloaded default segment (Story 3.6)" />
+        <column name="download_status" type="TEXT DEFAULT 'pending'" description="pending, downloading, complete, error" />
+        <column name="created_at" type="TEXT DEFAULT (datetime('now'))" />
+      </columns>
+      <indexes>
+        <index name="idx_visual_suggestions_scene" columns="scene_id" />
+      </indexes>
+
+      <story-3.4-changes>
+        <note>
+          rank field semantics change: Previously 1-15 (raw results from Story 3.3), now 1-8 (filtered results).
+          Filtering occurs BEFORE database persistence (cleaner data model).
+          Database stores only high-quality suggestions (reduces storage and UI clutter).
+        </note>
+      </story-3.4-changes>
+    </table>
+
+    <key-relationships>
+      <relationship>scenes.duration (REAL) → Scene voiceover duration used for duration filtering calculation</relationship>
+      <relationship>visual_suggestions.duration (INTEGER) → YouTube video duration used for filtering and ranking</relationship>
+      <relationship>visual_suggestions.rank (INTEGER) → Filtered ranking (1-8) after Story 3.4 processing</relationship>
+    </key-relationships>
+  </database-schema>
+
+  <!-- ========================================
+       IMPLEMENTATION GUIDANCE
+       ======================================== -->
+  <implementation-guidance>
+    <task id="1" name="Implement Duration Filtering Logic">
+      <file>lib/youtube/filter-results.ts</file>
+      <function>filterByDuration(results: VideoResult[], sceneDuration: number): VideoResult[]</function>
+      <key-points>
+        <point>PRIMARY FILTER: Duration filtering applied FIRST before all other filters</point>
+        <point>Input validation: Validate sceneDuration &gt; 0, throw error if invalid</point>
+        <point>Calculate minimum duration: 1x scene voiceover duration</point>
+        <point>Calculate maximum duration: Math.min(sceneDuration * 3, 300)</point>
+        <point>Duration field already available from Story 3.3 (stored as string seconds)</point>
+        <point>Parse duration from string to number for comparison</point>
+        <point>Edge case: Scene duration &gt; 300s → Accept videos ≥ scene duration (no maximum)</point>
+      </key-points>
+    </task>
+
+    <task id="2" name="Implement Content Quality Filtering">
+      <file>lib/youtube/filter-results.ts</file>
+      <function>filterByTitleQuality(results: VideoResult[]): VideoResult[]</function>
+      <key-points>
+        <point>Detect ALL CAPS: More than 50% of title characters are uppercase</point>
+        <point>Detect excessive emojis: More than 5 emojis in title</point>
+        <point>Detect excessive punctuation: More than 10 consecutive punctuation marks</point>
+        <point>Use regex or character-by-character analysis</point>
+        <point>NOTE: View count filtering REMOVED (data not available from Story 3.3)</point>
+        <point>NOTE: License filtering REMOVED (data not available from Story 3.3)</point>
+      </key-points>
+    </task>
+
+    <task id="3" name="Implement Quality Ranking Algorithm">
+      <file>lib/youtube/filter-results.ts</file>
+      <interface>interface RankedVideo extends VideoResult { qualityScore: number; }</interface>
+      <function>rankVideos(results: VideoResult[], sceneDuration: number): RankedVideo[]</function>
+      <key-points>
+        <point>SIMPLIFIED FOR MVP: Ranking based on duration preference + relevance (not view count)</point>
+        <point>Duration Match Score: Videos closer to 1.5x scene duration ranked higher</point>
+        <point>Formula: 1 / (1 + Math.abs(videoDuration - idealDuration) / idealDuration)</point>
+        <point>Relevance Score: Use existing rank from Story 3.3 (1 / rank)</point>
+        <point>Weighted total: qualityScore = (durationMatch * 0.6) + (relevance * 0.4)</point>
+        <point>Sort results by qualityScore descending (highest first)</point>
+        <point>Limit to top 5-8 videos (configurable, default 8)</point>
+      </key-points>
+    </task>
+
+    <task id="4" name="Implement Content-Type Specific Filtering">
+      <file>lib/youtube/filter-results.ts</file>
+      <function>filterByContentType(results: VideoResult[], contentType: ContentType): VideoResult[]</function>
+      <key-points>
+        <point>Use contentType from SceneAnalysis (Story 3.2)</point>
+        <point>Apply type-specific keyword filtering rules</point>
+        <point>GAMEPLAY: Prioritize "gameplay", "no commentary", filter out "tutorial", "review"</point>
+        <point>TUTORIAL: Prioritize "tutorial", "how to", filter out "gameplay", "vlog"</point>
+        <point>NATURE: Prioritize "wildlife", "nature", "documentary", filter out "vlog", "funny"</point>
+        <point>B_ROLL: No specific filtering (accept all)</point>
+        <point>Use keyword scoring: +1 for positive keywords, -1 for negative keywords</point>
+        <point>Filter out videos with negative score</point>
+      </key-points>
+    </task>
+
+    <task id="5" name="Implement Multi-Tier Fallback Logic">
+      <file>lib/youtube/filter-results.ts</file>
+      <function>filterAndRankResults(results: VideoResult[], sceneDuration: number, contentType: ContentType, options?: FilterOptions): RankedVideo[]</function>
+      <key-points>
+        <point>5-tier fallback (enhanced from 3-tier in tech spec)</point>
+        <point>Each tier relaxes ONE constraint at a time</point>
+        <point>Success condition: results.length ≥ 3</point>
+        <point>Log which fallback tier was used for monitoring</point>
+        <point>Warn if Tier 5 reached (indicates low-quality search results)</point>
+      </key-points>
+    </task>
+
+    <task id="6" name="Create Filter Configuration Module">
+      <file>lib/youtube/filter-config.ts</file>
+      <exports>
+        <export>DEFAULT_FILTER_CONFIG constant</export>
+        <export>getFilterConfig() function</export>
+      </exports>
+      <key-points>
+        <point>Use singleton pattern for server-side configuration</point>
+        <point>For MVP: Configuration is static (read-only singleton)</point>
+        <point>No setter function needed for MVP</point>
+        <point>Document each config option with JSDoc comments</point>
+      </key-points>
+    </task>
+
+    <task id="7" name="Integrate Filtering into Visual Generation Endpoint">
+      <file>app/api/projects/[id]/generate-visuals/route.ts</file>
+      <updated-flow>
+        <step>1. Load scenes</step>
+        <step>2. Analyze scene → generate queries</step>
+        <step>3. Search YouTube → get raw results (10-15 per scene)</step>
+        <step>4. NEW: Apply filterAndRankResults() to filter and rank</step>
+        <step>5. Save FILTERED results to database (5-8 per scene)</step>
+        <step>6. Return success</step>
+      </updated-flow>
+      <key-points>
+        <point>Import filterAndRankResults() from lib/youtube/filter-results.ts</point>
+        <point>Pass scene.duration (voiceover duration) to filtering function</point>
+        <point>Pass sceneAnalysis.contentType to filtering function</point>
+        <point>Error handling: Handle missing/malformed VideoResult fields gracefully</point>
+        <point>Validate duration field exists and is numeric</point>
+        <point>Log warning for malformed results, skip invalid entries</point>
+      </key-points>
+    </task>
+
+    <task id="8" name="Add Unit Tests for Filtering Logic">
+      <file>lib/youtube/__tests__/filter-results.test.ts</file>
+      <test-cases>
+        <case>filterByDuration() - Test 1x-3x ratio calculation</case>
+        <case>filterByDuration() - Test 5-minute cap (120s scene → max 300s, not 360s)</case>
+        <case>filterByDuration() - Test edge case: 400s scene → accept videos ≥ 400s (no maximum)</case>
+        <case>filterByDuration() - Test sceneDuration ≤ 0 throws error</case>
+        <case>filterByTitleQuality() - Test ALL CAPS detection (&gt;50% uppercase)</case>
+        <case>filterByTitleQuality() - Test excessive emoji detection (&gt;5 emojis)</case>
+        <case>rankVideos() - Test duration match scoring (videos closer to 1.5x ranked higher)</case>
+        <case>rankVideos() - Test relevance scoring (rank-based)</case>
+        <case>filterByContentType() - Test each ContentType enum filtering rules</case>
+        <case>filterAndRankResults() - Test all 5 fallback tiers</case>
+        <case>filterAndRankResults() - Test error handling for malformed VideoResult fields</case>
+      </test-cases>
+    </task>
+  </implementation-guidance>
+
+  <!-- ========================================
+       CRITICAL TECHNICAL NOTES
+       ======================================== -->
+  <technical-notes>
+    <note category="Data Dependencies">
+      <issue>View count, upload date, and channel subscriber count NOT available from Story 3.3</issue>
+      <resolution>
+        Simplified MVP ranking to duration-based only. Original ranking algorithm deferred to post-MVP.
+        Requires videos.list API call with part=statistics for these fields (additional quota cost + latency).
+      </resolution>
+    </note>
+
+    <note category="License Filtering">
+      <issue>License information NOT available from Story 3.3 search results</issue>
+      <resolution>
+        License filtering removed entirely for MVP. Requires videos.list API call with part=status.
+        Deferred to post-MVP Epic 3 enhancement.
+      </resolution>
+    </note>
+
+    <note category="Performance">
+      <target>Filtering time: &lt; 50ms for 15 results → 5-8 filtered results</target>
+      <note>
+        Each filter operation is O(n) time complexity (linear). Total filtering time: O(n * m) where n = results,
+        m = filter count (3-4 filters for MVP). Negligible compared to YouTube API latency (500-2000ms).
+      </note>
+    </note>
+
+    <note category="Fallback Enhancement">
+      <rationale>
+        Enhanced from 3-tier (tech spec) to 5-tier for better robustness. Each tier relaxes ONE constraint
+        at a time for graceful degradation. Goal: Provide 5-8 suggestions per scene (ideal) or 1-3 minimum
+        (acceptable). Zero suggestions only if YouTube returned zero results in Story 3.3.
+      </rationale>
+    </note>
+
+    <note category="Database Impact">
+      <change>No schema changes required (uses existing visual_suggestions table)</change>
+      <change>Rank field semantics change: Previously 1-15 (raw results), now 1-8 (filtered results)</change>
+      <change>Filtering occurs BEFORE database persistence (cleaner data model)</change>
+      <change>Database stores only high-quality suggestions (reduces storage and UI clutter)</change>
+    </note>
+
+    <note category="Error Handling">
+      <requirement>Task 1: Validate sceneDuration &gt; 0, throw error if invalid</requirement>
+      <requirement>Task 7: Handle missing/malformed VideoResult fields</requirement>
+      <requirement>Log warning for malformed results, skip invalid entries</requirement>
+      <requirement>Continue processing valid results even if some entries are invalid</requirement>
+    </note>
+  </technical-notes>
+
+  <!-- ========================================
+       VALIDATION & TESTING STRATEGY
+       ======================================== -->
+  <testing-strategy>
+    <unit-tests>
+      <test name="filterByDuration() - 1x-3x ratio">
+        Given 10s scene → Accepts 10s-30s videos
+        Given 90s scene → Accepts 90s-270s videos
+        Given 120s scene → Accepts 120s-300s videos (cap at 5 min, NOT 360s)
+      </test>
+
+      <test name="filterByDuration() - Edge cases">
+        Given 400s scene → Accepts videos ≥ 400s (no maximum constraint)
+        Given sceneDuration ≤ 0 → Throws validation error
+        Given empty results array → Returns empty array
+      </test>
+
+      <test name="filterByTitleQuality() - Spam detection">
+        Test ALL CAPS detection (&gt;50% uppercase)
+        Test excessive emoji detection (&gt;5 emojis)
+        Test normal titles pass through
+      </test>
+
+      <test name="rankVideos() - Scoring">
+        Test duration match scoring (1.5x scene duration = highest score)
+        Test relevance scoring (rank 1 = 1.0, rank 10 = 0.1)
+        Test sorting by qualityScore descending
+        Test limiting to top 8 results
+      </test>
+
+      <test name="filterByContentType() - All types">
+        Test ContentType.GAMEPLAY keyword filtering
+        Test ContentType.TUTORIAL keyword filtering
+        Test ContentType.NATURE keyword filtering
+        Test ContentType.B_ROLL (no filtering)
+      </test>
+
+      <test name="filterAndRankResults() - Fallback tiers">
+        Test Tier 1 success (strict filtering)
+        Test Tier 2 fallback (relaxed duration 1x-5x)
+        Test Tier 3 fallback (remove cap)
+        Test Tier 4 fallback (relax title quality)
+        Test Tier 5 fallback (all filters removed)
+      </test>
+    </unit-tests>
+
+    <integration-tests>
+      <test>
+        Full filtering pipeline: Raw results → Duration filter → Quality filter → Content type filter →
+        Ranking → Database save
+      </test>
+      <test>
+        Verify filtered results saved with correct rank (1-8, not 1-15)
+      </test>
+      <test>
+        Test error handling for malformed VideoResult fields
+      </test>
+    </integration-tests>
+
+    <e2e-tests>
+      <test>
+        Complete flow: Scene with 30s voiceover → YouTube search → Filtering → Only 30s-90s videos saved
+      </test>
+      <test>
+        Zero results scenario: YouTube returns 0 results → Handled gracefully (empty array)
+      </test>
+    </e2e-tests>
+  </testing-strategy>
+</story-context>
