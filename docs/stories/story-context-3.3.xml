@@ -1,0 +1,1588 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <story-metadata>
+    <id>3.3</id>
+    <title>YouTube Video Search & Result Retrieval</title>
+    <epic>Epic 3 - Visual Content Sourcing</epic>
+    <status>Ready</status>
+    <dependencies>
+      <dependency story="3.1" status="COMPLETED">YouTube API Client Setup & Configuration</dependency>
+      <dependency story="3.2" status="COMPLETED">Scene Text Analysis & Search Query Generation</dependency>
+    </dependencies>
+  </story-metadata>
+
+  <prd-references>
+    <!-- PRD Feature 1.5: AI-Powered Visual Sourcing (Lines 179-242) -->
+    <feature id="1.5" name="AI-Powered Visual Sourcing" lines="179-242">
+      <description>
+        The system analyzes script for each scene and sources relevant B-roll video clips
+        from YouTube using the YouTube Data API v3. Videos are intelligently filtered by
+        duration (1x-3x ratio with 5-minute max) to ensure appropriate scene length, and
+        default video segments are automatically downloaded to enable instant preview.
+      </description>
+
+      <functional-requirements>
+        <requirement id="FR1">
+          For each scene, the system must analyze the text to determine visual theme/subject matter
+        </requirement>
+        <requirement id="FR2">
+          The system must query YouTube Data API v3 with relevant search terms based on analysis
+        </requirement>
+        <requirement id="FR3">
+          The system must retrieve list of suggested YouTube video clips for each scene
+        </requirement>
+        <requirement id="FR4" priority="CRITICAL">
+          Duration Filtering: Filter video results based on 1x-3x duration ratio relative to scene voiceover
+        </requirement>
+        <requirement id="FR5" priority="CRITICAL">
+          Duration Cap: Enforce 5-minute (300 second) maximum duration cap regardless of scene length
+        </requirement>
+        <requirement id="FR6">
+          The system must implement appropriate filtering (Creative Commons licensing when possible, content type, duration)
+        </requirement>
+        <requirement id="FR7">
+          The system must handle YouTube API quotas and rate limits gracefully
+        </requirement>
+        <requirement id="FR8">
+          The system must pass scene data with suggested clips (YouTube video IDs/URLs, durations, metadata) to Visual Curation UI
+        </requirement>
+      </functional-requirements>
+
+      <acceptance-criteria>
+        <ac id="AC1" lines="197-201">
+          <description>Successful Visual Suggestion</description>
+          <given>Scene with text "A majestic lion roams the savanna at sunset"</given>
+          <when>Visual sourcing process runs for that scene</when>
+          <then>System must retrieve list of YouTube video clips featuring lions, savannas, or sunsets</then>
+        </ac>
+
+        <ac id="AC2" lines="202-205">
+          <description>Data Structure for Curation UI</description>
+          <given>Visual sourcing is complete for a script</given>
+          <when>Data is passed to Curation UI</when>
+          <then>Data structure for each scene must include: scene text, array of suggested YouTube video URLs/IDs, video durations, and default segment file paths</then>
+        </ac>
+
+        <ac id="AC3" lines="206-209">
+          <description>API Error Handling</description>
+          <given>YouTube API rate limit has been exceeded</given>
+          <when>System attempts to query for video clips</when>
+          <then>System must display appropriate error message and either retry with exponential backoff or provide fallback options</then>
+        </ac>
+
+        <ac id="AC4" lines="228-231">
+          <description>Duration Filtering (1x-3x ratio)</description>
+          <given>Scene with 30-second voiceover</given>
+          <when>Visual sourcing retrieves YouTube videos</when>
+          <then>Only videos between 30 seconds (1x) and 90 seconds (3x) must be included in suggestions</then>
+        </ac>
+
+        <ac id="AC5" lines="232-235">
+          <description>Duration Cap Enforcement (5 minute max)</description>
+          <given>Scene with 180-second (3-minute) voiceover</given>
+          <when>Duration filtering is applied</when>
+          <then>Maximum accepted video duration must be 300 seconds (5 minutes), NOT 540 seconds (3x ratio)</then>
+        </ac>
+      </acceptance-criteria>
+
+      <key-user-stories>
+        <user-story>
+          As a creator, I want the AI to automatically find relevant video clips for each scene of my script,
+          so that I don't have to spend time searching for stock footage myself.
+        </user-story>
+        <user-story>
+          As a creator, I want to be presented with several visual options for each scene,
+          so that I can choose the clip that best fits my narrative.
+        </user-story>
+        <user-story>
+          As a creator, I want videos filtered by duration so they're appropriate for my scene length,
+          so that I only see videos that can realistically be used without excessive trimming.
+        </user-story>
+      </key-user-stories>
+    </feature>
+  </prd-references>
+
+  <epics-definition>
+    <!-- Story 3.3 Definition from epics.md (Lines 660-699) -->
+    <story-definition source="epics.md" lines="660-699">
+      <goal>
+        Query YouTube API with generated search terms and retrieve relevant video clip suggestions
+      </goal>
+
+      <tasks>
+        <task id="1" file="lib/youtube/client.ts">
+          <title>Implement searchVideos() Method in YouTubeAPIClient</title>
+          <details>
+            - Build YouTube Data API search.list request with parameters
+            - Parse API response and extract video metadata
+            - CRITICAL: Retrieve video duration from contentDetails.duration (ISO 8601 format)
+            - Make additional videos.list API call to get duration data
+            - Convert ISO 8601 duration to seconds (e.g., "PT4M13S" → 253)
+            - Transform response to VideoResult[] format
+            - Include embedUrl construction: https://www.youtube.com/embed/${videoId}
+            - Handle API errors (quota exceeded, invalid query, network failures)
+            - Update quota tracking after each search
+          </details>
+        </task>
+
+        <task id="2" file="lib/youtube/client.ts or lib/youtube/search.ts">
+          <title>Implement Multi-Query Search with Deduplication</title>
+          <details>
+            - Execute searchVideos() for each query (primary + alternatives)
+            - Aggregate all results into single array
+            - Deduplicate by videoId (use Set or Map)
+            - Sort results by relevance score (preserve API ordering, primary query results first)
+            - Return combined, deduplicated list
+            - Handle partial failures gracefully (some queries succeed, others fail)
+          </details>
+        </task>
+
+        <task id="3" file="app/api/projects/[id]/generate-visuals/route.ts">
+          <title>Create POST /api/projects/[id]/generate-visuals Endpoint</title>
+          <details>
+            - Validate projectId parameter
+            - Load all scenes for project from database
+            - For each scene: analyze text → generate queries → search YouTube → store results
+            - Aggregate all suggestions across scenes
+            - Call database persistence layer with ranking
+            - Update project.visuals_generated = true
+            - Return success response with counts
+            - Handle errors gracefully, collect error messages, return partial success if possible
+          </details>
+        </task>
+
+        <task id="4" files="lib/db/queries.ts, migrations">
+          <title>Create visual_suggestions Database Table and Persistence Logic</title>
+          <details>
+            SQLite Schema:
+            - id TEXT PRIMARY KEY
+            - scene_id TEXT NOT NULL (FK to scenes)
+            - video_id TEXT NOT NULL
+            - title TEXT NOT NULL
+            - thumbnail_url TEXT
+            - channel_title TEXT
+            - embed_url TEXT NOT NULL
+            - rank INTEGER NOT NULL (1-15 based on result order)
+            - duration INTEGER (video length in seconds)
+            - default_segment_path TEXT
+            - download_status TEXT DEFAULT 'pending'
+            - created_at TEXT DEFAULT (datetime('now'))
+
+            Persistence Functions:
+            - saveVisualSuggestions(sceneId, suggestions[])
+            - getVisualSuggestions(sceneId)
+          </details>
+        </task>
+
+        <task id="5" file="app/api/projects/[id]/visual-suggestions/route.ts">
+          <title>Create GET /api/projects/[id]/visual-suggestions Endpoint</title>
+          <details>
+            - Load all scenes for the project
+            - For each scene, call getVisualSuggestions(sceneId)
+            - Aggregate all suggestions into single array
+            - Return suggestions ordered by scene order, then by rank ASC
+            - Return empty array when no suggestions exist (not error)
+          </details>
+        </task>
+
+        <task id="6" file="All above files">
+          <title>Implement Error Handling and Edge Cases</title>
+          <details>
+            Error Scenarios:
+            1. API Quota Exceeded: Catch quota error, return user-friendly message, don't crash
+            2. Zero Results for Query: Return empty array (not error), pass to Story 3.4 filter
+            3. Network Errors: Retry logic with exponential backoff (max 3 retries)
+            4. Invalid Search Query: Handle malformed queries gracefully, log warning, skip query
+            5. Database Errors: Wrap operations in try-catch, transaction rollback on failure
+          </details>
+        </task>
+      </tasks>
+    </story-definition>
+  </epics-definition>
+
+  <technical-specification>
+    <!-- Epic 3 Tech Spec: Story 3.3 Implementation Details -->
+    <tech-spec source="tech-spec-epic-3.md" version="2.0">
+      <overview>
+        Story 3.3 implements the core YouTube video search functionality that powers the visual
+        suggestion system. Using search queries generated in Story 3.2, this story executes
+        YouTube Data API searches to retrieve embeddable video clips that match scene content.
+
+        Key Technical Components:
+        - YouTube Data API search.list integration with duration retrieval
+        - Multi-query search with result aggregation and deduplication
+        - Error handling for quota limits, network failures, and zero results
+        - Database persistence of visual suggestions with ranking
+        - RESTful API endpoints for visual generation and retrieval
+      </overview>
+
+      <data-models>
+        <!-- Visual Suggestions Table Schema (Lines 70-84) -->
+        <database-table name="visual_suggestions">
+          <schema dialect="SQLite">
+            CREATE TABLE visual_suggestions (
+              id TEXT PRIMARY KEY,
+              scene_id TEXT NOT NULL,
+              video_id TEXT NOT NULL,
+              title TEXT NOT NULL,
+              thumbnail_url TEXT,
+              channel_title TEXT,
+              embed_url TEXT NOT NULL,
+              rank INTEGER NOT NULL,
+              duration INTEGER,
+              default_segment_path TEXT,
+              download_status TEXT DEFAULT 'pending',
+              created_at TEXT DEFAULT (datetime('now')),
+              FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX idx_visual_suggestions_scene ON visual_suggestions(scene_id);
+          </schema>
+
+          <field-descriptions>
+            <field name="id" type="TEXT">Primary key, generated via crypto.randomUUID()</field>
+            <field name="scene_id" type="TEXT">Foreign key to scenes.id</field>
+            <field name="video_id" type="TEXT">YouTube video ID</field>
+            <field name="title" type="TEXT">Video title from YouTube API</field>
+            <field name="thumbnail_url" type="TEXT">Thumbnail image URL</field>
+            <field name="channel_title" type="TEXT">YouTube channel name</field>
+            <field name="embed_url" type="TEXT">Embeddable video URL (https://www.youtube.com/embed/{videoId})</field>
+            <field name="rank" type="INTEGER">Suggestion ranking 1-15 based on result order</field>
+            <field name="duration" type="INTEGER">Video duration in seconds (converted from ISO 8601)</field>
+            <field name="default_segment_path" type="TEXT">Path to downloaded default segment (Story 3.6)</field>
+            <field name="download_status" type="TEXT">Download status: pending|downloading|complete|error</field>
+            <field name="created_at" type="TEXT">ISO timestamp</field>
+          </field-descriptions>
+
+          <critical-notes>
+            - Uses SQLite-compatible types (TEXT, INTEGER, not UUID, TIMESTAMP)
+            - rank field enables ordering suggestions 1-15
+            - duration field stores video length in seconds (needed for Story 3.6 segment extraction)
+            - download_status tracks download state for Story 3.6
+            - Foreign key on scene_id only (project_id accessible via scenes table JOIN)
+            - Cascade deletes ensure cleanup when scenes deleted
+            - Schema does NOT include redundant project_id foreign key
+            - Schema does NOT include removed fields: description, channel_id, published_at, search_query, relevance_score
+          </critical-notes>
+        </database-table>
+
+        <!-- VideoResult Interface (Lines 105-116 from types.ts) -->
+        <interface name="VideoResult">
+          <typescript>
+            interface VideoResult {
+              videoId: string;              // YouTube video ID
+              title: string;                // Video title
+              thumbnailUrl: string;         // Thumbnail image URL
+              channelTitle: string;         // YouTube channel name
+              embedUrl: string;             // Constructed: https://www.youtube.com/embed/${videoId}
+              publishedAt: string;          // ISO timestamp
+              description: string;          // Video description
+              viewCount?: number;           // Optional: view count
+              likeCount?: number;           // Optional: like count
+              duration?: string;            // CRITICAL: Video duration (ISO 8601 format, e.g., "PT4M13S")
+            }
+          </typescript>
+          <critical-requirements>
+            - duration field MUST be populated from YouTube API videos.list call (contentDetails.duration)
+            - Duration format is ISO 8601 (e.g., "PT4M13S" = 4 minutes 13 seconds)
+            - Duration must be converted to seconds before storing in database (253 seconds)
+            - embedUrl must be constructed as: https://www.youtube.com/embed/${videoId}
+            - videoEmbeddable=true filter ensures all results are embeddable
+          </critical-requirements>
+        </interface>
+
+        <!-- Search Parameters (Lines 92-104) -->
+        <interface name="SearchOptions">
+          <typescript>
+            interface SearchOptions {
+              maxResults?: number;          // 10-15 per query (configurable)
+              relevanceLanguage?: string;   // Default 'en'
+              videoEmbeddable?: boolean;    // Default true
+              videoDuration?: 'short' | 'medium' | 'long';
+              order?: 'relevance' | 'date' | 'viewCount' | 'rating';
+            }
+          </typescript>
+        </interface>
+      </data-models>
+
+      <api-endpoints>
+        <!-- POST /api/projects/[id]/generate-visuals (Lines 132-139) -->
+        <endpoint method="POST" path="/api/projects/[id]/generate-visuals">
+          <request>
+            <parameter name="projectId" type="string" location="path">Project ID</parameter>
+          </request>
+          <response status="200">
+            <json>
+              {
+                "success": boolean,
+                "scenesProcessed": number,
+                "suggestionsGenerated": number,
+                "errors"?: string[]
+              }
+            </json>
+          </response>
+          <implementation-flow>
+            1. Validate projectId parameter
+            2. Load all scenes for project from database
+            3. For each scene:
+               a. Call analyzeSceneForVisuals() to generate search queries
+               b. Execute searchWithMultipleQueries() with primary + alternative queries
+               c. Store results temporarily for database persistence
+            4. Aggregate all suggestions across scenes
+            5. Call database persistence layer (Task 4) with ranking
+            6. Update project.visuals_generated = true
+            7. Return success response with counts
+            8. Handle errors gracefully, collect error messages, return partial success if possible
+          </implementation-flow>
+        </endpoint>
+
+        <!-- GET /api/projects/[id]/visual-suggestions (Lines 141-148) -->
+        <endpoint method="GET" path="/api/projects/[id]/visual-suggestions">
+          <request>
+            <parameter name="projectId" type="string" location="path">Project ID</parameter>
+            <parameter name="sceneId" type="string" location="query" optional="true">Optional scene filter</parameter>
+          </request>
+          <response status="200">
+            <json>
+              {
+                "suggestions": VisualSuggestion[]
+              }
+            </json>
+            <critical-notes>
+              - Response structure simplified (removed totalScenes and scenesWithSuggestions metadata)
+              - Orders results by scene order, then rank ASC
+              - Returns empty array when no suggestions exist (not error)
+            </critical-notes>
+          </response>
+        </endpoint>
+      </api-endpoints>
+
+      <youtube-api-integration>
+        <!-- YouTube Data API v3 Integration Details -->
+        <search-list-method>
+          <parameters>
+            <param name="q">Search query string</param>
+            <param name="part">snippet</param>
+            <param name="type">video</param>
+            <param name="videoEmbeddable">true (only embeddable videos)</param>
+            <param name="maxResults">10-15 per query (configurable)</param>
+            <param name="relevanceLanguage">en (configurable)</param>
+          </parameters>
+          <quota-cost>100 units per request</quota-cost>
+        </search-list-method>
+
+        <videos-list-method>
+          <purpose>Retrieve video duration from contentDetails.duration</purpose>
+          <parameters>
+            <param name="id">Comma-separated video IDs from search results</param>
+            <param name="part">contentDetails</param>
+          </parameters>
+          <quota-cost>1 unit per request</quota-cost>
+          <critical-requirement>
+            MUST call videos.list to get duration data (not available in search.list response).
+            Convert ISO 8601 duration (e.g., "PT4M13S") to seconds (253) before storing.
+          </critical-requirement>
+        </videos-list-method>
+
+        <quota-management>
+          <daily-limit>10,000 units (default free tier)</daily-limit>
+          <rate-limit>100 requests per 100 seconds</rate-limit>
+          <cost-breakdown>
+            - Each search.list: 100 units
+            - Each videos.list: 1 unit
+            - Total per search: ~101 units (100 + 1)
+            - Searches per day: ~99 searches (10,000 / 101)
+          </cost-breakdown>
+        </quota-management>
+      </youtube-api-integration>
+
+      <error-handling>
+        <scenario name="API Quota Exceeded">
+          <detection>YouTube API returns quotaExceeded error</detection>
+          <response>
+            - Catch quota error from YouTube API
+            - Return user-friendly error message
+            - Don't crash endpoint, return partial results if available
+            - Log quota usage for monitoring
+          </response>
+        </scenario>
+
+        <scenario name="Zero Results for Query">
+          <detection>searchVideos() returns empty array</detection>
+          <response>
+            - Empty array passed to database persistence
+            - Scene gets 0 suggestions in database
+            - Triggers fallback/empty state in Story 3.5 AC6
+            - NOT treated as error (valid outcome)
+          </response>
+        </scenario>
+
+        <scenario name="Network Errors">
+          <detection>Network timeout, connection refused, DNS failure</detection>
+          <response>
+            - Implement retry logic with exponential backoff (max 3 retries)
+            - Catch network failures gracefully
+            - Return error in response.errors array
+            - Continue processing other scenes
+          </response>
+        </scenario>
+
+        <scenario name="Invalid Search Query">
+          <detection>Malformed query, special characters, empty string</detection>
+          <response>
+            - Handle malformed queries gracefully
+            - Log warning, skip query, continue with alternatives
+            - Don't fail entire scene processing
+          </response>
+        </scenario>
+
+        <scenario name="Database Errors">
+          <detection>SQLite constraint violation, write failure</detection>
+          <response>
+            - Wrap database operations in try-catch
+            - Transaction rollback on failure
+            - Return error details in response
+          </response>
+        </scenario>
+      </error-handling>
+
+      <performance-considerations>
+        <metric name="Scene Analysis">LT 5 seconds per scene</metric>
+        <metric name="YouTube API Search">LT 3 seconds per query (excluding network latency)</metric>
+        <metric name="Total Visual Sourcing">LT 30 seconds for 5-scene script</metric>
+        <metric name="Database Persistence">LT 100ms</metric>
+
+        <optimization-notes>
+          - Multiple queries per scene: 3-5 searches per scene
+          - Additional videos.list call for duration retrieval
+          - Batch database inserts for efficiency
+          - Consider caching search results (future optimization)
+          - Rate limiting on API calls to avoid quota exhaustion
+        </optimization-notes>
+      </performance-considerations>
+
+      <acceptance-criteria-mapping>
+        <!-- All AC from Story 3.3 with Tech Spec References -->
+        <ac id="AC1" title="searchVideos() Implementation">
+          <requirements>
+            - searchVideos() accepts search query string and optional SearchOptions
+            - Returns array of VideoResult objects with complete metadata
+            - Each result includes: videoId, title, thumbnailUrl, channelTitle, embedUrl, duration
+            - Duration field contains video length in seconds (converted from ISO 8601)
+            - Constructs embedUrl correctly: https://www.youtube.com/embed/${videoId}
+            - Applies videoEmbeddable=true filter (only embeddable videos returned)
+            - Returns 10-15 videos per query (configurable via maxResults)
+            - Uses relevanceLanguage='en' by default (configurable)
+          </requirements>
+        </ac>
+
+        <ac id="AC2" title="Multi-Query Search and Deduplication">
+          <requirements>
+            - searchWithMultipleQueries() executes searches for all provided queries
+            - Aggregates results from primary and alternative queries
+            - Deduplicates by videoId (no duplicate videos in final result)
+            - Preserves relevance ordering (primary query results prioritized)
+            - Handles partial failures (some queries succeed, others fail)
+          </requirements>
+        </ac>
+
+        <ac id="AC3" title="POST /api/projects/[id]/generate-visuals Endpoint">
+          <requirements>
+            - Endpoint accepts projectId parameter
+            - Loads all scenes for project from database
+            - For each scene: analyzes text → generates queries → searches YouTube → stores suggestions
+            - Returns success response with scenesProcessed and suggestionsGenerated counts
+            - Updates project.visuals_generated = true on success
+            - Processes all scenes even if some fail (collects errors)
+          </requirements>
+        </ac>
+
+        <ac id="AC4" title="Database Persistence">
+          <requirements>
+            - visual_suggestions table created with SQLite-compatible schema
+            - Schema uses TEXT PRIMARY KEY (not UUID type)
+            - Schema uses TEXT DEFAULT (datetime('now')) for timestamps (not TIMESTAMP type)
+            - Schema includes all required fields: id, scene_id, video_id, title, thumbnail_url, channel_title, embed_url, rank, duration, default_segment_path, download_status, created_at
+            - Schema does NOT include redundant project_id foreign key
+            - Schema does NOT include removed fields: description, channel_id, published_at, search_query, relevance_score
+            - saveVisualSuggestions() batch inserts all suggestions for a scene with rank values
+            - Rank values are sequential integers (1, 2, 3, ..., 15) based on result order
+            - Duration field is persisted from VideoResult.duration
+            - Foreign key enforces referential integrity (cascade deletes on scene_id)
+            - Index created on scene_id for query performance
+          </requirements>
+        </ac>
+
+        <ac id="AC5" title="GET /api/projects/[id]/visual-suggestions Endpoint">
+          <requirements>
+            - Returns all suggestions for project in format: { suggestions: VisualSuggestion[] }
+            - Does NOT include totalScenes or scenesWithSuggestions metadata
+            - Orders results by scene order, then rank ASC
+            - Returns empty array when no suggestions exist (not error)
+          </requirements>
+        </ac>
+
+        <ac id="AC6" title="Error Handling">
+          <requirements>
+            - API quota exceeded: returns user-friendly error message, doesn't crash
+            - Zero results for query: returns empty array, passes to Story 3.4 filter
+            - Network errors: retry with exponential backoff (max 3 retries)
+            - Invalid query: logs warning, skips query, continues processing
+            - Database errors: transaction rollback, error details in response
+            - Partial failures: collects errors in response.errors[], continues processing
+          </requirements>
+        </ac>
+
+        <ac id="AC7" title="Integration Test Case - Zero Results Scenario">
+          <requirements>
+            - When YouTube returns 0 results for a search query, system passes empty array to Story 3.4 filter
+            - Empty array triggers fallback or empty state in Story 3.5 AC6
+            - Scene with 0 suggestions doesn't crash visual selection UI
+            - User sees "No videos found" message in Story 3.5
+          </requirements>
+        </ac>
+      </acceptance-criteria-mapping>
+    </tech-spec>
+  </technical-specification>
+
+  <architecture-guidelines>
+    <!-- Epic 3 Architecture Patterns from architecture.md -->
+    <architecture-patterns source="architecture.md" version="1.3">
+      <epic-mapping section="Epic 3: Visual Content Sourcing">
+        <story id="3.3" title="YouTube Video Search & Result Retrieval">
+          <backend-components>
+            <component path="app/api/projects/[id]/generate-visuals/route.ts">
+              Main visual generation endpoint
+            </component>
+            <component path="lib/youtube/client.ts">
+              searchVideos() method with duration retrieval
+            </component>
+            <component path="lib/youtube/search.ts">
+              Multi-query search and deduplication (optional separate file)
+            </component>
+            <component path="lib/db/queries.ts">
+              saveVisualSuggestions(), getVisualSuggestions() functions
+            </component>
+          </backend-components>
+
+          <api-parameters>
+            YouTube Search Parameters:
+            - q: string (search query)
+            - part: 'snippet'
+            - type: 'video'
+            - videoEmbeddable: true (only embeddable videos)
+            - maxResults: 10-15
+            - relevanceLanguage: 'en' (default)
+
+            YouTube Videos.list Parameters (for duration):
+            - id: comma-separated video IDs
+            - part: 'contentDetails'
+          </api-parameters>
+
+          <data-flow>
+            1. Epic 2 voiceover generation completes → project.current_step = 'visual-sourcing'
+            2. Load all scenes for project from database (ordered by scene_number)
+            3. For each scene:
+               - Call analyzeSceneForVisuals() from Story 3.2
+               - Extract visual themes, generate search queries
+               - Execute YouTube searches (primary + alternatives)
+               - Aggregate and deduplicate results
+               - Retrieve video durations via videos.list API call
+               - Convert ISO 8601 duration to seconds
+               - Store top 5-8 suggestions in visual_suggestions table with duration and rank
+            4. Update project.visuals_generated = true
+            5. Trigger Story 3.6 default segment download workflow (future)
+            6. Update project.current_step = 'visual-curation'
+            7. Navigate to Epic 4 Visual Curation UI
+          </data-flow>
+
+          <integration-points>
+            <uses story="3.1">
+              YouTubeAPIClient class from lib/youtube/client.ts
+              - API authentication and quota tracking
+              - Rate limiting
+              - Error handling
+            </uses>
+            <uses story="3.2">
+              analyzeSceneForVisuals() from lib/youtube/analyze-scene.ts
+              - Scene text analysis
+              - Search query generation
+              - ContentType classification
+            </uses>
+            <provides-to story="3.4">
+              Visual suggestions in database for filtering and ranking
+            </provides-to>
+            <provides-to story="3.5">
+              Database schema and persistence layer for visual suggestions
+            </provides-to>
+          </integration-points>
+        </story>
+      </epic-mapping>
+
+      <database-architecture>
+        <visual-suggestions-schema>
+          <!-- SQLite-Specific Patterns -->
+          <sqlite-compatibility>
+            - Use TEXT for primary keys (generate with crypto.randomUUID())
+            - Use TEXT for timestamps with DEFAULT (datetime('now'))
+            - Use INTEGER for numeric fields (rank, duration)
+            - NO UUID type (not supported in SQLite)
+            - NO TIMESTAMP type (use TEXT with ISO 8601)
+          </sqlite-compatibility>
+
+          <normalization-strategy>
+            - project_id NOT stored in visual_suggestions table
+            - To get project_id for a suggestion: JOIN visual_suggestions → scenes → projects
+            - Reduces redundancy and maintains single source of truth
+            - No getVisualSuggestionsByProject() function needed (use JOIN instead)
+          </normalization-strategy>
+
+          <cascade-deletes>
+            - Foreign key on scene_id with ON DELETE CASCADE
+            - When scene deleted, all visual suggestions automatically deleted
+            - Maintains referential integrity
+          </cascade-deletes>
+        </visual-suggestions-schema>
+      </database-architecture>
+
+      <youtube-api-best-practices>
+        <quota-management>
+          - Each search.list costs 100 quota units
+          - Each videos.list costs 1 quota unit
+          - Default quota: 10,000 units/day = ~99 searches/day
+          - Monitor quota usage in YouTubeAPIClient
+          - Implement quota tracking and warning system
+        </quota-management>
+
+        <duration-retrieval>
+          CRITICAL: Video duration NOT available in search.list response
+          - Must make additional videos.list API call
+          - Request contentDetails.duration field
+          - Duration returned in ISO 8601 format (e.g., "PT4M13S")
+          - Parse ISO 8601 to seconds: "PT4M13S" = 4*60 + 13 = 253 seconds
+          - Store duration as INTEGER in database (seconds)
+        </duration-retrieval>
+
+        <error-recovery>
+          - Partial success model: process what you can, report what failed
+          - Empty results are valid (not errors)
+          - Quota exceeded is recoverable (user can retry later or upgrade quota)
+          - Network retries with backoff handle transient failures
+        </error-recovery>
+      </youtube-api-best-practices>
+
+      <implementation-patterns>
+        <multi-query-search>
+          Purpose: Execute multiple search queries (primary + alternatives) and aggregate results
+
+          Algorithm:
+          1. Execute searchVideos() for primary query
+          2. Execute searchVideos() for each alternative query
+          3. Aggregate all results into single array
+          4. Deduplicate by videoId using Set or Map
+          5. Sort by relevance (primary query results first)
+          6. Return combined, deduplicated list
+
+          Error Handling:
+          - If primary query fails: Return empty array (don't fail entire scene)
+          - If alternative queries fail: Continue with primary results only
+          - Collect errors in array for logging/reporting
+        </multi-query-search>
+
+        <database-persistence>
+          Pattern: Batch insert with ranking
+
+          Algorithm:
+          1. Loop through VideoResult array with index
+          2. Generate unique id for each suggestion (crypto.randomUUID())
+          3. Save each suggestion with rank = index + 1 (1 for first, 2 for second, etc.)
+          4. Include duration field from VideoResult.duration (seconds)
+          5. Set download_status = 'pending' by default
+          6. Set default_segment_path = null initially
+          7. Use transaction for atomicity
+
+          Database Query:
+          - INSERT INTO visual_suggestions (id, scene_id, video_id, ..., rank, duration)
+          - ORDER BY rank ASC when retrieving (returns ranked suggestions 1-15)
+        </database-persistence>
+
+        <iso8601-duration-parsing>
+          Purpose: Convert ISO 8601 duration string to seconds
+
+          Format Examples:
+          - "PT4M13S" = 4 minutes, 13 seconds = 253 seconds
+          - "PT1H30M" = 1 hour, 30 minutes = 5400 seconds
+          - "PT45S" = 45 seconds
+          - "PT2H" = 2 hours = 7200 seconds
+
+          Implementation:
+          - Use regex to extract hours (H), minutes (M), seconds (S)
+          - Convert to total seconds: (hours * 3600) + (minutes * 60) + seconds
+          - Handle missing components gracefully (e.g., "PT45S" has no hours/minutes)
+        </iso8601-duration-parsing>
+      </implementation-patterns>
+    </architecture-patterns>
+  </architecture-guidelines>
+
+  <existing-code-artifacts>
+    <!-- Code from Stories 3.1 and 3.2 that Story 3.3 depends on -->
+    <artifact path="ai-video-generator/src/lib/youtube/client.ts" status="exists" from-story="3.1">
+      <description>
+        YouTubeAPIClient class with API authentication, quota tracking, rate limiting, and error handling.
+
+        Key Methods:
+        - constructor(apiKey?: string): Initialize client with API key validation
+        - searchVideos(query: string, options?: SearchOptions): Promise&lt;VideoResult[]&gt;
+        - getQuotaUsage(): QuotaUsage
+        - isQuotaExceeded(): boolean
+
+        Supporting Modules:
+        - QuotaTracker: Tracks API quota usage (10,000 units/day limit)
+        - RateLimiter: Enforces 100 requests per 100 seconds
+        - RetryHandler: Exponential backoff retry logic (max 3 attempts)
+        - YouTubeLogger: Structured logging
+        - YouTubeErrorHandler: Error transformation and handling
+      </description>
+
+      <extends-for-story-3.3>
+        MUST ADD:
+        - searchVideos() already exists but needs duration retrieval enhancement
+        - Add videos.list API call after search.list to get contentDetails.duration
+        - Parse ISO 8601 duration format and convert to seconds
+        - Add duration field to VideoResult interface
+        - Implement searchWithMultipleQueries() method for multi-query aggregation
+      </extends-for-story-3.3>
+
+      <key-code-sections>
+        <!-- searchVideos() method (Lines 113-202) -->
+        - Input validation (query sanitization, maxResults bounds checking)
+        - Quota availability check before search
+        - Rate limiter acquisition
+        - YouTube search.list API call with retry logic
+        - Result transformation to VideoResult format
+        - Quota usage increment (100 units per search)
+        - Structured logging
+      </key-code-sections>
+    </artifact>
+
+    <artifact path="ai-video-generator/src/lib/youtube/analyze-scene.ts" status="exists" from-story="3.2">
+      <description>
+        analyzeSceneForVisuals() function that uses LLM to extract visual themes and generate search queries.
+
+        Function Signature:
+        async function analyzeSceneForVisuals(sceneText: string): Promise&lt;SceneAnalysis&gt;
+
+        Returns:
+        - mainSubject: Primary visual subject (e.g., "lion")
+        - setting: Environment (e.g., "savanna")
+        - mood: Atmosphere/tone (e.g., "sunset")
+        - action: Key movement (e.g., "roaming")
+        - keywords: Additional search terms
+        - primaryQuery: Main search query (e.g., "lion savanna sunset wildlife")
+        - alternativeQueries: 2-3 alternative queries
+        - contentType: Scene category (GAMEPLAY, TUTORIAL, NATURE, B_ROLL, etc.)
+
+        Error Handling:
+        - 10-second timeout with fallback to keyword extraction
+        - Retry logic (1x) for empty/invalid responses
+        - Graceful degradation when LLM unavailable
+      </description>
+
+      <usage-in-story-3.3>
+        Called by POST /api/projects/[id]/generate-visuals endpoint for each scene:
+        1. Load scene text from database
+        2. Call analyzeSceneForVisuals(scene.text)
+        3. Extract primaryQuery and alternativeQueries from result
+        4. Pass queries to searchWithMultipleQueries()
+        5. Use contentType for filtering in Story 3.4 (future)
+      </usage-in-story-3.3>
+    </artifact>
+
+    <artifact path="ai-video-generator/src/lib/youtube/types.ts" status="exists" from-story="3.1-3.2">
+      <description>
+        TypeScript type definitions for YouTube integration.
+
+        Key Interfaces:
+        - VideoResult: Search result from YouTube API
+        - SearchOptions: Search parameters
+        - SceneAnalysis: LLM analysis output with queries
+        - QuotaUsage: Quota tracking information
+        - YouTubeError: Custom error class
+        - YouTubeErrorCode: Error code enum
+        - ContentType: Scene category enum
+      </description>
+
+      <critical-for-story-3.3>
+        VideoResult interface (Lines 105-116):
+        - videoId: string
+        - title: string
+        - thumbnailUrl: string
+        - channelTitle: string
+        - embedUrl: string
+        - publishedAt: string
+        - description: string
+        - viewCount?: number
+        - likeCount?: number
+        - duration?: string  [CRITICAL: Must be populated in Story 3.3]
+
+        NOTE: duration field currently optional, must be made required and populated with seconds value
+      </critical-for-story-3.3>
+    </artifact>
+
+    <artifact path="ai-video-generator/src/lib/db/client.ts" status="exists" from-epic="1">
+      <description>
+        SQLite database client using better-sqlite3.
+
+        Features:
+        - Database file: ai-video-generator.db at project root
+        - Foreign key constraints enabled
+        - Exported as default instance
+
+        Usage Pattern:
+        import db from '@/lib/db/client';
+        const stmt = db.prepare('SELECT * FROM scenes WHERE project_id = ?');
+        const results = stmt.all(projectId);
+      </description>
+
+      <usage-in-story-3.3>
+        Database operations for Story 3.3:
+        1. Query scenes table to load all scenes for project
+        2. Insert visual suggestions into visual_suggestions table
+        3. Update project.visuals_generated = true
+        4. Use transactions for atomicity
+      </usage-in-story-3.3>
+    </artifact>
+
+    <artifact path="ai-video-generator/src/lib/db/queries.ts" status="exists" from-epic="1-2">
+      <description>
+        Reusable database query functions.
+
+        Existing Functions (from Epic 1-2):
+        - getAllProjects()
+        - createProject()
+        - updateProjectLastActive()
+        - getProjectById()
+        - saveScene()
+        - getScenesByProjectId()
+
+        MUST ADD for Story 3.3:
+        - saveVisualSuggestions(sceneId, suggestions[])
+        - getVisualSuggestions(sceneId)
+        - updateProjectVisualsGenerated(projectId, generated: boolean)
+      </description>
+    </artifact>
+
+    <artifact path="ai-video-generator/src/lib/llm/factory.ts" status="exists" from-epic="1">
+      <description>
+        LLM provider factory function.
+
+        Function Signature:
+        function createLLMProvider(): LLMProvider
+
+        Returns:
+        - OllamaProvider if LLM_PROVIDER=ollama (default)
+        - GeminiProvider if LLM_PROVIDER=gemini
+
+        Used By:
+        - analyzeSceneForVisuals() from Story 3.2
+        - Follows Epic 1 LLM provider abstraction pattern
+      </description>
+    </artifact>
+  </existing-code-artifacts>
+
+  <database-schema>
+    <!-- Visual Suggestions Table Schema -->
+    <table name="visual_suggestions">
+      <sql dialect="SQLite">
+        CREATE TABLE visual_suggestions (
+          id TEXT PRIMARY KEY,
+          scene_id TEXT NOT NULL,
+          video_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          thumbnail_url TEXT,
+          channel_title TEXT,
+          embed_url TEXT NOT NULL,
+          rank INTEGER NOT NULL,
+          duration INTEGER,
+          default_segment_path TEXT,
+          download_status TEXT DEFAULT 'pending',
+          created_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX idx_visual_suggestions_scene ON visual_suggestions(scene_id);
+      </sql>
+
+      <field-descriptions>
+        <field name="id">
+          Type: TEXT (SQLite-compatible)
+          Description: Primary key, generated via crypto.randomUUID()
+          Example: "550e8400-e29b-41d4-a716-446655440000"
+        </field>
+
+        <field name="scene_id">
+          Type: TEXT
+          Description: Foreign key to scenes.id (CASCADE DELETE)
+          Constraint: NOT NULL, must reference existing scene
+        </field>
+
+        <field name="video_id">
+          Type: TEXT
+          Description: YouTube video ID (11 characters)
+          Example: "dQw4w9WgXcQ"
+          Constraint: NOT NULL
+        </field>
+
+        <field name="title">
+          Type: TEXT
+          Description: Video title from YouTube API
+          Example: "Lion Pride Documentary - African Wildlife"
+          Constraint: NOT NULL
+        </field>
+
+        <field name="thumbnail_url">
+          Type: TEXT
+          Description: Thumbnail image URL from YouTube
+          Example: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+          Nullable: YES (some videos may lack thumbnails)
+        </field>
+
+        <field name="channel_title">
+          Type: TEXT
+          Description: YouTube channel name
+          Example: "National Geographic"
+          Nullable: YES
+        </field>
+
+        <field name="embed_url">
+          Type: TEXT
+          Description: Embeddable video URL
+          Format: "https://www.youtube.com/embed/${videoId}"
+          Example: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+          Constraint: NOT NULL (required for playback)
+        </field>
+
+        <field name="rank">
+          Type: INTEGER
+          Description: Suggestion ranking (1 = top result, 2 = second, etc.)
+          Range: 1-15 (typically 5-8 suggestions per scene)
+          Constraint: NOT NULL
+          Purpose: Enables ordering suggestions by relevance
+        </field>
+
+        <field name="duration">
+          Type: INTEGER
+          Description: Video duration in seconds
+          Example: 253 (for 4 minutes 13 seconds)
+          Source: Converted from ISO 8601 format ("PT4M13S") from YouTube API
+          Purpose: Used by Story 3.4 duration filtering and Story 3.6 segment downloads
+          Nullable: YES (backward compatibility)
+        </field>
+
+        <field name="default_segment_path">
+          Type: TEXT
+          Description: File path to downloaded default video segment (Story 3.6)
+          Example: ".cache/videos/{projectId}/scene-1-default.mp4"
+          Nullable: YES (NULL until download completes)
+          Purpose: Enables instant preview in Epic 4 curation UI
+        </field>
+
+        <field name="download_status">
+          Type: TEXT
+          Description: Download status tracking (Story 3.6)
+          Values: 'pending' | 'downloading' | 'complete' | 'error'
+          Default: 'pending'
+          Purpose: Track default segment download progress
+        </field>
+
+        <field name="created_at">
+          Type: TEXT (ISO 8601 timestamp)
+          Description: Record creation timestamp
+          Format: "2025-11-16T10:30:00.000Z"
+          Default: datetime('now') (SQLite function)
+        </field>
+      </field-descriptions>
+
+      <indexes>
+        <index name="idx_visual_suggestions_scene">
+          Column: scene_id
+          Purpose: Optimize queries retrieving all suggestions for a scene
+          Query Pattern: SELECT * FROM visual_suggestions WHERE scene_id = ? ORDER BY rank ASC
+        </index>
+      </indexes>
+
+      <foreign-keys>
+        <foreign-key>
+          Column: scene_id
+          References: scenes(id)
+          On Delete: CASCADE
+          Purpose: Maintain referential integrity; when scene deleted, all suggestions deleted
+        </foreign-key>
+      </foreign-keys>
+
+      <critical-notes>
+        <note priority="HIGH">
+          Schema uses SQLite-compatible types (TEXT, INTEGER) NOT PostgreSQL types (UUID, TIMESTAMP).
+          This is intentional for local SQLite database architecture.
+        </note>
+
+        <note priority="HIGH">
+          project_id is NOT stored in visual_suggestions table (normalized design).
+          To get project_id: JOIN visual_suggestions → scenes → projects.
+        </note>
+
+        <note priority="MEDIUM">
+          rank field enables Story 3.4 filtering and ranking (1 = highest relevance).
+          Must be set during insertion based on result order.
+        </note>
+
+        <note priority="MEDIUM">
+          duration field is CRITICAL for Story 3.4 duration filtering (1x-3x ratio, 5 min max).
+          Must be populated from YouTube API videos.list contentDetails.duration.
+        </note>
+
+        <note priority="LOW">
+          download_status and default_segment_path are prepared for Story 3.6 (not used in Story 3.3).
+        </note>
+      </critical-notes>
+    </table>
+
+    <scenes-table-reference>
+      <!-- Existing scenes table from Epic 2 (reference for foreign key) -->
+      <sql>
+        CREATE TABLE scenes (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          scene_number INTEGER NOT NULL,
+          text TEXT NOT NULL,
+          audio_file_path TEXT,
+          duration REAL,
+          created_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+      </sql>
+
+      <usage-in-story-3.3>
+        - Query to load all scenes: SELECT * FROM scenes WHERE project_id = ? ORDER BY scene_number ASC
+        - scene_id foreign key links visual_suggestions to specific scene
+        - scene.text passed to analyzeSceneForVisuals() for search query generation
+        - scene.duration used for duration filtering in Story 3.4 (1x-3x ratio)
+      </usage-in-story-3.3>
+    </scenes-table-reference>
+  </database-schema>
+
+  <acceptance-criteria>
+    <!-- All AC from story-3.3.md with implementation guidance -->
+    <ac id="AC1" priority="CRITICAL">
+      <title>searchVideos() Implementation</title>
+      <requirements>
+        - searchVideos() accepts search query string and optional SearchOptions
+        - Returns array of VideoResult objects with complete metadata
+        - Each result includes: videoId, title, thumbnailUrl, channelTitle, embedUrl, duration
+        - Duration field contains video length in seconds (converted from ISO 8601)
+        - Constructs embedUrl correctly: https://www.youtube.com/embed/${videoId}
+        - Applies videoEmbeddable=true filter (only embeddable videos returned)
+        - Returns 10-15 videos per query (configurable via maxResults)
+        - Uses relevanceLanguage='en' by default (configurable)
+      </requirements>
+
+      <implementation-notes>
+        CRITICAL: Must add duration retrieval to existing searchVideos() method:
+        1. After search.list API call, extract video IDs from results
+        2. Make additional videos.list API call with contentDetails part
+        3. Parse contentDetails.duration (ISO 8601 format, e.g., "PT4M13S")
+        4. Convert to seconds: "PT4M13S" = 4*60 + 13 = 253 seconds
+        5. Add duration field to each VideoResult object
+        6. Update quota tracking: search.list (100 units) + videos.list (1 unit) = 101 units total
+      </implementation-notes>
+
+      <test-scenarios>
+        - Test with query "gaming highlights" returns 10-15 videos with duration in seconds
+        - Test embedUrl format: https://www.youtube.com/embed/{videoId}
+        - Test duration parsing: "PT4M13S" → 253 seconds, "PT1H30M" → 5400 seconds
+        - Test videoEmbeddable filter: all results must be embeddable
+      </test-scenarios>
+    </ac>
+
+    <ac id="AC2" priority="HIGH">
+      <title>Multi-Query Search and Deduplication</title>
+      <requirements>
+        - searchWithMultipleQueries() executes searches for all provided queries
+        - Aggregates results from primary and alternative queries
+        - Deduplicates by videoId (no duplicate videos in final result)
+        - Preserves relevance ordering (primary query results prioritized)
+        - Handles partial failures (some queries succeed, others fail)
+      </requirements>
+
+      <implementation-notes>
+        Algorithm:
+        1. Execute searchVideos(primaryQuery)
+        2. For each alternativeQuery: execute searchVideos(alternativeQuery)
+        3. Aggregate all results: results = [...primaryResults, ...alt1Results, ...alt2Results]
+        4. Deduplicate using Map or Set keyed by videoId
+        5. Preserve primary query order (primary results first, then alternatives)
+        6. Return deduplicated array
+
+        Error Handling:
+        - If primary query fails: Throw error (scene cannot proceed without primary results)
+        - If alternative query fails: Log warning, continue with other queries
+        - Collect errors in array for response.errors field
+      </implementation-notes>
+
+      <test-scenarios>
+        - Test with 3 queries (1 primary, 2 alternatives) returns combined results without duplicates
+        - Test deduplication: If same video appears in multiple queries, only included once
+        - Test ordering: Primary query results appear before alternative query results
+        - Test partial failure: If alternative query fails, primary results still returned
+      </test-scenarios>
+    </ac>
+
+    <ac id="AC3" priority="CRITICAL">
+      <title>POST /api/projects/[id]/generate-visuals Endpoint</title>
+      <requirements>
+        - Endpoint accepts projectId parameter
+        - Loads all scenes for project from database
+        - For each scene: analyzes text → generates queries → searches YouTube → stores suggestions
+        - Returns success response with scenesProcessed and suggestionsGenerated counts
+        - Updates project.visuals_generated = true on success
+        - Processes all scenes even if some fail (collects errors)
+      </requirements>
+
+      <implementation-notes>
+        Flow:
+        1. Validate projectId (must exist in database)
+        2. Query: SELECT * FROM scenes WHERE project_id = ? ORDER BY scene_number ASC
+        3. For each scene:
+           a. Call analyzeSceneForVisuals(scene.text) → SceneAnalysis
+           b. Extract primaryQuery and alternativeQueries
+           c. Call searchWithMultipleQueries([primaryQuery, ...alternativeQueries])
+           d. Collect results for database persistence
+        4. For each scene's results:
+           a. Call saveVisualSuggestions(sceneId, results)
+           b. Rank suggestions 1-N based on order
+        5. Update: UPDATE projects SET visuals_generated = true WHERE id = ?
+        6. Return response:
+           {
+             success: true,
+             scenesProcessed: 5,
+             suggestionsGenerated: 25,
+             errors: []
+           }
+
+        Error Handling:
+        - Scene analysis fails: Log error, add to errors[], continue with next scene
+        - YouTube search fails: Log error, add to errors[], continue with next scene
+        - Database save fails: Rollback transaction, return error response
+        - Partial success model: Process all scenes even if some fail
+      </implementation-notes>
+
+      <test-scenarios>
+        - Test with 5-scene project: All scenes processed, suggestions generated
+        - Test with 1 failed scene: Other 4 scenes process successfully, error collected
+        - Test response format: scenesProcessed=5, suggestionsGenerated=25 (5 scenes × 5 videos)
+        - Test project.visuals_generated flag: Set to true on completion
+      </test-scenarios>
+    </ac>
+
+    <ac id="AC4" priority="CRITICAL">
+      <title>Database Persistence</title>
+      <requirements>
+        - visual_suggestions table created with SQLite-compatible schema
+        - Schema uses TEXT PRIMARY KEY (not UUID type)
+        - Schema uses TEXT DEFAULT (datetime('now')) for timestamps (not TIMESTAMP type)
+        - Schema includes all required fields: id, scene_id, video_id, title, thumbnail_url, channel_title, embed_url, rank, duration, default_segment_path, download_status, created_at
+        - Schema does NOT include redundant project_id foreign key
+        - Schema does NOT include removed fields: description, channel_id, published_at, search_query, relevance_score
+        - saveVisualSuggestions() batch inserts all suggestions for a scene with rank values
+        - Rank values are sequential integers (1, 2, 3, ..., 15) based on result order
+        - Duration field is persisted from VideoResult.duration
+        - Foreign key enforces referential integrity (cascade deletes on scene_id)
+        - Index created on scene_id for query performance
+      </requirements>
+
+      <implementation-notes>
+        saveVisualSuggestions(sceneId: string, suggestions: VideoResult[]): void
+
+        Algorithm:
+        1. Begin transaction
+        2. For each suggestion with index i:
+           - Generate id = crypto.randomUUID()
+           - rank = i + 1 (1-indexed)
+           - INSERT INTO visual_suggestions (id, scene_id, video_id, title, thumbnail_url, channel_title, embed_url, rank, duration, download_status)
+           - VALUES (id, sceneId, suggestion.videoId, suggestion.title, suggestion.thumbnailUrl, suggestion.channelTitle, suggestion.embedUrl, rank, suggestion.duration, 'pending')
+        3. Commit transaction
+        4. If error: Rollback transaction, throw error
+
+        getVisualSuggestions(sceneId: string): VisualSuggestion[]
+
+        Algorithm:
+        1. Query: SELECT * FROM visual_suggestions WHERE scene_id = ? ORDER BY rank ASC
+        2. Return all results (sorted by rank 1-15)
+      </implementation-notes>
+
+      <test-scenarios>
+        - Test schema creation: Table exists with all required fields
+        - Test field types: id is TEXT, rank is INTEGER, duration is INTEGER
+        - Test saveVisualSuggestions: Inserts 5 suggestions with ranks 1-5
+        - Test rank ordering: getVisualSuggestions returns results in rank order
+        - Test foreign key: Deleting scene cascades to delete all suggestions
+        - Test index: Query performance optimized for scene_id lookups
+      </test-scenarios>
+    </ac>
+
+    <ac id="AC5" priority="MEDIUM">
+      <title>GET /api/projects/[id]/visual-suggestions Endpoint</title>
+      <requirements>
+        - Returns all suggestions for project in format: { suggestions: VisualSuggestion[] }
+        - Does NOT include totalScenes or scenesWithSuggestions metadata
+        - Orders results by scene order, then rank ASC
+        - Returns empty array when no suggestions exist (not error)
+      </requirements>
+
+      <implementation-notes>
+        Flow:
+        1. Validate projectId
+        2. Query scenes: SELECT id FROM scenes WHERE project_id = ? ORDER BY scene_number ASC
+        3. For each scene: Call getVisualSuggestions(sceneId)
+        4. Aggregate all suggestions into single array
+        5. Return: { suggestions: VisualSuggestion[] }
+
+        Note: Response structure simplified (removed totalScenes, scenesWithSuggestions)
+      </implementation-notes>
+
+      <test-scenarios>
+        - Test with 5 scenes, 5 suggestions each: Returns 25 suggestions
+        - Test ordering: Suggestions for scene 1 appear before scene 2
+        - Test empty state: Project with no suggestions returns { suggestions: [] }
+        - Test response format: Only contains suggestions array (no metadata)
+      </test-scenarios>
+    </ac>
+
+    <ac id="AC6" priority="HIGH">
+      <title>Error Handling</title>
+      <requirements>
+        - API quota exceeded: returns user-friendly error message, doesn't crash
+        - Zero results for query: returns empty array, passes to Story 3.4 filter
+        - Network errors: retry with exponential backoff (max 3 retries)
+        - Invalid query: logs warning, skips query, continues processing
+        - Database errors: transaction rollback, error details in response
+        - Partial failures: collects errors in response.errors[], continues processing
+      </requirements>
+
+      <implementation-notes>
+        Scenario 1: API Quota Exceeded
+        - Detection: YouTubeError with code QUOTA_EXCEEDED
+        - Response: { success: false, error: "YouTube API quota exceeded. Try again tomorrow." }
+        - Don't crash endpoint, return partial results if some scenes processed
+
+        Scenario 2: Zero Results
+        - Detection: searchVideos() returns []
+        - Response: saveVisualSuggestions(sceneId, []) → 0 suggestions stored
+        - NOT an error, valid outcome
+        - Story 3.5 UI will display "No videos found" message
+
+        Scenario 3: Network Errors
+        - Detection: Network timeout, connection refused
+        - Response: RetryHandler executes with exponential backoff (1s, 2s, 4s delays)
+        - Max 3 retries, then fail with error message
+
+        Scenario 4: Invalid Query
+        - Detection: Empty query string, special characters
+        - Response: Log warning, skip query, continue with alternatives
+
+        Scenario 5: Database Errors
+        - Detection: SQLite constraint violation, write failure
+        - Response: Rollback transaction, return error details
+      </implementation-notes>
+
+      <test-scenarios>
+        - Test quota exceeded: Returns error, doesn't crash, partial results included
+        - Test zero results: Empty array stored, no error thrown
+        - Test network retry: 3 attempts with exponential backoff
+        - Test invalid query: Warning logged, processing continues
+        - Test database error: Transaction rolled back, error returned
+      </test-scenarios>
+    </ac>
+
+    <ac id="AC7" priority="MEDIUM">
+      <title>Integration Test Case - Zero Results Scenario</title>
+      <requirements>
+        - When YouTube returns 0 results for a search query, system passes empty array to Story 3.4 filter
+        - Empty array triggers fallback or empty state in Story 3.5 AC6
+        - Scene with 0 suggestions doesn't crash visual selection UI
+        - User sees "No videos found" message in Story 3.5
+      </requirements>
+
+      <implementation-notes>
+        Test Flow:
+        1. Create scene with text that has no YouTube results (e.g., "zxcvbnmasdfghjkl")
+        2. Call analyzeSceneForVisuals() → generates queries
+        3. Call searchVideos() → returns []
+        4. Call saveVisualSuggestions(sceneId, []) → stores 0 suggestions
+        5. Verify database: SELECT COUNT(*) FROM visual_suggestions WHERE scene_id = ? → 0
+        6. Verify response: scenesProcessed=1, suggestionsGenerated=0, no errors
+        7. Verify Story 3.5 UI: Displays "No videos found" message (not implemented in Story 3.3)
+      </implementation-notes>
+
+      <test-scenarios>
+        - Test with nonsense query: Returns empty array, no error
+        - Test database state: 0 suggestions stored for scene
+        - Test response: Success with 0 suggestionsGenerated
+        - Test UI (Story 3.5): Empty state message displayed
+      </test-scenarios>
+    </ac>
+  </acceptance-criteria>
+
+  <implementation-checklist>
+    <!-- Tasks from story converted to implementation checklist -->
+    <task id="1" priority="CRITICAL" status="pending">
+      <title>Extend searchVideos() Method with Duration Retrieval</title>
+      <file>ai-video-generator/src/lib/youtube/client.ts</file>
+      <subtasks>
+        <subtask>Add videos.list API call after search.list to retrieve contentDetails.duration</subtask>
+        <subtask>Parse ISO 8601 duration format (e.g., "PT4M13S") to seconds (253)</subtask>
+        <subtask>Update VideoResult.duration field with parsed seconds value</subtask>
+        <subtask>Update quota tracking: search.list (100 units) + videos.list (1 unit) = 101 units</subtask>
+        <subtask>Add unit tests for ISO 8601 duration parsing</subtask>
+        <subtask>Verify embedUrl construction: https://www.youtube.com/embed/${videoId}</subtask>
+      </subtasks>
+    </task>
+
+    <task id="2" priority="HIGH" status="pending">
+      <title>Implement Multi-Query Search with Deduplication</title>
+      <file>ai-video-generator/src/lib/youtube/client.ts or search.ts</file>
+      <subtasks>
+        <subtask>Create searchWithMultipleQueries() method accepting queries array</subtask>
+        <subtask>Execute searchVideos() for primary query</subtask>
+        <subtask>Execute searchVideos() for each alternative query</subtask>
+        <subtask>Aggregate results into single array</subtask>
+        <subtask>Deduplicate by videoId using Map or Set</subtask>
+        <subtask>Preserve relevance ordering (primary results first)</subtask>
+        <subtask>Handle partial failures (collect errors, continue processing)</subtask>
+        <subtask>Add unit tests for deduplication logic</subtask>
+      </subtasks>
+    </task>
+
+    <task id="3" priority="CRITICAL" status="pending">
+      <title>Create POST /api/projects/[id]/generate-visuals Endpoint</title>
+      <file>ai-video-generator/app/api/projects/[id]/generate-visuals/route.ts</file>
+      <subtasks>
+        <subtask>Validate projectId parameter (must exist in database)</subtask>
+        <subtask>Load all scenes for project: SELECT * FROM scenes WHERE project_id = ? ORDER BY scene_number ASC</subtask>
+        <subtask>For each scene: call analyzeSceneForVisuals(scene.text)</subtask>
+        <subtask>Extract primaryQuery and alternativeQueries from SceneAnalysis</subtask>
+        <subtask>Call searchWithMultipleQueries([primaryQuery, ...alternativeQueries])</subtask>
+        <subtask>Aggregate suggestions across all scenes</subtask>
+        <subtask>Call saveVisualSuggestions(sceneId, results) for each scene</subtask>
+        <subtask>Update project: UPDATE projects SET visuals_generated = true WHERE id = ?</subtask>
+        <subtask>Return response: { success, scenesProcessed, suggestionsGenerated, errors }</subtask>
+        <subtask>Implement error handling with partial success model</subtask>
+        <subtask>Add integration tests for full workflow</subtask>
+      </subtasks>
+    </task>
+
+    <task id="4" priority="CRITICAL" status="pending">
+      <title>Create visual_suggestions Database Table and Persistence Logic</title>
+      <files>
+        <file>ai-video-generator/src/lib/db/migrations/003_visual_suggestions.ts</file>
+        <file>ai-video-generator/src/lib/db/queries.ts</file>
+      </files>
+      <subtasks>
+        <subtask>Create migration script for visual_suggestions table</subtask>
+        <subtask>Define schema with SQLite-compatible types (TEXT, INTEGER)</subtask>
+        <subtask>Add foreign key: FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE</subtask>
+        <subtask>Create index: CREATE INDEX idx_visual_suggestions_scene ON visual_suggestions(scene_id)</subtask>
+        <subtask>Implement saveVisualSuggestions(sceneId, suggestions[]) with batch insert and ranking</subtask>
+        <subtask>Implement getVisualSuggestions(sceneId) with ORDER BY rank ASC</subtask>
+        <subtask>Implement updateProjectVisualsGenerated(projectId, generated)</subtask>
+        <subtask>Add transaction support for atomicity</subtask>
+        <subtask>Add database integration tests</subtask>
+        <subtask>Verify cascade delete behavior</subtask>
+      </subtasks>
+    </task>
+
+    <task id="5" priority="MEDIUM" status="pending">
+      <title>Create GET /api/projects/[id]/visual-suggestions Endpoint</title>
+      <file>ai-video-generator/app/api/projects/[id]/visual-suggestions/route.ts</file>
+      <subtasks>
+        <subtask>Validate projectId parameter</subtask>
+        <subtask>Load all scenes: SELECT id FROM scenes WHERE project_id = ? ORDER BY scene_number ASC</subtask>
+        <subtask>For each scene: call getVisualSuggestions(sceneId)</subtask>
+        <subtask>Aggregate suggestions into single array</subtask>
+        <subtask>Return response: { suggestions: VisualSuggestion[] }</subtask>
+        <subtask>Handle empty state: return empty array (not error)</subtask>
+        <subtask>Add integration tests</subtask>
+      </subtasks>
+    </task>
+
+    <task id="6" priority="HIGH" status="pending">
+      <title>Implement Comprehensive Error Handling</title>
+      <files>All above files</files>
+      <subtasks>
+        <subtask>API Quota Exceeded: Catch error, return user-friendly message, don't crash</subtask>
+        <subtask>Zero Results: Return empty array, store 0 suggestions, no error</subtask>
+        <subtask>Network Errors: Implement retry with exponential backoff (max 3 attempts)</subtask>
+        <subtask>Invalid Query: Log warning, skip query, continue with alternatives</subtask>
+        <subtask>Database Errors: Transaction rollback, return error details</subtask>
+        <subtask>Partial Failures: Collect errors in response.errors[], continue processing</subtask>
+        <subtask>Add error handling tests for all scenarios</subtask>
+        <subtask>Verify graceful degradation</subtask>
+      </subtasks>
+    </task>
+
+    <task id="7" priority="LOW" status="pending">
+      <title>Documentation and Code Review</title>
+      <subtasks>
+        <subtask>Add JSDoc comments to all new functions</subtask>
+        <subtask>Update API documentation</subtask>
+        <subtask>Add inline code comments for complex logic</subtask>
+        <subtask>Update README if needed</subtask>
+        <subtask>Self-review code for style consistency</subtask>
+        <subtask>Verify all acceptance criteria met</subtask>
+      </subtasks>
+    </task>
+  </implementation-checklist>
+
+  <integration-notes>
+    <integration-with-story-3.1>
+      <dependency>YouTubeAPIClient class</dependency>
+      <usage>
+        - Use existing searchVideos() method as foundation
+        - Extend with duration retrieval via videos.list API call
+        - Leverage existing quota tracking, rate limiting, error handling
+        - Follow same error handling patterns (YouTubeError, retry logic)
+      </usage>
+    </integration-with-story-3.1>
+
+    <integration-with-story-3.2>
+      <dependency>analyzeSceneForVisuals() function</dependency>
+      <usage>
+        - Call for each scene to generate search queries
+        - Extract primaryQuery and alternativeQueries from SceneAnalysis
+        - Pass queries to searchWithMultipleQueries()
+        - Use contentType for Story 3.4 filtering (future enhancement)
+      </usage>
+    </integration-with-story-3.2>
+
+    <integration-with-epic-1>
+      <dependency>LLM Provider Abstraction</dependency>
+      <usage>
+        - analyzeSceneForVisuals() uses createLLMProvider() from Epic 1
+        - Supports both Ollama (local) and Gemini (cloud) providers
+        - No provider-specific logic in Story 3.3 code
+      </usage>
+    </integration-with-epic-1>
+
+    <integration-with-epic-2>
+      <dependency>Scenes Table and Voiceover Data</dependency>
+      <usage>
+        - Load scenes from database: SELECT * FROM scenes WHERE project_id = ?
+        - scene.text passed to analyzeSceneForVisuals()
+        - scene.duration used for Story 3.4 duration filtering (future)
+        - Workflow trigger: After voiceover generation completes (Epic 2 Story 2.5)
+      </usage>
+    </integration-with-epic-2>
+
+    <integration-with-story-3.4>
+      <provides>Visual suggestions in database for filtering and ranking</provides>
+      <data-flow>
+        Story 3.3 stores raw YouTube search results with duration →
+        Story 3.4 applies duration filtering (1x-3x, max 5 min) and quality ranking →
+        Story 3.5 stores filtered results in database
+      </data-flow>
+    </integration-with-story-3.4>
+
+    <integration-with-story-3.5>
+      <provides>Database schema and persistence layer</provides>
+      <data-flow>
+        Story 3.3 creates visual_suggestions table and saveVisualSuggestions() function →
+        Story 3.5 uses table for workflow integration and progress tracking
+      </data-flow>
+    </integration-with-story-3.5>
+
+    <integration-with-story-3.6>
+      <prepares-for>Default segment downloads</prepares-for>
+      <data-flow>
+        Story 3.3 stores duration field in visual_suggestions table →
+        Story 3.6 uses duration to calculate segment length (scene.duration + 5s buffer) →
+        Story 3.6 downloads default segments and updates default_segment_path and download_status
+      </data-flow>
+    </integration-with-story-3.6>
+  </integration-notes>
+
+  <technical-notes>
+    <youtube-api-quotas>
+      <daily-limit>10,000 units (default free tier)</daily-limit>
+      <cost-per-search>
+        - search.list: 100 quota units
+        - videos.list: 1 quota unit
+        - Total per search: 101 units
+        - Searches per day: ~99 searches (10,000 / 101)
+      </cost-per-search>
+      <monitoring>
+        - Implement quota tracking in YouTubeAPIClient
+        - Log quota usage after each search
+        - Warn user when quota exceeds 80% (8,000 units)
+        - Provide quota reset time in error messages
+      </monitoring>
+    </youtube-api-quotas>
+
+    <iso8601-duration-format>
+      <format>PT[hours]H[minutes]M[seconds]S</format>
+      <examples>
+        - "PT4M13S" = 4 minutes, 13 seconds = 253 seconds
+        - "PT1H30M" = 1 hour, 30 minutes = 5400 seconds
+        - "PT45S" = 45 seconds
+        - "PT2H5M10S" = 2 hours, 5 minutes, 10 seconds = 7510 seconds
+      </examples>
+      <parsing-algorithm>
+        1. Use regex to extract hours (H), minutes (M), seconds (S)
+        2. Convert to total seconds: (hours * 3600) + (minutes * 60) + seconds
+        3. Handle missing components gracefully (e.g., "PT45S" has no hours/minutes)
+      </parsing-algorithm>
+    </iso8601-duration-format>
+
+    <database-design-patterns>
+      <sqlite-compatibility>
+        - Use TEXT for primary keys (crypto.randomUUID())
+        - Use TEXT for timestamps with DEFAULT (datetime('now'))
+        - Use INTEGER for numeric fields (rank, duration)
+        - NO UUID type (not supported in SQLite)
+        - NO TIMESTAMP type (use TEXT with ISO 8601)
+      </sqlite-compatibility>
+
+      <normalization>
+        - project_id NOT stored in visual_suggestions table
+        - To get project_id: JOIN visual_suggestions → scenes → projects
+        - Reduces redundancy and maintains single source of truth
+      </normalization>
+
+      <cascade-deletes>
+        - Foreign key on scene_id with ON DELETE CASCADE
+        - When scene deleted, all visual suggestions automatically deleted
+        - Maintains referential integrity
+      </cascade-deletes>
+    </database-design-patterns>
+
+    <performance-optimization>
+      <batch-operations>
+        - Use transactions for batch inserts (saveVisualSuggestions)
+        - Single transaction for all suggestions per scene
+        - Rollback on error ensures atomicity
+      </batch-operations>
+
+      <query-optimization>
+        - Index on scene_id for fast lookups
+        - ORDER BY rank ASC for sorted results
+        - Avoid N+1 queries (batch load scenes)
+      </query-optimization>
+
+      <caching-future-enhancement>
+        - Consider caching search results for 5 minutes
+        - Cache key: hash(query + maxResults + filters)
+        - Reduces API calls for repeated queries
+        - Not implemented in MVP (future optimization)
+      </caching-future-enhancement>
+    </performance-optimization>
+  </technical-notes>
+</story-context>
