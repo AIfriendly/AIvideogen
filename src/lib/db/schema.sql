@@ -76,3 +76,28 @@ CREATE TABLE IF NOT EXISTS scenes (
 -- Indexes on scenes for performance
 CREATE INDEX IF NOT EXISTS idx_scenes_project ON scenes(project_id);
 CREATE INDEX IF NOT EXISTS idx_scenes_number ON scenes(scene_number);
+
+-- ============================================================================
+-- Epic 3: Visual Content Sourcing
+-- ============================================================================
+
+-- Visual Suggestions Table
+-- Stores YouTube video suggestions for each scene with ranking
+CREATE TABLE IF NOT EXISTS visual_suggestions (
+  id TEXT PRIMARY KEY,
+  scene_id TEXT NOT NULL,
+  video_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  thumbnail_url TEXT,
+  channel_title TEXT,
+  embed_url TEXT NOT NULL,
+  rank INTEGER NOT NULL,
+  duration INTEGER,
+  default_segment_path TEXT,
+  download_status TEXT DEFAULT 'pending',
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+);
+
+-- Index on scene_id for performance
+CREATE INDEX IF NOT EXISTS idx_visual_suggestions_scene ON visual_suggestions(scene_id);

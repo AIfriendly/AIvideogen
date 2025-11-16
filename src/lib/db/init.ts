@@ -72,6 +72,23 @@ async function runMigrations(): Promise<void> {
     console.log(`Migration ${migration002Name} already applied, skipping`);
   }
 
+  // Migration 003: Visual Suggestions Schema (Epic 3)
+  const migration003Name = '003_visual_suggestions_schema';
+  if (!isMigrationApplied(migration003Name)) {
+    console.log(`Applying migration: ${migration003Name}`);
+    try {
+      const { up } = await import('./migrations/003_visual_suggestions_schema');
+      up(db);
+      markMigrationApplied(migration003Name);
+      console.log(`Migration ${migration003Name} applied successfully`);
+    } catch (error) {
+      console.error(`Failed to apply migration ${migration003Name}:`, error);
+      throw error;
+    }
+  } else {
+    console.log(`Migration ${migration003Name} already applied, skipping`);
+  }
+
   console.log('All migrations completed');
 }
 

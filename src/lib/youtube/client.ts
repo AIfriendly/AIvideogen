@@ -94,11 +94,12 @@ export class YouTubeAPIClient {
    * Search for videos on YouTube
    *
    * Performs a YouTube search with the given query and options, handling
-   * quota tracking, rate limiting, and automatic retries.
+   * quota tracking, rate limiting, and automatic retries. Retrieves video
+   * durations from the YouTube API and converts them to seconds.
    *
    * @param query - Search query string
    * @param options - Optional search parameters
-   * @returns Array of video results
+   * @returns Array of video results with duration in seconds
    * @throws {YouTubeError} If search fails after retries or quota exceeded
    *
    * @example
@@ -135,7 +136,7 @@ export class YouTubeAPIClient {
       throw error;
     }
 
-    // Check quota availability
+    // Check quota availability (search.list costs 100 + videos.list costs 1 = 101 total)
     if (this.quotaTracker.isExceeded()) {
       const usage = this.quotaTracker.getUsage();
       const error = new YouTubeError(
@@ -151,7 +152,7 @@ export class YouTubeAPIClient {
     this.logger.debug('YouTube search request initiated', {
       query: sanitizedQuery,
       maxResults,
-      quotaCost: 100,
+      quotaCost: 101, // 100 for search + 1 for video details
       options
     });
 
@@ -159,9 +160,9 @@ export class YouTubeAPIClient {
     await this.rateLimiter.acquire();
 
     // Execute search with retry logic
-    const results = await this.retryHandler.executeWithRetry(async () => {
+    const searchResults = await this.retryHandler.executeWithRetry(async () => {
       try {
-        // Make YouTube API request
+        // Make YouTube API search request
         const response = await this.youtube.search.list({
           part: ['snippet'],
           q: sanitizedQuery,
@@ -180,13 +181,18 @@ export class YouTubeAPIClient {
       }
     }, `YouTube search: "${sanitizedQuery}"`);
 
-    // Transform results to VideoResult format
-    const videoResults = results
+    // Transform results to VideoResult format (without duration yet)
+    const videoResults = searchResults
       .filter(item => item.id?.videoId && item.snippet)
       .map(item => this.transformSearchResult(item));
 
-    // Increment quota usage (search costs 100 units)
+    // Increment quota usage for search (100 units)
     this.quotaTracker.incrementUsage(100);
+
+    // Retrieve video durations if we have results
+    if (videoResults.length > 0) {
+      await this.enrichWithDurations(videoResults);
+    }
 
     // Log response
     const quotaUsage = this.quotaTracker.getUsage();
@@ -199,6 +205,105 @@ export class YouTubeAPIClient {
     });
 
     return videoResults;
+  }
+
+  /**
+   * Search for videos using multiple queries and deduplicate results
+   *
+   * Executes searches for primary and alternative queries, aggregates results,
+   * and deduplicates by videoId while preserving relevance ordering.
+   *
+   * @param queries - Array of search queries (first is primary, rest are alternatives)
+   * @param options - Optional search parameters
+   * @returns Deduplicated array of video results
+   * @throws {YouTubeError} If primary query fails
+   *
+   * @example
+   * ```typescript
+   * const results = await client.searchWithMultipleQueries([
+   *   'lion savanna sunset',
+   *   'african lion wildlife',
+   *   'lion walking grassland'
+   * ], { maxResults: 10 });
+   * ```
+   */
+  async searchWithMultipleQueries(
+    queries: string[],
+    options?: SearchOptions
+  ): Promise<VideoResult[]> {
+    if (!queries || queries.length === 0) {
+      const error = new YouTubeError(
+        YouTubeErrorCode.INVALID_REQUEST,
+        'At least one search query is required'
+      );
+      this.logger.error('Invalid queries array', error);
+      throw error;
+    }
+
+    const primaryQuery = queries[0];
+    const alternativeQueries = queries.slice(1);
+    const errors: string[] = [];
+
+    this.logger.debug('Multi-query search initiated', {
+      primaryQuery,
+      alternativeCount: alternativeQueries.length,
+      totalQueries: queries.length
+    });
+
+    // Execute primary query (required)
+    let allResults: VideoResult[] = [];
+    try {
+      const primaryResults = await this.searchVideos(primaryQuery, options);
+      allResults.push(...primaryResults);
+      this.logger.debug('Primary query completed', {
+        query: primaryQuery,
+        resultCount: primaryResults.length
+      });
+    } catch (error: any) {
+      // Primary query failure is fatal
+      this.logger.error('Primary query failed', error, { query: primaryQuery });
+      throw error;
+    }
+
+    // Execute alternative queries (optional - failures are logged but not fatal)
+    for (const altQuery of alternativeQueries) {
+      try {
+        const altResults = await this.searchVideos(altQuery, options);
+        allResults.push(...altResults);
+        this.logger.debug('Alternative query completed', {
+          query: altQuery,
+          resultCount: altResults.length
+        });
+      } catch (error: any) {
+        const errorMsg = `Alternative query "${altQuery}" failed: ${error.message}`;
+        errors.push(errorMsg);
+        this.logger.warn('Alternative query failed (continuing)', {
+          query: altQuery,
+          error: error.message
+        });
+        // Continue with other queries
+      }
+    }
+
+    // Deduplicate by videoId (keep first occurrence)
+    const seen = new Set<string>();
+    const deduplicatedResults = allResults.filter(result => {
+      if (seen.has(result.videoId)) {
+        return false;
+      }
+      seen.add(result.videoId);
+      return true;
+    });
+
+    this.logger.info('Multi-query search completed', {
+      queriesExecuted: queries.length,
+      queriesFailed: errors.length,
+      totalResults: allResults.length,
+      deduplicatedResults: deduplicatedResults.length,
+      errors: errors.length > 0 ? errors : undefined
+    });
+
+    return deduplicatedResults;
   }
 
   /**
@@ -238,6 +343,103 @@ export class YouTubeAPIClient {
   }
 
   /**
+   * Enrich video results with duration data from YouTube API
+   *
+   * Makes a videos.list API call to retrieve contentDetails.duration for all videos,
+   * parses ISO 8601 duration format, and updates the VideoResult objects in place.
+   *
+   * @param videoResults - Array of VideoResult objects to enrich
+   * @private
+   */
+  private async enrichWithDurations(videoResults: VideoResult[]): Promise<void> {
+    if (videoResults.length === 0) {
+      return;
+    }
+
+    try {
+      // Acquire rate limit slot for videos.list call
+      await this.rateLimiter.acquire();
+
+      // Extract video IDs
+      const videoIds = videoResults.map(v => v.videoId).join(',');
+
+      // Call videos.list to get contentDetails
+      const response = await this.retryHandler.executeWithRetry(async () => {
+        try {
+          return await this.youtube.videos.list({
+            part: ['contentDetails'],
+            id: [videoIds]
+          });
+        } catch (error: any) {
+          throw YouTubeErrorHandler.handleError(error, 'videos.list for durations');
+        }
+      }, 'YouTube videos.list');
+
+      // Increment quota usage (videos.list costs 1 unit)
+      this.quotaTracker.incrementUsage(1);
+
+      // Create a map of videoId -> duration in seconds
+      const durationMap = new Map<string, number>();
+      if (response.data.items) {
+        for (const item of response.data.items) {
+          if (item.id && item.contentDetails?.duration) {
+            const durationSeconds = this.parseISO8601Duration(item.contentDetails.duration);
+            durationMap.set(item.id, durationSeconds);
+          }
+        }
+      }
+
+      // Update VideoResult objects with duration
+      for (const result of videoResults) {
+        const duration = durationMap.get(result.videoId);
+        if (duration !== undefined) {
+          result.duration = duration.toString(); // Store as string to match interface
+        }
+      }
+
+      this.logger.debug('Video durations enriched', {
+        videosProcessed: videoResults.length,
+        durationsRetrieved: durationMap.size
+      });
+    } catch (error: any) {
+      // Log error but don't fail the search
+      this.logger.warn('Failed to enrich durations (continuing without duration data)', error);
+    }
+  }
+
+  /**
+   * Parse ISO 8601 duration format to seconds
+   *
+   * Converts YouTube API duration format (e.g., "PT4M13S") to total seconds.
+   *
+   * @param iso8601Duration - ISO 8601 duration string
+   * @returns Duration in seconds
+   * @private
+   *
+   * @example
+   * ```typescript
+   * parseISO8601Duration("PT4M13S") // returns 253
+   * parseISO8601Duration("PT1H30M") // returns 5400
+   * parseISO8601Duration("PT45S") // returns 45
+   * ```
+   */
+  private parseISO8601Duration(iso8601Duration: string): number {
+    // ISO 8601 duration format: PT[hours]H[minutes]M[seconds]S
+    const match = iso8601Duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+
+    if (!match) {
+      this.logger.warn('Invalid ISO 8601 duration format', { duration: iso8601Duration });
+      return 0;
+    }
+
+    const hours = parseInt(match[1] || '0', 10);
+    const minutes = parseInt(match[2] || '0', 10);
+    const seconds = parseInt(match[3] || '0', 10);
+
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+
+  /**
    * Transform YouTube API search result to VideoResult interface
    *
    * @param item - YouTube API search result item
@@ -259,7 +461,7 @@ export class YouTubeAPIClient {
       // Optional fields - would require additional API call to get
       viewCount: undefined,
       likeCount: undefined,
-      duration: undefined
+      duration: undefined // Will be enriched by enrichWithDurations()
     };
   }
 }

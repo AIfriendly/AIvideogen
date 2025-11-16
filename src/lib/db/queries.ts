@@ -29,8 +29,9 @@ export interface SystemPrompt {
 }
 
 /**
- * Project entity (Epic 1 + Epic 2 fields)
+ * Project entity (Epic 1 + Epic 2 + Epic 3 fields)
  * Includes Epic 2 fields: voice_id, script_generated, voice_selected, total_duration
+ * Includes Epic 3 fields: visuals_generated
  */
 export interface Project {
   id: string;
@@ -44,6 +45,7 @@ export interface Project {
   script_generated: boolean;         // Epic 2: Script generation completion status
   voice_selected: boolean;           // Epic 2: Voice selection completion status
   total_duration: number | null;     // Epic 2: Aggregated duration of all scenes
+  visuals_generated: boolean;        // Epic 3: Visual suggestions generation completion status
   created_at: string;
   last_active: string;
 }
@@ -236,6 +238,10 @@ export function updateProject(id: string, updates: Partial<Omit<Project, 'id' | 
     if (updates.total_duration !== undefined) {
       fields.push('total_duration = ?');
       values.push(updates.total_duration);
+    }
+    if (updates.visuals_generated !== undefined) {
+      fields.push('visuals_generated = ?');
+      values.push(updates.visuals_generated ? 1 : 0);
     }
 
     // Always update last_active timestamp
@@ -809,6 +815,189 @@ export function updateProjectDuration(id: string, totalDuration: number): Projec
     console.error('Error updating project duration:', error);
     throw new Error(
       `Failed to update project duration: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+// ============================================================================
+// Visual Suggestions Query Functions (Epic 3)
+// ============================================================================
+
+/**
+ * Visual Suggestion entity
+ * Stores YouTube video suggestions for each scene with ranking
+ */
+export interface VisualSuggestion {
+  id: string;
+  scene_id: string;
+  video_id: string;
+  title: string;
+  thumbnail_url: string | null;
+  channel_title: string | null;
+  embed_url: string;
+  rank: number;
+  duration: number | null;
+  default_segment_path: string | null;
+  download_status: string;
+  created_at: string;
+}
+
+/**
+ * Video result for saving (without database-specific fields)
+ */
+export interface VideoResultForSave {
+  videoId: string;
+  title: string;
+  thumbnailUrl: string;
+  channelTitle: string;
+  embedUrl: string;
+  duration?: string; // Duration as string from YouTube API (will be parsed to integer)
+}
+
+/**
+ * Save visual suggestions for a scene
+ * @param sceneId Scene ID
+ * @param suggestions Array of video results to save with ranking
+ * @returns Array of created visual suggestions
+ */
+export function saveVisualSuggestions(
+  sceneId: string,
+  suggestions: VideoResultForSave[]
+): VisualSuggestion[] {
+  try {
+    if (suggestions.length === 0) {
+      return [];
+    }
+
+    const insertStmt = db.prepare(`
+      INSERT INTO visual_suggestions (
+        id, scene_id, video_id, title, thumbnail_url, channel_title,
+        embed_url, rank, duration, download_status
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    `);
+
+    const insertMany = db.transaction((suggestionsToInsert: typeof suggestions) => {
+      for (let i = 0; i < suggestionsToInsert.length; i++) {
+        const suggestion = suggestionsToInsert[i];
+        const id = randomUUID();
+        const rank = i + 1; // 1-indexed ranking
+
+        // Parse duration from string to integer (seconds)
+        let durationInt: number | null = null;
+        if (suggestion.duration) {
+          const parsed = parseInt(suggestion.duration, 10);
+          if (!isNaN(parsed)) {
+            durationInt = parsed;
+          }
+        }
+
+        insertStmt.run(
+          id,
+          sceneId,
+          suggestion.videoId,
+          suggestion.title,
+          suggestion.thumbnailUrl || null,
+          suggestion.channelTitle || null,
+          suggestion.embedUrl,
+          rank,
+          durationInt
+        );
+      }
+    });
+
+    insertMany(suggestions);
+
+    // Retrieve and return all created suggestions
+    return getVisualSuggestions(sceneId);
+  } catch (error) {
+    console.error('Error saving visual suggestions:', error);
+
+    // Check for foreign key violation
+    if (error instanceof Error && error.message.includes('FOREIGN KEY constraint failed')) {
+      throw new Error('Invalid scene_id: The specified scene does not exist');
+    }
+
+    throw new Error(
+      `Failed to save visual suggestions: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Retrieve visual suggestions for a scene
+ * @param sceneId Scene ID
+ * @returns Array of visual suggestions ordered by rank ASC
+ */
+export function getVisualSuggestions(sceneId: string): VisualSuggestion[] {
+  try {
+    const stmt = db.prepare(`
+      SELECT * FROM visual_suggestions
+      WHERE scene_id = ?
+      ORDER BY rank ASC
+    `);
+    return stmt.all(sceneId) as VisualSuggestion[];
+  } catch (error) {
+    console.error('Error fetching visual suggestions:', error);
+    throw new Error(
+      `Failed to fetch visual suggestions: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Retrieve all visual suggestions for a project
+ * @param projectId Project ID
+ * @returns Array of visual suggestions ordered by scene number, then rank ASC
+ */
+export function getVisualSuggestionsByProject(projectId: string): VisualSuggestion[] {
+  try {
+    const stmt = db.prepare(`
+      SELECT vs.*
+      FROM visual_suggestions vs
+      INNER JOIN scenes s ON vs.scene_id = s.id
+      WHERE s.project_id = ?
+      ORDER BY s.scene_number ASC, vs.rank ASC
+    `);
+    return stmt.all(projectId) as VisualSuggestion[];
+  } catch (error) {
+    console.error('Error fetching visual suggestions by project:', error);
+    throw new Error(
+      `Failed to fetch visual suggestions: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Delete all visual suggestions for a scene
+ * @param sceneId Scene ID
+ */
+export function deleteVisualSuggestions(sceneId: string): void {
+  try {
+    const stmt = db.prepare('DELETE FROM visual_suggestions WHERE scene_id = ?');
+    stmt.run(sceneId);
+  } catch (error) {
+    console.error('Error deleting visual suggestions:', error);
+    throw new Error(
+      `Failed to delete visual suggestions: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Update project visuals_generated flag
+ * @param projectId Project ID
+ * @param generated Whether visuals have been generated
+ */
+export function updateProjectVisualsGenerated(projectId: string, generated: boolean): void {
+  try {
+    updateProject(projectId, {
+      visuals_generated: generated
+    });
+  } catch (error) {
+    console.error('Error updating project visuals_generated:', error);
+    throw new Error(
+      `Failed to update project visuals_generated: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
 }

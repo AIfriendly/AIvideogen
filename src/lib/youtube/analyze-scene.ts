@@ -36,11 +36,11 @@ import { ContentType } from './types';
  * pattern from Epic 1 Story 1.3.
  *
  * Error Handling:
- * - LLM connection failure ’ Immediate fallback
- * - LLM timeout (>10s) ’ Immediate fallback
- * - Empty response ’ Retry once (1s delay) ’ Fallback if retry fails
- * - Invalid JSON ’ Immediate fallback (no retry)
- * - Missing required fields ’ Retry once ’ Fallback if retry fails
+ * - LLM connection failure -> Immediate fallback
+ * - LLM timeout (>10s) -> Immediate fallback
+ * - Empty response -> Retry once (1s delay) -> Fallback if retry fails
+ * - Invalid JSON -> Immediate fallback (no retry)
+ * - Missing required fields -> Retry once -> Fallback if retry fails
  *
  * Logging:
  * - INFO: Successful analysis with timing
@@ -101,7 +101,7 @@ export async function analyzeSceneForVisuals(
     try {
       analysis = JSON.parse(response);
     } catch (parseError) {
-      // Invalid JSON ’ Immediate fallback (no retry)
+      // Invalid JSON ï¿½ Immediate fallback (no retry)
       console.warn('[SceneAnalyzer] Invalid JSON response, using fallback');
       const duration = Date.now() - startTime;
       console.log(`[SceneAnalyzer] Fallback analysis completed in ${duration}ms`);
