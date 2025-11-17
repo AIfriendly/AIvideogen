@@ -22,7 +22,8 @@ export class GeminiProvider implements LLMProvider {
   private modelName: string;
 
   // Retry configuration for handling temporary API overload (503 errors)
-  private readonly maxRetries: number = 3;
+  // 5 retries with exponential backoff: 1s, 2s, 4s, 8s, 16s (total: 31s max wait)
+  private readonly maxRetries: number = 5;
   private readonly baseDelayMs: number = 1000; // 1 second base delay
 
   /**
@@ -115,7 +116,7 @@ export class GeminiProvider implements LLMProvider {
           throw this.handleError(error);
         }
 
-        // Calculate delay with exponential backoff: 1s, 2s, 4s
+        // Calculate delay with exponential backoff: 1s, 2s, 4s, 8s, 16s
         const delayMs = this.baseDelayMs * Math.pow(2, attempt);
         console.log(
           `[Gemini] API overloaded (503), retrying in ${delayMs}ms ` +
@@ -219,7 +220,7 @@ export class GeminiProvider implements LLMProvider {
     if (errorMessage.includes('503') || errorMessage.includes('overloaded')) {
       return new Error(
         'Gemini API is temporarily overloaded.\n\n' +
-        `Retried ${this.maxRetries} times with exponential backoff.\n` +
+        `Retried ${this.maxRetries} times with exponential backoff (max wait: 31 seconds).\n` +
         'This is a temporary Google infrastructure issue.\n' +
         'Please wait a few minutes and try again.'
       );

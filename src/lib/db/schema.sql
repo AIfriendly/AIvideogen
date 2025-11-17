@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS projects (
   topic TEXT,
   current_step TEXT DEFAULT 'topic' CHECK(current_step IN (
     'topic',
-    'script',
     'voice',
+    'script-generation',
     'voiceover',
     'visual-sourcing',
     'visual-curation',

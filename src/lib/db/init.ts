@@ -106,6 +106,23 @@ async function runMigrations(): Promise<void> {
     console.log(`Migration ${migration004Name} already applied, skipping`);
   }
 
+  // Migration 005: Fix CHECK Constraint for current_step (Bug Fix)
+  const migration005Name = '005_fix_current_step_constraint';
+  if (!isMigrationApplied(migration005Name)) {
+    console.log(`Applying migration: ${migration005Name}`);
+    try {
+      const { up } = await import('./migrations/005_fix_current_step_constraint');
+      up(db);
+      markMigrationApplied(migration005Name);
+      console.log(`Migration ${migration005Name} applied successfully`);
+    } catch (error) {
+      console.error(`Failed to apply migration ${migration005Name}:`, error);
+      throw error;
+    }
+  } else {
+    console.log(`Migration ${migration005Name} already applied, skipping`);
+  }
+
   console.log('All migrations completed');
 }
 
