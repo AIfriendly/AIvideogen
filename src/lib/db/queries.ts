@@ -870,7 +870,7 @@ export function saveVisualSuggestions(
     }
 
     const insertStmt = db.prepare(`
-      INSERT INTO visual_suggestions (
+      INSERT OR IGNORE INTO visual_suggestions (
         id, scene_id, video_id, title, thumbnail_url, channel_title,
         embed_url, rank, duration, download_status
       )
