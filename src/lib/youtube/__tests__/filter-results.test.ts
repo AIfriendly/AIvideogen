@@ -64,7 +64,7 @@ function createVideosWithDurations(durations: number[]): VideoResult[] {
 // ============================================================================
 
 describe('filterByDuration', () => {
-  it('should accept videos within 1x-3x ratio for 10s scene', () => {
+  it('[3.4-UT-001] [P0] should accept videos within 1x-3x ratio for 10s scene (AC1)', () => {
     // 10s scene → accepts 10s-30s videos
     const videos = createVideosWithDurations([5, 10, 20, 30, 40, 60]);
     const filtered = filterByDuration(videos, 10);
@@ -73,7 +73,7 @@ describe('filterByDuration', () => {
     expect(filtered.map(v => v.duration)).toEqual(['10', '20', '30']);
   });
 
-  it('should accept videos within 1x-3x ratio for 90s scene', () => {
+  it('[3.4-UT-002] [P0] should accept videos within 1x-3x ratio for 90s scene (AC1)', () => {
     // 90s scene → accepts 90s-270s videos (no cap)
     const videos = createVideosWithDurations([60, 90, 180, 270, 300, 360]);
     const filtered = filterByDuration(videos, 90);
@@ -82,7 +82,7 @@ describe('filterByDuration', () => {
     expect(filtered.map(v => v.duration)).toEqual(['90', '180', '270']);
   });
 
-  it('should enforce 5-minute cap for 120s scene', () => {
+  it('[3.4-UT-003] [P0] should enforce 5-minute cap for 120s scene (AC1)', () => {
     // 120s scene → max 300s (5 min cap), NOT 360s (3x ratio)
     const videos = createVideosWithDurations([100, 120, 240, 300, 360, 400]);
     const filtered = filterByDuration(videos, 120);
@@ -92,7 +92,7 @@ describe('filterByDuration', () => {
     expect(filtered.map(v => v.duration)).not.toContain('360'); // Cap enforced
   });
 
-  it('should enforce 5-minute cap for 180s scene', () => {
+  it('[3.4-UT-004] [P0] should enforce 5-minute cap for 180s scene (AC1)', () => {
     // 180s scene → max 300s (5 min cap), NOT 540s (3x ratio)
     const videos = createVideosWithDurations([150, 180, 300, 400, 540]);
     const filtered = filterByDuration(videos, 180);
@@ -102,7 +102,7 @@ describe('filterByDuration', () => {
     expect(filtered.map(v => v.duration)).not.toContain('540'); // Cap enforced
   });
 
-  it('should handle edge case: 400s scene (no maximum constraint)', () => {
+  it('[3.4-UT-005] [P1] should handle edge case: 400s scene (no maximum constraint) (AC1)', () => {
     // 400s scene → accept videos >= 400s (no maximum limit)
     const videos = createVideosWithDurations([300, 400, 600, 1200, 3600]);
     const filtered = filterByDuration(videos, 400);
@@ -112,27 +112,27 @@ describe('filterByDuration', () => {
     expect(filtered.map(v => v.duration)).not.toContain('300'); // Below minimum
   });
 
-  it('should throw error for sceneDuration <= 0', () => {
+  it('[3.4-UT-006] [P0] should throw error for sceneDuration <= 0 (AC1)', () => {
     const videos = createVideosWithDurations([10, 20, 30]);
 
     expect(() => filterByDuration(videos, 0)).toThrow('Invalid sceneDuration: 0');
     expect(() => filterByDuration(videos, -10)).toThrow('Invalid sceneDuration: -10');
   });
 
-  it('should return empty array when all videos outside range', () => {
+  it('[3.4-UT-007] [P2] should return empty array when all videos outside range', () => {
     const videos = createVideosWithDurations([5, 8, 100, 150]);
     const filtered = filterByDuration(videos, 30); // Accepts 30-90s
 
     expect(filtered).toHaveLength(0);
   });
 
-  it('should return empty array for empty input', () => {
+  it('[3.4-UT-008] [P2] should return empty array for empty input', () => {
     const filtered = filterByDuration([], 30);
 
     expect(filtered).toHaveLength(0);
   });
 
-  it('should skip videos with invalid/missing duration', () => {
+  it('[3.4-UT-009] [P1] should skip videos with invalid/missing duration', () => {
     const videos = [
       createMockVideo({ videoId: 'v1', duration: '30' }),
       createMockVideo({ videoId: 'v2', duration: undefined }),
@@ -147,7 +147,7 @@ describe('filterByDuration', () => {
     expect(filtered.map(v => v.videoId)).toEqual(['v1', 'v5']);
   });
 
-  it('should handle custom ratio and cap parameters', () => {
+  it('[3.4-UT-010] [P2] should handle custom ratio and cap parameters', () => {
     const videos = createVideosWithDurations([30, 60, 150, 180, 200]);
 
     // Custom: 1x-5x ratio with 180s cap
@@ -164,7 +164,7 @@ describe('filterByDuration', () => {
 // ============================================================================
 
 describe('filterByTitleQuality', () => {
-  it('should filter out titles with excessive emojis (>5)', () => {
+  it('[3.4-UT-011] [P1] should filter out titles with excessive emojis (>5) (AC3)', () => {
     const videos = [
       createMockVideo({ videoId: 'v1', title: 'Normal title' }),
       createMockVideo({ videoId: 'v2', title: 'Some emojis 😀😁😂' }),
@@ -179,7 +179,7 @@ describe('filterByTitleQuality', () => {
     expect(filtered.map(v => v.videoId)).not.toContain('v3');
   });
 
-  it('should filter out titles with >50% ALL CAPS', () => {
+  it('[3.4-UT-012] [P1] should filter out titles with >50% ALL CAPS (AC3)', () => {
     const videos = [
       createMockVideo({ videoId: 'v1', title: 'Normal Title Case' }),
       createMockVideo({ videoId: 'v2', title: 'SOME CAPS but mostly lower' }),
@@ -196,7 +196,7 @@ describe('filterByTitleQuality', () => {
     expect(filtered.map(v => v.videoId)).not.toContain('v3');
   });
 
-  it('should filter out titles with excessive consecutive punctuation (>10)', () => {
+  it('[3.4-UT-013] [P1] should filter out titles with excessive consecutive punctuation (>10) (AC3)', () => {
     const videos = [
       createMockVideo({ videoId: 'v1', title: 'Normal title!' }),
       createMockVideo({ videoId: 'v2', title: 'A few punctuation!!!' }),
@@ -212,7 +212,7 @@ describe('filterByTitleQuality', () => {
     expect(filtered.map(v => v.videoId)).not.toContain('v3');
   });
 
-  it('should preserve normal titles', () => {
+  it('[3.4-UT-014] [P2] should preserve normal titles (AC3)', () => {
     const videos = [
       createMockVideo({ title: 'How to Build a Website' }),
       createMockVideo({ title: 'Tutorial: JavaScript Basics' }),
@@ -225,7 +225,7 @@ describe('filterByTitleQuality', () => {
     expect(filtered).toHaveLength(4);
   });
 
-  it('should skip videos with missing/invalid title', () => {
+  it('[3.4-UT-015] [P1] should skip videos with missing/invalid title', () => {
     const videos = [
       createMockVideo({ videoId: 'v1', title: 'Valid title' }),
       createMockVideo({ videoId: 'v2', title: undefined as any }),
@@ -240,7 +240,7 @@ describe('filterByTitleQuality', () => {
     expect(filtered.map(v => v.videoId)).toContain('v4');
   });
 
-  it('should handle edge case: title with only special characters', () => {
+  it('[3.4-UT-016] [P3] should handle edge case: title with only special characters', () => {
     const videos = [
       createMockVideo({ title: '!!!###@@@' }),
       createMockVideo({ title: '     ' })
@@ -258,7 +258,7 @@ describe('filterByTitleQuality', () => {
 // ============================================================================
 
 describe('rankVideos', () => {
-  it('should rank videos closer to 1.5x scene duration higher', () => {
+  it('[3.4-UT-017] [P1] should rank videos closer to 1.5x scene duration higher (AC4)', () => {
     // 30s scene → ideal 45s video
     // Note: Ranking combines duration match (60%) + relevance (40%)
     // 45s video has perfect duration match but lower relevance (position 3)
@@ -280,7 +280,7 @@ describe('rankVideos', () => {
     }
   });
 
-  it('should use relevance score based on original rank', () => {
+  it('[3.4-UT-018] [P1] should use relevance score based on original rank (AC4)', () => {
     // Create videos with same duration but different positions
     const videos = [
       createMockVideo({ videoId: 'v1', duration: '60' }), // Rank 1 (highest relevance)
@@ -295,7 +295,7 @@ describe('rankVideos', () => {
     expect(ranked[0].originalRank).toBe(1);
   });
 
-  it('should sort by qualityScore descending (highest first)', () => {
+  it('[3.4-UT-019] [P0] should sort by qualityScore descending (highest first) (AC4)', () => {
     const videos = createVideosWithDurations([10, 30, 60, 90, 120]);
     const ranked = rankVideos(videos, 40); // 40s scene, ideal 60s
 
@@ -305,21 +305,21 @@ describe('rankVideos', () => {
     }
   });
 
-  it('should limit to top N results (default 8)', () => {
+  it('[3.4-UT-020] [P1] should limit to top N results (default 8) (AC4)', () => {
     const videos = createVideosWithDurations([10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]);
     const ranked = rankVideos(videos, 30);
 
     expect(ranked).toHaveLength(8);
   });
 
-  it('should respect custom maxResults parameter', () => {
+  it('[3.4-UT-021] [P2] should respect custom maxResults parameter (AC4)', () => {
     const videos = createVideosWithDurations([10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
     const ranked = rankVideos(videos, 30, 5);
 
     expect(ranked).toHaveLength(5);
   });
 
-  it('should calculate quality score with correct weights (60% duration, 40% relevance)', () => {
+  it('[3.4-UT-022] [P0] should calculate quality score with correct weights (60%% duration, 40%% relevance) (AC4)', () => {
     const config = getFilterConfig();
     const sceneDuration = 30;
     const idealDuration = sceneDuration * 1.5; // 45s
@@ -334,7 +334,7 @@ describe('rankVideos', () => {
     expect(ranked[0].qualityScore).toBeCloseTo(1.0, 2);
   });
 
-  it('should handle videos with 0 or invalid duration', () => {
+  it('[3.4-UT-023] [P1] should handle videos with 0 or invalid duration', () => {
     const videos = [
       createMockVideo({ videoId: 'v1', duration: '0' }),
       createMockVideo({ videoId: 'v2', duration: undefined }),
@@ -348,7 +348,7 @@ describe('rankVideos', () => {
     expect(ranked[0].videoId).toBe('v3');
   });
 
-  it('should preserve all original VideoResult fields', () => {
+  it('[3.4-UT-024] [P2] should preserve all original VideoResult fields', () => {
     const originalVideo = createMockVideo({
       videoId: 'test-123',
       title: 'Test Video',
@@ -371,7 +371,7 @@ describe('rankVideos', () => {
 // ============================================================================
 
 describe('filterByContentType', () => {
-  it('should prioritize GAMEPLAY keywords and filter negative ones', () => {
+  it('[3.4-UT-025] [P1] should prioritize GAMEPLAY keywords and filter negative ones (AC5)', () => {
     const videos = [
       createMockVideo({ videoId: 'v1', title: 'Minecraft Gameplay No Commentary', description: 'Pure gameplay' }),
       createMockVideo({ videoId: 'v2', title: 'Game Review and Tutorial', description: 'How to play' }),
@@ -388,7 +388,7 @@ describe('filterByContentType', () => {
     expect(filtered.map(v => v.videoId)).toContain('v3');
   });
 
-  it('should prioritize TUTORIAL keywords and filter negative ones', () => {
+  it('[3.4-UT-026] [P1] should prioritize TUTORIAL keywords and filter negative ones (AC5)', () => {
     const videos = [
       createMockVideo({ videoId: 'v1', title: 'How to Code in JavaScript', description: 'Tutorial guide' }),
       createMockVideo({ videoId: 'v2', title: 'Learn Python Basics', description: 'Step by step guide' }),
@@ -403,7 +403,7 @@ describe('filterByContentType', () => {
     expect(filtered.map(v => v.videoId)).toContain('v4');
   });
 
-  it('should prioritize NATURE keywords and filter negative ones', () => {
+  it('[3.4-UT-027] [P1] should prioritize NATURE keywords and filter negative ones (AC5)', () => {
     const videos = [
       createMockVideo({ videoId: 'v1', title: 'Wildlife Documentary 4K', description: 'Nature footage' }),
       createMockVideo({ videoId: 'v2', title: 'Funny Animal Compilation', description: 'Hilarious pets' }),
@@ -417,7 +417,7 @@ describe('filterByContentType', () => {
     expect(filtered.map(v => v.videoId)).toContain('v3');
   });
 
-  it('should accept all videos for B_ROLL (no filtering)', () => {
+  it('[3.4-UT-028] [P2] should accept all videos for B_ROLL (no filtering) (AC5)', () => {
     const videos = [
       createMockVideo({ videoId: 'v1', title: 'Random video 1' }),
       createMockVideo({ videoId: 'v2', title: 'Random video 2' }),
@@ -430,7 +430,7 @@ describe('filterByContentType', () => {
     expect(filtered.map(v => v.videoId)).toEqual(['v1', 'v2', 'v3']);
   });
 
-  it('should filter DOCUMENTARY content correctly', () => {
+  it('[3.4-UT-029] [P1] should filter DOCUMENTARY content correctly (AC5)', () => {
     const videos = [
       createMockVideo({ videoId: 'v1', title: 'Documentary: The Story of X', description: 'History documentary' }),
       createMockVideo({ videoId: 'v2', title: 'Movie Trailer', description: 'Coming soon' }),
@@ -443,7 +443,7 @@ describe('filterByContentType', () => {
     expect(filtered.map(v => v.videoId)).toContain('v3');
   });
 
-  it('should filter URBAN content correctly', () => {
+  it('[3.4-UT-030] [P1] should filter URBAN content correctly (AC5)', () => {
     const videos = [
       createMockVideo({ videoId: 'v1', title: 'City Time Lapse 4K', description: 'Urban architecture' }),
       createMockVideo({ videoId: 'v2', title: 'Travel Vlog', description: 'My trip' }),
@@ -456,7 +456,7 @@ describe('filterByContentType', () => {
     expect(filtered.map(v => v.videoId)).toContain('v3');
   });
 
-  it('should filter ABSTRACT content correctly', () => {
+  it('[3.4-UT-031] [P1] should filter ABSTRACT content correctly (AC5)', () => {
     const videos = [
       createMockVideo({ videoId: 'v1', title: 'Abstract Animation Visual', description: 'Motion graphics' }),
       createMockVideo({ videoId: 'v2', title: 'Gameplay Tutorial', description: 'How to play' }),
@@ -469,7 +469,7 @@ describe('filterByContentType', () => {
     expect(filtered.map(v => v.videoId)).toContain('v3');
   });
 
-  it('should filter out videos with negative score', () => {
+  it('[3.4-UT-032] [P0] should filter out videos with negative score (AC5)', () => {
     const videos = [
       createMockVideo({
         videoId: 'v1',
@@ -495,7 +495,7 @@ describe('filterByContentType', () => {
 // ============================================================================
 
 describe('filterAndRankResults', () => {
-  it('should succeed with Tier 1 (strict filtering) when sufficient results', () => {
+  it('[3.4-UT-033] [P0] should succeed with Tier 1 (strict filtering) when sufficient results (AC7)', () => {
     // Create 10 videos that match strict criteria
     const videos = createVideosWithDurations([30, 35, 40, 45, 50, 55, 60, 65, 70, 75]).map((v, i) => ({
       ...v,
@@ -510,7 +510,7 @@ describe('filterAndRankResults', () => {
     expect(filtered.length).toBeLessThanOrEqual(8);
   });
 
-  it('should fall back to Tier 2 when Tier 1 returns < 3 results', () => {
+  it('[3.4-UT-034] [P1] should fall back to Tier 2 when Tier 1 returns < 3 results (AC7)', () => {
     // Create videos that only pass with relaxed duration (1x-5x)
     const videos = [
       ...createVideosWithDurations([30, 40, 50]), // Pass Tier 1 (30-90s range)
@@ -523,7 +523,7 @@ describe('filterAndRankResults', () => {
     expect(filtered.length).toBeGreaterThanOrEqual(3);
   });
 
-  it('should fall back to Tier 3 when removing duration cap helps', () => {
+  it('[3.4-UT-035] [P1] should fall back to Tier 3 when removing duration cap helps (AC7)', () => {
     // Create videos that need no cap to pass
     const videos = [
       ...createVideosWithDurations([100, 120]), // Pass Tier 1 (100-300s)
@@ -536,7 +536,7 @@ describe('filterAndRankResults', () => {
     expect(filtered.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('should fall back to Tier 4 when title quality is too strict', () => {
+  it('[3.4-UT-036] [P1] should fall back to Tier 4 when title quality is too strict (AC7)', () => {
     // Create videos with spam titles but good duration
     const videos = createVideosWithDurations([30, 40, 50, 60]).map((v, i) => ({
       ...v,
@@ -549,7 +549,7 @@ describe('filterAndRankResults', () => {
     expect(filtered.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('should fall back to Tier 5 (minimal filtering) as last resort', () => {
+  it('[3.4-UT-037] [P0] should fall back to Tier 5 (minimal filtering) as last resort (AC7)', () => {
     // Create videos that barely pass any filters
     const videos = [
       createMockVideo({ duration: '30', title: 'SPAM!!!!!', description: 'bad content' }),
@@ -562,20 +562,20 @@ describe('filterAndRankResults', () => {
     expect(filtered.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('should handle empty results gracefully', () => {
+  it('[3.4-UT-038] [P2] should handle empty results gracefully', () => {
     const filtered = filterAndRankResults([], 30, ContentType.B_ROLL);
 
     expect(filtered).toHaveLength(0);
   });
 
-  it('should throw error for invalid sceneDuration', () => {
+  it('[3.4-UT-039] [P0] should throw error for invalid sceneDuration', () => {
     const videos = createVideosWithDurations([30, 60, 90]);
 
     expect(() => filterAndRankResults(videos, 0, ContentType.B_ROLL)).toThrow('Invalid sceneDuration: 0');
     expect(() => filterAndRankResults(videos, -10, ContentType.B_ROLL)).toThrow('Invalid sceneDuration: -10');
   });
 
-  it('should handle malformed VideoResult fields gracefully', () => {
+  it('[3.4-UT-040] [P1] should handle malformed VideoResult fields gracefully', () => {
     const videos = [
       createMockVideo({ videoId: 'v1', duration: '30', title: 'Valid' }),
       createMockVideo({ videoId: 'v2', duration: undefined, title: 'No duration' }),
@@ -591,7 +591,7 @@ describe('filterAndRankResults', () => {
     expect(filtered.map(v => v.videoId)).toContain('v4');
   });
 
-  it('should complete filtering in < 50ms (performance target)', () => {
+  it('[3.4-UT-041] [P0] should complete filtering in < 50ms (performance target)', () => {
     // Create 15 videos (realistic search result count)
     const videos = createVideosWithDurations([
       30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100
@@ -617,7 +617,7 @@ describe('filterAndRankResults', () => {
 // ============================================================================
 
 describe('getFilterConfig', () => {
-  it('should return configuration with expected default values', () => {
+  it('[3.4-UT-042] [P2] should return configuration with expected default values (AC6)', () => {
     const config = getFilterConfig();
 
     expect(config.maxEmojisInTitle).toBe(5);
@@ -633,7 +633,7 @@ describe('getFilterConfig', () => {
     expect(config.relevanceWeight).toBe(0.4);
   });
 
-  it('should return same configuration instance (singleton)', () => {
+  it('[3.4-UT-043] [P2] should return same configuration instance (singleton) (AC6)', () => {
     const config1 = getFilterConfig();
     const config2 = getFilterConfig();
 

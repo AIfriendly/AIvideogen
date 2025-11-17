@@ -1001,3 +1001,105 @@ export function updateProjectVisualsGenerated(projectId: string, generated: bool
     );
   }
 }
+
+/**
+ * Update segment download status for a visual suggestion (Story 3.6)
+ * @param suggestionId Visual suggestion ID
+ * @param status Download status
+ * @param filePath Optional file path when download completes
+ */
+export function updateSegmentDownloadStatus(
+  suggestionId: string,
+  status: string,
+  filePath?: string
+): void {
+  try {
+    const updates: string[] = ['download_status = ?'];
+    const values: any[] = [status];
+
+    if (filePath !== undefined) {
+      updates.push('default_segment_path = ?');
+      values.push(filePath);
+    }
+
+    values.push(suggestionId);
+
+    const stmt = db.prepare(`
+      UPDATE visual_suggestions
+      SET ${updates.join(', ')}
+      WHERE id = ?
+    `);
+
+    stmt.run(...values);
+  } catch (error) {
+    console.error('Error updating segment download status:', error);
+    throw new Error(
+      `Failed to update segment download status: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Get count of total scenes in a project
+ * @param projectId Project ID
+ * @returns Number of scenes
+ */
+export function getScenesCount(projectId: string): number {
+  try {
+    const stmt = db.prepare('SELECT COUNT(*) as count FROM scenes WHERE project_id = ?');
+    const result = stmt.get(projectId) as { count: number };
+    return result.count;
+  } catch (error) {
+    console.error('Error counting scenes:', error);
+    throw new Error(
+      `Failed to count scenes: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Get count of scenes with visual suggestions
+ * @param projectId Project ID
+ * @returns Number of scenes that have at least one visual suggestion
+ */
+export function getScenesWithSuggestionsCount(projectId: string): number {
+  try {
+    const stmt = db.prepare(`
+      SELECT COUNT(DISTINCT s.id) as count
+      FROM scenes s
+      INNER JOIN visual_suggestions vs ON s.id = vs.scene_id
+      WHERE s.project_id = ?
+    `);
+    const result = stmt.get(projectId) as { count: number };
+    return result.count;
+  } catch (error) {
+    console.error('Error counting scenes with suggestions:', error);
+    throw new Error(
+      `Failed to count scenes with suggestions: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Get list of scene IDs that have visual suggestions
+ * Used by error recovery logic to skip completed scenes
+ * @param projectId Project ID
+ * @returns Array of scene IDs
+ */
+export function getScenesWithVisualSuggestions(projectId: string): string[] {
+  try {
+    const stmt = db.prepare(`
+      SELECT DISTINCT vs.scene_id
+      FROM visual_suggestions vs
+      INNER JOIN scenes s ON vs.scene_id = s.id
+      WHERE s.project_id = ?
+    `);
+    const results = stmt.all(projectId) as Array<{ scene_id: string }>;
+    return results.map(r => r.scene_id);
+  } catch (error) {
+    console.error('Error fetching scenes with visual suggestions:', error);
+    throw new Error(
+      `Failed to fetch scenes with visual suggestions: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}

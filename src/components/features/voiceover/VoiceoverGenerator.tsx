@@ -155,10 +155,13 @@ export function VoiceoverGenerator({ projectId, sceneCount }: VoiceoverGenerator
     handleGenerate();
   };
 
-  // Handle continue
-  const handleContinue = () => {
-    // Navigate to script review page to see audio alongside script
-    router.push(`/projects/${projectId}/script-review`);
+  // Handle continue - triggers visual sourcing workflow
+  const handleContinue = async () => {
+    // After Epic 2 voiceover generation completes, automatically trigger Epic 3 visual sourcing
+    // The voiceover API already updated current_step to 'visual-sourcing'
+
+    // Navigate to visual sourcing page which will show the VisualSourcingLoader
+    router.push(`/projects/${projectId}/visual-sourcing`);
   };
 
   // Render loading state

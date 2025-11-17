@@ -47,12 +47,13 @@ export function up(db: Database): void {
         rank INTEGER NOT NULL,
         duration INTEGER,
         default_segment_path TEXT,
-        download_status TEXT DEFAULT 'pending',
+        download_status TEXT DEFAULT 'pending' CHECK(download_status IN ('pending', 'downloading', 'complete', 'error')),
         created_at TEXT DEFAULT (datetime('now')),
-        FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+        FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE,
+        UNIQUE(scene_id, video_id)
       )
     `);
-    console.log('  - Created visual_suggestions table');
+    console.log('  - Created visual_suggestions table with CHECK constraint and UNIQUE constraint');
 
     // 3. Create index on scene_id
     db.exec('CREATE INDEX IF NOT EXISTS idx_visual_suggestions_scene ON visual_suggestions(scene_id)');

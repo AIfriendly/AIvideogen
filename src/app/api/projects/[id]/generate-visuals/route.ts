@@ -25,6 +25,7 @@ import {
   getScenesByProjectId,
   saveVisualSuggestions,
   updateProjectVisualsGenerated,
+  getScenesWithVisualSuggestions,
   type VideoResultForSave
 } from '@/lib/db/queries';
 import { initializeDatabase } from '@/lib/db/init';
@@ -72,6 +73,27 @@ export async function POST(
 
     console.log(`[Visual Generation] Starting for project ${projectId} with ${scenes.length} scenes`);
 
+    // ERROR RECOVERY: Get scenes that already have visual suggestions
+    // This allows resuming after partial failure without regenerating completed scenes
+    const completedSceneIds = getScenesWithVisualSuggestions(projectId);
+    console.log(`[Visual Generation] Found ${completedSceneIds.length} scenes with existing suggestions (will skip)`);
+
+    // Filter out completed scenes
+    const scenesToProcess = scenes.filter(scene => !completedSceneIds.includes(scene.id));
+    console.log(`[Visual Generation] Processing ${scenesToProcess.length} scenes (${scenes.length - scenesToProcess.length} skipped)`);
+
+    // If all scenes already have suggestions, return success immediately
+    if (scenesToProcess.length === 0) {
+      console.log('[Visual Generation] All scenes already have suggestions, marking as complete');
+      updateProjectVisualsGenerated(projectId, true);
+      return NextResponse.json({
+        success: true,
+        scenesProcessed: scenes.length,
+        suggestionsGenerated: completedSceneIds.length,
+        message: 'All scenes already have visual suggestions'
+      }, { status: 200 });
+    }
+
     // Initialize YouTube API client
     const youtubeClient = new YouTubeAPIClient();
 
@@ -79,8 +101,8 @@ export async function POST(
     let suggestionsGenerated = 0;
     const errors: string[] = [];
 
-    // Process each scene
-    for (const scene of scenes) {
+    // Process each scene (only scenes without suggestions)
+    for (const scene of scenesToProcess) {
       try {
         console.log(`[Visual Generation] Processing scene ${scene.scene_number}: "${scene.text.substring(0, 50)}..."`);
 

@@ -38,10 +38,26 @@ function applyTestSchema(db: Database.Database): void {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       topic TEXT,
-      current_step TEXT DEFAULT 'topic-discovery',
-      visuals_generated INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      current_step TEXT DEFAULT 'topic' CHECK(current_step IN (
+        'topic',
+        'script',
+        'voice',
+        'voiceover',
+        'visual-sourcing',
+        'visual-curation',
+        'editing',
+        'export'
+      )),
+      status TEXT DEFAULT 'draft',
+      config_json TEXT,
+      system_prompt_id TEXT,
+      voice_id TEXT,
+      script_generated BOOLEAN DEFAULT 0,
+      voice_selected BOOLEAN DEFAULT 0,
+      total_duration REAL,
+      visuals_generated BOOLEAN DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      last_active TEXT DEFAULT (datetime('now'))
     )
   `);
 
@@ -72,9 +88,10 @@ function applyTestSchema(db: Database.Database): void {
       rank INTEGER NOT NULL,
       duration INTEGER NOT NULL,
       default_segment_path TEXT,
-      download_status TEXT DEFAULT 'pending',
+      download_status TEXT DEFAULT 'pending' CHECK(download_status IN ('pending', 'downloading', 'complete', 'error')),
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+      FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE,
+      UNIQUE(scene_id, video_id)
     )
   `);
 

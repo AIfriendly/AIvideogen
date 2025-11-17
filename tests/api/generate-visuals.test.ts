@@ -6,25 +6,30 @@
  * Following TEA test-quality.md best practices:
  * - BDD format (Given-When-Then)
  * - Test IDs for traceability
- * - Isolated tests with fixtures
- * - Network-first pattern (route mocking before navigate)
+ * - Proper mocking with vi.spyOn (no try-catch scaffolding)
+ * - Isolated tests with fixtures and auto-cleanup
  */
 
 import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { POST } from '@/app/api/projects/[id]/generate-visuals/route';
 import { NextRequest } from 'next/server';
+import * as queries from '@/lib/db/queries';
+import * as youtubeClient from '@/lib/youtube/client';
+import * as sceneAnalysis from '@/lib/llm/scene-analysis';
 import {
   createTestProject,
   createTestScene,
-  createVideoResult
-} from '../../factories/visual-suggestions.factory';
-
-/**
- * Note: These tests document expected API behavior for Story 3.3
- * Some tests may need implementation in the actual route file
- */
+  createTestScenes,
+  createVideoResult,
+  createSceneAnalysis,
+  createYouTubeErrorResponse
+} from '../factories/visual-suggestions.factory';
 
 describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe('P0 (Critical) - Core Workflow and Error Handling', () => {
     /**
      * 3.3-API-001: Full Workflow Integration
@@ -32,8 +37,23 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
      * Acceptance Criteria: AC3 (POST endpoint orchestrates full pipeline)
      */
     test('3.3-API-001: should complete full visual generation workflow', async () => {
-      // Given: Project with scenes
+      // Given: Project with 3 scenes
       const projectId = 'test-project-123';
+      const mockProject = createTestProject({ id: projectId });
+      const mockScenes = createTestScenes(3, projectId);
+      const mockAnalysis = createSceneAnalysis();
+      const mockVideoResults = [
+        createVideoResult({ duration: '180' }),
+        createVideoResult({ duration: '240' }),
+        createVideoResult({ duration: '150' })
+      ];
+
+      vi.spyOn(queries, 'getProject').mockReturnValue(mockProject);
+      vi.spyOn(queries, 'getScenesByProject').mockReturnValue(mockScenes);
+      vi.spyOn(sceneAnalysis, 'analyzeScene').mockResolvedValue(mockAnalysis);
+      vi.spyOn(youtubeClient, 'searchVideos').mockResolvedValue(mockVideoResults);
+      vi.spyOn(queries, 'saveVisualSuggestions').mockResolvedValue(undefined);
+      vi.spyOn(queries, 'updateProject').mockReturnValue(mockProject);
 
       // Mock request
       const request = new NextRequest(
@@ -42,20 +62,20 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
       );
 
       // When: Calling POST endpoint
-      // Note: This will fail until route is properly implemented
-      try {
-        const response = await POST(request, { params: { id: projectId } });
-        const result = await response.json();
+      const response = await POST(request, { params: Promise.resolve({ id: projectId }) });
+      const result = await response.json();
 
-        // Then: Should return success response
-        expect(response.status).toBe(200);
-        expect(result.success).toBe(true);
-        expect(result.scenesProcessed).toBeGreaterThan(0);
-        expect(result.suggestionsGenerated).toBeGreaterThan(0);
-      } catch (error) {
-        // Test documents expected behavior
-        expect(true).toBe(true); // Placeholder until implementation
-      }
+      // Then: Should return success response
+      expect(response.status).toBe(200);
+      expect(result.success).toBe(true);
+      expect(result.scenesProcessed).toBe(3);
+      expect(result.suggestionsGenerated).toBeGreaterThan(0);
+
+      // And: Should call dependencies in correct order
+      expect(queries.getProject).toHaveBeenCalledWith(projectId);
+      expect(queries.getScenesByProject).toHaveBeenCalledWith(projectId);
+      expect(sceneAnalysis.analyzeScene).toHaveBeenCalledTimes(3);
+      expect(youtubeClient.searchVideos).toHaveBeenCalled();
     });
 
     /**
@@ -64,29 +84,33 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
      * Acceptance Criteria: AC6 (Error handling - quota exceeded)
      */
     test('3.3-API-002: should handle YouTube API quota exceeded gracefully', async () => {
-      // Given: Project ID
+      // Given: Project that will trigger quota exceeded error
       const projectId = 'test-project-quota';
+      const mockProject = createTestProject({ id: projectId });
+      const mockScenes = createTestScenes(1, projectId);
+      const mockAnalysis = createSceneAnalysis();
+      const quotaError = createYouTubeErrorResponse(403, 'quotaExceeded');
 
-      // Mock request
+      vi.spyOn(queries, 'getProject').mockReturnValue(mockProject);
+      vi.spyOn(queries, 'getScenesByProject').mockReturnValue(mockScenes);
+      vi.spyOn(sceneAnalysis, 'analyzeScene').mockResolvedValue(mockAnalysis);
+      vi.spyOn(youtubeClient, 'searchVideos').mockRejectedValue(
+        new Error(`YouTube API quota exceeded: ${JSON.stringify(quotaError)}`)
+      );
+
       const request = new NextRequest(
         `http://localhost:3000/api/projects/${projectId}/generate-visuals`,
         { method: 'POST' }
       );
 
-      // When: YouTube quota is exceeded (mock scenario)
-      try {
-        const response = await POST(request, { params: { id: projectId } });
+      // When: YouTube quota is exceeded
+      const response = await POST(request, { params: Promise.resolve({ id: projectId }) });
+      const result = await response.json();
 
-        // Then: Should return 503 Service Unavailable (not 500 crash)
-        if (response.status === 503) {
-          const result = await response.json();
-          expect(result.error).toContain('quota');
-          expect(result.error).toContain('tomorrow'); // Actionable guidance
-        }
-      } catch (error: any) {
-        // If implementation throws, verify it's a proper error
-        expect(error.message).toBeDefined();
-      }
+      // Then: Should return 503 Service Unavailable (not 500 crash)
+      expect(response.status).toBe(503);
+      expect(result.error).toContain('quota');
+      expect(result.error).toMatch(/try again|tomorrow/i); // Actionable guidance
     });
 
     /**
@@ -97,25 +121,32 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
     test('3.3-API-003: should handle zero results without error', async () => {
       // Given: Project with scene that will return zero YouTube results
       const projectId = 'test-project-zero-results';
+      const mockProject = createTestProject({ id: projectId });
+      const mockScenes = createTestScenes(1, projectId);
+      const mockAnalysis = createSceneAnalysis();
+
+      vi.spyOn(queries, 'getProject').mockReturnValue(mockProject);
+      vi.spyOn(queries, 'getScenesByProject').mockReturnValue(mockScenes);
+      vi.spyOn(sceneAnalysis, 'analyzeScene').mockResolvedValue(mockAnalysis);
+      vi.spyOn(youtubeClient, 'searchVideos').mockResolvedValue([]); // Zero results
+      vi.spyOn(queries, 'saveVisualSuggestions').mockResolvedValue(undefined);
+      vi.spyOn(queries, 'updateProject').mockReturnValue(mockProject);
 
       const request = new NextRequest(
         `http://localhost:3000/api/projects/${projectId}/generate-visuals`,
         { method: 'POST' }
       );
 
-      // When: Generating visuals (mock returns 0 results)
-      try {
-        const response = await POST(request, { params: { id: projectId } });
-        const result = await response.json();
+      // When: Generating visuals (returns 0 results)
+      const response = await POST(request, { params: Promise.resolve({ id: projectId }) });
+      const result = await response.json();
 
-        // Then: Should succeed with 0 suggestions (NOT an error)
-        expect(result.success).toBe(true);
-        expect(result.suggestionsGenerated).toBe(0);
-        expect(result.errors).toBeUndefined(); // Zero results is valid, not error
-      } catch (error) {
-        // Test documents expected behavior
-        expect(true).toBe(true);
-      }
+      // Then: Should succeed with 0 suggestions (NOT an error)
+      expect(response.status).toBe(200);
+      expect(result.success).toBe(true);
+      expect(result.scenesProcessed).toBe(1);
+      expect(result.suggestionsGenerated).toBe(0);
+      expect(result.errors).toBeUndefined(); // Zero results is valid, not error
     });
   });
 
@@ -128,6 +159,20 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
     test('3.3-API-004: should return scenesProcessed and suggestionsGenerated counts', async () => {
       // Given: Project with 3 scenes
       const projectId = 'test-project-counts';
+      const mockProject = createTestProject({ id: projectId });
+      const mockScenes = createTestScenes(3, projectId);
+      const mockAnalysis = createSceneAnalysis();
+      const mockVideoResults = [
+        createVideoResult({ duration: '180' }),
+        createVideoResult({ duration: '240' })
+      ];
+
+      vi.spyOn(queries, 'getProject').mockReturnValue(mockProject);
+      vi.spyOn(queries, 'getScenesByProject').mockReturnValue(mockScenes);
+      vi.spyOn(sceneAnalysis, 'analyzeScene').mockResolvedValue(mockAnalysis);
+      vi.spyOn(youtubeClient, 'searchVideos').mockResolvedValue(mockVideoResults);
+      vi.spyOn(queries, 'saveVisualSuggestions').mockResolvedValue(undefined);
+      vi.spyOn(queries, 'updateProject').mockReturnValue(mockProject);
 
       const request = new NextRequest(
         `http://localhost:3000/api/projects/${projectId}/generate-visuals`,
@@ -135,21 +180,18 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
       );
 
       // When: Generating visuals
-      try {
-        const response = await POST(request, { params: { id: projectId } });
-        const result = await response.json();
+      const response = await POST(request, { params: Promise.resolve({ id: projectId }) });
+      const result = await response.json();
 
-        // Then: Response should have required fields
-        expect(result).toHaveProperty('success');
-        expect(result).toHaveProperty('scenesProcessed');
-        expect(result).toHaveProperty('suggestionsGenerated');
+      // Then: Response should have required fields
+      expect(result).toHaveProperty('success');
+      expect(result).toHaveProperty('scenesProcessed');
+      expect(result).toHaveProperty('suggestionsGenerated');
 
-        // And: Counts should be numbers
-        expect(typeof result.scenesProcessed).toBe('number');
-        expect(typeof result.suggestionsGenerated).toBe('number');
-      } catch (error) {
-        expect(true).toBe(true);
-      }
+      // And: Counts should be numbers
+      expect(typeof result.scenesProcessed).toBe('number');
+      expect(typeof result.suggestionsGenerated).toBe('number');
+      expect(result.scenesProcessed).toBe(3);
     });
 
     /**
@@ -158,8 +200,23 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
      * Acceptance Criteria: AC3 (Database state update)
      */
     test('3.3-API-005: should update project.visuals_generated = true on success', async () => {
-      // Given: Project ID
+      // Given: Project that will successfully generate visuals
       const projectId = 'test-project-flag';
+      const mockProject = createTestProject({ id: projectId, visuals_generated: false });
+      const mockScenes = createTestScenes(2, projectId);
+      const mockAnalysis = createSceneAnalysis();
+      const mockVideoResults = [createVideoResult({ duration: '180' })];
+
+      vi.spyOn(queries, 'getProject').mockReturnValue(mockProject);
+      vi.spyOn(queries, 'getScenesByProject').mockReturnValue(mockScenes);
+      vi.spyOn(sceneAnalysis, 'analyzeScene').mockResolvedValue(mockAnalysis);
+      vi.spyOn(youtubeClient, 'searchVideos').mockResolvedValue(mockVideoResults);
+      vi.spyOn(queries, 'saveVisualSuggestions').mockResolvedValue(undefined);
+
+      const updateSpy = vi.spyOn(queries, 'updateProject').mockReturnValue({
+        ...mockProject,
+        visuals_generated: true
+      });
 
       const request = new NextRequest(
         `http://localhost:3000/api/projects/${projectId}/generate-visuals`,
@@ -167,15 +224,13 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
       );
 
       // When: Generating visuals successfully
-      try {
-        const response = await POST(request, { params: { id: projectId } });
+      const response = await POST(request, { params: Promise.resolve({ id: projectId }) });
+      const result = await response.json();
 
-        // Then: Should update database flag
-        // Note: Actual database check requires database fixture integration
-        expect(response.status).toBeLessThan(500); // Not crash
-      } catch (error) {
-        expect(true).toBe(true);
-      }
+      // Then: Should update database flag
+      expect(response.status).toBe(200);
+      expect(result.success).toBe(true);
+      expect(updateSpy).toHaveBeenCalledWith(projectId, { visualsGenerated: true });
     });
 
     /**
@@ -184,8 +239,29 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
      * Acceptance Criteria: AC6 (Error handling - partial failures)
      */
     test('3.3-API-006: should process all scenes even if some fail', async () => {
-      // Given: Project with 5 scenes, some will fail
+      // Given: Project with 5 scenes, where scene 2 and 4 will fail
       const projectId = 'test-project-partial';
+      const mockProject = createTestProject({ id: projectId });
+      const mockScenes = createTestScenes(5, projectId);
+      const mockAnalysis = createSceneAnalysis();
+      const mockVideoResults = [createVideoResult({ duration: '180' })];
+
+      vi.spyOn(queries, 'getProject').mockReturnValue(mockProject);
+      vi.spyOn(queries, 'getScenesByProject').mockReturnValue(mockScenes);
+
+      // Mock analyzeScene to fail for scenes 2 and 4
+      let callCount = 0;
+      vi.spyOn(sceneAnalysis, 'analyzeScene').mockImplementation(async () => {
+        callCount++;
+        if (callCount === 2 || callCount === 4) {
+          throw new Error('Analysis failed for scene');
+        }
+        return mockAnalysis;
+      });
+
+      vi.spyOn(youtubeClient, 'searchVideos').mockResolvedValue(mockVideoResults);
+      vi.spyOn(queries, 'saveVisualSuggestions').mockResolvedValue(undefined);
+      vi.spyOn(queries, 'updateProject').mockReturnValue(mockProject);
 
       const request = new NextRequest(
         `http://localhost:3000/api/projects/${projectId}/generate-visuals`,
@@ -193,21 +269,17 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
       );
 
       // When: Processing with some scene failures
-      try {
-        const response = await POST(request, { params: { id: projectId } });
-        const result = await response.json();
+      const response = await POST(request, { params: Promise.resolve({ id: projectId }) });
+      const result = await response.json();
 
-        // Then: Should continue processing other scenes
-        expect(result.success).toBe(true); // Overall success
-        expect(result.scenesProcessed).toBeGreaterThan(0);
+      // Then: Should continue processing other scenes
+      expect(result.success).toBe(true); // Overall success (partial completion allowed)
+      expect(result.scenesProcessed).toBe(3); // 3 of 5 succeeded
 
-        // And: Should collect errors for failed scenes
-        if (result.errors) {
-          expect(Array.isArray(result.errors)).toBe(true);
-        }
-      } catch (error) {
-        expect(true).toBe(true);
-      }
+      // And: Should collect errors for failed scenes
+      expect(result.errors).toBeDefined();
+      expect(Array.isArray(result.errors)).toBe(true);
+      expect(result.errors).toHaveLength(2); // Scenes 2 and 4 failed
     });
   });
 
@@ -217,9 +289,19 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
      * Priority: P2 (R-007 Score 4)
      * Acceptance Criteria: AC6 (Error handling - network errors)
      */
-    test('3.3-API-009: should retry network errors with exponential backoff', async () => {
+    test('3.3-API-009: should handle network errors gracefully', async () => {
       // Given: Project that will experience network errors
       const projectId = 'test-project-network';
+      const mockProject = createTestProject({ id: projectId });
+      const mockScenes = createTestScenes(1, projectId);
+      const mockAnalysis = createSceneAnalysis();
+
+      vi.spyOn(queries, 'getProject').mockReturnValue(mockProject);
+      vi.spyOn(queries, 'getScenesByProject').mockReturnValue(mockScenes);
+      vi.spyOn(sceneAnalysis, 'analyzeScene').mockResolvedValue(mockAnalysis);
+      vi.spyOn(youtubeClient, 'searchVideos').mockRejectedValue(
+        new Error('Network error: ECONNREFUSED')
+      );
 
       const request = new NextRequest(
         `http://localhost:3000/api/projects/${projectId}/generate-visuals`,
@@ -227,14 +309,13 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
       );
 
       // When: Network error occurs
-      try {
-        const response = await POST(request, { params: { id: projectId } });
+      const response = await POST(request, { params: Promise.resolve({ id: projectId }) });
+      const result = await response.json();
 
-        // Then: Should retry (max 3 attempts) then fail gracefully
-        expect(response.status).toBeOneOf([200, 503, 500]);
-      } catch (error) {
-        expect(true).toBe(true);
-      }
+      // Then: Should fail gracefully with error message
+      expect(response.status).toBeGreaterThanOrEqual(400);
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
     });
 
     /**
@@ -242,9 +323,22 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
      * Priority: P2 (R-012 Score 1)
      * Acceptance Criteria: AC6 (Error handling - invalid input)
      */
-    test('3.3-API-010: should handle invalid query gracefully', async () => {
+    test('3.3-API-010: should handle scenes with invalid text gracefully', async () => {
       // Given: Scene with text that generates invalid search query
       const projectId = 'test-project-invalid-query';
+      const mockProject = createTestProject({ id: projectId });
+      const mockScenes = [createTestScene({
+        project_id: projectId,
+        text: '' // Empty text
+      })];
+      const mockAnalysis = createSceneAnalysis({ primaryQuery: '' }); // Invalid query
+
+      vi.spyOn(queries, 'getProject').mockReturnValue(mockProject);
+      vi.spyOn(queries, 'getScenesByProject').mockReturnValue(mockScenes);
+      vi.spyOn(sceneAnalysis, 'analyzeScene').mockResolvedValue(mockAnalysis);
+      vi.spyOn(youtubeClient, 'searchVideos').mockResolvedValue([]);
+      vi.spyOn(queries, 'saveVisualSuggestions').mockResolvedValue(undefined);
+      vi.spyOn(queries, 'updateProject').mockReturnValue(mockProject);
 
       const request = new NextRequest(
         `http://localhost:3000/api/projects/${projectId}/generate-visuals`,
@@ -252,15 +346,13 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
       );
 
       // When: Processing invalid query
-      try {
-        const response = await POST(request, { params: { id: projectId } });
-        const result = await response.json();
+      const response = await POST(request, { params: Promise.resolve({ id: projectId }) });
+      const result = await response.json();
 
-        // Then: Should log warning and skip query (not crash)
-        expect(result.success).toBe(true);
-      } catch (error) {
-        expect(true).toBe(true);
-      }
+      // Then: Should skip invalid query and continue (not crash)
+      expect(response.status).toBe(200);
+      expect(result.success).toBe(true);
+      expect(result.scenesProcessed).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -270,9 +362,21 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
      * Priority: P3
      * Acceptance Criteria: AC6 (Error handling - database errors)
      */
-    test('3.3-API-012: should handle database errors with rollback', async () => {
-      // Given: Scenario that causes database error
+    test('3.3-API-012: should handle database errors with proper error response', async () => {
+      // Given: Scenario that causes database error during save
       const projectId = 'test-project-db-error';
+      const mockProject = createTestProject({ id: projectId });
+      const mockScenes = createTestScenes(1, projectId);
+      const mockAnalysis = createSceneAnalysis();
+      const mockVideoResults = [createVideoResult({ duration: '180' })];
+
+      vi.spyOn(queries, 'getProject').mockReturnValue(mockProject);
+      vi.spyOn(queries, 'getScenesByProject').mockReturnValue(mockScenes);
+      vi.spyOn(sceneAnalysis, 'analyzeScene').mockResolvedValue(mockAnalysis);
+      vi.spyOn(youtubeClient, 'searchVideos').mockResolvedValue(mockVideoResults);
+      vi.spyOn(queries, 'saveVisualSuggestions').mockRejectedValue(
+        new Error('Database constraint violation')
+      );
 
       const request = new NextRequest(
         `http://localhost:3000/api/projects/${projectId}/generate-visuals`,
@@ -280,31 +384,13 @@ describe('POST /api/projects/[id]/generate-visuals - Story 3.3', () => {
       );
 
       // When: Database error occurs during insert
-      try {
-        const response = await POST(request, { params: { id: projectId } });
+      const response = await POST(request, { params: Promise.resolve({ id: projectId }) });
+      const result = await response.json();
 
-        // Then: Should rollback transaction and return 500
-        if (response.status === 500) {
-          const result = await response.json();
-          expect(result.error).toBeDefined();
-        }
-      } catch (error) {
-        expect(true).toBe(true);
-      }
+      // Then: Should return error response
+      expect(response.status).toBeGreaterThanOrEqual(400);
+      expect(result.error).toBeDefined();
+      expect(result.success).toBe(false);
     });
   });
-});
-
-// Helper for expect.toBeOneOf (custom matcher)
-expect.extend({
-  toBeOneOf(received: any, expected: any[]) {
-    const pass = expected.includes(received);
-    return {
-      pass,
-      message: () =>
-        pass
-          ? `expected ${received} not to be one of ${expected}`
-          : `expected ${received} to be one of ${expected}`
-    };
-  }
 });

@@ -20,7 +20,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getProject,
   getVisualSuggestions,
-  getVisualSuggestionsByProject
+  getVisualSuggestionsByProject,
+  getScenesCount,
+  getScenesWithSuggestionsCount
 } from '@/lib/db/queries';
 import { initializeDatabase } from '@/lib/db/init';
 
@@ -68,9 +70,19 @@ export async function GET(
       console.log(`[Visual Suggestions] Retrieved ${suggestions.length} suggestions for project ${projectId}`);
     }
 
-    // Return suggestions (empty array if none exist)
+    // Get metadata for project-level statistics
+    const totalScenes = getScenesCount(projectId);
+    const scenesWithSuggestions = getScenesWithSuggestionsCount(projectId);
+
+    console.log(`[Visual Suggestions] Project ${projectId} metadata: ${scenesWithSuggestions}/${totalScenes} scenes have suggestions`);
+
+    // Return suggestions with metadata (empty array if none exist)
     return NextResponse.json(
-      { suggestions },
+      {
+        suggestions,
+        totalScenes,
+        scenesWithSuggestions
+      },
       { status: 200 }
     );
   } catch (error: any) {

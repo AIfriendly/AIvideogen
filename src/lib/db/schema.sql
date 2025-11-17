@@ -25,7 +25,16 @@ CREATE TABLE IF NOT EXISTS projects (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   topic TEXT,
-  current_step TEXT DEFAULT 'topic',
+  current_step TEXT DEFAULT 'topic' CHECK(current_step IN (
+    'topic',
+    'script',
+    'voice',
+    'voiceover',
+    'visual-sourcing',
+    'visual-curation',
+    'editing',
+    'export'
+  )),
   status TEXT DEFAULT 'draft',
   config_json TEXT,
   system_prompt_id TEXT,
@@ -94,9 +103,10 @@ CREATE TABLE IF NOT EXISTS visual_suggestions (
   rank INTEGER NOT NULL,
   duration INTEGER,
   default_segment_path TEXT,
-  download_status TEXT DEFAULT 'pending',
+  download_status TEXT DEFAULT 'pending' CHECK(download_status IN ('pending', 'downloading', 'complete', 'error')),
   created_at TEXT DEFAULT (datetime('now')),
-  FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+  FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE,
+  UNIQUE(scene_id, video_id)
 );
 
 -- Index on scene_id for performance
