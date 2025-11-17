@@ -91,12 +91,13 @@ export class KokoroProvider implements TTSProvider {
   private maxRestartAttempts: number = 3;
 
   // Timeouts (ms)
-  // Note: KokoroTTS synthesis takes ~27-30 seconds per scene based on production testing
+  // Note: KokoroTTS synthesis takes ~27-50 seconds per scene based on production testing
+  // Increased from 45s to 120s to handle longer scenes and file I/O delays
   private readonly COLD_START_TIMEOUT = parseInt(
-    process.env.TTS_TIMEOUT_MS_COLD || '60000'  // 60s for cold start (model loading + first synthesis)
+    process.env.TTS_TIMEOUT_MS_COLD || '120000'  // 120s for cold start (model loading + first synthesis)
   );
   private readonly WARM_TIMEOUT = parseInt(
-    process.env.TTS_TIMEOUT_MS_WARM || '45000'  // 45s for warm requests (synthesis only, ~30s observed + buffer)
+    process.env.TTS_TIMEOUT_MS_WARM || '90000'  // 90s for warm requests (synthesis ~50s observed + 40s buffer)
   );
 
   // Service script path (now inside project directory)
@@ -422,22 +423,42 @@ export class KokoroProvider implements TTSProvider {
           const response: TTSResponse = JSON.parse(data.toString());
 
           if (response.success) {
-            // DEBUG: Check if file exists before reading
-            console.log(`[DEBUG TTS] Response success, attempting to read file: ${outputPath}`);
-            console.log(`[DEBUG TTS] File exists check: ${existsSync(outputPath)}`);
-            if (existsSync(outputPath)) {
-              console.log(`[DEBUG TTS] File size: ${readFileSync(outputPath).length} bytes`);
-            }
+            // Wait for file to be written to disk (with retry logic)
+            // The Python service returns success immediately, but file I/O may lag
+            const waitForFile = async (path: string, maxRetries = 10, delayMs = 100): Promise<void> => {
+              for (let i = 0; i < maxRetries; i++) {
+                if (existsSync(path)) {
+                  // File exists, give it 50ms to finish writing
+                  await new Promise(resolve => setTimeout(resolve, 50));
+                  return;
+                }
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+              }
+              throw new Error(`File not found after ${maxRetries} retries: ${path}`);
+            };
 
-            // Read audio file
-            const audioBuffer = new Uint8Array(readFileSync(outputPath));
+            waitForFile(outputPath)
+              .then(() => {
+                console.log(`[DEBUG TTS] File ready: ${outputPath} (${readFileSync(outputPath).length} bytes)`);
 
-            resolve({
-              audioBuffer,
-              duration: response.duration || 0,
-              filePath: response.filePath || outputPath,
-              fileSize: response.fileSize || audioBuffer.length,
-            });
+                // Read audio file
+                const audioBuffer = new Uint8Array(readFileSync(outputPath));
+
+                resolve({
+                  audioBuffer,
+                  duration: response.duration || 0,
+                  filePath: response.filePath || outputPath,
+                  fileSize: response.fileSize || audioBuffer.length,
+                });
+              })
+              .catch((error) => {
+                reject(
+                  new TTSError(
+                    TTSErrorCode.TTS_SERVICE_ERROR,
+                    `File not available after waiting: ${error instanceof Error ? error.message : String(error)}`
+                  )
+                );
+              });
           } else {
             // Service returned error
             const errorCode =
