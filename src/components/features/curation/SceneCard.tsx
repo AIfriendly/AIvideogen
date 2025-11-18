@@ -1,5 +1,5 @@
 /**
- * SceneCard Component - Epic 4, Story 4.1
+ * SceneCard Component - Epic 4, Story 4.1 & 4.2
  *
  * Displays a single scene with its script text and metadata.
  * Used in the visual curation page to show scenes in a scene-by-scene layout.
@@ -8,6 +8,7 @@
  * - Scene number badge
  * - Script text display
  * - Duration display (formatted from seconds)
+ * - Visual suggestion gallery (Story 4.2)
  * - Responsive text sizing
  * - Card-based layout using shadcn/ui
  */
@@ -15,12 +16,14 @@
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { type Scene } from '@/lib/db/queries';
+import { VisualSuggestionGallery } from './VisualSuggestionGallery';
 
 /**
  * Props for SceneCard component
  */
 interface SceneCardProps {
   scene: Scene;
+  projectId: string; // Added in Story 4.2 for VisualSuggestionGallery
   className?: string;
 }
 
@@ -47,14 +50,15 @@ function formatDuration(seconds: number | null): string {
 /**
  * SceneCard Component
  *
- * Displays a single scene with its number, text, and duration.
+ * Displays a single scene with its number, text, duration, and visual suggestions.
  * Designed for the visual curation workflow.
  *
  * @param scene - Scene data from database
+ * @param projectId - Project identifier for fetching visual suggestions
  * @param className - Optional additional CSS classes
  * @returns Scene card component
  */
-export function SceneCard({ scene, className }: SceneCardProps) {
+export function SceneCard({ scene, projectId, className }: SceneCardProps) {
   return (
     <Card className={className}>
       <CardHeader className="pb-3">
@@ -76,6 +80,15 @@ export function SceneCard({ scene, className }: SceneCardProps) {
         <p className="text-sm md:text-base text-slate-700 dark:text-slate-300 leading-relaxed">
           {scene.text}
         </p>
+
+        {/* Visual Separator and Suggestion Gallery - Story 4.2 */}
+        <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+          <VisualSuggestionGallery
+            projectId={projectId}
+            sceneId={scene.id}
+            sceneNumber={scene.scene_number}
+          />
+        </div>
       </CardContent>
     </Card>
   );

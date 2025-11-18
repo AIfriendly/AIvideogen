@@ -213,13 +213,13 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
             <div className="space-y-4 md:space-y-6">
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 md:p-4">
                 <p className="text-xs md:text-sm text-blue-800 dark:text-blue-300">
-                  <strong>Review each scene below.</strong> Select visual clips for each scene to
-                  match your script. (Visual selection coming in Story 4.2)
+                  <strong>Review each scene below.</strong> Browse the AI-suggested video clips for each scene.
+                  Click on a clip to preview it, then select your favorite to include in the final video.
                 </p>
               </div>
 
               {scenes.map((scene) => (
-                <SceneCard key={scene.id} scene={scene} />
+                <SceneCard key={scene.id} scene={scene} projectId={project.id} />
               ))}
 
               <div className="pt-4 md:pt-6 border-t">
