@@ -58,3 +58,12 @@ next-env.d.ts
 *.db-journal
 *.db-shm
 *.db-wal
+
+# Temporary test files
+manual-test-*.js
+test-*.mjs
+*-temp.ts
+nul
+
+# Development scripts
+scripts/init-db.ts
