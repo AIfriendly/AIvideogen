@@ -1,0 +1,775 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>4.2</story-id>
+    <story-key>4-2-visual-suggestions-display-gallery</story-key>
+    <epic>Epic 4 - Visual Curation Interface</epic>
+    <title>Visual Suggestions Display &amp; Gallery</title>
+    <status>ready-for-dev</status>
+    <generated-date>2025-11-18</generated-date>
+    <generated-by>story-context workflow</generated-by>
+    <agent>Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)</agent>
+  </metadata>
+
+  <story-definition>
+    <user-story>
+      <role>user who has completed visual sourcing (Epic 3)</role>
+      <goal>see AI-suggested video clips for each scene displayed in an organized gallery with thumbnails and metadata</goal>
+      <benefit>review the available options and make informed selections for my video assembly</benefit>
+    </user-story>
+
+    <acceptance-criteria>
+      <criterion id="AC1">
+        <description>Each scene section displays its suggested video clips in a gallery grid (2-3 columns)</description>
+        <priority>must-have</priority>
+      </criterion>
+      <criterion id="AC2">
+        <description>Each suggestion card shows: YouTube thumbnail, video title, channel name, duration</description>
+        <priority>must-have</priority>
+      </criterion>
+      <criterion id="AC3">
+        <description>Suggestions ordered by rank (1-8) from Epic 3 Story 3.4 filtering</description>
+        <priority>must-have</priority>
+      </criterion>
+      <criterion id="AC4">
+        <description>Download status indicator visible per suggestion (pending/downloading/complete/error icon)</description>
+        <priority>must-have</priority>
+      </criterion>
+      <criterion id="AC5">
+        <description>Empty State: If scene has 0 suggestions, display message: "No clips found for this scene. The script may be too abstract or specific. Try editing the script text."</description>
+        <priority>must-have</priority>
+      </criterion>
+      <criterion id="AC6">
+        <description>Retry Functionality: If visual sourcing failed, "Retry Visual Sourcing" button appears</description>
+        <priority>must-have</priority>
+      </criterion>
+      <criterion id="AC7">
+        <description>Loading skeleton displays while suggestions are being fetched</description>
+        <priority>must-have</priority>
+      </criterion>
+      <criterion id="AC8">
+        <description>Graceful degradation if thumbnails fail to load (show placeholder image)</description>
+        <priority>must-have</priority>
+      </criterion>
+    </acceptance-criteria>
+
+    <dependencies>
+      <dependency id="story-4.1" status="DONE" critical="true">
+        <description>Story 4.1 (Scene-by-Scene UI Layout &amp; Script Display) - SceneCard component and page structure</description>
+        <integration-points>
+          <point>VisualSuggestionGallery will be added as child component to SceneCard</point>
+          <point>SceneCard provides sceneId and sceneNumber props</point>
+          <point>Skeleton component already created in Story 4.1 will be reused</point>
+        </integration-points>
+      </dependency>
+      <dependency id="epic-3.5" status="DONE" critical="true">
+        <description>Epic 3 Story 3.5 (Visual Suggestions Database &amp; Workflow Integration)</description>
+        <integration-points>
+          <point>Consumes GET /api/projects/[id]/visual-suggestions endpoint</point>
+          <point>Reads visual_suggestions table data with rank, duration, download_status</point>
+        </integration-points>
+      </dependency>
+      <dependency id="epic-3.6" status="DONE" critical="true">
+        <description>Epic 3 Story 3.6 (Default Segment Download Service)</description>
+        <integration-points>
+          <point>Uses default_segment_path for future video preview (Story 4.3)</point>
+          <point>Displays download_status indicator badges</point>
+        </integration-points>
+      </dependency>
+    </dependencies>
+  </story-definition>
+
+  <technical-context>
+    <architecture-patterns>
+      <pattern name="Component Hierarchy">
+        <description>VisualSuggestionGallery is child component of SceneCard</description>
+        <rationale>Scene-level data fetching for independent scene loading (better UX if one scene fails)</rationale>
+        <alternative>Page-level fetching with prop drilling (deferred optimization)</alternative>
+      </pattern>
+
+      <pattern name="Grid Layout System">
+        <description>Responsive grid using Tailwind CSS: grid grid-cols-2 lg:grid-cols-3 gap-4</description>
+        <breakpoints>
+          <breakpoint size="mobile" width="&lt;768px">Deferred to post-MVP</breakpoint>
+          <breakpoint size="tablet" width="768px-1023px">2 columns (grid-cols-2)</breakpoint>
+          <breakpoint size="desktop" width="1024px+">3 columns (lg:grid-cols-3)</breakpoint>
+        </breakpoints>
+        <rationale>3 columns at 1920px allows 600px card width with spacing; 2 columns at 768px ensures readable metadata</rationale>
+      </pattern>
+
+      <pattern name="Data Fetching Strategy">
+        <description>Component-level fetching using useEffect + fetch() API</description>
+        <location>VisualSuggestionGallery component (per scene)</location>
+        <rationale>Independent scene loading provides better error isolation and progressive rendering</rationale>
+      </pattern>
+
+      <pattern name="Loading State Pattern">
+        <description>Skeleton components from Story 4.1 in grid layout matching final UI</description>
+        <implementation>Display 6 skeleton cards (2×3 or 3×2 grid) while fetching</implementation>
+      </pattern>
+
+      <pattern name="Error Handling Pattern">
+        <description>Empty state component with retry button for 0 suggestions or API failures</description>
+        <components>
+          <component>EmptyClipState.tsx for zero-suggestion scenarios</component>
+          <component>Error toast notifications for API failures</component>
+        </components>
+      </pattern>
+    </architecture-patterns>
+
+    <file-locations>
+      <component path="src/components/features/curation/VisualSuggestionGallery.tsx" status="to-create">
+        <description>Main gallery component displaying 5-8 suggestion cards per scene</description>
+        <props>
+          <prop name="sceneId" type="string" required="true">Scene identifier for filtering suggestions</prop>
+          <prop name="sceneNumber" type="number" required="true">Scene number for display and retry functionality</prop>
+        </props>
+      </component>
+
+      <component path="src/components/features/curation/SuggestionCard.tsx" status="to-create">
+        <description>Individual suggestion card with thumbnail, metadata, and download status badge</description>
+        <props>
+          <prop name="suggestion" type="VisualSuggestion" required="true">Complete suggestion object from API</prop>
+        </props>
+      </component>
+
+      <component path="src/components/features/curation/EmptyClipState.tsx" status="to-create">
+        <description>Empty state display for scenes with zero suggestions</description>
+        <props>
+          <prop name="sceneNumber" type="number" required="true">Scene number for display</prop>
+          <prop name="onRetry" type="() =&gt; void" required="true">Retry callback function</prop>
+        </props>
+      </component>
+
+      <component path="src/components/features/curation/SceneCard.tsx" status="to-modify">
+        <description>Extend existing component to include VisualSuggestionGallery as child</description>
+        <modifications>
+          <modification>Import VisualSuggestionGallery component</modification>
+          <modification>Add gallery below scene text display with visual separator</modification>
+          <modification>Pass sceneId and sceneNumber as props</modification>
+        </modifications>
+      </component>
+
+      <api-endpoint path="src/app/api/projects/[id]/visual-suggestions/route.ts" status="exists">
+        <description>Existing endpoint from Story 3.5 - no modifications needed</description>
+        <response-format>
+          {
+            "suggestions": VisualSuggestion[],
+            "totalScenes": number,
+            "scenesWithSuggestions": number
+          }
+        </response-format>
+      </api-endpoint>
+    </file-locations>
+
+    <interfaces-and-types>
+      <typescript-interface name="VisualSuggestion" source="src/types/visual-suggestions.ts">
+        <description>Visual suggestion data structure from Epic 3</description>
+        <fields>
+          <field name="id" type="string">Unique suggestion identifier</field>
+          <field name="sceneId" type="string">Foreign key to scenes table</field>
+          <field name="videoId" type="string">YouTube video ID</field>
+          <field name="title" type="string">Video title from YouTube API</field>
+          <field name="thumbnailUrl" type="string">YouTube thumbnail URL (medium quality 320x180)</field>
+          <field name="channelTitle" type="string">Channel name from YouTube API</field>
+          <field name="embedUrl" type="string">YouTube embed URL for iframe fallback</field>
+          <field name="rank" type="number">Relevance ranking (1-8 from Story 3.4)</field>
+          <field name="duration" type="number | undefined">Video duration in seconds</field>
+          <field name="defaultSegmentPath" type="string | undefined">Relative path to downloaded segment (.cache/videos/...)</field>
+          <field name="downloadStatus" type="'pending' | 'downloading' | 'complete' | 'error'">Download state from Story 3.6</field>
+          <field name="createdAt" type="string">ISO 8601 timestamp</field>
+        </fields>
+      </typescript-interface>
+
+      <typescript-interface name="VisualSuggestionGalleryProps" status="to-create">
+        <description>Props for VisualSuggestionGallery component</description>
+        <fields>
+          <field name="sceneId" type="string">Scene identifier for API filtering</field>
+          <field name="sceneNumber" type="number">Scene number for display</field>
+        </fields>
+      </typescript-interface>
+
+      <typescript-interface name="SuggestionCardProps" status="to-create">
+        <description>Props for SuggestionCard component</description>
+        <fields>
+          <field name="suggestion" type="VisualSuggestion">Complete suggestion object</field>
+        </fields>
+      </typescript-interface>
+
+      <typescript-interface name="EmptyClipStateProps" status="to-create">
+        <description>Props for EmptyClipState component</description>
+        <fields>
+          <field name="sceneNumber" type="number">Scene number for message</field>
+          <field name="onRetry" type="() =&gt; void">Retry callback</field>
+        </fields>
+      </typescript-interface>
+    </interfaces-and-types>
+
+    <database-schema>
+      <table name="visual_suggestions">
+        <description>Existing table from Epic 3 Story 3.5 - READ ONLY for this story</description>
+        <columns>
+          <column name="id" type="TEXT PRIMARY KEY">Suggestion identifier</column>
+          <column name="scene_id" type="TEXT">Foreign key to scenes table</column>
+          <column name="video_id" type="TEXT">YouTube video ID</column>
+          <column name="title" type="TEXT">Video title</column>
+          <column name="thumbnail_url" type="TEXT">Thumbnail URL</column>
+          <column name="channel_title" type="TEXT">Channel name</column>
+          <column name="embed_url" type="TEXT">YouTube embed URL</column>
+          <column name="rank" type="INTEGER">Relevance rank 1-8</column>
+          <column name="duration" type="INTEGER">Video duration in seconds</column>
+          <column name="default_segment_path" type="TEXT">Downloaded segment path</column>
+          <column name="download_status" type="TEXT">pending/downloading/complete/error</column>
+          <column name="created_at" type="TEXT">ISO 8601 timestamp</column>
+        </columns>
+        <indexes>
+          <index name="idx_visual_suggestions_scene_id">ON visual_suggestions(scene_id)</index>
+        </indexes>
+        <query-pattern>
+          SELECT * FROM visual_suggestions
+          WHERE scene_id = ?
+          ORDER BY rank ASC
+        </query-pattern>
+      </table>
+    </database-schema>
+
+    <api-contracts>
+      <endpoint method="GET" path="/api/projects/[id]/visual-suggestions">
+        <description>Retrieve all visual suggestions for a project (existing from Story 3.5)</description>
+        <request>
+          <path-params>
+            <param name="id">Project ID</param>
+          </path-params>
+          <query-params>
+            <param name="sceneId" optional="true">Filter suggestions for specific scene</param>
+          </query-params>
+        </request>
+        <response status="200">
+          <json-schema>
+            {
+              "suggestions": [
+                {
+                  "id": "sugg-1",
+                  "sceneId": "scene-1",
+                  "videoId": "dQw4w9WgXcQ",
+                  "title": "Mars Colony Visualization",
+                  "thumbnailUrl": "https://i.ytimg.com/...",
+                  "channelTitle": "Space Channel",
+                  "embedUrl": "https://youtube.com/embed/...",
+                  "rank": 1,
+                  "duration": 45,
+                  "defaultSegmentPath": ".cache/videos/abc123/scene-1-default.mp4",
+                  "downloadStatus": "complete",
+                  "createdAt": "2025-11-18T10:30:00Z"
+                }
+              ],
+              "totalScenes": 5,
+              "scenesWithSuggestions": 5
+            }
+          </json-schema>
+        </response>
+        <response status="404">
+          <description>Project not found</description>
+        </response>
+        <response status="500">
+          <description>Database query failure</description>
+        </response>
+      </endpoint>
+    </api-contracts>
+
+    <component-library-usage>
+      <shadcn-components>
+        <component name="Card" from="@/components/ui/card">
+          <usage>SuggestionCard wrapper styling</usage>
+        </component>
+        <component name="Skeleton" from="@/components/ui/skeleton">
+          <usage>Loading state placeholders (reuse from Story 4.1)</usage>
+        </component>
+        <component name="Button" from="@/components/ui/button">
+          <usage>Retry button in EmptyClipState</usage>
+        </component>
+        <component name="Badge" from="@/components/ui/badge">
+          <usage>Download status indicators (pending/downloading/complete/error)</usage>
+          <note>May need to create if not exists</note>
+        </component>
+      </shadcn-components>
+
+      <lucide-icons>
+        <icon name="User">Channel icon for channel_title display</icon>
+        <icon name="Clock">Pending download status</icon>
+        <icon name="Download">Downloading status</icon>
+        <icon name="CheckCircle">Complete download status</icon>
+        <icon name="AlertCircle">Error status and empty state</icon>
+      </lucide-icons>
+
+      <next-js-components>
+        <component name="Image" from="next/image">
+          <usage>Optimized YouTube thumbnail loading with onError fallback</usage>
+          <config>
+            <property name="layout">responsive</property>
+            <property name="aspect-ratio">16:9</property>
+            <property name="quality">medium (320x180)</property>
+          </config>
+        </component>
+      </next-js-components>
+    </component-library-usage>
+
+    <styling-guidelines>
+      <responsive-design>
+        <breakpoint name="desktop" min-width="1024px">
+          <layout>3-column grid (lg:grid-cols-3)</layout>
+          <card-width>~600px with spacing</card-width>
+        </breakpoint>
+        <breakpoint name="tablet" min-width="768px" max-width="1023px">
+          <layout>2-column grid (grid-cols-2)</layout>
+          <card-width>Ensures readable metadata</card-width>
+        </breakpoint>
+        <breakpoint name="mobile" max-width="767px">
+          <layout>Deferred to post-MVP</layout>
+        </breakpoint>
+      </responsive-design>
+
+      <thumbnail-display>
+        <resolution>Medium quality (320x180) from YouTube</resolution>
+        <aspect-ratio>16:9 maintained via Next.js Image</aspect-ratio>
+        <fallback>Placeholder image on load failure</fallback>
+      </thumbnail-display>
+
+      <download-status-badges>
+        <badge status="pending">
+          <icon>Clock</icon>
+          <text>Queued</text>
+          <color>Gray/neutral</color>
+        </badge>
+        <badge status="downloading">
+          <icon>Download</icon>
+          <text>Downloading...</text>
+          <color>Blue with animation</color>
+        </badge>
+        <badge status="complete">
+          <icon>CheckCircle</icon>
+          <text>Ready</text>
+          <color>Green</color>
+        </badge>
+        <badge status="error">
+          <icon>AlertCircle</icon>
+          <text>Failed</text>
+          <color>Red</color>
+        </badge>
+      </download-status-badges>
+    </styling-guidelines>
+
+    <integration-patterns>
+      <story-4-1-integration>
+        <description>Extend SceneCard component from Story 4.1</description>
+        <steps>
+          <step>Import VisualSuggestionGallery component</step>
+          <step>Add visual separator below scene text (border-t, mt-6, pt-6)</step>
+          <step>Render gallery with sceneId={scene.id} sceneNumber={scene.scene_number}</step>
+          <step>Ensure projectId is accessible in SceneCard context for API calls</step>
+        </steps>
+      </story-4-1-integration>
+
+      <api-integration>
+        <description>Fetch suggestions at component level</description>
+        <implementation>
+          <code-pattern>
+            // In VisualSuggestionGallery.tsx
+            useEffect(() => {
+              fetch(`/api/projects/${projectId}/visual-suggestions?sceneId=${sceneId}`)
+                .then(res => res.json())
+                .then(data => {
+                  // Filter for current scene if needed
+                  const sceneSuggestions = data.suggestions.filter(s => s.sceneId === sceneId);
+                  // Sort by rank
+                  sceneSuggestions.sort((a, b) => a.rank - b.rank);
+                  setSuggestions(sceneSuggestions);
+                })
+                .catch(error => setError(error));
+            }, [projectId, sceneId]);
+          </code-pattern>
+        </implementation>
+      </api-integration>
+
+      <error-recovery>
+        <scenario type="zero-suggestions">
+          <condition>suggestions.length === 0</condition>
+          <display>EmptyClipState component</display>
+          <message>No clips found for this scene. The script may be too abstract or specific. Try editing the script text.</message>
+          <action>Retry Visual Sourcing button</action>
+        </scenario>
+        <scenario type="api-failure">
+          <condition>Fetch error or 500 response</condition>
+          <display>Error message with retry button</display>
+          <message>Failed to load video suggestions. Please try again.</message>
+          <action>Retry button re-fetches suggestions</action>
+        </scenario>
+        <scenario type="thumbnail-failure">
+          <condition>Image onError event</condition>
+          <display>Placeholder image or icon</display>
+          <fallback>Generic video icon or shadcn/ui Avatar with fallback</fallback>
+        </scenario>
+      </error-recovery>
+    </integration-patterns>
+
+    <performance-considerations>
+      <target name="suggestions-fetch" value="&lt;1 second">
+        <description>API call to fetch suggestions for 30-40 total suggestions</description>
+      </target>
+      <target name="thumbnail-load" value="Lazy load via Intersection Observer">
+        <description>Only load thumbnails when cards enter viewport</description>
+      </target>
+      <optimization name="Image optimization">
+        <description>Use Next.js Image component for automatic optimization</description>
+      </optimization>
+    </performance-considerations>
+  </technical-context>
+
+  <documentation-references>
+    <prd-references>
+      <reference section="Feature 1.6" lines="244-277">
+        <description>Visual Curation UI requirements</description>
+        <key-points>
+          <point>Scene and clip display with thumbnails</point>
+          <point>Preview functionality</point>
+          <point>Selection workflow</point>
+        </key-points>
+      </reference>
+      <reference section="Feature 1.6 AC1" lines="263-266">
+        <description>Scene and Clip Display acceptance criteria</description>
+        <requirement>UI must display 3 distinct sections with each section showing its suggested video clips</requirement>
+      </reference>
+      <reference section="Feature 1.5" lines="179-242">
+        <description>AI-Powered Visual Sourcing (data source for this story)</description>
+        <key-points>
+          <point>YouTube Data API v3 integration</point>
+          <point>Duration filtering</point>
+          <point>Default segment downloads</point>
+        </key-points>
+      </reference>
+    </prd-references>
+
+    <tech-spec-references>
+      <reference section="Story 4.2" lines="540-548">
+        <description>Authoritative acceptance criteria for Story 4.2</description>
+        <authority>primary</authority>
+      </reference>
+      <reference section="Services &amp; Modules" lines="70-75">
+        <description>VisualSuggestionGallery and EmptyClipState component specifications</description>
+      </reference>
+      <reference section="APIs" lines="182-205">
+        <description>GET /visual-suggestions API specification</description>
+      </reference>
+      <reference section="Data Models" lines="114-127">
+        <description>VisualSuggestion TypeScript interface</description>
+      </reference>
+    </tech-spec-references>
+
+    <architecture-references>
+      <reference section="Project Structure" lines="209-219">
+        <description>Component file locations and organization</description>
+      </reference>
+      <reference section="Epic 4 Architecture" lines="287-336">
+        <description>Epic 4 component structure and integration points</description>
+      </reference>
+      <reference section="Decision Summary" lines="82-102">
+        <description>Technology stack versions and rationale</description>
+      </reference>
+    </architecture-references>
+
+    <epics-references>
+      <reference section="Epic 4 Story 4.2" lines="925-953">
+        <description>Original story definition with tasks and acceptance criteria</description>
+      </reference>
+      <reference section="Epic 3 Story 3.5" lines="758-809">
+        <description>Visual suggestions database schema and API endpoint</description>
+      </reference>
+      <reference section="Epic 3 Story 3.6" lines="812-867">
+        <description>Default segment download service integration</description>
+      </reference>
+    </epics-references>
+
+    <ux-spec-references>
+      <reference document="ux-design-specification.md">
+        <description>UI/UX requirements for suggestion gallery layout, card design, and responsive behavior</description>
+        <note>Referenced by tech spec as authoritative for visual design decisions</note>
+      </reference>
+    </ux-spec-references>
+  </documentation-references>
+
+  <testing-strategy>
+    <unit-tests framework="Vitest">
+      <test name="SuggestionCard rendering">
+        <description>Test card renders with sample VisualSuggestion data</description>
+        <data>Mock suggestion with all fields populated</data>
+      </test>
+      <test name="Download status badges">
+        <description>Test all 4 download status badges display correctly</description>
+        <cases>
+          <case>pending → Clock icon, "Queued" text</case>
+          <case>downloading → Download icon, "Downloading..." text</case>
+          <case>complete → CheckCircle icon, "Ready" text</case>
+          <case>error → AlertCircle icon, "Failed" text</case>
+        </cases>
+      </test>
+      <test name="Thumbnail fallback">
+        <description>Test image onError handler triggers placeholder</description>
+      </test>
+      <test name="Duration formatting">
+        <description>Test duration seconds convert to "MM:SS" format (e.g., 225s → "03:45")</description>
+      </test>
+      <test name="Rank display">
+        <description>Test rank badge displays "#1", "#2", etc.</description>
+      </test>
+    </unit-tests>
+
+    <component-tests framework="Vitest + Testing Library">
+      <test name="Gallery with varying counts">
+        <description>Test VisualSuggestionGallery with 0, 1, 5, 8 suggestions</description>
+        <expected>Correct number of cards rendered, proper grid layout</expected>
+      </test>
+      <test name="Loading state">
+        <description>Test skeleton grid displays while fetching</description>
+        <expected>6 skeleton cards in grid layout</expected>
+      </test>
+      <test name="Error state">
+        <description>Test error message and retry button display on API failure</description>
+      </test>
+      <test name="Empty state">
+        <description>Test EmptyClipState displays when suggestions.length === 0</description>
+        <expected>Empty message and retry button</expected>
+      </test>
+      <test name="Rank sorting">
+        <description>Test suggestions sorted by rank (1, 2, 3... 8)</description>
+        <data>Mock suggestions in random order</data>
+        <expected>Rendered in ascending rank order</expected>
+      </test>
+      <test name="Retry functionality">
+        <description>Test retry button triggers API call refetch</description>
+      </test>
+    </component-tests>
+
+    <integration-tests>
+      <test name="Full SceneCard with gallery">
+        <description>Test SceneCard renders → VisualSuggestionGallery fetches → suggestions display</description>
+        <steps>
+          <step>Render SceneCard with scene data</step>
+          <step>Verify gallery component rendered</step>
+          <step>Mock API call returns suggestions</step>
+          <step>Verify suggestion cards rendered</step>
+        </steps>
+      </test>
+      <test name="API integration">
+        <description>Test GET /visual-suggestions returns expected data structure</description>
+        <validation>Response matches VisualSuggestion[] schema</validation>
+      </test>
+      <test name="Responsive layout">
+        <description>Test grid layout at 1920px (3 columns) and 768px (2 columns)</description>
+        <tool>Testing Library with viewport resize</tool>
+      </test>
+      <test name="Thumbnail placeholder">
+        <description>Test thumbnail load failure triggers placeholder fallback</description>
+      </test>
+      <test name="Download status display">
+        <description>Test download status indicators match database values</description>
+      </test>
+    </integration-tests>
+
+    <manual-tests>
+      <test name="Visual design verification">
+        <description>Verify design matches UX specifications</description>
+        <checklist>
+          <item>Card spacing and layout</item>
+          <item>Typography sizing and readability</item>
+          <item>Color scheme matches design system</item>
+          <item>Icons correctly positioned</item>
+        </checklist>
+      </test>
+      <test name="User interaction">
+        <description>Test retry button click interaction</description>
+      </test>
+      <test name="Thumbnail quality">
+        <description>Verify thumbnail quality and aspect ratios</description>
+      </test>
+      <test name="Grid layout responsiveness">
+        <description>Test on actual devices at 1920px and 768px</description>
+      </test>
+      <test name="Metadata overflow">
+        <description>Verify long titles don't break layout (line-clamp-2)</description>
+      </test>
+    </manual-tests>
+  </testing-strategy>
+
+  <constraints-and-edge-cases>
+    <constraints>
+      <constraint type="technology">
+        <description>Desktop-first responsive design (1920px primary, 768px tablet minimum)</description>
+        <impact>Mobile viewport (&lt;768px) deferred to post-MVP</impact>
+      </constraint>
+      <constraint type="data">
+        <description>Expected 5-8 suggestions per scene from Epic 3 filtering</description>
+        <impact>Grid layout optimized for this range</impact>
+      </constraint>
+      <constraint type="api">
+        <description>Existing GET /visual-suggestions endpoint (no modifications allowed)</description>
+        <impact>Must work with current response format from Story 3.5</impact>
+      </constraint>
+      <constraint type="performance">
+        <description>Page load &lt;2 seconds, API fetch &lt;1 second (NFR targets)</description>
+        <impact>Lazy load thumbnails, optimize component rendering</impact>
+      </constraint>
+    </constraints>
+
+    <edge-cases>
+      <case name="Zero suggestions">
+        <condition>Scene has 0 suggestions (YouTube API returned no results)</condition>
+        <handling>Display EmptyClipState with message and retry button</handling>
+        <ux>User can retry visual sourcing or edit script text</ux>
+      </case>
+      <case name="Failed downloads">
+        <condition>download_status = 'error' for all suggestions</condition>
+        <handling>Show error badge, Story 4.3 will use YouTube iframe fallback</handling>
+        <ux>User can still preview and select clips (streaming)</ux>
+      </case>
+      <case name="Thumbnail load failures">
+        <condition>YouTube thumbnail URL returns 404 or network error</condition>
+        <handling>onError handler shows placeholder image</handling>
+        <ux>Graceful degradation, no broken image icons</ux>
+      </case>
+      <case name="Long video titles">
+        <condition>Title exceeds card width</condition>
+        <handling>line-clamp-2 CSS truncates to 2 lines with ellipsis</handling>
+        <ux>Prevents layout breaking</ux>
+      </case>
+      <case name="Missing duration">
+        <condition>duration field is null or undefined</condition>
+        <handling>Display placeholder like "--:--" or hide duration indicator</handling>
+      </case>
+      <case name="API timeout">
+        <condition>GET /visual-suggestions takes &gt;5 seconds</condition>
+        <handling>Show error state with retry button</handling>
+      </case>
+    </edge-cases>
+  </constraints-and-edge-cases>
+
+  <implementation-notes>
+    <critical-decisions>
+      <decision id="fetch-strategy">
+        <description>Component-level data fetching vs page-level</description>
+        <chosen>Component-level fetching in VisualSuggestionGallery</chosen>
+        <rationale>Independent scene loading provides better error isolation and UX</rationale>
+        <alternative>Page-level fetch with prop drilling (deferred optimization)</alternative>
+      </decision>
+
+      <decision id="thumbnail-quality">
+        <description>YouTube thumbnail resolution selection</description>
+        <chosen>Medium quality (320x180)</chosen>
+        <rationale>Optimal balance of quality and load time for 2-3 column grid</rationale>
+        <alternatives>
+          <option>default (120x90) - Too small, pixelated</option>
+          <option>high (480x360) - Unnecessary bandwidth, slower loading</option>
+        </alternatives>
+      </decision>
+
+      <decision id="retry-endpoint">
+        <description>Retry visual sourcing endpoint</description>
+        <chosen>POST /api/projects/[projectId]/scenes/[sceneId]/regenerate-visuals</chosen>
+        <status>Placeholder for Story 4.6</status>
+        <note>Story 4.2 adds UI button, Story 4.6 implements endpoint</note>
+      </decision>
+    </critical-decisions>
+
+    <best-practices>
+      <practice>Use Next.js Image component for all thumbnails (automatic optimization)</practice>
+      <practice>Apply lazy loading to thumbnails (Intersection Observer pattern)</practice>
+      <practice>Sort suggestions by rank before rendering (ascending: 1, 2, 3...)</practice>
+      <practice>Handle all 4 download status states with distinct visual indicators</practice>
+      <practice>Provide retry functionality for both empty state and error state</practice>
+      <practice>Log errors to console for debugging (no user-visible stack traces)</practice>
+      <practice>Use responsive Tailwind classes for all layout and typography</practice>
+    </best-practices>
+
+    <gotchas>
+      <gotcha>
+        <issue>projectId must be passed from VisualCurationClient to SceneCard to VisualSuggestionGallery</issue>
+        <solution>Add projectId to SceneCard props, pass through component hierarchy</solution>
+      </gotcha>
+      <gotcha>
+        <issue>API returns all suggestions for project, not filtered by scene</issue>
+        <solution>Filter client-side: suggestions.filter(s => s.sceneId === sceneId)</solution>
+      </gotcha>
+      <gotcha>
+        <issue>Thumbnail URLs may be relative or absolute</issue>
+        <solution>YouTube always returns absolute URLs, but add validation</solution>
+      </gotcha>
+      <gotcha>
+        <issue>Duration in seconds needs formatting to "MM:SS"</issue>
+        <solution>Implement formatDuration() utility: Math.floor(seconds / 60) + ":" + (seconds % 60).padStart(2, '0')</solution>
+      </gotcha>
+      <gotcha>
+        <issue>Empty suggestions array vs null vs undefined</issue>
+        <solution>Always return empty array [] from API (never null), check length === 0 for empty state</solution>
+      </gotcha>
+    </gotchas>
+  </implementation-notes>
+
+  <story-file-reference>
+    <file-path>D:\BMAD video generator\docs\stories\story-4.2.md</file-path>
+    <tasks-summary>
+      <task id="1">Create VisualSuggestionGallery Component (AC: #1, #2, #3, #7)</task>
+      <task id="2">Create SuggestionCard Component (AC: #2, #4, #8)</task>
+      <task id="3">Implement Loading State (AC: #7)</task>
+      <task id="4">Create EmptyClipState Component (AC: #5, #6)</task>
+      <task id="5">Implement Retry Functionality (AC: #6)</task>
+      <task id="6">Implement Error Handling (AC: #8)</task>
+      <task id="7">Integrate with SceneCard Component (AC: #1)</task>
+      <task id="8">Implement Responsive Design (AC: #1)</task>
+      <task id="9">Integration Testing (AC: All)</task>
+    </tasks-summary>
+  </story-file-reference>
+
+  <package-dependencies>
+    <dependency name="next" version="16.0.1">Framework with App Router and Image optimization</dependency>
+    <dependency name="react" version="19.2.0">UI library for components</dependency>
+    <dependency name="react-dom" version="19.2.0">DOM rendering</dependency>
+    <dependency name="@radix-ui/react-*" version="latest">shadcn/ui primitive components</dependency>
+    <dependency name="lucide-react" version="0.552.0">Icon library (User, Clock, Download, CheckCircle, AlertCircle)</dependency>
+    <dependency name="tailwindcss" version="4">CSS framework for responsive styling</dependency>
+    <dependency name="clsx" version="latest">Conditional class names utility</dependency>
+    <dependency name="tailwind-merge" version="latest">Tailwind class merging utility</dependency>
+  </package-dependencies>
+
+  <completion-checklist>
+    <item id="1" status="pending">VisualSuggestionGallery.tsx component created with data fetching</item>
+    <item id="2" status="pending">SuggestionCard.tsx component created with thumbnail and metadata display</item>
+    <item id="3" status="pending">EmptyClipState.tsx component created with retry button</item>
+    <item id="4" status="pending">SceneCard.tsx extended to include gallery with visual separator</item>
+    <item id="5" status="pending">Download status badges implemented for all 4 states</item>
+    <item id="6" status="pending">Responsive grid layout (2 columns tablet, 3 columns desktop)</item>
+    <item id="7" status="pending">Loading skeleton state using Story 4.1 Skeleton component</item>
+    <item id="8" status="pending">Thumbnail fallback on load failure</item>
+    <item id="9" status="pending">Suggestions sorted by rank (ascending 1-8)</item>
+    <item id="10" status="pending">Empty state displays for zero suggestions</item>
+    <item id="11" status="pending">Error handling with retry functionality</item>
+    <item id="12" status="pending">Duration formatting utility (seconds to "MM:SS")</item>
+    <item id="13" status="pending">Rank badge displays in top-left corner of cards</item>
+    <item id="14" status="pending">Integration tests passing for all acceptance criteria</item>
+    <item id="15" status="pending">Responsive design tested at 1920px and 768px</item>
+  </completion-checklist>
+
+  <workflow-context>
+    <current-step>Story 4.2 (ready-for-dev)</current-step>
+    <previous-steps>
+      <step id="epic-1" status="complete">Conversational Topic Discovery</step>
+      <step id="epic-2" status="complete">Content Generation Pipeline + Voice Selection</step>
+      <step id="epic-3" status="complete">Visual Content Sourcing (YouTube API)</step>
+      <step id="story-4.1" status="complete">Scene-by-Scene UI Layout &amp; Script Display</step>
+    </previous-steps>
+    <next-steps>
+      <step id="story-4.3">Video Preview &amp; Playback Functionality</step>
+      <step id="story-4.4">Clip Selection Mechanism &amp; State Management</step>
+      <step id="story-4.5">Assembly Trigger &amp; Validation Workflow</step>
+      <step id="story-4.6">Visual Curation Workflow Integration &amp; Error Recovery</step>
+    </next-steps>
+  </workflow-context>
+</story-context>

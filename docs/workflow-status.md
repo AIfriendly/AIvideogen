@@ -23,7 +23,7 @@ PHASE_4_COMPLETE: false
 
 TODO_STORY:
 IN_PROGRESS_STORY:
-DONE_STORY: 4.1
+DONE_STORY: 4.1, 4.2
 BACKLOG_STORY:
 
 ## Epic 1 Status
@@ -83,4 +83,4 @@ CURRENT_EPIC: Epic 4 - Visual Curation Interface
 
 ---
 
-_Last Updated: 2025-11-18 (Story 4.1 implemented and deployed - Epic 4 started!)_
+_Last Updated: 2025-11-18 (Story 4.2 implemented and deployed - Epic 4 progressing: 2/6 stories complete!)_

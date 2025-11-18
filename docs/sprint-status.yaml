@@ -70,6 +70,7 @@ development_status:
   # Epic 4: Visual Curation Interface
   epic-4: contexted
   4-1-scene-by-scene-ui-layout-script-display: done
+  4-2-visual-suggestions-display-gallery: done
   epic-4-retrospective: optional
 
   # Epic 5: Video Assembly & Output
