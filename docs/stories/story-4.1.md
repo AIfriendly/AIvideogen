@@ -272,7 +272,9 @@ This is the first story in Epic 4, so learnings from the previous epic's final s
 
 ### Context Reference
 
-Story implemented with comprehensive Dev Notes section. Story Context XML generation skipped as story file contains all necessary context.
+- **Story Context XML:** `docs/stories/4-1-scene-by-scene-ui-layout-script-display.context.xml` (31 KB)
+- Generated: 2025-11-18
+- Contains: User story, acceptance criteria, tasks, documentation references, code artifacts, dependencies, interfaces, constraints, testing standards, and completion record
 
 ### Agent Model Used
 

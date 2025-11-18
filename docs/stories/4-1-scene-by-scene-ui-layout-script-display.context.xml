@@ -1,0 +1,674 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Story Context File: Story 4.1 - Scene-by-Scene UI Layout & Script Display
+Generated: 2025-11-18
+Epic: 4 - Visual Curation Interface
+Status: done
+Purpose: Comprehensive development context for implementing foundational visual curation page
+-->
+<story-context>
+  <metadata>
+    <story-id>4.1</story-id>
+    <story-key>4-1-scene-by-scene-ui-layout-script-display</story-key>
+    <epic-id>4</epic-id>
+    <epic-name>Visual Curation Interface</epic-name>
+    <status>done</status>
+    <title>Scene-by-Scene UI Layout &amp; Script Display</title>
+    <generated-date>2025-11-18</generated-date>
+    <project-root>D:\BMAD video generator</project-root>
+  </metadata>
+
+  <story-definition>
+    <user-story>
+      As a user who has completed script generation, voiceover synthesis, and visual sourcing,
+      I want to see my script displayed scene-by-scene in a clear, organized layout,
+      so that I can review each scene's content before curating the visual clips for final video assembly.
+    </user-story>
+
+    <goal>
+      Create the foundational UI structure for the visual curation page with scene-by-scene layout
+    </goal>
+
+    <context>
+      This story establishes the foundational UI structure for the Visual Curation Interface (Epic 4),
+      enabling users to review their AI-generated script scene-by-scene alongside visual suggestions before
+      finalizing video assembly. As the first story in Epic 4, it creates the main page component, layout
+      structure, and data-fetching patterns that subsequent stories (4.2-4.6) will build upon.
+
+      The Visual Curation page appears after Epic 3 completes automated visual sourcing. Users navigate
+      from the voiceover preview (Epic 2 Story 2.6) to this interface where they can see their complete
+      script broken into numbered scenes, preview suggested video clips, and ultimately select one clip
+      per scene for assembly.
+    </context>
+
+    <acceptance-criteria>
+      <criterion id="AC1">VisualCuration page displays after visual sourcing completes (projects.current_step = 'visual-curation')</criterion>
+      <criterion id="AC2">All scenes displayed in sequential order (Scene 1, Scene 2, Scene 3...)</criterion>
+      <criterion id="AC3">Each scene section shows scene number and complete script text</criterion>
+      <criterion id="AC4">Scene data loads from database via GET /api/projects/[id]/scenes endpoint</criterion>
+      <criterion id="AC5">Loading indicator displays while fetching scene data</criterion>
+      <criterion id="AC6">Error messages display if scenes cannot be loaded</criterion>
+      <criterion id="AC7">Layout is responsive and readable on desktop (1920px) and tablet (768px) screens</criterion>
+      <criterion id="AC8">Empty state displays if no scenes exist for project</criterion>
+    </acceptance-criteria>
+
+    <dependencies>
+      <dependency type="epic" status="completed">Epic 3 (Visual Content Sourcing)</dependency>
+      <dependency type="story" status="completed">Story 3.6 (Default Segment Download Service)</dependency>
+      <dependency type="epic" status="completed">Epic 2 (Content Generation)</dependency>
+      <dependency type="database">scenes table from Epic 2 with text, audio_file_path, duration</dependency>
+    </dependencies>
+  </story-definition>
+
+  <technical-specification>
+    <key-components>
+      <component name="VisualCuration.tsx" location="app/projects/[id]/visual-curation/page.tsx">
+        Main page component at /app/projects/[id]/visual-curation/page.tsx
+        Next.js page component with dynamic route param [id]
+        Server component with workflow step validation
+      </component>
+
+      <component name="VisualCurationClient.tsx" location="app/projects/[id]/visual-curation/VisualCurationClient.tsx">
+        Client component with data fetching using fetch() API
+        Uses useState for scenes data and loading/error states
+        Implements useEffect for data fetching on component mount
+      </component>
+
+      <component name="SceneCard.tsx" location="components/features/curation/SceneCard.tsx">
+        Individual scene section with script text display
+        Renders scene header with format: "Scene {scene_number}"
+        Displays scene.text in readable paragraph format
+        Shows duration indicator: "{duration}s"
+        Uses shadcn/ui Card component for styling
+      </component>
+
+      <component name="GET /api/projects/[id]/scenes" location="app/api/projects/[id]/scenes/route.ts">
+        API endpoint to retrieve all scenes for project
+        Returns scenes ordered by scene_number ASC
+        Handles error cases: project not found (404), database errors (500)
+      </component>
+    </key-components>
+
+    <database-integration>
+      <table name="scenes">
+        <description>Epic 2 table containing script text and voiceover metadata</description>
+        <schema>
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id),
+          scene_number INTEGER NOT NULL,
+          text TEXT NOT NULL,
+          sanitized_text TEXT,
+          audio_file_path TEXT,
+          duration REAL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE(project_id, scene_number)
+        </schema>
+        <query-pattern>SELECT * FROM scenes WHERE project_id = ? ORDER BY scene_number ASC</query-pattern>
+        <connection>Uses lib/db/client.ts for SQLite connection via better-sqlite3 12.4.1</connection>
+        <index>Index exists on scenes.project_id for efficient query performance</index>
+      </table>
+
+      <table name="projects">
+        <description>Project metadata including workflow state</description>
+        <relevant-fields>
+          id TEXT PRIMARY KEY,
+          current_step TEXT CHECK(current_step IN ('chat', 'voice', 'script', 'voiceover', 'visual-sourcing', 'visual-curation', 'assembly')),
+          visuals_generated BOOLEAN DEFAULT 0
+        </relevant-fields>
+        <workflow-validation>
+          Verify projects.current_step = 'visual-curation' before displaying page
+          Redirect to appropriate step if validation fails
+        </workflow-validation>
+      </table>
+    </database-integration>
+
+    <api-design>
+      <endpoint path="/api/projects/[id]/scenes" method="GET">
+        <purpose>Retrieve all scenes for a project</purpose>
+        <request>
+          <parameter name="id" type="path" required="true">Project UUID</parameter>
+        </request>
+        <response status="200">
+          <format>JSON</format>
+          <structure>
+            {
+              "success": true,
+              "data": {
+                "scenes": [
+                  {
+                    "id": "uuid-string",
+                    "project_id": "project-uuid",
+                    "scene_number": 1,
+                    "text": "Scene text content",
+                    "sanitized_text": "Sanitized text for TTS",
+                    "audio_file_path": "/path/to/audio.mp3",
+                    "duration": 5.2,
+                    "created_at": "2025-11-18T12:34:56.789Z",
+                    "updated_at": "2025-11-18T12:34:56.789Z"
+                  }
+                ]
+              }
+            }
+          </structure>
+        </response>
+        <response status="404">
+          <reason>Project not found</reason>
+          <structure>
+            {
+              "success": false,
+              "error": {
+                "message": "Project not found",
+                "code": "NOT_FOUND"
+              }
+            }
+          </structure>
+        </response>
+        <response status="500">
+          <reason>Database error</reason>
+          <structure>
+            {
+              "success": false,
+              "error": {
+                "message": "Failed to fetch scenes",
+                "code": "DATABASE_ERROR"
+              }
+            }
+          </structure>
+        </response>
+      </endpoint>
+    </api-design>
+
+    <architecture-patterns>
+      <pattern name="Data Fetching">
+        <approach>Client Component with "use client" directive</approach>
+        <rationale>
+          Subsequent stories (4.4, 4.5) require interactive state management (clip selection, assembly trigger).
+          Use client-side data fetching with fetch() API in useEffect hook.
+        </rationale>
+        <implementation>
+          - Server component validates workflow (page.tsx)
+          - Client component fetches data (VisualCurationClient.tsx)
+          - Future optimization: Consider Server Component for initial data in post-MVP
+        </implementation>
+      </pattern>
+
+      <pattern name="API Error Handling">
+        <standard-format>
+          { error: string, code?: string }
+        </standard-format>
+        <http-status-codes>
+          200 (success), 404 (not found), 500 (server error)
+        </http-status-codes>
+        <authentication>No authentication required (single-user local app)</authentication>
+      </pattern>
+
+      <pattern name="Responsive Design">
+        <strategy>Desktop-first approach</strategy>
+        <viewports>
+          <primary>1920px (desktop)</primary>
+          <minimum>768px (tablet)</minimum>
+          <deferred>Mobile viewport (&lt;768px) deferred to post-MVP</deferred>
+        </viewports>
+        <tailwind-breakpoints>Use md:, lg:, xl: prefixes for responsive adjustments</tailwind-breakpoints>
+      </pattern>
+    </architecture-patterns>
+  </technical-specification>
+
+  <prd-references>
+    <reference section="Feature 1.6" lines="244-277">
+      <title>Visual Curation UI</title>
+      <key-points>
+        - Scene-by-scene display of script text alongside suggested clips
+        - Preview video clips before selection
+        - Simple way to confirm selections and trigger assembly
+      </key-points>
+    </reference>
+
+    <reference section="Feature 1.6 AC1" lines="263-266">
+      <acceptance-criterion>Scene and Clip Display</acceptance-criterion>
+      <requirement>
+        UI must display distinct sections for each scene, with each section showing
+        the scene's text and its suggested video clips
+      </requirement>
+    </reference>
+  </prd-references>
+
+  <architecture-references>
+    <reference section="Epic 4 Component Structure" lines="287-336">
+      <components>
+        - components/features/curation/VisualCuration.tsx (Story 4.1)
+        - components/features/curation/SceneCard.tsx (Story 4.1)
+        - components/features/curation/ProgressTracker.tsx (Story 4.1, 4.5)
+      </components>
+    </reference>
+
+    <reference section="Project Structure" lines="141-283">
+      <file-path-conventions>
+        - Page: app/projects/[id]/visual-curation/page.tsx (Next.js 15.5 App Router)
+        - API: app/api/projects/[id]/scenes/route.ts (Next.js API Routes)
+        - Component: components/features/curation/SceneCard.tsx (Feature-specific directory)
+      </file-path-conventions>
+    </reference>
+
+    <reference section="Technology Stack" lines="82-102">
+      <decisions>
+        - Next.js 15.5 (App Router)
+        - React 19.2.0
+        - Tailwind CSS v4
+        - shadcn/ui (Radix UI primitives)
+        - better-sqlite3 12.4.1 for database
+      </decisions>
+    </reference>
+
+    <reference section="Database Schema" lines="1024-1105">
+      <scenes-table>
+        Schema established in Epic 2
+        Query pattern: SELECT * FROM scenes WHERE project_id = ? ORDER BY scene_number ASC
+        Foreign key: scenes.project_id → projects.id
+      </scenes-table>
+    </reference>
+  </architecture-references>
+
+  <tech-spec-references>
+    <reference section="Story 4.1 Acceptance Criteria" lines="531-538">
+      <authoritative-source>Tech Spec Epic 4</authoritative-source>
+      <criteria>
+        1. VisualCuration page displays after visual sourcing (current_step = 'visual-curation')
+        2. Scenes in sequential order
+        3. Scene sections show number and complete text
+        4. Data loads via GET /api/projects/[id]/scenes
+        5. Loading indicator while fetching
+        6. Error messages on load failure
+        7. Responsive layout (1920px desktop, 768px tablet)
+        8. Empty state for zero scenes
+      </criteria>
+    </reference>
+
+    <reference section="Services &amp; Modules" lines="68-69">
+      <components>
+        - VisualCuration.tsx: Main page component, orchestrates layout
+        - SceneCard.tsx: Individual scene section with script text
+      </components>
+    </reference>
+
+    <reference section="APIs" lines="159-180">
+      <endpoint>GET /api/projects/[id]/scenes specification</endpoint>
+      <returns>Array of scene objects with text, audio, duration</returns>
+    </reference>
+
+    <reference section="Data Models" lines="101-111">
+      <interface>Scene TypeScript interface definition</interface>
+      <fields>id, project_id, scene_number, text, audio_file_path, duration, selected_clip_id</fields>
+    </reference>
+  </tech-spec-references>
+
+  <ux-design-references>
+    <reference section="Epic 4: Visual Curation Interface" page="UX Design Specification v3.3">
+      <component name="Scene Card Component">
+        <layout>Vertical card with scene number header and text content</layout>
+        <styling>shadcn/ui Card component (background: #1e293b Slate 800, border-radius: 12px)</styling>
+        <typography>
+          - Scene header: 1.125rem (18px), font-weight: 600, color: #f8fafc (Slate 50)
+          - Scene text: 1rem (16px), line-height: 1.75, color: #cbd5e1 (Slate 300)
+          - Duration badge: 0.875rem (14px), color: #94a3b8 (Slate 400)
+        </typography>
+        <spacing>Margin-bottom: 1.5rem (24px) between cards</spacing>
+        <responsive>
+          - Desktop (1920px): max-width: 1280px (7xl container)
+          - Tablet (768px): max-width: 768px (md container), padding: 1rem
+        </responsive>
+      </component>
+
+      <component name="Loading State">
+        <implementation>shadcn/ui Skeleton component</implementation>
+        <pattern>3 skeleton SceneCard placeholders with shimmer animation</pattern>
+        <loading-text>"Loading your script..." centered with spinner</loading-text>
+      </component>
+
+      <component name="Error State">
+        <icon>Warning triangle icon (lucide-react)</icon>
+        <message>"Failed to load scenes. Please try again."</message>
+        <action>Retry button (secondary button style)</action>
+        <color-scheme>Error icon: #ef4444 (Red 500)</color-scheme>
+      </component>
+
+      <component name="Empty State">
+        <icon>FileText icon (lucide-react)</icon>
+        <message>"No scenes found for this project."</message>
+        <action>"Back to Script Generation" button (primary button style)</action>
+      </component>
+    </reference>
+
+    <reference section="Design System Foundation" lines="39-70">
+      <component-library>shadcn/ui (Tailwind-based, Radix UI primitives)</component-library>
+      <accessibility>WCAG AA compliant out of box</accessibility>
+      <dark-mode>
+        Background: #0f172a (Slate 900 primary), #1e293b (Slate 800 cards)
+        Text: #f8fafc (Slate 50 headers), #cbd5e1 (Slate 300 body)
+      </dark-mode>
+    </reference>
+
+    <reference section="Button Hierarchy" lines="76-103">
+      <primary-button>
+        Background: #6366f1 (Indigo 500), Color: White
+        Usage: Main actions ("Continue", "Assemble Video")
+        Hover: #4f46e5 (Indigo 600)
+        Disabled: #475569 (Slate 600), opacity 0.5
+      </primary-button>
+      <secondary-button>
+        Background: Transparent, Border: 1px solid #6366f1
+        Usage: Alternative actions ("Retry", "Back")
+      </secondary-button>
+    </reference>
+  </ux-design-references>
+
+  <epic-context>
+    <previous-epic status="completed">
+      <epic-id>3</epic-id>
+      <epic-name>Visual Content Sourcing</epic-name>
+      <relevant-story id="3.6" title="Default Segment Download Service">
+        <learnings>
+          - New services: yt-dlp integration (lib/youtube/download-segment.ts), download queue (lib/youtube/download-queue.ts)
+          - Database fields: visual_suggestions.download_status ('pending'|'downloading'|'complete'|'error')
+          - Database fields: visual_suggestions.default_segment_path (relative file paths)
+          - File structure: .cache/videos/{projectId}/scene-{sceneNumber}-default.mp4 (zero-padded scene numbers)
+          - Integration: Story 4.2 will consume visual_suggestions data, Story 4.3 uses downloaded segments
+          - Patterns: Use relative paths for portability, graceful degradation on download failures
+          - Security: Apply input validation and parameterized queries (follow 3.6 review findings)
+        </learnings>
+      </relevant-story>
+    </previous-epic>
+
+    <current-epic>
+      <epic-id>4</epic-id>
+      <epic-name>Visual Curation Interface</epic-name>
+      <story-sequence>
+        <current-story id="4.1">Scene-by-Scene UI Layout &amp; Script Display (FOUNDATIONAL)</current-story>
+        <next-story id="4.2">Visual Suggestion Gallery (builds on SceneCard from 4.1)</next-story>
+        <next-story id="4.3">Video Preview Player (uses segments from Epic 3)</next-story>
+        <next-story id="4.4">Clip Selection Mechanism (state management)</next-story>
+        <next-story id="4.5">Assembly Trigger Button (validation &amp; workflow)</next-story>
+        <next-story id="4.6">Workflow Integration (navigation &amp; error recovery)</next-story>
+      </story-sequence>
+    </current-epic>
+
+    <integration-points>
+      <epic-2>
+        Consumes: scenes.text, scenes.audio_file_path, scenes.duration
+        Displays: Script text scene-by-scene with duration indicators
+      </epic-2>
+      <epic-3>
+        Prepares for: Story 4.2 will display visual_suggestions data
+        File access: Story 4.3 will use .cache/videos/ segments downloaded in 3.6
+      </epic-3>
+      <epic-5>
+        Prepares for: Assembly trigger in Story 4.5 passes data to Epic 5
+      </epic-5>
+    </integration-points>
+  </epic-context>
+
+  <implementation-guidance>
+    <file-locations>
+      <created>
+        <file>src/app/api/projects/[id]/scenes/route.ts</file>
+        <file>src/components/ui/skeleton.tsx</file>
+        <file>src/components/features/curation/SceneCard.tsx</file>
+        <file>src/app/projects/[id]/visual-curation/VisualCurationClient.tsx</file>
+      </created>
+      <modified>
+        <file>src/app/projects/[id]/visual-curation/page.tsx</file>
+      </modified>
+    </file-locations>
+
+    <component-library-usage>
+      <shadcn-components>
+        <component>Card (from components/ui/card.tsx) - SceneCard styling</component>
+        <component>Skeleton (from components/ui/skeleton.tsx) - Loading states</component>
+        <component>Button (from components/ui/button.tsx) - Retry, navigation actions</component>
+      </shadcn-components>
+      <lucide-icons>
+        <icon>Book - Scene number indicator</icon>
+        <icon>Clock - Duration badge</icon>
+        <icon>FileText - Empty state icon</icon>
+        <icon>AlertTriangle - Error state icon</icon>
+      </lucide-icons>
+    </component-library-usage>
+
+    <responsive-design>
+      <desktop viewport="1920px">
+        <container>max-w-7xl (1280px)</container>
+        <padding>px-8 (2rem)</padding>
+        <font-size>text-lg (1.125rem) for scene text</font-size>
+      </desktop>
+      <tablet viewport="768px">
+        <container>max-w-3xl (768px)</container>
+        <padding>px-4 (1rem)</padding>
+        <font-size>text-base (1rem) for scene text</font-size>
+      </tablet>
+      <breakpoint-classes>
+        Use Tailwind responsive classes: text-base md:text-lg
+        Container: max-w-3xl md:max-w-7xl
+      </breakpoint-classes>
+    </responsive-design>
+
+    <performance-targets>
+      <page-load>Less than 2 seconds on desktop (1920px, Chrome)</page-load>
+      <api-response>GET /scenes less than 500ms (typical 3-5 scenes)</api-response>
+      <scene-count>
+        <typical>3-5 scenes per project</typical>
+        <maximum>10-15 scenes (acceptable performance for MVP)</maximum>
+        <optimization>No virtual scrolling required for MVP</optimization>
+      </scene-count>
+    </performance-targets>
+
+    <testing-standards>
+      <unit-tests framework="Vitest">
+        <test>GET /api/projects/[id]/scenes endpoint with mock database</test>
+        <test>SceneCard component rendering with sample Scene data</test>
+        <test>Error handling paths (404, 500 errors)</test>
+        <test>Empty state and loading state rendering</test>
+      </unit-tests>
+
+      <integration-tests>
+        <test>Full page load flow: fetch → render → display</test>
+        <test>Workflow validation (current_step check)</test>
+        <test>Responsive layout at 1920px and 768px breakpoints</test>
+        <test>Varying scene counts (1, 3, 10 scenes)</test>
+      </integration-tests>
+
+      <manual-tests>
+        <test>Visual design matches UX specifications</test>
+        <test>User interaction with retry button</test>
+        <test>Scene text readability and formatting</test>
+        <test>Navigation from Epic 2 voiceover preview page</test>
+      </manual-tests>
+    </testing-standards>
+
+    <actionable-items>
+      <item priority="1">Query scenes table established by Epic 2 (no schema changes needed)</item>
+      <item priority="2">Prepare SceneCard for Story 4.2 integration (will contain VisualSuggestionGallery child component)</item>
+      <item priority="3">Follow relative path pattern when handling file references in future stories</item>
+      <item priority="4">Implement comprehensive error handling with user-friendly messages (learned from 3.6)</item>
+      <item priority="5">Apply input validation pattern from Epic 3 to project_id parameter in API endpoint</item>
+    </actionable-items>
+
+    <key-decisions>
+      <decision>
+        <question>Server Component vs Client Component for page?</question>
+        <answer>Server component (page.tsx) validates workflow, Client component (VisualCurationClient.tsx) handles data fetching</answer>
+        <rationale>Subsequent stories need interactive state (clip selection), so use client component pattern early</rationale>
+      </decision>
+
+      <decision>
+        <question>How to handle zero scenes edge case?</question>
+        <answer>Display empty state with "No scenes found" message and "Back to Script Generation" button</answer>
+        <rationale>Provides user guidance and path to resolution rather than error state</rationale>
+      </decision>
+
+      <decision>
+        <question>Loading state implementation?</question>
+        <answer>3 skeleton SceneCard placeholders with shimmer animation + "Loading your script..." text</answer>
+        <rationale>Skeleton screens reduce perceived load time and match component structure</rationale>
+      </decision>
+    </key-decisions>
+  </implementation-guidance>
+
+  <dependencies-detailed>
+    <npm-packages>
+      <package name="next" version="16.0.1">Framework for App Router pages and API routes</package>
+      <package name="react" version="19.2.0">UI library for component rendering and hooks</package>
+      <package name="react-dom" version="19.2.0">DOM rendering and hydration</package>
+      <package name="better-sqlite3" version="12.4.1">Database access for scenes table queries</package>
+      <package name="tailwindcss" version="4">CSS framework for responsive styling</package>
+      <package name="lucide-react" version="0.552.0">Icon library (Book, Clock, FileText, AlertTriangle)</package>
+      <package name="clsx" version="latest">Conditional class names utility</package>
+      <package name="tailwind-merge" version="latest">Tailwind class merging utility</package>
+    </npm-packages>
+
+    <shadcn-components>
+      <component>card.tsx - Card component for SceneCard styling</component>
+      <component>skeleton.tsx - Skeleton component for loading states</component>
+      <component>button.tsx - Button component for actions</component>
+    </shadcn-components>
+
+    <internal-modules>
+      <module path="lib/db/client.ts">SQLite database connection client</module>
+      <module path="lib/db/queries.ts">Database query functions (getProject, getScenesByProjectId)</module>
+      <module path="lib/db/types.ts">TypeScript interfaces (Scene, Project)</module>
+    </internal-modules>
+  </dependencies-detailed>
+
+  <completion-record>
+    <implementation-date>2025-11-18</implementation-date>
+
+    <files-created>
+      <file>src/app/api/projects/[id]/scenes/route.ts</file>
+      <file>src/components/ui/skeleton.tsx</file>
+      <file>src/components/features/curation/SceneCard.tsx</file>
+      <file>src/app/projects/[id]/visual-curation/VisualCurationClient.tsx</file>
+    </files-created>
+
+    <files-modified>
+      <file>src/app/projects/[id]/visual-curation/page.tsx</file>
+    </files-modified>
+
+    <test-results>
+      <result type="typescript-compilation">PASSED</result>
+      <result type="nextjs-build">SUCCESSFUL (exit code 0)</result>
+      <result type="api-endpoint-tests">PASSED (4/4 test cases)</result>
+      <result type="database-validation">PASSED (4 projects, 20 scenes)</result>
+    </test-results>
+
+    <features-implemented>
+      <feature>Scene-by-scene layout with responsive design (mobile, tablet, desktop)</feature>
+      <feature>Loading states with animated skeletons</feature>
+      <feature>Error handling with retry functionality</feature>
+      <feature>Empty state messaging</feature>
+      <feature>Workflow validation (server-side)</feature>
+      <feature>API endpoint with proper error codes (400, 404, 500)</feature>
+    </features-implemented>
+
+    <testing-notes>
+      <note>Tested with 4 projects containing 4-8 scenes each</note>
+      <note>Verified responsive layout on desktop (1920px) and tablet (768px)</note>
+      <note>Confirmed all scene data fields present and correctly formatted</note>
+      <note>Validated error handling for invalid project IDs</note>
+    </testing-notes>
+
+    <status>COMPLETE - All 8 tasks implemented and tested</status>
+
+    <agent-model>Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)</agent-model>
+  </completion-record>
+
+  <traceability-matrix>
+    <mapping>
+      <prd-requirement id="Feature 1.6 AC1">Scene and Clip Display</prd-requirement>
+      <tech-spec-criterion id="Story 4.1 AC1-AC8">All 8 acceptance criteria</tech-spec-criterion>
+      <implementation>
+        <component>VisualCuration.tsx (main page orchestration)</component>
+        <component>SceneCard.tsx (individual scene display)</component>
+        <api>GET /api/projects/[id]/scenes (data retrieval)</api>
+      </implementation>
+      <verification>
+        Integration test: Load project with 3 scenes, verify 3 SceneCards rendered
+        Component test: Mock scenes API, verify scene sections with correct text/numbers
+      </verification>
+    </mapping>
+
+    <mapping>
+      <prd-requirement id="Feature 1.6 AC4">Incomplete Selection Prevention (prepares for Story 4.5)</prd-requirement>
+      <tech-spec-criterion id="Story 4.1">ProgressTracker component foundation</tech-spec-criterion>
+      <implementation>
+        <component>ProgressTracker.tsx (scene completion counter - created in this story, used in 4.5)</component>
+      </implementation>
+      <verification>Manual test: Verify "X/Y scenes" indicator displays correctly</verification>
+    </mapping>
+
+    <mapping>
+      <architecture-decision id="Data Fetching Pattern">Client Component with useEffect</architecture-decision>
+      <rationale>Future stories (4.4, 4.5) require interactive state management</rationale>
+      <implementation>
+        <file>VisualCurationClient.tsx with "use client" directive</file>
+        <pattern>fetch() API in useEffect hook for client-side data loading</pattern>
+      </implementation>
+      <verification>Component test: Verify data fetching triggers on mount, loading states work</verification>
+    </mapping>
+
+    <mapping>
+      <ux-specification section="Scene Card Component">Visual design and responsive layout</ux-specification>
+      <implementation>
+        <component>SceneCard.tsx using shadcn/ui Card</component>
+        <styling>Tailwind CSS v4 utilities (responsive breakpoints, spacing, typography)</styling>
+      </implementation>
+      <verification>Manual test: Visual inspection on 1920px and 768px viewports</verification>
+    </mapping>
+  </traceability-matrix>
+
+  <next-story-integration>
+    <story-4-2>
+      <title>Visual Suggestion Gallery</title>
+      <integration-points>
+        - SceneCard component will contain VisualSuggestionGallery as child component
+        - GET /api/projects/[id]/visual-suggestions endpoint will be consumed
+        - visual_suggestions table from Epic 3 provides clip data
+        - Download status indicators from Epic 3 Story 3.6
+      </integration-points>
+      <preparation>
+        SceneCard structure ready to accept gallery component
+        Responsive layout ensures gallery fits within scene sections
+      </preparation>
+    </story-4-2>
+
+    <story-4-3>
+      <title>Video Preview Player</title>
+      <integration-points>
+        - Will use default_segment_path from visual_suggestions table
+        - Plays downloaded segments from .cache/videos/{projectId}/
+        - Plyr library for HTML5 video player
+        - Keyboard shortcuts and YouTube iframe fallback
+      </integration-points>
+    </story-4-3>
+
+    <story-4-4>
+      <title>Clip Selection Mechanism</title>
+      <integration-points>
+        - curation-store.ts (Zustand) for selection state management
+        - POST /api/projects/[id]/select-clip for persistence
+        - ProgressTracker component updates with selection count
+        - scenes.selected_clip_id database field
+      </integration-points>
+    </story-4-4>
+  </next-story-integration>
+
+  <reference-documentation>
+    <document type="story">D:\BMAD video generator\docs\stories\story-4.1.md</document>
+    <document type="prd">D:\BMAD video generator\docs\prd.md</document>
+    <document type="architecture">D:\BMAD video generator\docs\architecture.md</document>
+    <document type="tech-spec">D:\BMAD video generator\docs\sprint-artifacts\tech-spec-epic-4.md</document>
+    <document type="epics">D:\BMAD video generator\docs\epics.md</document>
+    <document type="ux-design">D:\BMAD video generator\docs\ux-design-specification.md</document>
+    <document type="database">src/lib/db/client.ts, src/lib/db/queries.ts, src/lib/db/types.ts</document>
+    <document type="api">src/app/api/projects/[id]/scenes/route.ts</document>
+  </reference-documentation>
+</story-context>
