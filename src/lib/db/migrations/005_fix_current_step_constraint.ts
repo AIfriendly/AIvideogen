@@ -35,13 +35,9 @@ export function up(db: Database): void {
 
     // Start transaction for atomicity
     const transaction = db.transaction(() => {
-      // Step 1: Rename existing table
-      db.exec('ALTER TABLE projects RENAME TO projects_old');
-      console.log('  - Renamed projects to projects_old');
-
-      // Step 2: Create new table with CORRECTED CHECK constraint
+      // Step 1: Create new table with temporary name and CORRECTED CHECK constraint
       db.exec(`
-        CREATE TABLE projects (
+        CREATE TABLE projects_new (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
           topic TEXT,
@@ -68,11 +64,11 @@ export function up(db: Database): void {
           FOREIGN KEY (system_prompt_id) REFERENCES system_prompts(id) ON DELETE SET NULL
         )
       `);
-      console.log('  - Created new projects table with corrected CHECK constraint on current_step');
+      console.log('  - Created projects_new table with corrected CHECK constraint on current_step');
 
-      // Step 3: Copy data from old table to new table
+      // Step 2: Copy data from old table to new table
       db.exec(`
-        INSERT INTO projects (
+        INSERT INTO projects_new (
           id, name, topic, current_step, status, config_json, system_prompt_id,
           voice_id, script_generated, voice_selected, total_duration,
           visuals_generated, created_at, last_active
@@ -81,13 +77,17 @@ export function up(db: Database): void {
           id, name, topic, current_step, status, config_json, system_prompt_id,
           voice_id, script_generated, voice_selected, total_duration,
           visuals_generated, created_at, last_active
-        FROM projects_old
+        FROM projects
       `);
-      console.log('  - Copied data from projects_old to projects');
+      console.log('  - Copied data from projects to projects_new');
 
-      // Step 4: Drop old table
-      db.exec('DROP TABLE projects_old');
-      console.log('  - Dropped projects_old table');
+      // Step 3: Drop old table
+      db.exec('DROP TABLE projects');
+      console.log('  - Dropped old projects table');
+
+      // Step 4: Rename new table to final name
+      db.exec('ALTER TABLE projects_new RENAME TO projects');
+      console.log('  - Renamed projects_new to projects');
 
       // Step 5: Recreate indexes
       db.exec('CREATE INDEX IF NOT EXISTS idx_projects_last_active ON projects(last_active)');
