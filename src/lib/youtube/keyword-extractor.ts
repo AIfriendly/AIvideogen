@@ -35,14 +35,39 @@ const STOP_WORDS = new Set([
   'into', 'about', 'after', 'before', 'between', 'through', 'during',
   // Pronouns
   'i', 'you', 'he', 'she', 'it', 'we', 'they', 'them', 'their',
-  'this', 'that', 'these', 'those',
+  'this', 'that', 'these', 'those', 'what', 'which', 'where', 'when',
+  'why', 'how', 'who', 'whom', 'whose',
   // Verbs (common auxiliaries and to-be)
   'is', 'am', 'are', 'was', 'were', 'be', 'been', 'being',
-  'have', 'has', 'had', 'do', 'does', 'did',
+  'have', 'has', 'had', 'do', 'does', 'did', 'didn', 'doesn', 'don',
   'will', 'would', 'should', 'could', 'may', 'might', 'must', 'can',
-  // Others
+  // Common non-visual verbs
+  'imagine', 'think', 'know', 'want', 'need', 'like', 'feel', 'seem',
+  'become', 'make', 'take', 'come', 'give', 'find', 'tell', 'ask',
+  'work', 'call', 'try', 'leave', 'put', 'mean', 'keep', 'let', 'begin',
+  'help', 'show', 'hear', 'play', 'run', 'move', 'live', 'believe',
+  'suggest', 'push', 'pull', 'turn', 'start', 'stop', 'bring', 'hold',
+  'write', 'read', 'learn', 'change', 'follow', 'create', 'speak',
+  // Abstract/filler words
   'then', 'than', 'such', 'some', 'any', 'all', 'each', 'every',
-  'very', 'more', 'most', 'much', 'many', 'few', 'less', 'least'
+  'very', 'more', 'most', 'much', 'many', 'few', 'less', 'least',
+  'just', 'also', 'even', 'still', 'already', 'always', 'never', 'ever',
+  'only', 'really', 'actually', 'certainly', 'probably', 'perhaps',
+  'however', 'therefore', 'because', 'since', 'while', 'although',
+  'often', 'quite', 'simple', 'whether', 'ultimately', 'finally',
+  'maybe', 'sometimes', 'usually', 'especially', 'particularly',
+  'basically', 'generally', 'simply', 'clearly', 'obviously',
+  'course', 'fact', 'thing', 'case', 'week', 'company', 'system',
+  'program', 'question', 'government', 'number', 'point',
+  'area', 'money', 'story', 'month', 'lot', 'right', 'study',
+  'word', 'business', 'issue', 'side', 'kind', 'service',
+  'member', 'law', 'end', 'people', 'person', 'group', 'state',
+  // Narrative words (common in scripts but not visual)
+  'happen', 'incredible', 'amazing', 'immense', 'vast', 'huge', 'great',
+  'good', 'bad', 'new', 'old', 'long', 'little', 'own', 'other',
+  'big', 'high', 'different', 'small', 'large', 'next', 'early', 'young',
+  'important', 'public', 'same', 'able', 'global', 'true', 'false',
+  'real', 'certain', 'possible', 'likely', 'unlikely', 'necessary'
 ]);
 
 /**

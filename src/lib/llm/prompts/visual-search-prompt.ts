@@ -131,7 +131,12 @@ Input: "The concept of innovation drives progress"
 ✅ mainSubject: "lightbulb moment" (visual metaphor)
 
 OUTPUT FORMAT:
-Return ONLY valid JSON with this exact structure (no other text before or after):
+Return ONLY the JSON object below. Do NOT include:
+- Markdown code blocks (no \`\`\`json or \`\`\`)
+- Explanations or commentary
+- Any text before or after the JSON
+
+Just output the raw JSON object:
 {
   "mainSubject": "...",
   "setting": "...",

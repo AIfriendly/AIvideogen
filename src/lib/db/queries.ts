@@ -824,10 +824,10 @@ export function updateProjectDuration(id: string, totalDuration: number): Projec
 // ============================================================================
 
 /**
- * Visual Suggestion entity
- * Stores YouTube video suggestions for each scene with ranking
+ * Visual Suggestion database row (snake_case from SQLite)
+ * Internal type - use VisualSuggestionCamelCase for API responses
  */
-export interface VisualSuggestion {
+interface VisualSuggestionRow {
   id: string;
   scene_id: string;
   video_id: string;
@@ -840,6 +840,47 @@ export interface VisualSuggestion {
   default_segment_path: string | null;
   download_status: string;
   created_at: string;
+}
+
+/**
+ * Visual Suggestion entity (camelCase for frontend compatibility)
+ * Stores YouTube video suggestions for each scene with ranking
+ */
+export interface VisualSuggestion {
+  id: string;
+  sceneId: string;
+  videoId: string;
+  title: string;
+  thumbnailUrl: string | null;
+  channelTitle: string | null;
+  embedUrl: string;
+  rank: number;
+  duration: number | null;
+  defaultSegmentPath: string | null;
+  downloadStatus: string;
+  createdAt: string;
+}
+
+/**
+ * Transform database row (snake_case) to API response (camelCase)
+ * @param row Database row with snake_case fields
+ * @returns Transformed object with camelCase fields
+ */
+function transformVisualSuggestion(row: VisualSuggestionRow): VisualSuggestion {
+  return {
+    id: row.id,
+    sceneId: row.scene_id,
+    videoId: row.video_id,
+    title: row.title,
+    thumbnailUrl: row.thumbnail_url,
+    channelTitle: row.channel_title,
+    embedUrl: row.embed_url,
+    rank: row.rank,
+    duration: row.duration,
+    defaultSegmentPath: row.default_segment_path,
+    downloadStatus: row.download_status,
+    createdAt: row.created_at
+  };
 }
 
 /**
@@ -927,7 +968,7 @@ export function saveVisualSuggestions(
 /**
  * Retrieve visual suggestions for a scene
  * @param sceneId Scene ID
- * @returns Array of visual suggestions ordered by rank ASC
+ * @returns Array of visual suggestions ordered by rank ASC (camelCase)
  */
 export function getVisualSuggestions(sceneId: string): VisualSuggestion[] {
   try {
@@ -936,7 +977,8 @@ export function getVisualSuggestions(sceneId: string): VisualSuggestion[] {
       WHERE scene_id = ?
       ORDER BY rank ASC
     `);
-    return stmt.all(sceneId) as VisualSuggestion[];
+    const rows = stmt.all(sceneId) as VisualSuggestionRow[];
+    return rows.map(transformVisualSuggestion);
   } catch (error) {
     console.error('Error fetching visual suggestions:', error);
     throw new Error(
@@ -948,7 +990,7 @@ export function getVisualSuggestions(sceneId: string): VisualSuggestion[] {
 /**
  * Retrieve all visual suggestions for a project
  * @param projectId Project ID
- * @returns Array of visual suggestions ordered by scene number, then rank ASC
+ * @returns Array of visual suggestions ordered by scene number, then rank ASC (camelCase)
  */
 export function getVisualSuggestionsByProject(projectId: string): VisualSuggestion[] {
   try {
@@ -959,7 +1001,8 @@ export function getVisualSuggestionsByProject(projectId: string): VisualSuggesti
       WHERE s.project_id = ?
       ORDER BY s.scene_number ASC, vs.rank ASC
     `);
-    return stmt.all(projectId) as VisualSuggestion[];
+    const rows = stmt.all(projectId) as VisualSuggestionRow[];
+    return rows.map(transformVisualSuggestion);
   } catch (error) {
     console.error('Error fetching visual suggestions by project:', error);
     throw new Error(

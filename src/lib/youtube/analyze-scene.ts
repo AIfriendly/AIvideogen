@@ -87,25 +87,46 @@ export async function analyzeSceneForVisuals(
     // Step 3: Get LLM provider and call with timeout
     const llm = createLLMProvider();
 
-    // Create timeout promise (10 seconds)
+    // Create timeout promise (60 seconds)
+    // Note: 10s was too short for Gemini with the detailed visual search prompt
+    // Gemini can take 15-45s for complex prompts, especially under load
+    // 60s provides ample buffer for slow responses
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('LLM_TIMEOUT')), 10000)
+      setTimeout(() => reject(new Error('LLM_TIMEOUT')), 60000)
     );
 
     // Race between LLM call and timeout
     const llmPromise = llm.chat([{ role: 'user', content: prompt }]);
     const response = await Promise.race([llmPromise, timeoutPromise]);
 
-    // Step 4: Parse JSON response
+    // Step 4: Parse JSON response (with extraction for markdown-wrapped responses)
     let analysis: any;
     try {
+      // Try direct parse first
       analysis = JSON.parse(response);
     } catch (parseError) {
-      // Invalid JSON � Immediate fallback (no retry)
-      console.warn('[SceneAnalyzer] Invalid JSON response, using fallback');
-      const duration = Date.now() - startTime;
-      console.log(`[SceneAnalyzer] Fallback analysis completed in ${duration}ms`);
-      return createFallbackAnalysis(cleanText);
+      // Try to extract JSON from markdown code blocks or surrounding text
+      const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/) ||
+                        response.match(/(\{[\s\S]*\})/);
+
+      if (jsonMatch && jsonMatch[1]) {
+        try {
+          analysis = JSON.parse(jsonMatch[1].trim());
+          console.log('[SceneAnalyzer] Extracted JSON from wrapped response');
+        } catch (extractError) {
+          // Extraction failed - use fallback
+          console.warn('[SceneAnalyzer] Invalid JSON response (even after extraction), using fallback');
+          const duration = Date.now() - startTime;
+          console.log(`[SceneAnalyzer] Fallback analysis completed in ${duration}ms`);
+          return createFallbackAnalysis(cleanText);
+        }
+      } else {
+        // No JSON found - use fallback
+        console.warn('[SceneAnalyzer] Invalid JSON response, using fallback');
+        const duration = Date.now() - startTime;
+        console.log(`[SceneAnalyzer] Fallback analysis completed in ${duration}ms`);
+        return createFallbackAnalysis(cleanText);
+      }
     }
 
     // Step 5: Validate required fields
@@ -170,7 +191,7 @@ export async function analyzeSceneForVisuals(
 
     // Log specific error types
     if (error.message === 'LLM_TIMEOUT') {
-      console.warn(`[SceneAnalyzer] LLM timeout after 10s, using fallback`);
+      console.warn(`[SceneAnalyzer] LLM timeout after 60s, using fallback`);
     } else if (error instanceof SyntaxError) {
       console.warn(`[SceneAnalyzer] Invalid JSON response, using fallback`);
     } else {
