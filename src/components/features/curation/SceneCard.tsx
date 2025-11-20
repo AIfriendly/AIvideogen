@@ -16,6 +16,7 @@
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { type Scene } from '@/lib/db/queries';
+import { type VisualSuggestion } from '@/types/visual-suggestions';
 import { VisualSuggestionGallery } from './VisualSuggestionGallery';
 
 /**
@@ -25,6 +26,7 @@ interface SceneCardProps {
   scene: Scene;
   projectId: string; // Added in Story 4.2 for VisualSuggestionGallery
   className?: string;
+  onSuggestionClick?: (suggestion: VisualSuggestion) => void; // Story 4.3
 }
 
 /**
@@ -58,7 +60,7 @@ function formatDuration(seconds: number | null): string {
  * @param className - Optional additional CSS classes
  * @returns Scene card component
  */
-export function SceneCard({ scene, projectId, className }: SceneCardProps) {
+export function SceneCard({ scene, projectId, className, onSuggestionClick }: SceneCardProps) {
   return (
     <Card className={className}>
       <CardHeader className="pb-3">
@@ -87,6 +89,7 @@ export function SceneCard({ scene, projectId, className }: SceneCardProps) {
             projectId={projectId}
             sceneId={scene.id}
             sceneNumber={scene.scene_number}
+            onSuggestionClick={onSuggestionClick}
           />
         </div>
       </CardContent>

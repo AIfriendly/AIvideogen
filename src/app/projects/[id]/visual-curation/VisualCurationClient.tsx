@@ -17,10 +17,17 @@
 
 import * as React from 'react';
 import { type Project, type Scene } from '@/lib/db/queries';
+import { type VisualSuggestion } from '@/types/visual-suggestions';
 import { SceneCard } from '@/components/features/curation/SceneCard';
+import { VideoPreviewPlayer } from '@/components/features/curation/VideoPreviewPlayer';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 /**
  * Props for VisualCurationClient
@@ -150,6 +157,17 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
   const [scenes, setScenes] = React.useState<Scene[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [selectedSuggestion, setSelectedSuggestion] = React.useState<VisualSuggestion | null>(null);
+
+  // Handle suggestion click - open preview
+  const handleSuggestionClick = React.useCallback((suggestion: VisualSuggestion) => {
+    setSelectedSuggestion(suggestion);
+  }, []);
+
+  // Handle closing preview
+  const handleClosePreview = React.useCallback(() => {
+    setSelectedSuggestion(null);
+  }, []);
 
   /**
    * Fetch scenes from API
@@ -219,7 +237,12 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
               </div>
 
               {scenes.map((scene) => (
-                <SceneCard key={scene.id} scene={scene} projectId={project.id} />
+                <SceneCard
+                  key={scene.id}
+                  scene={scene}
+                  projectId={project.id}
+                  onSuggestionClick={handleSuggestionClick}
+                />
               ))}
 
               <div className="pt-4 md:pt-6 border-t">
@@ -236,6 +259,29 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
           )}
         </div>
       </main>
+
+      {/* Video Preview Dialog - Story 4.3 */}
+      <Dialog
+        open={selectedSuggestion !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleClosePreview();
+          }
+        }}
+      >
+        <DialogContent className="max-w-[800px] w-[95vw] p-6 bg-slate-800 border-slate-700">
+          <DialogTitle className="sr-only">
+            {selectedSuggestion?.title || 'Video Preview'}
+          </DialogTitle>
+          {selectedSuggestion && (
+            <VideoPreviewPlayer
+              suggestion={selectedSuggestion}
+              projectId={project.id}
+              onClose={handleClosePreview}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

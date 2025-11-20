@@ -31,6 +31,7 @@ interface VisualSuggestionGalleryProps {
   sceneId: string;
   sceneNumber: number;
   className?: string;
+  onSuggestionClick?: (suggestion: VisualSuggestion) => void;
 }
 
 /**
@@ -119,6 +120,7 @@ export function VisualSuggestionGallery({
   sceneId,
   sceneNumber,
   className,
+  onSuggestionClick,
 }: VisualSuggestionGalleryProps) {
   const [suggestions, setSuggestions] = React.useState<VisualSuggestion[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -209,7 +211,11 @@ export function VisualSuggestionGallery({
           {/* Grid */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             {suggestions.map((suggestion) => (
-              <SuggestionCard key={suggestion.id} suggestion={suggestion} />
+              <SuggestionCard
+                key={suggestion.id}
+                suggestion={suggestion}
+                onClick={() => onSuggestionClick?.(suggestion)}
+              />
             ))}
           </div>
         </div>

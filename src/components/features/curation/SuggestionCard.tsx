@@ -33,6 +33,7 @@ import {
 interface SuggestionCardProps {
   suggestion: VisualSuggestion;
   className?: string;
+  onClick?: () => void;
 }
 
 /**
@@ -106,14 +107,24 @@ function getDownloadStatusBadge(status: VisualSuggestion['downloadStatus']) {
  * @param className - Optional additional CSS classes
  * @returns Suggestion card component
  */
-export function SuggestionCard({ suggestion, className }: SuggestionCardProps) {
+export function SuggestionCard({ suggestion, className, onClick }: SuggestionCardProps) {
   const [thumbnailError, setThumbnailError] = React.useState(false);
   const statusBadge = getDownloadStatusBadge(suggestion.downloadStatus);
   const StatusIcon = statusBadge.icon;
 
   return (
     <Card
-      className={`relative overflow-hidden transition-all hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-600 ${className || ''}`}
+      className={`relative overflow-hidden transition-all hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-600 cursor-pointer ${className || ''}`}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+      aria-label={`Preview video: ${suggestion.title} by ${suggestion.channelTitle}`}
     >
       {/* Rank Badge - Top Left */}
       <div className="absolute top-2 left-2 z-10">
