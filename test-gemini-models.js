@@ -5,7 +5,7 @@
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const API_KEY = 'AIzaSyDFNDvhjeRc61YpN0nkTl0Qew7Ko7H10b8';
+const API_KEY = '';
 
 async function testGeminiModels() {
   console.log('Testing Gemini API access...\n');
