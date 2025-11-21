@@ -16,10 +16,13 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { type Project, type Scene } from '@/lib/db/queries';
 import { type VisualSuggestion } from '@/types/visual-suggestions';
 import { SceneCard } from '@/components/features/curation/SceneCard';
 import { VideoPreviewPlayer } from '@/components/features/curation/VideoPreviewPlayer';
+import { AssemblyTriggerButton } from '@/components/features/curation/AssemblyTriggerButton';
+import { ConfirmationModal } from '@/components/features/curation/ConfirmationModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
@@ -30,6 +33,7 @@ import {
 } from '@/components/ui/dialog';
 import { CheckCircle } from 'lucide-react';
 import { useCurationStore, type ClipSelection } from '@/lib/stores/curation-store';
+import { toast } from '@/hooks/use-toast';
 
 /**
  * Props for VisualCurationClient
@@ -156,10 +160,15 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
  * @returns Visual curation interface
  */
 export function VisualCurationClient({ project }: VisualCurationClientProps) {
+  const router = useRouter();
   const [scenes, setScenes] = React.useState<Scene[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [selectedSuggestion, setSelectedSuggestion] = React.useState<VisualSuggestion | null>(null);
+
+  // Assembly modal state
+  const [showConfirmModal, setShowConfirmModal] = React.useState(false);
+  const [isAssembling, setIsAssembling] = React.useState(false);
 
   // Get curation store state and actions
   const {
@@ -172,6 +181,58 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
 
   const selectionCount = getSelectionCount();
   const allSelected = scenes.length > 0 && selectionCount >= scenes.length;
+
+  // Handle assemble button click - open modal
+  const handleAssembleClick = React.useCallback(() => {
+    setShowConfirmModal(true);
+  }, []);
+
+  // Handle assembly confirmation
+  const handleConfirmAssembly = React.useCallback(async () => {
+    setIsAssembling(true);
+    try {
+      const response = await fetch(`/api/projects/${project.id}/assemble`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Assembly failed');
+      }
+
+      const data = await response.json();
+
+      // Success toast
+      toast({
+        title: 'Video assembly started!',
+        description: `Job ${data.assemblyJobId} has been queued for processing.`,
+      });
+
+      // Navigate to assembly status page
+      router.push(`/projects/${project.id}/assembly?jobId=${data.assemblyJobId}`);
+    } catch (error) {
+      console.error('Assembly failed:', error);
+
+      const errorMessage = error instanceof Error
+        ? error.message
+        : 'Failed to start assembly';
+
+      // Error toast with retry action
+      toast({
+        variant: 'destructive',
+        title: 'Assembly Failed',
+        description: errorMessage,
+        action: {
+          label: 'Retry',
+          onClick: handleConfirmAssembly,
+        } as any, // Type workaround for action property
+      });
+    } finally {
+      setIsAssembling(false);
+      setShowConfirmModal(false);
+    }
+  }, [project.id, router]);
 
   // Handle suggestion click - open preview
   const handleSuggestionClick = React.useCallback((suggestion: VisualSuggestion) => {
@@ -266,8 +327,8 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex flex-1 flex-col p-4 md:p-6 lg:p-8 bg-slate-50 dark:bg-slate-950">
+      {/* Main Content - pb-24 accounts for sticky footer */}
+      <main className="flex flex-1 flex-col p-4 md:p-6 lg:p-8 pb-24 bg-slate-50 dark:bg-slate-950">
         <div className="max-w-4xl mx-auto w-full">
           {/* Loading State */}
           {loading && <LoadingSkeleton />}
@@ -339,6 +400,24 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Assembly Trigger Button - Story 4.5 */}
+      {!loading && !error && scenes.length > 0 && (
+        <AssemblyTriggerButton
+          onAssembleClick={handleAssembleClick}
+          isLoading={isAssembling}
+        />
+      )}
+
+      {/* Confirmation Modal - Story 4.5 */}
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleConfirmAssembly}
+        isLoading={isAssembling}
+        sceneCount={scenes.length}
+        selections={selections}
+      />
     </div>
   );
 }
