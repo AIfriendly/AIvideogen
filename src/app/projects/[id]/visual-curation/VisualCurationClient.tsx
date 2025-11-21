@@ -28,6 +28,8 @@ import {
   DialogContent,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { CheckCircle } from 'lucide-react';
+import { useCurationStore, type ClipSelection } from '@/lib/stores/curation-store';
 
 /**
  * Props for VisualCurationClient
@@ -159,6 +161,18 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
   const [error, setError] = React.useState<string | null>(null);
   const [selectedSuggestion, setSelectedSuggestion] = React.useState<VisualSuggestion | null>(null);
 
+  // Get curation store state and actions
+  const {
+    selections,
+    setProject,
+    setTotalScenes,
+    loadSelections,
+    getSelectionCount,
+  } = useCurationStore();
+
+  const selectionCount = getSelectionCount();
+  const allSelected = scenes.length > 0 && selectionCount >= scenes.length;
+
   // Handle suggestion click - open preview
   const handleSuggestionClick = React.useCallback((suggestion: VisualSuggestion) => {
     setSelectedSuggestion(suggestion);
@@ -168,6 +182,31 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
   const handleClosePreview = React.useCallback(() => {
     setSelectedSuggestion(null);
   }, []);
+
+  // Initialize curation store with project
+  React.useEffect(() => {
+    setProject(project.id);
+  }, [project.id, setProject]);
+
+  // Update total scenes when scenes are loaded
+  React.useEffect(() => {
+    if (scenes.length > 0) {
+      setTotalScenes(scenes.length);
+
+      // Load existing selections from database
+      const selectionsFromDB: ClipSelection[] = scenes
+        .filter((scene) => scene.selected_clip_id)
+        .map((scene) => ({
+          sceneId: scene.id,
+          suggestionId: scene.selected_clip_id!,
+          videoId: '', // Will be populated when suggestions are loaded
+        }));
+
+      if (selectionsFromDB.length > 0) {
+        loadSelections(selectionsFromDB);
+      }
+    }
+  }, [scenes, setTotalScenes, loadSelections]);
 
   /**
    * Fetch scenes from API
@@ -211,6 +250,19 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
               Visual Curation - Select clips for each scene
             </p>
           </div>
+
+          {/* Selection Progress Counter */}
+          {!loading && !error && scenes.length > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-slate-600 dark:text-slate-400">Scenes Selected:</span>
+              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                {selectionCount}/{scenes.length}
+              </span>
+              {allSelected && (
+                <CheckCircle className="w-4 h-4 text-green-500" />
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -275,8 +327,13 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
           </DialogTitle>
           {selectedSuggestion && (
             <VideoPreviewPlayer
-              suggestion={selectedSuggestion}
+              suggestionId={selectedSuggestion.id}
               projectId={project.id}
+              videoId={selectedSuggestion.videoId}
+              title={selectedSuggestion.title}
+              channelTitle={selectedSuggestion.channelTitle || ''}
+              segmentPath={selectedSuggestion.defaultSegmentPath || null}
+              downloadStatus={selectedSuggestion.downloadStatus}
               onClose={handleClosePreview}
             />
           )}

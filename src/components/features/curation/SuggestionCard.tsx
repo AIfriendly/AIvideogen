@@ -25,7 +25,10 @@ import {
   CheckCircle,
   AlertCircle,
   Video,
+  Check,
+  Play,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 /**
  * Props for SuggestionCard component
@@ -33,7 +36,9 @@ import {
 interface SuggestionCardProps {
   suggestion: VisualSuggestion;
   className?: string;
-  onClick?: () => void;
+  isSelected?: boolean;
+  onSelect?: () => void;
+  onClick?: () => void; // Preview handler
 }
 
 /**
@@ -102,30 +107,47 @@ function getDownloadStatusBadge(status: VisualSuggestion['downloadStatus']) {
  * SuggestionCard Component
  *
  * Displays a single visual suggestion with thumbnail, metadata, and status indicators.
+ * Supports selection state with visual indicators and separate preview action.
  *
  * @param suggestion - Visual suggestion data
  * @param className - Optional additional CSS classes
+ * @param isSelected - Whether this card is selected
+ * @param onSelect - Handler for selecting this card
+ * @param onClick - Handler for previewing this card
  * @returns Suggestion card component
  */
-export function SuggestionCard({ suggestion, className, onClick }: SuggestionCardProps) {
+export function SuggestionCard({ suggestion, className, isSelected, onSelect, onClick }: SuggestionCardProps) {
   const [thumbnailError, setThumbnailError] = React.useState(false);
   const statusBadge = getDownloadStatusBadge(suggestion.downloadStatus);
   const StatusIcon = statusBadge.icon;
 
   return (
     <Card
-      className={`relative overflow-hidden transition-all hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-600 cursor-pointer ${className || ''}`}
-      onClick={onClick}
+      className={cn(
+        "relative overflow-hidden transition-all duration-200 cursor-pointer",
+        isSelected
+          ? "border-indigo-500 border-2 shadow-lg shadow-indigo-500/20"
+          : "hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-600",
+        className
+      )}
+      onClick={onSelect}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          onClick?.();
+          onSelect?.();
         }
       }}
-      aria-label={`Preview video: ${suggestion.title} by ${suggestion.channelTitle}`}
+      aria-label={`${isSelected ? 'Selected: ' : 'Select '}${suggestion.title} by ${suggestion.channelTitle}`}
     >
+      {/* Selection Checkmark - Top Right (when selected) */}
+      {isSelected && (
+        <div className="absolute top-2 right-2 z-20 bg-indigo-500 rounded-full p-1 shadow-md">
+          <Check className="w-3 h-3 text-white" />
+        </div>
+      )}
+
       {/* Rank Badge - Top Left */}
       <div className="absolute top-2 left-2 z-10">
         <Badge
@@ -136,13 +158,15 @@ export function SuggestionCard({ suggestion, className, onClick }: SuggestionCar
         </Badge>
       </div>
 
-      {/* Download Status Badge - Top Right */}
-      <div className="absolute top-2 right-2 z-10">
-        <Badge variant={statusBadge.variant} className={statusBadge.className}>
-          <StatusIcon className="w-3 h-3 mr-1" />
-          {statusBadge.text}
-        </Badge>
-      </div>
+      {/* Download Status Badge - Top Right (only when not selected) */}
+      {!isSelected && (
+        <div className="absolute top-2 right-2 z-10">
+          <Badge variant={statusBadge.variant} className={statusBadge.className}>
+            <StatusIcon className="w-3 h-3 mr-1" />
+            {statusBadge.text}
+          </Badge>
+        </div>
+      )}
 
       <CardContent className="p-0">
         {/* Thumbnail */}
@@ -162,6 +186,18 @@ export function SuggestionCard({ suggestion, className, onClick }: SuggestionCar
               <Video className="w-12 h-12 text-slate-400 dark:text-slate-600" />
             </div>
           )}
+
+          {/* Preview Button - Bottom Right of Thumbnail */}
+          <button
+            className="absolute bottom-2 right-2 bg-black/60 hover:bg-black/80 rounded-full p-2 transition-colors z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick?.();
+            }}
+            aria-label={`Preview ${suggestion.title}`}
+          >
+            <Play className="w-4 h-4 text-white" />
+          </button>
         </div>
 
         {/* Metadata */}
@@ -190,6 +226,13 @@ export function SuggestionCard({ suggestion, className, onClick }: SuggestionCar
               <span className="font-medium">{formatDuration(suggestion.duration)}</span>
             </div>
           </div>
+
+          {/* Selected Badge */}
+          {isSelected && (
+            <Badge className="bg-indigo-500 text-white text-xs">
+              Selected
+            </Badge>
+          )}
         </div>
       </CardContent>
     </Card>

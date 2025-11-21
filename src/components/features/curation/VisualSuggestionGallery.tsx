@@ -22,6 +22,8 @@ import { EmptyClipState } from './EmptyClipState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { AlertCircle } from 'lucide-react';
+import { useCurationStore } from '@/lib/stores/curation-store';
+import { toast } from '@/hooks/use-toast';
 
 /**
  * Props for VisualSuggestionGallery component
@@ -126,6 +128,35 @@ export function VisualSuggestionGallery({
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
+  // Get selection state from store
+  const { selections, selectClip } = useCurationStore();
+  const currentSelection = selections.get(sceneId);
+
+  /**
+   * Handle clip selection with toast notifications
+   */
+  const handleSelectClip = React.useCallback((suggestion: VisualSuggestion) => {
+    selectClip(
+      sceneId,
+      suggestion.id,
+      suggestion.videoId,
+      (error) => {
+        // Error callback for toast notification
+        toast({
+          variant: 'destructive',
+          title: 'Selection Failed',
+          description: error.message || 'Failed to save selection. Please try again.',
+        });
+      }
+    );
+
+    // Optimistic success toast
+    toast({
+      title: 'Clip Selected',
+      description: `Selected "${suggestion.title}" for Scene ${sceneNumber}`,
+    });
+  }, [sceneId, sceneNumber, selectClip]);
+
   /**
    * Fetch suggestions from API
    */
@@ -214,6 +245,8 @@ export function VisualSuggestionGallery({
               <SuggestionCard
                 key={suggestion.id}
                 suggestion={suggestion}
+                isSelected={currentSelection?.suggestionId === suggestion.id}
+                onSelect={() => handleSelectClip(suggestion)}
                 onClick={() => onSuggestionClick?.(suggestion)}
               />
             ))}

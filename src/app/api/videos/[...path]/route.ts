@@ -121,6 +121,10 @@ export async function GET(
           'Content-Length': chunkSize.toString(),
           'Content-Type': contentType,
           'Cache-Control': 'public, max-age=31536000, immutable',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+          'Access-Control-Allow-Headers': 'Range',
+          'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length',
         },
       });
     }
@@ -135,10 +139,95 @@ export async function GET(
         'Content-Length': fileSize.toString(),
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=31536000, immutable',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+        'Access-Control-Allow-Headers': 'Range',
+        'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length',
       },
     });
   } catch (error) {
     console.error('[Video API] Error serving video:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
+}
+
+/**
+ * HEAD /api/videos/[...path]
+ *
+ * Returns headers without body for video metadata inspection.
+ */
+export async function HEAD(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  try {
+    const resolvedParams = await params;
+    const pathSegments = resolvedParams.path;
+
+    if (!pathSegments || pathSegments.length === 0) {
+      return new NextResponse(null, { status: 400 });
+    }
+
+    const requestedPath = pathSegments.join('/');
+    const cacheDir = path.join(process.cwd(), '.cache');
+    const filePath = path.join(cacheDir, requestedPath);
+    const normalizedFilePath = path.normalize(filePath);
+    const normalizedCacheDir = path.normalize(cacheDir);
+
+    if (!normalizedFilePath.startsWith(normalizedCacheDir)) {
+      return new NextResponse(null, { status: 403 });
+    }
+
+    if (!fs.existsSync(normalizedFilePath)) {
+      return new NextResponse(null, { status: 404 });
+    }
+
+    const stat = fs.statSync(normalizedFilePath);
+    const fileSize = stat.size;
+    const ext = path.extname(normalizedFilePath).toLowerCase();
+    let contentType = 'application/octet-stream';
+    if (ext === '.mp4') {
+      contentType = 'video/mp4';
+    } else if (ext === '.webm') {
+      contentType = 'video/webm';
+    }
+
+    return new NextResponse(null, {
+      status: 200,
+      headers: {
+        'Accept-Ranges': 'bytes',
+        'Content-Length': fileSize.toString(),
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+        'Access-Control-Allow-Headers': 'Range',
+        'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length',
+      },
+    });
+  } catch (error) {
+    console.error('[Video API] Error in HEAD request:', error);
+    return new NextResponse(null, { status: 500 });
+  }
+}
+
+/**
+ * OPTIONS /api/videos/[...path]
+ *
+ * Handles CORS preflight requests.
+ */
+export async function OPTIONS(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      'Access-Control-Allow-Headers': 'Range, Content-Type',
+      'Access-Control-Max-Age': '86400',
+      'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length',
+    },
+  });
 }

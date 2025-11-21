@@ -123,6 +123,23 @@ async function runMigrations(): Promise<void> {
     console.log(`Migration ${migration005Name} already applied, skipping`);
   }
 
+  // Migration 006: Add selected_clip_id to scenes table (Epic 4, Story 4.4)
+  const migration006Name = '006_add_selected_clip_id';
+  if (!isMigrationApplied(migration006Name)) {
+    console.log(`Applying migration: ${migration006Name}`);
+    try {
+      const { up } = await import('./migrations/006_add_selected_clip_id');
+      up(db);
+      markMigrationApplied(migration006Name);
+      console.log(`Migration ${migration006Name} applied successfully`);
+    } catch (error) {
+      console.error(`Failed to apply migration ${migration006Name}:`, error);
+      throw error;
+    }
+  } else {
+    console.log(`Migration ${migration006Name} already applied, skipping`);
+  }
+
   console.log('All migrations completed');
 }
 

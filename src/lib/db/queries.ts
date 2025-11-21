@@ -402,6 +402,7 @@ export interface Scene {
   sanitized_text: string | null;
   audio_file_path: string | null;
   duration: number | null;
+  selected_clip_id: string | null;  // Epic 4, Story 4.4: Selected visual suggestion
   created_at: string;
   updated_at: string;
 }
@@ -721,6 +722,36 @@ export function deleteScenesByProjectId(projectId: string): void {
     console.error('Error deleting scenes by project:', error);
     throw new Error(
       `Failed to delete scenes: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Update scene selected clip (Epic 4, Story 4.4)
+ * @param sceneId Scene ID
+ * @param selectedClipId Visual suggestion ID to set as selected
+ * @returns Updated scene
+ */
+export function updateSceneSelectedClip(sceneId: string, selectedClipId: string | null): Scene {
+  try {
+    const stmt = db.prepare(`
+      UPDATE scenes
+      SET selected_clip_id = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `);
+
+    stmt.run(selectedClipId, sceneId);
+
+    // Retrieve and return the updated scene
+    const scene = getSceneById(sceneId);
+    if (!scene) {
+      throw new Error(`Scene not found after update: ${sceneId}`);
+    }
+    return scene;
+  } catch (error) {
+    console.error('Error updating scene selected clip:', error);
+    throw new Error(
+      `Failed to update scene selected clip: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
 }
