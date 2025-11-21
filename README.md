@@ -28,7 +28,7 @@ The AI Video Generator is a desktop-first web application built with Next.js 15 
 - **KokoroTTS** - High-quality text-to-speech (82M model, Apache 2.0)
 - **yt-dlp** - YouTube video downloading
 - **FFmpeg 7.1.2+** - Video processing and assembly
-
+- **Gemini 2.5 Free** Free tier API
 ### State & Data
 - **Zustand 5.0.8** - Lightweight client state management
 - **SQLite (better-sqlite3)** - Embedded database for conversation history and projects
