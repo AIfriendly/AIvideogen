@@ -23,15 +23,18 @@ import { SceneCard } from '@/components/features/curation/SceneCard';
 import { VideoPreviewPlayer } from '@/components/features/curation/VideoPreviewPlayer';
 import { AssemblyTriggerButton } from '@/components/features/curation/AssemblyTriggerButton';
 import { ConfirmationModal } from '@/components/features/curation/ConfirmationModal';
+import { NavigationBreadcrumb } from '@/components/features/curation/NavigationBreadcrumb';
+import { UnsavedChangesModal } from '@/components/features/curation/UnsavedChangesModal';
+import { useSessionPersistence } from '@/lib/hooks/useSessionPersistence';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Alert } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, ArrowLeft, RefreshCw, AlertTriangle, Loader2 } from 'lucide-react';
 import { useCurationStore, type ClipSelection } from '@/lib/stores/curation-store';
 import { toast } from '@/hooks/use-toast';
 
@@ -170,6 +173,11 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
   const [showConfirmModal, setShowConfirmModal] = React.useState(false);
   const [isAssembling, setIsAssembling] = React.useState(false);
 
+  // Story 4.6: Navigation and session state
+  const [showUnsavedModal, setShowUnsavedModal] = React.useState(false);
+  const [pendingNavigation, setPendingNavigation] = React.useState<string | null>(null);
+  const [isRegenerating, setIsRegenerating] = React.useState(false);
+
   // Get curation store state and actions
   const {
     selections,
@@ -181,6 +189,16 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
 
   const selectionCount = getSelectionCount();
   const allSelected = scenes.length > 0 && selectionCount >= scenes.length;
+
+  // Story 4.6: Check for scenes with missing audio
+  const scenesWithMissingAudio = scenes.filter((scene) => !scene.audio_file_path);
+  const hasMissingAudio = scenesWithMissingAudio.length > 0;
+
+  // Story 4.6: Session persistence
+  const {
+    saveScrollPosition,
+    restoreState,
+  } = useSessionPersistence(project.id);
 
   // Handle assemble button click - open modal
   const handleAssembleClick = React.useCallback(() => {
@@ -223,10 +241,6 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
         variant: 'destructive',
         title: 'Assembly Failed',
         description: errorMessage,
-        action: {
-          label: 'Retry',
-          onClick: handleConfirmAssembly,
-        } as any, // Type workaround for action property
       });
     } finally {
       setIsAssembling(false);
@@ -243,6 +257,70 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
   const handleClosePreview = React.useCallback(() => {
     setSelectedSuggestion(null);
   }, []);
+
+  // Story 4.6: Handle back to script preview navigation
+  const handleBackToScriptPreview = React.useCallback(() => {
+    if (!allSelected && selectionCount > 0) {
+      setPendingNavigation(`/projects/${project.id}/voiceover-preview`);
+      setShowUnsavedModal(true);
+    } else {
+      router.push(`/projects/${project.id}/voiceover-preview`);
+    }
+  }, [allSelected, selectionCount, project.id, router]);
+
+  // Story 4.6: Handle breadcrumb navigation
+  const handleBreadcrumbNavigate = React.useCallback((href: string) => {
+    if (!allSelected && selectionCount > 0) {
+      setPendingNavigation(href);
+      setShowUnsavedModal(true);
+    } else {
+      router.push(href);
+    }
+  }, [allSelected, selectionCount, router]);
+
+  // Story 4.6: Handle regenerate visuals
+  const handleRegenerateVisuals = React.useCallback(async () => {
+    setIsRegenerating(true);
+    try {
+      const response = await fetch(`/api/projects/${project.id}/generate-visuals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to regenerate visuals');
+      }
+
+      toast({
+        title: 'Visual sourcing started',
+        description: 'New visual suggestions are being generated. This may take a moment.',
+      });
+
+      // Refresh scene data after a delay
+      setTimeout(() => {
+        fetchScenes();
+      }, 2000);
+    } catch (error) {
+      console.error('Regenerate visuals failed:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Regeneration Failed',
+        description: error instanceof Error ? error.message : 'Failed to regenerate visuals',
+      });
+    } finally {
+      setIsRegenerating(false);
+    }
+  }, [project.id]);
+
+  // Story 4.6: Handle navigation confirmation from modal
+  const handleConfirmLeave = React.useCallback(() => {
+    setShowUnsavedModal(false);
+    if (pendingNavigation) {
+      router.push(pendingNavigation);
+      setPendingNavigation(null);
+    }
+  }, [pendingNavigation, router]);
 
   // Initialize curation store with project
   React.useEffect(() => {
@@ -298,38 +376,146 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
     fetchScenes();
   }, [fetchScenes]);
 
+  // Story 4.6: Scroll position tracking with debounce
+  React.useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const handleScroll = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        saveScrollPosition(window.scrollY);
+      }, 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      clearTimeout(timeoutId);
+    };
+  }, [saveScrollPosition]);
+
+  // Story 4.6: Restore scroll position on mount
+  React.useEffect(() => {
+    if (scenes.length === 0) return;
+
+    const state = restoreState();
+    if (state && state.scrollPosition > 0) {
+      setTimeout(() => {
+        window.scrollTo(0, state.scrollPosition);
+      }, 100);
+    }
+  }, [scenes.length, restoreState]);
+
+  // Story 4.6: Browser beforeunload warning
+  React.useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!allSelected && selectionCount > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [allSelected, selectionCount]);
+
   return (
     <div className="flex min-h-screen flex-col">
       {/* Header */}
       <header className="border-b bg-background dark:bg-slate-900 sticky top-0 z-10">
-        <div className="container flex h-16 items-center gap-4 px-4 md:px-6 lg:px-8">
-          <div className="flex-1">
-            <h1 className="text-lg md:text-xl font-semibold text-slate-900 dark:text-slate-100">
-              {project.name}
-            </h1>
-            <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400">
-              Visual Curation - Select clips for each scene
-            </p>
-          </div>
+        <div className="container flex flex-col gap-2 px-4 md:px-6 lg:px-8 py-3">
+          {/* Story 4.6: Breadcrumb */}
+          <NavigationBreadcrumb
+            projectId={project.id}
+            projectName={project.name}
+            currentStep="visual-curation"
+            onNavigate={handleBreadcrumbNavigate}
+          />
 
-          {/* Selection Progress Counter */}
-          {!loading && !error && scenes.length > 0 && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-slate-600 dark:text-slate-400">Scenes Selected:</span>
-              <span className="font-semibold text-slate-900 dark:text-slate-100">
-                {selectionCount}/{scenes.length}
-              </span>
-              {allSelected && (
-                <CheckCircle className="w-4 h-4 text-green-500" />
-              )}
+          {/* Title and actions row */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <h1 className="text-lg md:text-xl font-semibold text-slate-900 dark:text-slate-100">
+                {project.name}
+              </h1>
+              <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400">
+                Visual Curation - Select clips for each scene
+              </p>
             </div>
-          )}
+
+            {/* Selection Progress Counter */}
+            {!loading && !error && scenes.length > 0 && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-slate-600 dark:text-slate-400">Scenes Selected:</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">
+                  {selectionCount}/{scenes.length}
+                </span>
+                {allSelected && (
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
       {/* Main Content - pb-24 accounts for sticky footer */}
       <main className="flex flex-1 flex-col p-4 md:p-6 lg:p-8 pb-24 bg-slate-50 dark:bg-slate-950">
         <div className="max-w-4xl mx-auto w-full">
+          {/* Story 4.6: Navigation Actions */}
+          {!loading && !error && scenes.length > 0 && (
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <Button
+                variant="outline"
+                onClick={handleBackToScriptPreview}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Script Preview
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={handleRegenerateVisuals}
+                disabled={isRegenerating}
+                className="flex items-center gap-2"
+              >
+                {isRegenerating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                Regenerate Visuals
+              </Button>
+            </div>
+          )}
+
+          {/* Story 4.6: Missing Audio Alert */}
+          {!loading && !error && hasMissingAudio && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Missing Audio Files</AlertTitle>
+              <AlertDescription>
+                Some scenes are missing audio files. Please regenerate voiceovers before continuing.
+              </AlertDescription>
+              <div className="mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    router.push(`/projects/${project.id}/voiceover-preview?regenerate=true`);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Regenerate Voiceovers
+                </Button>
+              </div>
+            </Alert>
+          )}
+
           {/* Loading State */}
           {loading && <LoadingSkeleton />}
 
@@ -417,6 +603,18 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
         isLoading={isAssembling}
         sceneCount={scenes.length}
         selections={selections}
+      />
+
+      {/* Story 4.6: Unsaved Changes Modal */}
+      <UnsavedChangesModal
+        isOpen={showUnsavedModal}
+        onClose={() => {
+          setShowUnsavedModal(false);
+          setPendingNavigation(null);
+        }}
+        onConfirmLeave={handleConfirmLeave}
+        selectionCount={selectionCount}
+        totalScenes={scenes.length}
       />
     </div>
   );
