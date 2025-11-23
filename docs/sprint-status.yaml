@@ -58,19 +58,25 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: Visual Content Sourcing (YouTube API)
-  epic-3: done
+  epic-3: contexted
   3-1-YouTube API Client Setup & Configuration: done
   3-2-Scene Text Analysis & Search Query Generation: done
+  3-2b-Enhanced Search Query Generation: done
   3-3-YouTube Video Search & Result Retrieval: done
   3-4-Content Filtering & Quality Ranking: done
   3-5-Visual Suggestions Database & Workflow Integration: done
   3-6-Default Segment Download Service: done
+  3-7-Computer Vision Content Filtering: done
   epic-3-retrospective: optional
 
   # Epic 4: Visual Curation Interface
   epic-4: contexted
   4-1-scene-by-scene-ui-layout-script-display: done
   4-2-visual-suggestions-display-gallery: done
+  4-3-video-preview-playback: done
+  4-4-clip-selection-mechanism: done
+  4-5-assembly-trigger-validation: done
+  4-6-workflow-integration-error-recovery: backlog
   epic-4-retrospective: optional
 
   # Epic 5: Video Assembly & Output
