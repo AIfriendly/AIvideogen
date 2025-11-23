@@ -18,7 +18,7 @@
 import * as React from 'react';
 import Plyr from 'plyr';
 import { type VisualSuggestion } from '@/types/visual-suggestions';
-import { X, AlertCircle } from 'lucide-react';
+import { X, AlertCircle, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 /**
@@ -127,9 +127,10 @@ function LocalVideoPlayer({
     if (!videoRef.current) return;
 
     // Initialize Plyr
+    // Story 3.7: Remove 'mute' and 'volume' controls - audio is stripped from all segments
     try {
       plyrRef.current = new Plyr(videoRef.current, {
-        controls: ['play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen'],
+        controls: ['play', 'progress', 'current-time', 'fullscreen'],
         keyboard: { focused: false, global: false }, // We handle keyboard shortcuts manually
         clickToPlay: true,
         hideControls: true,
@@ -322,6 +323,20 @@ export function VideoPreviewPlayer({
             videoId={videoId}
             title={title}
           />
+        )}
+
+        {/* Story 3.7: Silent Video Indicator */}
+        {useLocal && (
+          <div
+            className="flex items-center gap-2 mt-2 text-muted-foreground"
+            title="Audio removed for preview"
+            data-testid="silent-video-indicator"
+          >
+            <VolumeX className="w-4 h-4 text-slate-400" aria-hidden="true" />
+            <span className="text-xs" aria-label="Audio removed for preview">
+              Audio removed for preview
+            </span>
+          </div>
         )}
 
         {/* Player Mode Indicator */}

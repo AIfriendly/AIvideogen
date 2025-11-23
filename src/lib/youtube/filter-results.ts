@@ -21,6 +21,90 @@ import { VideoResult, ContentType } from './types';
 import { getFilterConfig } from './filter-config';
 
 // ============================================================================
+// Story 3.7: Global Keyword Filtering (Tier 1)
+// ============================================================================
+
+/**
+ * Global filter patterns - remove these from ALL content types
+ * These patterns indicate low-quality B-roll (commentary, reactions, etc.)
+ */
+const GLOBAL_FILTER_PATTERNS: string[] = [
+  'reaction',
+  'reacts',
+  'commentary',
+  'my thoughts',
+  'review',
+  'tier list',
+  'ranking',
+  'explained',
+  'vlog'
+];
+
+/**
+ * Global priority patterns - boost these for ALL content types
+ * These patterns indicate high-quality B-roll footage
+ */
+const GLOBAL_PRIORITY_PATTERNS: string[] = [
+  'stock footage',
+  'cinematic',
+  '4k',
+  'no text',
+  'gameplay only',
+  'no commentary',
+  'b-roll',
+  'footage'
+];
+
+/**
+ * Filter videos by global keyword patterns (Story 3.7 - Tier 1)
+ *
+ * Removes videos with titles/descriptions containing low-quality patterns
+ * (reaction, commentary, vlog, etc.) regardless of content type.
+ *
+ * @param results - Array of video results to filter
+ * @returns Filtered array with low-quality videos removed
+ */
+export function filterByKeywords(results: VideoResult[]): VideoResult[] {
+  return results.filter(video => {
+    const titleLower = (video.title || '').toLowerCase();
+    const descriptionLower = (video.description || '').toLowerCase();
+    const combinedText = `${titleLower} ${descriptionLower}`;
+
+    // Check for filter patterns (these indicate low-quality B-roll)
+    for (const pattern of GLOBAL_FILTER_PATTERNS) {
+      if (combinedText.includes(pattern.toLowerCase())) {
+        console.log(`[filterByKeywords] Filtered video (contains "${pattern}"):`, video.title);
+        return false;
+      }
+    }
+
+    return true;
+  });
+}
+
+/**
+ * Calculate priority boost for global B-roll indicators (Story 3.7)
+ *
+ * @param video - Video to calculate boost for
+ * @returns Boost score (0-1 range, added to quality score)
+ */
+export function calculatePriorityBoost(video: VideoResult): number {
+  const titleLower = (video.title || '').toLowerCase();
+  const descriptionLower = (video.description || '').toLowerCase();
+  const combinedText = `${titleLower} ${descriptionLower}`;
+
+  let boost = 0;
+  for (const pattern of GLOBAL_PRIORITY_PATTERNS) {
+    if (combinedText.includes(pattern.toLowerCase())) {
+      boost += 0.1; // Each matching pattern adds 0.1 boost
+    }
+  }
+
+  // Cap boost at 0.3 to prevent excessive boosting
+  return Math.min(boost, 0.3);
+}
+
+// ============================================================================
 // Interfaces
 // ============================================================================
 
@@ -267,6 +351,10 @@ const CONTENT_TYPE_KEYWORDS: Record<ContentType, { positive: string[], negative:
     positive: ['gameplay', 'no commentary', 'walkthrough', 'playthrough'],
     negative: ['tutorial', 'review', 'reaction']
   },
+  [ContentType.GAMING]: {
+    positive: ['gameplay', 'no commentary', 'boss fight', 'gameplay only'],
+    negative: ['reaction', 'review', 'tier list', 'ranking', 'commentary']
+  },
   [ContentType.TUTORIAL]: {
     positive: ['tutorial', 'how to', 'guide', 'learn'],
     negative: ['gameplay', 'review', 'vlog']
@@ -283,6 +371,10 @@ const CONTENT_TYPE_KEYWORDS: Record<ContentType, { positive: string[], negative:
     positive: ['documentary', 'story', 'history'],
     negative: ['trailer', 'review', 'reaction']
   },
+  [ContentType.HISTORICAL]: {
+    positive: ['documentary', 'historical footage', 'archive', 'period footage'],
+    negative: ['reaction', 'explained', 'opinion', 'analysis']
+  },
   [ContentType.URBAN]: {
     positive: ['city', 'urban', 'architecture', 'time lapse', 'timelapse'],
     negative: ['vlog', 'travel']
@@ -290,6 +382,10 @@ const CONTENT_TYPE_KEYWORDS: Record<ContentType, { positive: string[], negative:
   [ContentType.ABSTRACT]: {
     positive: ['animation', 'abstract', 'visual'],
     negative: ['tutorial', 'gameplay']
+  },
+  [ContentType.CONCEPTUAL]: {
+    positive: ['cinematic', '4K', 'stock footage', 'b-roll'],
+    negative: ['reaction', 'review', 'vlog', 'my thoughts']
   }
 };
 
@@ -415,10 +511,14 @@ export function rankVideos(
     const rank = index + 1;
     const relevance = 1 / rank;
 
-    // Calculate weighted quality score
+    // Story 3.7: Calculate priority boost for B-roll indicators
+    const priorityBoost = calculatePriorityBoost(video);
+
+    // Calculate weighted quality score (with priority boost)
     const qualityScore =
       (durationMatch * config.durationMatchWeight) +
-      (relevance * config.relevanceWeight);
+      (relevance * config.relevanceWeight) +
+      priorityBoost;
 
     return {
       ...video,
@@ -486,7 +586,11 @@ export function filterAndRankResults(
   // TIER 1: Strict Filtering (Primary)
   // -------------------------------------------------------------------------
   try {
-    let filtered = filterByDuration(results, sceneDuration, 3, 300); // 1x-3x, 5-min cap
+    // Story 3.7: Apply global keyword filter FIRST (removes reaction/commentary/vlog)
+    let filtered = filterByKeywords(results);
+    console.log(`[Tier 1] After global keyword filter: ${filtered.length} results`);
+
+    filtered = filterByDuration(filtered, sceneDuration, 3, 300); // 1x-3x, 5-min cap
     console.log(`[Tier 1] After duration filter (1x-3x, 300s cap): ${filtered.length} results`);
 
     filtered = filterByTitleQuality(filtered);

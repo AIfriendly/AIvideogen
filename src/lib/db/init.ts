@@ -140,6 +140,23 @@ async function runMigrations(): Promise<void> {
     console.log(`Migration ${migration006Name} already applied, skipping`);
   }
 
+  // Migration 007: Add cv_score to visual_suggestions (Epic 3, Story 3.7)
+  const migration007Name = '007_add_cv_score';
+  if (!isMigrationApplied(migration007Name)) {
+    console.log(`Applying migration: ${migration007Name}`);
+    try {
+      const { up } = await import('./migrations/007_add_cv_score');
+      up(db);
+      markMigrationApplied(migration007Name);
+      console.log(`Migration ${migration007Name} applied successfully`);
+    } catch (error) {
+      console.error(`Failed to apply migration ${migration007Name}:`, error);
+      throw error;
+    }
+  } else {
+    console.log(`Migration ${migration007Name} already applied, skipping`);
+  }
+
   console.log('All migrations completed');
 }
 
