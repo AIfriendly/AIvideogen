@@ -27,9 +27,9 @@
  * - Translate abstract concepts into visual metaphors
  * - Return results as JSON for structured parsing
  */
-export const VISUAL_SEARCH_PROMPT = `You are a visual content researcher helping to find B-roll footage on YouTube.
+export const VISUAL_SEARCH_PROMPT = `You are a visual content researcher helping to find pure B-roll footage on YouTube (no commentary, reactions, or vlogs).
 
-TASK: Analyze the scene text and extract visual elements to generate YouTube search queries.
+TASK: Analyze the scene text, extract entities, detect content type, and generate optimized YouTube search queries with B-roll quality terms.
 
 SCENE TEXT:
 {sceneText}
@@ -40,9 +40,11 @@ INSTRUCTIONS:
 3. Identify the MOOD (atmosphere, lighting, emotion)
 4. Identify the ACTION (what is happening, movement)
 5. Extract KEYWORDS (concrete visual elements, not abstract concepts)
-6. Generate PRIMARY QUERY (4-6 most relevant keywords for YouTube)
-7. Generate 2-3 ALTERNATIVE QUERIES (different keyword combinations, synonyms)
-8. Classify CONTENT TYPE (gameplay, tutorial, nature, b-roll, documentary, urban, abstract)
+6. Extract ENTITIES (specific names: game titles, boss names, historical events, locations, concepts)
+7. Classify CONTENT TYPE (gaming, historical, conceptual, nature, tutorial, documentary, urban, abstract)
+8. Generate PRIMARY QUERY with B-roll quality terms based on content type
+9. Generate 2-3 ALTERNATIVE QUERIES (different keyword combinations, synonyms)
+10. Generate EXPECTED LABELS (3-5 labels that should appear in video frames for content verification)
 
 RULES:
 - Focus on VISUAL elements (what you can SEE in a video)
@@ -52,6 +54,19 @@ RULES:
 - Alternative queries should provide DIVERSITY (different angles, synonyms)
 - Keywords should be YouTube search optimized (popular search terms)
 - Exclude filler words (the, a, is, in) from queries
+
+B-ROLL QUALITY TERMS BY CONTENT TYPE:
+- Gaming: Include "no commentary", "gameplay only" in queries
+- Historical: Include "historical footage", "documentary", "archive" in queries
+- Conceptual: Include "cinematic", "4K", "stock footage" in queries
+- Nature: Include "cinematic", "4K", "wildlife documentary" in queries
+- Tutorial: Include "demonstration", "no talking" in queries
+
+ENTITY EXTRACTION RULES:
+- Gaming: Extract game titles, boss names, character names, level names
+- Historical: Extract event names, dates, locations, historical figures
+- Conceptual: Extract key concepts, technologies, themes
+- Nature: Extract animal species, locations, phenomena
 
 EXAMPLES BY SCENE TYPE:
 
@@ -70,17 +85,51 @@ Output:
 }
 
 Gaming Scene:
-Input: "A player navigates through a dark forest in Minecraft"
+Input: "The epic battle against Ornstein and Smough tests every player's skill"
 Output:
 {
-  "mainSubject": "minecraft gameplay",
-  "setting": "dark forest",
-  "mood": "dark",
-  "action": "navigating",
-  "keywords": ["minecraft", "forest", "survival", "exploration"],
-  "primaryQuery": "minecraft dark forest gameplay",
-  "alternativeQueries": ["minecraft forest exploration", "minecraft survival forest night"],
-  "contentType": "gameplay"
+  "mainSubject": "dark souls boss fight",
+  "setting": "anor londo cathedral",
+  "mood": "intense epic",
+  "action": "fighting dodging",
+  "keywords": ["boss fight", "combat", "action rpg", "challenge"],
+  "entities": ["Dark Souls", "Ornstein and Smough", "Anor Londo"],
+  "primaryQuery": "dark souls ornstein smough boss fight no commentary gameplay only",
+  "alternativeQueries": ["dark souls boss fight clean gameplay", "ornstein smough fight no talking"],
+  "contentType": "gaming",
+  "expectedLabels": ["video game", "combat", "boss", "knight", "cathedral"]
+}
+
+Historical Scene:
+Input: "The storming of the Winter Palace marked the beginning of Soviet rule"
+Output:
+{
+  "mainSubject": "winter palace storming",
+  "setting": "petrograd russia 1917",
+  "mood": "revolutionary dramatic",
+  "action": "storming revolution",
+  "keywords": ["revolution", "palace", "bolshevik", "october"],
+  "entities": ["Winter Palace", "Russian Revolution", "1917", "Petrograd", "Bolsheviks"],
+  "primaryQuery": "russian revolution winter palace historical footage documentary archive",
+  "alternativeQueries": ["october revolution 1917 documentary", "bolshevik revolution archive footage"],
+  "contentType": "historical",
+  "expectedLabels": ["palace", "crowd", "revolution", "historical", "building"]
+}
+
+Conceptual Scene:
+Input: "Towering skyscrapers loom over empty streets as autonomous drones patrol"
+Output:
+{
+  "mainSubject": "dystopian cityscape drones",
+  "setting": "futuristic city",
+  "mood": "dark ominous",
+  "action": "patrolling surveillance",
+  "keywords": ["dystopia", "drones", "surveillance", "futuristic", "AI"],
+  "entities": ["dystopia", "autonomous drones", "smart city", "surveillance"],
+  "primaryQuery": "dystopian city AI robots cinematic 4K stock footage",
+  "alternativeQueries": ["futuristic city drones cinematic", "sci-fi surveillance city 4K"],
+  "contentType": "conceptual",
+  "expectedLabels": ["skyscraper", "drone", "city", "futuristic", "night"]
 }
 
 Tutorial Scene:
@@ -143,9 +192,11 @@ Just output the raw JSON object:
   "mood": "...",
   "action": "...",
   "keywords": ["...", "..."],
+  "entities": ["...", "..."],
   "primaryQuery": "...",
   "alternativeQueries": ["...", "..."],
-  "contentType": "..."
+  "contentType": "...",
+  "expectedLabels": ["...", "..."]
 }`;
 
 /**

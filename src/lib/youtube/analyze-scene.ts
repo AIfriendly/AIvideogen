@@ -5,6 +5,68 @@ import type { SceneAnalysis } from './types';
 import { ContentType } from './types';
 
 /**
+ * Negative terms to exclude from search results by content type
+ * These are appended to queries as -term to filter unwanted content
+ */
+const NEGATIVE_TERMS: Record<string, string[]> = {
+  gaming: ['reaction', 'review', 'tier list', 'ranking', 'commentary', 'explained'],
+  historical: ['reaction', 'explained', 'opinion', 'analysis', 'my thoughts'],
+  conceptual: ['reaction', 'review', 'vlog', 'my thoughts'],
+  nature: ['vlog', 'reaction', 'review', 'my experience'],
+  tutorial: ['reaction', 'opinion', 'rant', 'review'],
+  documentary: ['reaction', 'review', 'vlog'],
+  urban: ['vlog', 'reaction', 'review'],
+  abstract: ['reaction', 'review', 'vlog'],
+  'b-roll': ['reaction', 'vlog', 'my thoughts', 'review'],
+  gameplay: ['reaction', 'review', 'tier list', 'ranking', 'commentary']
+};
+
+/**
+ * B-roll quality terms by content type
+ * These improve search results to return pure footage
+ */
+const BROLL_QUALITY_TERMS: Record<string, string[]> = {
+  gaming: ['no commentary', 'gameplay only'],
+  historical: ['historical footage', 'documentary', 'archive footage'],
+  conceptual: ['cinematic', '4K', 'stock footage'],
+  nature: ['cinematic', '4K', 'wildlife documentary'],
+  tutorial: ['demonstration', 'no talking'],
+  documentary: ['documentary', 'footage'],
+  urban: ['cinematic', '4K', 'timelapse'],
+  abstract: ['cinematic', '4K', 'stock footage'],
+  'b-roll': ['cinematic', '4K', 'stock footage'],
+  gameplay: ['no commentary', 'gameplay only']
+};
+
+/**
+ * Generate enhanced query with negative terms and B-roll quality indicators
+ */
+function generateEnhancedQuery(primaryQuery: string, contentType: string): string {
+  const negativeTerms = NEGATIVE_TERMS[contentType] || NEGATIVE_TERMS['b-roll'];
+  const qualityTerms = BROLL_QUALITY_TERMS[contentType] || BROLL_QUALITY_TERMS['b-roll'];
+
+  // Add quality terms if not already present
+  let enhanced = primaryQuery;
+  for (const term of qualityTerms) {
+    if (!enhanced.toLowerCase().includes(term.toLowerCase())) {
+      enhanced += ` ${term}`;
+    }
+  }
+
+  // Add negative terms
+  const negatives = negativeTerms.map(term => `-${term}`).join(' ');
+  enhanced += ` ${negatives}`;
+
+  // Trim and limit length (YouTube has ~500 char limit)
+  enhanced = enhanced.trim();
+  if (enhanced.length > 450) {
+    enhanced = enhanced.substring(0, 450);
+  }
+
+  return enhanced;
+}
+
+/**
  * Scene Analysis Module
  *
  * This module provides intelligent scene text analysis using LLM to extract
@@ -218,6 +280,10 @@ function normalizeAnalysis(analysis: any): SceneAnalysis {
   const alternativeQueries = Array.isArray(analysis.alternativeQueries)
     ? analysis.alternativeQueries
     : [];
+  const entities = Array.isArray(analysis.entities) ? analysis.entities : [];
+  const expectedLabels = Array.isArray(analysis.expectedLabels)
+    ? analysis.expectedLabels
+    : [];
 
   // Validate and normalize content type
   let contentType: ContentType = ContentType.B_ROLL;
@@ -225,10 +291,39 @@ function normalizeAnalysis(analysis: any): SceneAnalysis {
   if (analysis.contentType && validTypes.includes(analysis.contentType)) {
     contentType = analysis.contentType as ContentType;
   } else if (analysis.contentType) {
-    console.warn(
-      `[SceneAnalyzer] Invalid contentType "${analysis.contentType}", defaulting to B_ROLL`
-    );
+    // Map common variations to valid content types
+    const typeMap: Record<string, ContentType> = {
+      'gaming': ContentType.GAMING,
+      'game': ContentType.GAMING,
+      'historical': ContentType.HISTORICAL,
+      'history': ContentType.HISTORICAL,
+      'conceptual': ContentType.CONCEPTUAL,
+      'concept': ContentType.CONCEPTUAL,
+      'nature': ContentType.NATURE,
+      'wildlife': ContentType.NATURE,
+      'tutorial': ContentType.TUTORIAL,
+      'documentary': ContentType.DOCUMENTARY,
+      'urban': ContentType.URBAN,
+      'city': ContentType.URBAN,
+      'abstract': ContentType.ABSTRACT,
+      'gameplay': ContentType.GAMEPLAY
+    };
+
+    const normalizedType = analysis.contentType.toLowerCase();
+    if (typeMap[normalizedType]) {
+      contentType = typeMap[normalizedType];
+    } else {
+      console.warn(
+        `[SceneAnalyzer] Invalid contentType "${analysis.contentType}", defaulting to B_ROLL`
+      );
+    }
   }
+
+  // Generate enhanced query with negative terms and B-roll quality indicators
+  const primaryQuery = analysis.primaryQuery || '';
+  const enhancedQuery = primaryQuery
+    ? generateEnhancedQuery(primaryQuery, contentType)
+    : '';
 
   return {
     mainSubject: analysis.mainSubject || '',
@@ -236,8 +331,11 @@ function normalizeAnalysis(analysis: any): SceneAnalysis {
     mood: analysis.mood || '',
     action: analysis.action || '',
     keywords,
-    primaryQuery: analysis.primaryQuery || '',
+    primaryQuery,
     alternativeQueries,
-    contentType
+    contentType,
+    entities,
+    enhancedQuery,
+    expectedLabels
   };
 }

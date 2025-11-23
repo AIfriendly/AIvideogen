@@ -169,6 +169,11 @@ export function createFallbackAnalysis(sceneText: string): SceneAnalysis {
   const keywords = extractKeywords(sceneText);
   const primaryQuery = keywords.slice(0, 4).join(' ');
 
+  // Generate a basic enhanced query with default B-roll terms
+  const enhancedQuery = primaryQuery
+    ? `${primaryQuery} cinematic 4K stock footage -reaction -vlog -my thoughts -review`
+    : '';
+
   return {
     mainSubject: keywords[0] || '',
     setting: keywords[1] || '',
@@ -177,6 +182,9 @@ export function createFallbackAnalysis(sceneText: string): SceneAnalysis {
     keywords: keywords,
     primaryQuery: primaryQuery,
     alternativeQueries: [],
-    contentType: ContentType.B_ROLL
+    contentType: ContentType.B_ROLL,
+    entities: [], // Empty for fallback (no entity extraction without LLM)
+    enhancedQuery: enhancedQuery,
+    expectedLabels: [] // Empty for fallback (no label generation without LLM)
   };
 }

@@ -79,7 +79,7 @@ export function ConfirmationModal({
 
         <div className="py-4">
           <p className="text-sm text-slate-300">
-            <strong className="text-white">{sceneCount} scenes</strong> will be assembled with your selected clips.
+            <strong className="text-white">{sceneCount} {sceneCount === 1 ? 'scene' : 'scenes'}</strong> will be assembled with your selected clips.
           </p>
 
           {/* Selection summary */}

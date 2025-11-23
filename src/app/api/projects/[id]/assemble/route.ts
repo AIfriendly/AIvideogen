@@ -98,6 +98,9 @@ export async function POST(
     }
 
     // Load all scenes with selections (JOIN on visual_suggestions)
+    // Note: INNER JOIN is intentional - if a suggestion is deleted after selection,
+    // the scene will not appear in results, triggering the validation error below.
+    // This ensures data integrity by requiring all selected clips to exist.
     const scenes = db.prepare(`
       SELECT
         s.id as sceneId,
@@ -128,7 +131,7 @@ export async function POST(
     }
 
     // Generate unique assembly job ID
-    const assemblyJobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const assemblyJobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
     // Update project status to 'editing' (valid current_step value)
     db.prepare(`

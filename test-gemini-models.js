@@ -5,7 +5,11 @@
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
+<<<<<<< Updated upstream
 const API_KEY = '';
+=======
+const API_KEY =  ';
+>>>>>>> Stashed changes
 
 async function testGeminiModels() {
   console.log('Testing Gemini API access...\n');

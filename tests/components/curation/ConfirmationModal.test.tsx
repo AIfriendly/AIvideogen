@@ -241,8 +241,8 @@ describe('[4.5-UNIT] ConfirmationModal Component Tests', () => {
         />
       );
 
-      // Then: Shows "1 scenes" (singular/plural handled by UI)
-      expect(screen.getByText('1 scenes')).toBeInTheDocument();
+      // Then: Shows "1 scene" (singular form)
+      expect(screen.getByText('1 scene')).toBeInTheDocument();
     });
 
     it('should handle large scene counts', () => {
