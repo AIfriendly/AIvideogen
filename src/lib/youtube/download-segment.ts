@@ -195,6 +195,7 @@ export async function downloadDefaultSegment(
       '--no-playlist',                                  // Don't download playlists
       '--no-warnings',                                  // Suppress warnings
       '--quiet',                                        // Quiet mode (errors only)
+      '--postprocessor-args', 'ffmpeg:-an',            // Story 3.7: Strip audio (AC35)
     ];
 
     console.log(`[Download] Starting download: videoId=${videoId}, duration=${segmentDuration}s, path=${sanitizedPath}`);
