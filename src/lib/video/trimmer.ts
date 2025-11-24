@@ -1,8 +1,13 @@
-// Video Trimmer - Scene video trimming logic
-// Story 5.2: Scene Video Trimming & Preparation
+/**
+ * Video Trimmer - Scene video trimming logic
+ * Story 5.2: Scene Video Trimming & Preparation
+ *
+ * Handles trimming video clips to match voiceover duration.
+ * Edge cases: long videos (trim), short videos (loop/extend).
+ */
 
 import { existsSync } from 'fs';
-import { AssemblyScene } from '../../src/types/assembly';
+import { AssemblyScene } from '@/types/assembly';
 import { FFmpegClient } from './ffmpeg';
 
 export interface TrimResult {
@@ -23,7 +28,7 @@ export class Trimmer {
     scene: AssemblyScene,
     outputDir: string
   ): Promise<string> {
-    // Get video path from defaultSegmentPath or construct from videoId
+    // Get video path from defaultSegmentPath
     const videoPath = scene.defaultSegmentPath || '';
 
     // Validate input file exists
@@ -126,7 +131,7 @@ export class Trimmer {
       const scene = scenes[i];
 
       if (onProgress) {
-        onProgress(scene.scene_number, scenes.length);
+        onProgress(scene.sceneNumber, scenes.length);
       }
 
       const outputPath = await this.trimScene(scene, outputDir);
@@ -143,14 +148,15 @@ export class Trimmer {
     scene: AssemblyScene,
     outputDir: string
   ): Promise<TrimResult> {
-    const videoDuration = await this.ffmpeg.getVideoDuration(scene.video_path);
+    const videoPath = scene.defaultSegmentPath || '';
+    const videoDuration = await this.ffmpeg.getVideoDuration(videoPath);
     const outputPath = await this.trimScene(scene, outputDir);
 
     return {
       outputPath,
       originalDuration: videoDuration,
-      trimmedDuration: scene.duration,
-      wasLooped: videoDuration < scene.duration
+      trimmedDuration: scene.clipDuration,
+      wasLooped: videoDuration < scene.clipDuration,
     };
   }
 }

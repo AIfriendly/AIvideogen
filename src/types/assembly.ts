@@ -69,11 +69,16 @@ export interface AssemblyJobResponse {
 export interface AssemblyScene {
   sceneId: string;
   sceneNumber: number;
+  scene_number: number; // Alias for backward compatibility with stubs
   scriptText: string;
+  script_text?: string; // Alias for backward compatibility
   audioFilePath: string;
+  audio_path: string; // Alias for backward compatibility
+  video_path: string; // Alias for backward compatibility
   selectedClipId: string;
   videoId: string;
   clipDuration: number;
+  duration: number; // Alias for backward compatibility
   defaultSegmentPath?: string;
 }
 
@@ -187,6 +192,15 @@ export interface AssemblyError {
   error: string;
   code: AssemblyErrorCode;
   details?: Record<string, unknown>;
+}
+
+/**
+ * Job progress update interface (for backward compatibility with stubs)
+ */
+export interface JobProgressUpdate {
+  stage: AssemblyStage;
+  progress: number;
+  current_scene?: number;
 }
 
 // ============================================================================
