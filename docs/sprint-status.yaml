@@ -76,9 +76,14 @@ development_status:
   4-3-video-preview-playback: done
   4-4-clip-selection-mechanism: done
   4-5-assembly-trigger-validation: done
-  4-6-workflow-integration-error-recovery: backlog
+  4-6-workflow-integration-error-recovery: done
   epic-4-retrospective: optional
 
   # Epic 5: Video Assembly & Output
-  epic-5: backlog
+  epic-5: parallel-contexted
+  5-1-video-processing-infrastructure: done
+  5-2-scene-video-trimming: done
+  5-3-video-concatenation-audio-overlay: done
+  5-4-automated-thumbnail-generation: backlog
+  5-5-export-ui-download-workflow: backlog
   epic-5-retrospective: optional
