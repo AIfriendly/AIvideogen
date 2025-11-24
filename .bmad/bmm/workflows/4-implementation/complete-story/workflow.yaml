@@ -73,13 +73,18 @@ context_documents:
     alias: "prd"
     required: true
 
+  - path: "{output_folder}/ux-design-specification.md"
+    alias: "ux-design-specification.md"
+    required: true
+
+
   - path: "{output_folder}/workflow-status.md"
     alias: "workflow_status"
     required: true
 
   - path: "{output_folder}/architecture.md"
     alias: "solution_architecture"
-    required: false
+    required: true
 
   # Tech spec will be discovered dynamically based on current epic
   - path: "{output_folder}/tech-spec-epic-{{epic_num}}.md"
@@ -106,7 +111,6 @@ variables:
 
   # ENHANCED MODE FEATURES (activate when enhancement_mode == 'enhanced')
   enable_self_learning: "{{enhancement_mode == 'enhanced'}}"
-  enable_parallel_testing: "{{enhancement_mode == 'enhanced'}}"
   enable_performance_checks: "{{enhancement_mode == 'enhanced'}}"
   enable_visual_testing: "{{enhancement_mode == 'enhanced'}}"
   enable_accessibility_validation: "{{enhancement_mode == 'enhanced'}}"
@@ -199,7 +203,7 @@ orchestration:
     condition: "Step 3 verdict == APPROVED"
     skip_if: "{skip_manual_approval}"
 
-  - name: "Step 6: Generate Story Context"
+  - name: "Step 6: Generate Story Context **MANDATORY** "
     agent: "SM"
     workflow: "story-context"
     description: "Assemble dynamic Story Context XML from latest docs and code"
@@ -219,7 +223,6 @@ orchestration:
           - generate_interfaces: "From story context"
           - create_file_structure: "Based on patterns"
           - setup_test_harness: "Test infrastructure"
-        parallel: true
 
       - name: "Step 7b: Core Implementation"
         description: "Implement business logic"
@@ -237,7 +240,6 @@ orchestration:
           - generate_test_cases: "From ACs"
           - implement_tests: "With mocking"
           - measure_coverage: "Target 80%+"
-        parallel: true
 
       - name: "Step 7d: Integration Testing"
         description: "Test component interactions"
@@ -315,8 +317,8 @@ orchestration:
       strategy: "{{enhancement_mode == 'enhanced' ? 'intelligent_retry' : 'standard_retry'}}"
       learn_from_success: "{{enable_self_learning}}"
 
-  - name: "Step 9: Comprehensive Testing (Enhanced with Parallel Execution)"
-    description: "Run all test suites in parallel for faster feedback"
+  - name: "Step 9: Comprehensive Testing"
+    description: "Run all test suites"
 
     # Standard mode: Just database tests
     standard_mode:
@@ -328,9 +330,9 @@ orchestration:
         - "Data migration verification"
         - "Constraints and indexes"
 
-    # Enhanced mode: Parallel comprehensive testing
-    parallel_test_suites:
-      enabled: "{{enable_parallel_testing}}"
+    # Enhanced mode: Sequential comprehensive testing
+    test_suites:
+      enabled: "{{enhancement_mode == 'enhanced'}}"
 
       - name: "Unit Tests"
         agent: "{{enable_dynamic_agents ? 'Amelia' : 'dev'}}"
@@ -466,7 +468,6 @@ orchestration:
     condition: "{{enable_auto_documentation}}"
     agent: "{{enable_dynamic_agents ? 'Paige' : 'dev'}}"
     description: "Generate and deploy all documentation"
-    parallel_execution: true
     documentation_tasks:
       - api_documentation:
           generate: "From code annotations"
@@ -571,7 +572,6 @@ feature_flag_providers:
 # - Workflow runs with original steps only
 #
 # Benefits of Enhanced Mode:
-# - 40% faster execution through parallel testing
 # - 60% fewer manual interventions via self-learning
 # - 80% better error recovery with categorization
 # - Automatic documentation and rollback plans

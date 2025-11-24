@@ -1,0 +1,239 @@
+# Story Contracts for Epic 5: Video Assembly & Output
+# Generated: 2025-11-24
+# Use this file for programmatic contract validation during parallel implementation
+
+epic_id: 5
+epic_title: "Video Assembly & Output"
+total_stories: 5
+merge_order: [5.1, 5.2, 5.3, 5.4, 5.5]
+
+shared_components:
+  types:
+    - path: "src/types/assembly.ts"
+      owner: "5.1"
+      exports: ["AssemblyJob", "AssemblyScene", "AssemblyRequest", "AssemblyResult", "ThumbnailOptions", "FFmpegProgress", "AssemblyError", "AssemblyErrorCode"]
+
+  utilities:
+    - path: "lib/video/ffmpeg.ts"
+      owner: "shared"
+      methods:
+        "5.1": ["getVideoDuration", "getAudioDuration", "probe"]
+        "5.2": ["trimToAudioDuration", "trimVideo"]
+        "5.3": ["concatenateVideos", "overlayAudio", "mergeAudioTracks"]
+        "5.4": ["extractFrame", "extractMultipleFrames"]
+
+    - path: "lib/video/assembler.ts"
+      owner: "shared"
+      methods:
+        "5.1": ["createJob", "updateJobProgress", "getJobStatus", "failJob", "completeJob"]
+        "5.2": ["trimAllScenes", "handleShortVideo", "handleLongVideo"]
+        "5.3": ["concatenateScenes", "overlayVoiceovers", "renderFinalVideo"]
+        "5.4": ["generateThumbnail"]
+
+  constants:
+    - path: "lib/video/constants.ts"
+      owner: "5.1"
+
+  database:
+    - table: "assembly_jobs"
+      owner: "5.1"
+      columns: ["id", "project_id", "status", "progress", "current_stage", "current_scene", "total_scenes", "error_message", "started_at", "completed_at", "created_at"]
+
+stories:
+  - id: "5.1"
+    title: "Video Processing Infrastructure Setup"
+
+    exclusive_create:
+      - "src/types/assembly.ts"
+      - "lib/video/ffmpeg.ts"
+      - "lib/video/constants.ts"
+      - "lib/video/assembler.ts"
+      - "lib/db/migrations/008_assembly_jobs.sql"
+      - "app/api/projects/[id]/assemble/route.ts"
+      - "app/api/projects/[id]/assembly-status/route.ts"
+      - "tests/unit/video/ffmpeg.test.ts"
+      - "tests/unit/video/assembler.test.ts"
+
+    exclusive_modify:
+      - path: "lib/db/queries.ts"
+        sections: ["Add assembly job query functions"]
+      - path: "lib/db/schema.sql"
+        sections: ["Add assembly_jobs table definition"]
+
+    read_only:
+      - "lib/db/client.ts"
+      - "src/types/database.ts"
+
+    database:
+      creates_tables: ["assembly_jobs"]
+      adds_columns:
+        projects: ["video_path", "thumbnail_path", "total_duration", "video_file_size"]
+
+    api_endpoints:
+      - endpoint: "POST /api/projects/[id]/assemble"
+        error_codes: ["INVALID_REQUEST", "PROJECT_NOT_FOUND", "SCENE_NOT_FOUND", "FILE_NOT_FOUND", "JOB_ALREADY_EXISTS"]
+      - endpoint: "GET /api/projects/[id]/assembly-status"
+        error_codes: ["PROJECT_NOT_FOUND", "JOB_NOT_FOUND"]
+
+    naming:
+      file_prefix: "assembly-"
+      component_prefix: "Assembly"
+      test_prefix: "assembly."
+
+  - id: "5.2"
+    title: "Scene Video Trimming & Preparation"
+
+    exclusive_create:
+      - "lib/video/trimmer.ts"
+      - "tests/unit/video/trimmer.test.ts"
+
+    exclusive_modify:
+      - path: "lib/video/ffmpeg.ts"
+        sections: ["Add trimToAudioDuration method", "Add trimVideo method"]
+      - path: "lib/video/assembler.ts"
+        sections: ["Add trimAllScenes method"]
+
+    read_only:
+      - "lib/video/constants.ts"
+      - "src/types/assembly.ts"
+      - "lib/db/client.ts"
+
+    database:
+      creates_tables: []
+      adds_columns: {}
+      reads: ["assembly_jobs", "scenes"]
+
+    api_endpoints: []
+
+    naming:
+      file_prefix: "trim-"
+      component_prefix: "Trim"
+      test_prefix: "trim."
+
+  - id: "5.3"
+    title: "Video Concatenation & Audio Overlay"
+
+    exclusive_create:
+      - "lib/video/concatenator.ts"
+      - "tests/unit/video/concatenator.test.ts"
+
+    exclusive_modify:
+      - path: "lib/video/ffmpeg.ts"
+        sections: ["Add concatenateVideos method", "Add overlayAudio method", "Add mergeAudioTracks method"]
+      - path: "lib/video/assembler.ts"
+        sections: ["Add concatenateScenes method", "Add overlayVoiceovers method", "Add renderFinalVideo method"]
+
+    read_only:
+      - "lib/video/constants.ts"
+      - "src/types/assembly.ts"
+      - "lib/db/client.ts"
+
+    database:
+      creates_tables: []
+      adds_columns: {}
+      reads: ["assembly_jobs", "scenes"]
+
+    api_endpoints: []
+
+    naming:
+      file_prefix: "concat-"
+      component_prefix: "Concat"
+      test_prefix: "concat."
+
+  - id: "5.4"
+    title: "Automated Thumbnail Generation"
+
+    exclusive_create:
+      - "lib/video/thumbnail.ts"
+      - "app/api/projects/[id]/generate-thumbnail/route.ts"
+      - "tests/unit/video/thumbnail.test.ts"
+
+    exclusive_modify:
+      - path: "lib/video/ffmpeg.ts"
+        sections: ["Add extractFrame method", "Add extractMultipleFrames method"]
+      - path: "lib/video/assembler.ts"
+        sections: ["Add generateThumbnail method"]
+
+    read_only:
+      - "lib/video/constants.ts"
+      - "src/types/assembly.ts"
+      - "lib/db/client.ts"
+
+    database:
+      creates_tables: []
+      adds_columns: {}
+      reads: ["assembly_jobs", "projects"]
+
+    api_endpoints:
+      - endpoint: "POST /api/projects/[id]/generate-thumbnail"
+        error_codes: ["INVALID_REQUEST", "PROJECT_NOT_FOUND", "FILE_NOT_FOUND", "FFMPEG_ERROR", "DISK_SPACE_ERROR"]
+
+    naming:
+      file_prefix: "thumb-"
+      component_prefix: "Thumbnail"
+      test_prefix: "thumbnail."
+
+  - id: "5.5"
+    title: "Export UI & Download Workflow"
+
+    exclusive_create:
+      - "app/projects/[id]/export/page.tsx"
+      - "app/projects/[id]/export/export-client.tsx"
+      - "components/assembly/AssemblyProgress.tsx"
+      - "components/assembly/VideoDownload.tsx"
+      - "components/assembly/ThumbnailPreview.tsx"
+      - "components/assembly/ExportSummary.tsx"
+      - "app/api/projects/[id]/export/route.ts"
+      - "stores/export-store.ts"
+      - "tests/unit/components/export.test.tsx"
+
+    exclusive_modify:
+      - path: "lib/db/queries.ts"
+        sections: ["Add getExportData query function"]
+
+    read_only:
+      - "lib/video/constants.ts"
+      - "src/types/assembly.ts"
+      - "lib/db/client.ts"
+      - "components/ui/button.tsx"
+      - "components/ui/card.tsx"
+
+    database:
+      creates_tables: []
+      adds_columns: {}
+      reads: ["assembly_jobs", "projects", "scenes"]
+
+    api_endpoints:
+      - endpoint: "GET /api/projects/[id]/export"
+        error_codes: ["PROJECT_NOT_FOUND", "FILE_NOT_FOUND", "JOB_NOT_FOUND"]
+
+    naming:
+      file_prefix: "export-"
+      component_prefix: "Export"
+      test_prefix: "export."
+
+collision_prevention:
+  merge_order: "Story 5.1 first (creates infrastructure), then 5.2, 5.3, 5.4, 5.5"
+
+  shared_file_rules:
+    ffmpeg.ts: "Each story adds its methods to designated sections"
+    assembler.ts: "Each story adds its methods to designated sections"
+
+  naming_prefixes:
+    "5.1": "assembly-"
+    "5.2": "trim-"
+    "5.3": "concat-"
+    "5.4": "thumb-"
+    "5.5": "export-"
+
+  database_rules:
+    migrations: "Only Story 5.1 creates migrations"
+    updates: "Stories 5.2-5.4 update job progress only"
+
+integration_tests:
+  after_merge:
+    - "End-to-end assembly pipeline"
+    - "Progress tracking through all stages"
+    - "Error recovery scenarios"
+    - "File integrity verification"
+    - "Thumbnail quality validation"

@@ -5,9 +5,12 @@ _Updated on 2025-11-04 to include full application scope (Project Management UI 
 _Updated on 2025-11-05 to include Epic 2 (Voice Selection + Script Generation + Voiceover Preview)_
 _Updated on 2025-11-13 to include Epic 3 (Visual Sourcing Loading UI + Empty Clip State)_
 _Updated on 2025-11-13 to add comprehensive UX patterns, accessibility standards, and testing strategy_
+_Updated on 2025-11-18 to complete Epic 4 (Visual Curation Interface) with all 6 stories fully specified_
+_Updated on 2025-11-22 to add Silent Video Indicator for VideoPreviewPlayer (audio stripped per Story 3.7)_
+_Updated on 2025-11-23 to add Epic 5 (Video Assembly Progress UI + Export Page UI) - FULL MVP COMPLETE_
 _Generated using BMad Method - Create UX Design Workflow v1.0_
 
-**Version:** 3.2 (Production-Ready: Epic 1-4 Complete, Patterns & Accessibility Finalized)
+**Version:** 3.5 (Production-Ready: Epic 1-5 Complete - Full MVP UX Specification)
 
 ---
 
@@ -63,6 +66,9 @@ _Generated using BMad Method - Create UX Design Workflow v1.0_
 - VideoPreviewThumbnail (video clip preview component)
 - SceneCard (scene script + clip grid container)
 - ProgressTracker (scene completion indicator)
+- VisualSuggestionGallery (clip suggestions grid with thumbnails, metadata, download status) **[Epic 4]**
+- VideoPreviewPlayer (HTML5 video player with controls, keyboard shortcuts, fallback to YouTube) **[Epic 4]**
+- AssemblyTriggerButton (sticky "Assemble Video" button with validation and confirmation modal) **[Epic 4]**
 
 ### 1.2 UX Pattern Consistency Rules
 
@@ -671,18 +677,19 @@ graph LR
 9. **Video Assembly** (Epic 5) - Final video generation (automatic)
 10. **Download/Share** (Epic 5) - Get final video + thumbnail
 
-**Current Scope of UX Spec (Version 3.2):**
+**Current Scope of UX Spec (Version 3.3):**
 - ✅ **Project Management UI** (Story 1.6) - Fully specified (Section 5)
 - ✅ **Chat Interface** (Epic 1) - Fully specified (Section 6.1-6.4)
 - ✅ **Voice Selection UI** (Epic 2, Story 2.3) - Fully specified (Section 6.5)
 - ✅ **Script Generation UI** (Epic 2, Story 2.4) - Fully specified (Section 6.6)
 - ✅ **Script & Voiceover Preview UI** (Epic 2, Story 2.6) - Fully specified (Section 6.7)
 - ✅ **Visual Sourcing Loading UI** (Epic 3, Story 3.5) - Fully specified (Section 6.8)
-- ✅ **Visual Curation UI** (Epic 4) - Fully specified (Section 7)
+- ✅ **Visual Curation UI** (Epic 4, Stories 4.1-4.6) - Fully specified (Section 7 + Section 7.5 + Components 8.12-8.14) + Interactive mockup (ux-epic-4-mockup.html)
+- ✅ **Video Assembly Progress UI** (Epic 5, Stories 5.1-5.4) - Fully specified (Section 7.6) - Detailed scene-by-scene progress dashboard
+- ✅ **Export Page UI** (Epic 5, Story 5.5) - Fully specified (Section 7.7) - Showcase layout with video + thumbnail downloads
 - ✅ **UX Pattern Consistency** - Fully specified (Section 1.2)
 - ✅ **Accessibility Standards** - WCAG 2.1 AA with testing strategy (Section 3.5)
 - ✅ **Touch Targets & Responsive Design** - 44px minimum, breakpoints defined (Section 3.4)
-- 🔄 **Video Assembly & Download UI** (Epic 5) - To be designed in future iteration
 
 ---
 
@@ -2098,6 +2105,642 @@ Similar to Section 6.6 (Script Generation Loading), but with scene-by-scene prog
      - **Option B:** Return to Script Preview (Section 6.7) and regenerate script with different content
      - **Option C (Future):** Use manual search to find clips for this scene
 
+### 7.5 Workflow Integration & Navigation (Epic 4, Story 4.6)
+
+**Purpose:** Integrate Visual Curation into project workflow with seamless navigation and error recovery
+
+**Navigation Flow:**
+```
+Epic 2: Voiceover Preview → [Continue Button] → Epic 3: Visual Sourcing → [Auto-Navigate] → Epic 4: Visual Curation → [Assemble Button] → Epic 5: Video Assembly
+```
+
+**Entry Points:**
+
+1. **From Voiceover Preview (Epic 2, Story 2.6):**
+   - After voiceover generation completes
+   - "Continue to Visual Curation" button appears in script preview page
+   - Button navigates to `/projects/[id]/visual-curation`
+   - Updates `projects.current_step = 'visual-sourcing'` first (triggers Epic 3)
+
+2. **Auto-Navigate from Visual Sourcing (Epic 3, Story 3.5):**
+   - After visual sourcing completes (all scenes processed OR partial success)
+   - 0.5s delay, then auto-navigate to `/projects/[id]/visual-curation`
+   - Updates `projects.current_step = 'visual-curation'`
+
+3. **Direct URL Access:**
+   - User can navigate directly to `/projects/[id]/visual-curation`
+   - **Validation:** Check `projects.current_step = 'visual-curation'`
+   - **If wrong step:** Redirect to correct workflow step with warning toast:
+     - If `current_step = 'chat'` → Redirect to `/projects/[id]` with message: "Complete topic discussion first"
+     - If `current_step = 'voice'` → Redirect to `/projects/[id]/voice-selection` with message: "Complete voice selection first"
+     - If `current_step = 'script'` → Redirect to `/projects/[id]/script-preview` with message: "Review script first"
+     - If `current_step = 'visual-sourcing'` → Redirect to `/projects/[id]/visual-sourcing` with message: "Visual sourcing in progress"
+
+4. **From Project Page:**
+   - If `projects.current_step = 'visual-curation'`
+   - Show "Resume Visual Curation" button
+   - Navigate to `/projects/[id]/visual-curation`
+
+**Navigation Controls:**
+
+1. **Header Breadcrumbs:**
+   - Display: `Project → Script → Voiceover → Visual Curation`
+   - Clickable links to previous steps (if user wants to review)
+   - Current step highlighted (Indigo 500)
+
+2. **"Back to Script Preview" Link:**
+   - Located at top of page (below header, above scenes)
+   - Style: Secondary ghost button with ← back arrow icon
+   - Action: Navigate to `/projects/[id]/script-preview` (Epic 2, Story 2.6)
+   - Tooltip: "Review script and voiceover before continuing"
+
+3. **"Regenerate Visuals" Button:**
+   - Located next to "Back to Script Preview" link
+   - Style: Secondary ghost button with 🔄 refresh icon
+   - Action: Trigger POST `/api/projects/[id]/generate-visuals` to re-run Epic 3
+   - Confirmation modal: "Regenerate visual suggestions? This will replace current suggestions with new searches."
+   - Loading state: Shows visual sourcing loading screen (Section 6.8)
+   - Use case: User unsatisfied with current clip suggestions
+
+**Session Persistence (localStorage):**
+
+1. **Scroll Position:**
+   - Save scroll position when user scrolls curation page
+   - Key: `curation-scroll-${projectId}`
+   - Restore scroll position on page reload
+   - Clear on navigation away from page
+
+2. **Preview State:**
+   - Save which clip user last previewed (if any)
+   - Key: `curation-preview-${projectId}`
+   - Value: `{sceneNumber: X, suggestionId: Y}`
+   - Use case: User reloads page while previewing → restore preview state (optional)
+
+3. **Selection State:**
+   - **Primary:** Selections stored in Zustand store (in-memory, session-only)
+   - **Backup:** On selection change → save to localStorage
+   - Key: `curation-selections-${projectId}`
+   - Value: `{scene1: clipId, scene2: clipId, ...}`
+   - On mount → Check localStorage, restore selections if Zustand store empty
+   - Sync selections to database via POST `/api/projects/[id]/select-clip` (Story 4.4)
+
+**Unsaved Changes Warning:**
+
+- **Trigger:** User navigates away with incomplete selections (any scene missing clip AND not skipped)
+- **Warning Modal:**
+  - Heading: "You haven't selected clips for all scenes"
+  - Message: "You've selected clips for {X} out of {N} scenes. Your progress will be saved, but you'll need to return to complete curation."
+  - Buttons:
+    - **"Stay and Continue"** (primary) → Close modal, stay on page
+    - **"Leave Anyway"** (secondary ghost) → Navigate away
+- **Implementation:** Use `beforeunload` event OR Next.js router change detection
+
+**Edge Case Handling:**
+
+1. **Scene Missing Voiceover:**
+   - **Check:** `scenes.audio_file_path` is NULL
+   - **Display:** Error message in scene card: "Voiceover unavailable for this scene. Regenerate voiceovers to continue."
+   - **Action Button:** "Regenerate Voiceovers" → Navigate to Epic 2 voiceover generation
+
+2. **Visual Suggestions Deleted/Expired:**
+   - **Check:** GET `/api/projects/[id]/visual-suggestions` returns 0 results for scene
+   - **Display:** Empty state (Section 7.4) with "Retry Visual Sourcing" button
+   - **Action:** Trigger POST `/api/projects/[id]/generate-visuals` to re-run Epic 3
+
+3. **Script Modified After Visual Sourcing:**
+   - **Detection:** Compare `scenes.script_text` timestamp with `visual_suggestions.created_at`
+   - **Warning:** Show info banner: "⚠ Script was modified after visual suggestions were generated. Suggestions may not match current script. Regenerate?"
+   - **Action Button:** "Regenerate Visuals" to update suggestions
+
+4. **Missing Downloaded Segments:**
+   - **Check:** `visual_suggestions.download_status = 'error'` OR `default_segment_path` is NULL
+   - **Display:** Download status badge shows error icon (⚠)
+   - **Fallback:** VideoPreviewPlayer uses YouTube iframe embed instead (Section 8.13)
+   - **User Impact:** Preview still works, but loads from YouTube (not instant)
+
+**Workflow State Management:**
+
+- **Current Step Tracking:** `projects.current_step` column
+- **Valid Progression:**
+  ```
+  'chat' → 'voice' → 'script' → 'visual-sourcing' → 'visual-curation' → 'assembly' → 'complete'
+  ```
+- **Update Triggers:**
+  - Enter Visual Curation page → Ensure `current_step = 'visual-curation'`
+  - Click "Assemble Video" (Story 4.5) → Update `current_step = 'assembly'`
+- **Validation:** Server-side check on API calls to prevent out-of-order workflow access
+
+**Performance Optimizations:**
+
+1. **Lazy Load Suggestions:** Fetch visual suggestions for visible scenes first (viewport-based)
+2. **Infinite Scroll (Future):** For projects with 10+ scenes, load scenes in batches
+3. **Image Optimization:** Use Next.js Image component for YouTube thumbnails with blur placeholder
+4. **Debounced Selection:** Save selections to database with 500ms debounce (avoid excessive API calls)
+
+---
+
+## 7.6. Video Assembly Progress UI (Epic 5, Stories 5.1-5.4)
+
+### 7.6.1 Overview
+
+**Purpose:** Provide detailed progress feedback during video assembly process, keeping users informed while their video is being created.
+
+**User Value:** Transparency builds trust - creators see exactly what's happening with their video at each stage. Detailed progress reduces anxiety and sets accurate expectations for completion time.
+
+**Key Features:**
+- Scene-by-scene progress tracking
+- Detailed stage messages for each processing phase
+- Overall progress bar with percentage
+- Estimated time remaining
+- Error handling with retry mechanism
+- Auto-navigation to Export page on completion
+
+### 7.6.2 Visual Design
+
+**Video Assembly Progress Screen:**
+
+```
+┌─────────────────────────────────────┐
+│                                     │
+│     Assembling Your Video           │  <- Main header
+│                                     │
+│     ━━━━━━━━━━━━━━━━━━━━━ 67%       │  <- Overall progress bar
+│     Estimated: 1:23 remaining       │  <- ETA
+│                                     │
+│  ┌─────────────────────────────┐   │
+│  │ Scene 1         ✓ Complete  │   │  <- Scene progress cards
+│  │ Scene 2         ✓ Complete  │   │
+│  │ Scene 3         ⏳ Processing│   │  <- Current scene
+│  │   └── Overlaying audio...   │   │  <- Stage detail
+│  │ Scene 4         ○ Pending   │   │
+│  │ Scene 5         ○ Pending   │   │
+│  └─────────────────────────────┘   │
+│                                     │
+│     Generating thumbnail...         │  <- Final stage
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Assembly Progress Container:**
+- **Position:** Full-screen modal overlay OR dedicated page at `/projects/:id/assembly`
+- **Background:** `#0f172a` (Slate 900)
+- **Display:** Flex, center aligned
+- **Max Width:** 600px (centered)
+- **Padding:** 48px
+
+**Main Header:**
+- **Text:** "Assembling Your Video"
+- **Font Size:** 1.5rem (24px)
+- **Font Weight:** 600 (semi-bold)
+- **Color:** `#f8fafc` (Slate 50)
+- **Margin Bottom:** 24px (lg)
+- **Text Align:** Center
+
+**Overall Progress Bar:**
+- **Width:** 100%
+- **Height:** 8px
+- **Background:** `#334155` (Slate 700)
+- **Border Radius:** 4px
+- **Fill:** Linear gradient (`#6366f1` → `#8b5cf6`)
+- **Animation:** Smooth width transition (0.3s ease)
+
+**Percentage Display:**
+- **Position:** Right of progress bar
+- **Font Size:** 1.125rem (18px)
+- **Font Weight:** 600
+- **Color:** `#6366f1` (Indigo 500)
+- **Format:** "67%"
+
+**Estimated Time Remaining:**
+- **Font Size:** 0.875rem (14px)
+- **Color:** `#94a3b8` (Slate 400)
+- **Margin Top:** 8px
+- **Format:** "Estimated: 1:23 remaining" or "Less than a minute remaining"
+- **Icon:** Clock icon (⏱) optional
+
+**Scene Progress List:**
+- **Background:** `#1e293b` (Slate 800)
+- **Border:** 1px solid `#334155` (Slate 700)
+- **Border Radius:** 12px
+- **Padding:** 16px
+- **Margin:** 24px 0
+- **Max Height:** 300px (scrollable if many scenes)
+
+**Scene Progress Item:**
+- **Display:** Flex row, space-between
+- **Padding:** 12px 0
+- **Border Bottom:** 1px solid `#334155` (Slate 700) - except last
+
+**Scene Progress Item Content:**
+- **Left:** Scene name ("Scene 1", "Scene 2", etc.)
+  - Font Size: 0.875rem (14px)
+  - Color: `#f8fafc` (Slate 50)
+- **Right:** Status indicator
+
+**Status Indicators:**
+
+**✓ Complete:**
+- **Icon:** Green checkmark (✓)
+- **Color:** `#10b981` (Emerald 500)
+- **Text:** "Complete"
+
+**⏳ Processing:**
+- **Icon:** Spinning loader or hourglass
+- **Color:** `#6366f1` (Indigo 500)
+- **Text:** "Processing"
+- **Animation:** Spinner rotation
+
+**○ Pending:**
+- **Icon:** Empty circle (○)
+- **Color:** `#94a3b8` (Slate 400)
+- **Text:** "Pending"
+
+**Stage Detail (for current scene):**
+- **Display:** Indented below scene name
+- **Font Size:** 0.75rem (12px)
+- **Color:** `#cbd5e1` (Slate 300)
+- **Icon:** └── arrow indicator
+- **Text:** Current operation ("Trimming video...", "Overlaying audio...", etc.)
+- **Animation:** Subtle pulse or dots animation
+
+**Stage Messages (Cycle for each scene):**
+1. "Downloading clip..." (if needed)
+2. "Trimming to voiceover duration..."
+3. "Overlaying audio..."
+4. "Encoding scene..."
+
+**Final Stages (after all scenes):**
+1. "Concatenating scenes..."
+2. "Rendering final video..."
+3. "Generating thumbnail..."
+4. "Finalizing..."
+
+**Thumbnail Generation Indicator:**
+- **Position:** Below scene list
+- **Text:** "Generating thumbnail..."
+- **Font Size:** 0.875rem (14px)
+- **Color:** `#cbd5e1` (Slate 300)
+- **Icon:** Image icon (🖼) or spinner
+- **Visibility:** Only shown during thumbnail generation phase
+
+### 7.6.3 Interaction Patterns
+
+**Assembly Progress Flow:**
+1. User clicks "Assemble Video" from Visual Curation (Section 7.5)
+2. System navigates to Assembly Progress page
+3. Overall progress bar starts at 0%
+4. Each scene processes sequentially:
+   a. Scene status changes from Pending → Processing
+   b. Stage detail shows current operation
+   c. Scene completes → status changes to Complete (✓)
+   d. Progress bar updates (e.g., 20% per scene for 5 scenes)
+5. After all scenes: "Concatenating scenes..." → "Generating thumbnail..."
+6. Progress reaches 100%
+7. Brief success animation (optional: checkmark, confetti)
+8. Auto-navigate to Export Page (Section 7.7) after 1 second delay
+
+**No User Interaction (Read-Only):**
+- Assembly screen is informational only
+- No cancel button (process is automatic and cannot be interrupted safely)
+- User can navigate away (assembly continues in background)
+- Return shows current progress state
+
+**ETA Calculation:**
+- Initial estimate based on scene count and average processing time
+- Updates dynamically as scenes complete (learns actual pace)
+- Minimum display: "Less than a minute remaining"
+
+### 7.6.4 States
+
+**Processing (Normal):**
+- Progress bar advancing
+- Scenes completing sequentially
+- ETA updating
+- Stage messages cycling
+
+**Processing (Final Stage):**
+- All scenes complete (✓)
+- "Concatenating scenes..." or "Generating thumbnail..."
+- Progress bar at 80-99%
+- ETA: "Almost done..."
+
+**Success (Completion):**
+- Progress bar at 100%
+- All scenes show ✓ Complete
+- Success message: "Your video is ready!"
+- Checkmark animation (green, centered)
+- Auto-navigate to Export Page after 1 second
+
+**Error State:**
+- Progress bar stops
+- Error icon (red circle with X) on failed scene
+- Scene status: "✗ Failed"
+- Error message below: "FFmpeg encoding failed" or specific error
+- **Retry Button** appears:
+  - Style: Primary button
+  - Text: "Retry Assembly"
+  - Action: Retries from failed scene (not from beginning)
+- **Back Button:**
+  - Style: Ghost button
+  - Text: "Back to Visual Curation"
+  - Action: Returns to Visual Curation for clip changes
+
+**Network/Connection Error:**
+- Error message: "Connection lost. Assembly will resume when reconnected."
+- Spinner continues (optimistic)
+- Auto-retry when connection restored
+
+### 7.6.5 Accessibility
+
+- **ARIA Live Region:** `aria-live="polite"` for progress updates
+- **Screen Reader Announcements:**
+  - "Assembling video, 20% complete, Scene 1 finished"
+  - "Scene 3 processing, trimming video"
+  - "Video assembly complete, navigating to download page"
+- **Progress Bar:** `role="progressbar"` with `aria-valuenow`, `aria-valuemin`, `aria-valuemax`
+- **Focus Management:** Focus on error message/retry button if error occurs
+
+---
+
+## 7.7. Export Page UI (Epic 5, Story 5.5)
+
+### 7.7.1 Overview
+
+**Purpose:** Display completed video and thumbnail with download options, celebrating the user's completed creation.
+
+**User Value:** Clear, satisfying conclusion to the video creation workflow. Easy access to final outputs with all relevant metadata. Encourages users to create more videos.
+
+**Key Features:**
+- Large video player showcasing final output
+- Thumbnail preview in sidebar
+- Download buttons for video and thumbnail
+- Video metadata display (duration, size, resolution)
+- Project summary
+- "Create New Video" CTA for retention
+
+### 7.7.2 Visual Design
+
+**Export Page Layout (Showcase Style):**
+
+```
+┌─────────────────────────────────────────────────────┐
+│  🎉 Your Video is Ready!                            │  <- Header
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  ┌───────────────────────────┐  ┌───────────────┐  │
+│  │                           │  │               │  │
+│  │                           │  │  Thumbnail    │  │
+│  │      Video Player         │  │   Preview     │  │
+│  │       (16:9)              │  │               │  │
+│  │                           │  │ [Download]    │  │
+│  │                           │  │               │  │
+│  └───────────────────────────┘  └───────────────┘  │
+│                                                     │
+│  [▼ Download Video]                                 │  <- Primary CTA
+│                                                     │
+│  ┌─────────────────────────────────────────────┐   │
+│  │ Duration: 2:34  |  Size: 45 MB  |  720p     │   │  <- Metadata
+│  │ Topic: Mars Colonization  |  5 Scenes       │   │
+│  └─────────────────────────────────────────────┘   │
+│                                                     │
+│  [+ Create New Video]        [← Back to Curation]  │  <- Actions
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+**Export Page Container:**
+- **URL:** `/projects/:id/export`
+- **Max Width:** 1200px (centered)
+- **Padding:** 32px (lg)
+- **Background:** `#0f172a` (Slate 900)
+
+**Header:**
+- **Text:** "🎉 Your Video is Ready!"
+- **Font Size:** 1.5rem (24px)
+- **Font Weight:** 600 (semi-bold)
+- **Color:** `#f8fafc` (Slate 50)
+- **Margin Bottom:** 24px (lg)
+- **Icon:** Party popper emoji (🎉) for celebration
+
+**Main Content Layout:**
+- **Display:** CSS Grid
+- **Columns:** `2fr 1fr` (Video 66%, Thumbnail 33%)
+- **Gap:** 24px (lg)
+- **Margin Bottom:** 24px
+
+**Video Player Section:**
+- **Aspect Ratio:** 16:9
+- **Background:** `#000000` (pure black for video contrast)
+- **Border Radius:** 12px
+- **Box Shadow:** 0 4px 12px rgba(0,0,0,0.4)
+- **Overflow:** Hidden
+
+**Video Player Controls:**
+- **Type:** HTML5 video with native controls
+- **Controls:** Play/pause, progress bar, volume, fullscreen
+- **Autoplay:** No (user initiates playback)
+- **Poster:** First frame of video or generated thumbnail
+
+**Thumbnail Preview Section:**
+- **Background:** `#1e293b` (Slate 800)
+- **Border:** 1px solid `#334155` (Slate 700)
+- **Border Radius:** 12px
+- **Padding:** 16px
+- **Display:** Flex column
+
+**Thumbnail Image:**
+- **Aspect Ratio:** 16:9
+- **Border Radius:** 8px
+- **Max Width:** 100%
+- **Object Fit:** Cover
+- **Box Shadow:** 0 2px 8px rgba(0,0,0,0.3)
+
+**Thumbnail Label:**
+- **Text:** "Thumbnail"
+- **Font Size:** 0.875rem (14px)
+- **Font Weight:** 600
+- **Color:** `#cbd5e1` (Slate 300)
+- **Margin Bottom:** 12px
+
+**Thumbnail Download Button:**
+- **Style:** Secondary button (full width)
+- **Background:** Transparent
+- **Border:** 1px solid `#6366f1` (Indigo 500)
+- **Color:** `#6366f1` (Indigo 500)
+- **Padding:** 8px 16px
+- **Border Radius:** 6px
+- **Margin Top:** 12px
+- **Icon:** Download icon (↓) before text
+- **Text:** "Download Thumbnail"
+- **Hover:** Background `#334155` (Slate 700, 30% opacity)
+
+**Primary Download Button (Video):**
+- **Position:** Below video player, full width of video section
+- **Style:** Primary button (large)
+- **Background:** `#6366f1` (Indigo 500)
+- **Color:** White
+- **Padding:** 14px 32px
+- **Border Radius:** 8px
+- **Font Size:** 1rem (16px)
+- **Font Weight:** 600
+- **Icon:** Download icon (↓) before text
+- **Text:** "Download Video"
+- **Hover:** Darker indigo (`#4f46e5`)
+- **Box Shadow:** 0 4px 12px rgba(99, 102, 241, 0.3)
+
+**Metadata Card:**
+- **Background:** `#1e293b` (Slate 800)
+- **Border:** 1px solid `#334155` (Slate 700)
+- **Border Radius:** 8px
+- **Padding:** 16px
+- **Margin Top:** 24px
+- **Display:** Flex row, wrap, justify center
+- **Gap:** 24px
+
+**Metadata Items:**
+- **Format:** Icon + Label + Value
+- **Font Size:** 0.875rem (14px)
+- **Color:** Label `#94a3b8` (Slate 400), Value `#f8fafc` (Slate 50)
+- **Items:**
+  - **Duration:** ⏱ "Duration: 2:34"
+  - **File Size:** 📁 "Size: 45 MB"
+  - **Resolution:** 🖥 "Resolution: 1280x720"
+  - **Topic:** 📝 "Topic: Mars Colonization"
+  - **Scenes:** 🎬 "Scenes: 5"
+
+**Action Buttons (Bottom):**
+- **Display:** Flex row, space-between
+- **Margin Top:** 32px
+
+**"Create New Video" Button:**
+- **Style:** Primary button
+- **Background:** `#6366f1` (Indigo 500)
+- **Color:** White
+- **Padding:** 10px 24px
+- **Border Radius:** 6px
+- **Icon:** Plus icon (+) before text
+- **Text:** "Create New Video"
+- **Action:** Creates new project, navigates to empty chat
+
+**"Back to Curation" Button:**
+- **Style:** Ghost button
+- **Background:** Transparent
+- **Color:** `#cbd5e1` (Slate 300)
+- **Padding:** 10px 24px
+- **Border Radius:** 6px
+- **Icon:** Arrow left (←) before text
+- **Text:** "Back to Curation"
+- **Action:** Returns to Visual Curation page (for re-selection if needed)
+
+### 7.7.3 Interaction Patterns
+
+**Arriving at Export Page:**
+1. User auto-navigated from Assembly Progress after completion
+2. Video player loads with final video (not autoplaying)
+3. Thumbnail preview loads
+4. Metadata populated from project/video data
+5. Download buttons active immediately
+
+**Downloading Video:**
+1. User clicks "Download Video" button
+2. Browser initiates download
+3. Filename: `{video-title}-sanitized.mp4` (e.g., "mars-colonization.mp4")
+4. File saves to user's Downloads folder
+5. Success toast: "Video downloaded successfully"
+
+**Downloading Thumbnail:**
+1. User clicks "Download Thumbnail" button
+2. Browser initiates download
+3. Filename: `{video-title}-thumbnail.jpg`
+4. Success toast: "Thumbnail downloaded successfully"
+
+**Filename Sanitization:**
+- Replace spaces with hyphens
+- Remove special characters (!@#$%^&*()+=)
+- Lowercase all characters
+- Truncate to 50 characters
+- Example: "The Best Mars Facts! (2024)" → "the-best-mars-facts-2024.mp4"
+
+**Creating New Video:**
+1. User clicks "Create New Video"
+2. System creates new project in database
+3. System navigates to `/projects/:newId` (empty chat)
+4. Sidebar updates with new project at top
+
+**Returning to Curation:**
+1. User clicks "Back to Curation"
+2. System navigates to `/projects/:id/visual-curation`
+3. User can change clip selections and re-assemble
+
+### 7.7.4 States
+
+**Normal (Loaded):**
+- Video player ready with final video
+- Thumbnail preview loaded
+- All metadata displayed
+- Download buttons enabled
+- Action buttons visible
+
+**Loading:**
+- Skeleton loaders for video player and thumbnail
+- Metadata shows "Loading..."
+- Download buttons disabled
+- Loading spinner in place of content
+
+**Download in Progress:**
+- Button shows loading spinner
+- Button text changes to "Downloading..."
+- Button disabled until download initiates
+- Progress indication (browser-native)
+
+**Error (Video Not Found):**
+- Video player shows error state: "Video file not found"
+- Download button disabled
+- Error message: "Assembly may have failed. Return to Visual Curation?"
+- Retry assembly button
+
+**Error (Thumbnail Not Found):**
+- Thumbnail preview shows placeholder: "Thumbnail unavailable"
+- Thumbnail download button disabled
+- Video download still works
+
+### 7.7.5 Accessibility
+
+- **Video Player:** Native HTML5 controls (accessible by default)
+- **Keyboard Navigation:**
+  - Tab to video player controls
+  - Tab to download buttons
+  - Tab to action buttons
+- **ARIA Labels:**
+  - Download Video: `aria-label="Download video file, 45 megabytes"`
+  - Download Thumbnail: `aria-label="Download thumbnail image"`
+  - Video Player: `aria-label="Final video preview, duration 2 minutes 34 seconds"`
+- **Screen Reader Announcements:**
+  - On page load: "Your video is ready. Press Tab to navigate to download options."
+  - On download: "Video download started"
+- **Focus:** Auto-focus on "Download Video" button on page load
+- **Alt Text:** Thumbnail image: `alt="{video-title} thumbnail, 1920 by 1080 pixels"`
+
+### 7.7.6 Responsive Design
+
+**Desktop (1024px+):**
+- Two-column layout (Video + Thumbnail sidebar)
+- Video player 66% width
+- Metadata in single row
+
+**Tablet (768-1023px):**
+- Single column layout
+- Video player full width
+- Thumbnail below video (smaller, 50% width, centered)
+- Metadata in two rows
+
+**Mobile (<768px):**
+- Single column, stacked layout
+- Video player full width
+- Thumbnail full width below
+- Metadata stacked vertically
+- Buttons full width, stacked
+
 ---
 
 ## 8. Component Library
@@ -2472,6 +3115,260 @@ Similar to Section 6.6 (Script Generation Loading), but with scene-by-scene prog
 - Keyboard: Tab to controls, Space/Enter for play/pause, arrow keys for scrubbing
 - Screen reader: Announces playback state, time remaining, volume level
 - Focus indicators visible on all controls
+
+### 8.12 VisualSuggestionGallery Component (Epic 4, Story 4.2)
+
+**Purpose:** Display grid of AI-suggested video clips for each scene with thumbnails, metadata, and download status indicators
+
+**Anatomy:**
+- Grid container (CSS Grid, responsive columns)
+- Suggestion cards (5-8 per scene)
+- Each card contains:
+  - YouTube thumbnail image (16:9 aspect ratio)
+  - Video metadata overlay (title, channel, duration)
+  - Download status indicator badge (pending/downloading/complete/error icon)
+  - Play icon overlay (centered)
+  - Rank indicator (optional, top-left: #1, #2, etc.)
+  - Selection state (checkmark, border highlight, glow)
+- Loading skeleton placeholders
+- Empty state message (if 0 suggestions)
+- Retry button (if visual sourcing failed)
+
+**States:**
+- **Loading:** Skeleton placeholders (5-8 cards) with shimmer animation
+- **Loaded:** All suggestion cards visible with thumbnails, metadata, download status
+- **Empty (No Suggestions):** Empty state message: "No clips found for this scene. The script may be too abstract or specific. Try editing the script text." + "Retry Visual Sourcing" button
+- **Error (Failed Load):** Error message + "Retry" button
+- **Partial (Some Downloaded):** Mix of complete/downloading/pending status indicators
+
+**Download Status Indicators:**
+- **Pending:** Gray icon (⏳ hourglass), tooltip: "Queued for download"
+- **Downloading:** Indigo spinner icon, tooltip: "Downloading segment... X%"
+- **Complete:** Green checkmark icon (✓), tooltip: "Ready to preview"
+- **Error:** Red warning icon (⚠), tooltip: "Download failed. Will use YouTube embed."
+
+**Variants:**
+- Grid: 3 columns (desktop 1024px+), 2 columns (tablet 768px+), 1 column (mobile)
+- Card size: Standard (220px width), Compact (180px width for smaller screens)
+
+**Behavior:**
+- On mount → Fetch visual suggestions from GET /api/projects/[id]/visual-suggestions?scene={sceneNumber}
+- Loading → Show skeleton placeholders
+- Loaded → Render suggestion cards ordered by rank (1-8)
+- Hover card → Scale 1.02, border highlight, play icon prominent
+- Click card → Toggle selection (if not playing video)
+- Download status updates → Real-time badge updates as segments download
+- Empty state → Show message + "Retry Visual Sourcing" button
+- Click retry → Call POST /api/projects/[id]/generate-visuals to re-run Epic 3
+
+**Accessibility:**
+- ARIA role: `grid` with label "Video clip suggestions for scene {number}"
+- Each card: ARIA role `gridcell`, ARIA label: "Video option {rank}, {title}, {duration}, download status: {status}, {selected/not selected}"
+- Keyboard: Tab to navigate cards, Enter/Space to select, arrow keys to move between cards
+- Screen reader: Announces selection state changes, download status updates
+- Download status badge: ARIA live region (polite) for status updates
+
+### 8.13 VideoPreviewPlayer Component (Epic 4, Story 4.3)
+
+**Purpose:** HTML5 video player for previewing downloaded video segments with controls and keyboard shortcuts
+
+**Anatomy:**
+- Video container (16:9 aspect ratio, responsive)
+- HTML5 `<video>` element
+- Custom controls overlay:
+  - Play/Pause button (center, large)
+  - Progress bar (bottom, scrubbing enabled)
+  - Time display (current / total)
+  - **Silent video indicator (🔇 icon with tooltip - audio intentionally stripped)**
+  - Fullscreen toggle (optional)
+- Video metadata header (title, channel name)
+- Close button (top-right, X icon)
+- Loading spinner (while video loads)
+- Error state (fallback to YouTube embed)
+
+**Note:** Volume control removed - all preview videos have audio stripped at download time (Story 3.7). Silent indicator communicates this is intentional, not a bug.
+
+**States:**
+- **Idle (Not Playing):** Large play icon in center, controls hidden
+- **Playing:** Play icon hidden, controls appear on hover, progress bar updating
+- **Paused:** Pause icon visible, controls visible, progress bar at current position
+- **Loading:** Spinner overlay, controls disabled, "Loading video..."
+- **Error (Fallback):** YouTube iframe embed instead of HTML5 player, message: "Using YouTube preview (download unavailable)"
+- **Fullscreen:** Video fills screen, controls at bottom, ESC to exit
+
+**Video Source Logic:**
+- **Primary:** Load downloaded segment from `default_segment_path` (`.cache/videos/{projectId}/scene-{sceneNumber}-default.mp4`)
+- **Fallback:** If `download_status = 'error'` OR `default_segment_path` is NULL → Embed YouTube iframe with `video_id`
+
+**Controls Specification:**
+- **Play/Pause Button:**
+  - Size: 64px diameter (center overlay when idle), 44px (bottom controls when playing)
+  - Icon: ▶ (play) / ⏸ (pause)
+  - Background: Indigo 500 with opacity 0.9, white icon
+  - Hover: Indigo 600, scale 1.05
+- **Progress Bar:**
+  - Height: 6px (8px on hover for easier scrubbing)
+  - Background: Slate 700 (`#334155`)
+  - Fill: Indigo 500 (`#6366f1`)
+  - Scrubber handle: 14px circle, appears on hover
+  - Tooltip: Shows timestamp on hover
+- **Silent Video Indicator:**
+  - Icon: 🔇 (static mute icon - not interactive)
+  - Position: Bottom-left of controls bar, before time display
+  - Size: 16px, matching other control icons
+  - Color: `text-muted-foreground` (Slate 400, `#94a3b8`) - not alarming
+  - Tooltip: "Audio removed for preview" (appears on hover)
+  - No slider or unmute option (audio permanently stripped)
+  - Purpose: Communicates that silence is intentional, not broken playback
+- **Time Display:**
+  - Format: "MM:SS / MM:SS"
+  - Color: Slate 300 (`#cbd5e1`)
+  - Font size: 0.875rem (14px)
+
+**Keyboard Shortcuts:**
+- **Space:** Play/Pause toggle
+- **Esc:** Close preview player, return to gallery
+- **Left/Right Arrow:** Rewind/Forward 5 seconds
+- **F:** Fullscreen toggle
+
+**Note:** Volume shortcuts (M, Up/Down for volume) removed - audio is permanently stripped from all preview videos.
+
+**Interaction Patterns:**
+- Click suggestion card → Open preview player modal/lightbox
+- Video loads → Show spinner, then auto-play on load
+- Hover video → Show controls (play/pause, progress bar, volume)
+- Click outside player OR press ESC → Close preview, return to gallery
+- Video completes → Pause at end, show replay button
+- Error loading → Show fallback YouTube embed with iframe
+
+**Behavior:**
+- **Lazy Loading:** Only load video when user clicks to preview (not on page load)
+- **Preload on Hover (Optional):** Start loading video segment when user hovers suggestion card for >500ms
+- **Auto-Pause Previous:** If user opens new preview while another is playing → pause/close previous player
+- **Session Tracking:** Track which clips user previewed (analytics, optional)
+
+**Accessibility:**
+- ARIA role: `region` with label "Video preview player"
+- ARIA label for video: "{title} by {channel}, duration {duration}"
+- ARIA label for play/pause: "Play video" / "Pause video"
+- ARIA label for progress bar: "Video progress, {percentage}% played"
+- ARIA label for silent indicator: "Audio removed for preview"
+- ARIA live region for time display, playback state
+- Keyboard: Tab to controls, Space/Enter for play/pause, arrow keys for scrubbing
+- Screen reader: Announces playback state, time remaining, silent audio status
+- Focus indicators visible on all controls
+- Closed captions support (if available in video metadata)
+
+**Note:** Volume-related accessibility features removed as audio is permanently stripped from preview videos.
+
+**Responsive Design:**
+- **Desktop (1024px+):** Player opens in lightbox modal (max-width 800px, centered)
+- **Tablet (768-1023px):** Player opens fullscreen with close button top-right
+- **Mobile (<768px):** Player opens fullscreen, touch-optimized controls, larger touch targets (44px minimum)
+
+### 8.14 AssemblyTriggerButton Component (Epic 4, Story 4.5)
+
+**Purpose:** Sticky "Assemble Video" button with validation, confirmation modal, and assembly trigger
+
+
+**Anatomy:**
+- Sticky footer container (fixed at bottom of viewport)
+- Primary button: "Assemble Video"
+- Validation tooltip (disabled state)
+- Confirmation modal (triggered on click when enabled)
+- Loading spinner (during assembly request)
+- Error toast (if assembly fails)
+
+**States:**
+- **Disabled (Incomplete Selections):** Gray background (#475569 Slate 600), opacity 0.6, cursor not-allowed, tooltip: "Select clips for all X scenes to continue"
+- **Enabled (All Selections Complete):** Indigo 500 background, white text, cursor pointer, hover: Indigo 600
+- **Loading (Assembly Request Processing):** Indigo 500 background, white spinner icon, text: "Assembling...", button disabled
+- **Error (Assembly Failed):** Button returns to enabled state, error toast appears: "Failed to start assembly. Please try again."
+
+**Button Specification:**
+- **Size:** Large (padding 16px 48px, height 56px)
+- **Font Size:** 1.125rem (18px)
+- **Font Weight:** 600 (semibold)
+- **Border Radius:** 8px
+- **Box Shadow:** 0 4px 12px rgba(99, 102, 241, 0.4) when enabled
+- **Icon:** Optional video assembly icon (🎬) before text
+- **Position:** Fixed at bottom of viewport, z-index 100
+- **Width:** auto (centered with padding)
+- **Animation:** Smooth transition between states (0.2s ease)
+
+**Sticky Footer Container:**
+- **Background:** `#1e293b` (Slate 800) with slight blur (backdrop-filter: blur(8px))
+- **Border Top:** 1px solid `#334155` (Slate 700)
+- **Padding:** 16px 32px
+- **Display:** Flex row, center alignment
+- **Height:** 88px
+- **Sticky:** position: sticky, bottom: 0
+- **Z-index:** 100 (above page content)
+
+**Confirmation Modal:**
+- **Trigger:** Click enabled "Assemble Video" button
+- **Background:** Glassmorphism overlay (rgba(15, 23, 42, 0.9) with blur)
+- **Modal Container:**
+  - Background: Slate 800 (`#1e293b`)
+  - Border: 1px solid Slate 700 (`#334155`)
+  - Border Radius: 12px
+  - Padding: 32px
+  - Max Width: 500px
+  - Center aligned
+- **Modal Content:**
+  - **Icon:** Video assembly icon (🎬) or checkmark circle (large, indigo)
+  - **Heading:** "Ready to Assemble Your Video?" (h2, 1.5rem)
+  - **Summary:** "You've selected clips for all {N} scenes. This will create your final video with synchronized voiceovers."
+  - **Scene Count Display:** "{N} scenes • ~{total duration} estimated"
+  - **Action Buttons:**
+    - **Cancel:** Secondary ghost button, "Not Yet", closes modal
+    - **Confirm:** Primary button, "Assemble Video", triggers assembly
+- **Modal Behavior:**
+  - ESC key → Close modal (cancel)
+  - Click outside → Close modal (cancel)
+  - Click "Confirm" → Call POST /api/projects/[id]/assemble, show loading spinner, navigate to assembly status page
+
+**Validation Logic:**
+- On mount → Check all scenes have `selected_clip_id` in Zustand store
+- On selection change → Re-validate, update button state
+- **Enabled conditions:**
+  - All scenes have selected_clip_id (non-null)
+  - OR all incomplete scenes are marked as "skipped"
+- **Disabled conditions:**
+  - ANY scene missing selected_clip_id AND not marked as skipped
+- **Tooltip content:**
+  - "Select clips for all {X} scenes to continue" (shows missing scene count)
+
+**Assembly Trigger Flow:**
+1. User clicks enabled "Assemble Video" button
+2. Confirmation modal appears
+3. User clicks "Assemble Video" in modal
+4. Button shows loading spinner, text: "Assembling..."
+5. POST /api/projects/[id]/assemble with scene data:
+   - `scene_number`, `script_text`, `selected_clip_id`, `voiceover_audio_path`, `clip_duration`
+6. **Success Response:**
+   - Update `projects.current_step = 'assembly'` (or 'export')
+   - Navigate to assembly status page: `/projects/{id}/assembly-status`
+   - Show success toast: "Video assembly started! This may take a few minutes."
+7. **Error Response:**
+   - Button returns to enabled state
+   - Show error toast: "Failed to start assembly. Please try again."
+   - Keep user on curation page
+
+**Accessibility:**
+- ARIA role: `button`
+- ARIA label: "Assemble video with {N} selected clips" (enabled) / "Assemble video disabled, select clips for all scenes first" (disabled)
+- ARIA disabled: `true` when validation fails
+- ARIA live region for tooltip message
+- Keyboard: Tab to focus, Enter/Space to trigger (if enabled)
+- Screen reader: Announces button state, validation message, modal content
+- Focus indicator: 2px solid Indigo 500 outline with 2px offset
+- Tooltip: ARIA describedby pointing to validation message element
+
+**Responsive Design:**
+- **Desktop (1024px+):** Sticky footer, button centered with padding
+- **Tablet (768-1023px):** Full-width sticky footer, button spans 90% width
+- **Mobile (<768px):** Full-width sticky footer, button full width with 16px side padding, larger touch target (56px height)
 
 ---
 
@@ -2932,14 +3829,58 @@ graph TD
 - User can cancel confirmation and return to curation
 
 **Error Scenarios:**
-- **Clip fails to load:** Gray placeholder + "Retry" button appears, user clicks to retry
-- **Network error:** Toast notification "Lost connection. Check network." appears top-right
-- **No clips available:** Rare edge case - show message "No clips found for this scene. Try manual search." (future feature)
+
+**Scenario A: Clip Download Failed (Epic 4, Story 4.3)**
+- User clicks clip thumbnail with error download status (⚠ red icon)
+- VideoPreviewPlayer opens with YouTube embed fallback instead of downloaded segment
+- Message displays: "Using YouTube preview (download unavailable)"
+- Video plays from YouTube (slightly slower load, but functional)
+- User can still select clip and proceed
+
+**Scenario B: Scene with No Suggestions (Epic 4, Story 4.2)**
+- User arrives at Scene 3, sees empty state instead of clip grid
+- Message: "No clips found for this scene. The script may be too abstract or specific. Try editing the script text."
+- Action buttons:
+  - "Retry Visual Sourcing" → Triggers POST /api/projects/[id]/generate-visuals to re-run Epic 3 for this scene
+  - "Skip This Scene" checkbox → User checks to exclude scene from final video
+- If user skips scene → Progress counts as complete (e.g., 4/5 → 5/5 if Scene 3 skipped)
+- "Assemble Video" button enables when all non-skipped scenes have selections
+
+**Scenario C: Download Status Indicators (Epic 4, Story 4.2)**
+- User arrives while some clip segments still downloading
+- Clip thumbnails show download status badges:
+  - ⏳ Pending (gray) - Queued for download
+  - Indigo spinner - Downloading segment... 45%
+  - ✓ Complete (green) - Ready to preview
+  - ⚠ Error (red) - Download failed, will use YouTube embed
+- User can still preview clips with "Pending" or "Downloading" status (uses YouTube embed)
+- Status updates in real-time as downloads complete
+- User receives toast when all downloads complete: "All video previews ready!"
+
+**Scenario D: Network Error During Selection**
+- User selects clip → POST /api/projects/[id]/select-clip fails due to network error
+- Selection appears immediately (optimistic UI update)
+- After 500ms, error toast appears: "Failed to save selection. Retrying..."
+- System retries request automatically
+- If retry fails → Toast updates: "Failed to save. Changes will be saved on next selection."
+- Selection remains in UI (Zustand store), saved to localStorage as backup
+
+**Scenario E: User Navigates Away with Incomplete Selections**
+- User has selected clips for 3/5 scenes
+- User clicks browser back button OR "Back to Script Preview" link
+- Warning modal appears:
+  - "You haven't selected clips for all scenes"
+  - "You've selected clips for 3 out of 5 scenes. Your progress will be saved, but you'll need to return to complete curation."
+  - Buttons: ["Stay and Continue"] ["Leave Anyway"]
+- If user clicks "Leave Anyway" → Navigate away, selections saved to localStorage + database
+- If user returns later → Selections restored from database, user can continue where they left off
 
 **Success Metrics:**
 - User completes all scenes within 5-10 minutes
 - User understands selection mechanism (visual feedback clear)
 - User feels confident in selections (preview functionality used)
+- User successfully recovers from errors (retry functionality, fallback to YouTube embed)
+- User understands download status indicators (80%+ of users select clips with "Complete" status first)
 
 ---
 
@@ -3268,17 +4209,19 @@ This UX Design Specification serves as input to:
 - ✅ Full application layout and navigation architecture
 - ✅ Project Management UI (Story 1.6) - Complete specification
 - ✅ Chat Interface (Epic 1 foundation) - Complete specification
+- ✅ Voice Selection UI (Epic 2) - Complete specification
+- ✅ Script Generation & Preview UI (Epic 2) - Complete specification
+- ✅ Visual Sourcing Loading UI (Epic 3) - Complete specification
 - ✅ Visual Curation UI (Epic 4) - Complete specification
-- ✅ Component library for all three interfaces
+- ✅ Video Assembly Progress UI (Epic 5) - Complete specification
+- ✅ Export Page UI (Epic 5) - Complete specification
+- ✅ Component library for all interfaces
 - ✅ End-to-end user journeys across all workflows
 - ✅ Responsive design and accessibility for entire app
 
 **Future Additions (Post-MVP):**
-- 🔄 Voice Selection UI (Epic 2) - Basic flow described, detailed UI TBD
-- 🔄 Script Generation UI (Epic 2) - Automatic process, minimal UI needed
-- 🔄 Video Assembly Progress UI (Epic 5) - Loading screen with progress
-- 🔄 Download/Share UI (Epic 5) - Final output screen
 - 🔄 Settings/Preferences UI - Post-MVP feature
+- 🔄 Social Sharing UI - Post-MVP enhancement
 
 ### Design Decisions Summary
 
@@ -3317,6 +4260,7 @@ This UX Design Specification serves as input to:
 | ---------- | ------- | -------------------------------------------------------------- | --------- |
 | 2025-10-31 | 1.0     | Initial UX Design Specification (Visual Curation UI only)      | lichking  |
 | 2025-11-04 | 2.0     | Major update: Added Project Management UI + Chat Interface + Full app architecture | lichking  |
+| 2025-11-22 | 3.4     | Added Silent Video Indicator to VideoPreviewPlayer for audio-stripped previews (Story 3.7) | lichking  |
 
 **v2.0 Changes:**
 - Added Executive Summary covering full application scope

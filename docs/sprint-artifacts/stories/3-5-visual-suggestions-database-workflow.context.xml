@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context id="3.5" title="Visual Suggestions Database & Workflow Integration" epic="3" date="2025-11-17">
+
+  <user-story>
+    <as-a>AI Video Generator system</as-a>
+    <i-want>to persist visual suggestions to database with proper schema and integrate visual sourcing into project workflow</i-want>
+    <so-that>filtered YouTube video suggestions are stored reliably and users seamlessly transition from voiceover generation to visual curation</so-that>
+  </user-story>
+
+  <story-tasks>
+    <task id="0">Define TypeScript interfaces: VisualSuggestion, DownloadStatus, type guards</task>
+    <task id="1">Create visual_suggestions table with foreign keys, unique constraints, CHECK constraints</task>
+    <task id="2">Add indexes on sceneId for query performance</task>
+    <task id="3">Implement database query functions: saveVisualSuggestions, getVisualSuggestions, updateSegmentDownloadStatus, helper functions</task>
+    <task id="4">Add projects.visuals_generated flag to track completion</task>
+    <task id="5">Update POST /api/projects/[id]/generate-visuals to save filtered suggestions to database</task>
+    <task id="6">Create GET /api/projects/[id]/visual-suggestions endpoint</task>
+    <task id="7">Create VisualSourcingLoader component with progress indicator</task>
+    <task id="8">Integrate visual sourcing trigger after Epic 2 voiceover completion with idempotency</task>
+    <task id="9">Implement error recovery for partial completion scenarios</task>
+  </story-tasks>
+
+  <acceptance-criteria>
+    <criterion id="AC1">visual_suggestions table created with foreign key CASCADE, composite unique constraint, CHECK constraint</criterion>
+    <criterion id="AC2">duration column stores video duration in seconds (INTEGER, nullable)</criterion>
+    <criterion id="AC3">download_status columns with default 'pending' and CHECK constraint enforcement</criterion>
+    <criterion id="AC4">Index on scene_id with query time &lt; 100ms</criterion>
+    <criterion id="AC5">saveVisualSuggestions() stores 5-8 suggestions with transaction atomicity</criterion>
+    <criterion id="AC6">getVisualSuggestions() retrieves ordered suggestions with all fields</criterion>
+    <criterion id="AC7">updateSegmentDownloadStatus() updates tracking with validation</criterion>
+    <criterion id="AC8">Helper functions getScenesCount(), getScenesWithSuggestionsCount(), getScenesWithVisualSuggestions() implemented</criterion>
+    <criterion id="AC9">projects.visuals_generated flag updated on completion</criterion>
+    <criterion id="AC10">VisualSourcingLoader displays during processing</criterion>
+    <criterion id="AC11">Progress indicator shows real-time status</criterion>
+    <criterion id="AC12">Automatic trigger after Epic 2 with idempotency check</criterion>
+    <criterion id="AC13">Project state advances to 'visual-curation' with ProjectStep enum updates</criterion>
+    <criterion id="AC14">Partial failure recovery skips completed scenes</criterion>
+    <criterion id="AC15">Zero results empty state with guidance</criterion>
+    <criterion id="AC16">API failure retry button functional</criterion>
+    <criterion id="AC17">TypeScript types defined centrally</criterion>
+  </acceptance-criteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/sprint-artifacts/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="Data Models and Contracts" snippet="VisualSuggestion interface with id, sceneId, videoId, title, thumbnailUrl, channelTitle, embedUrl, rank, duration, defaultSegmentPath, downloadStatus, createdAt"/>
+      <doc path="docs/sprint-artifacts/tech-spec-epic-3.md" title="Epic 3 Technical Specification" section="APIs and Interfaces" snippet="POST /generate-visuals and GET /visual-suggestions endpoints with request/response contracts"/>
+      <doc path="docs/architecture.md" title="System Architecture" section="Database Schema" snippet="SQLite database with better-sqlite3, foreign key constraints, cascade deletes"/>
+      <doc path="docs/prd.md" title="Product Requirements" section="Feature 1.5" snippet="AI-Powered Visual Sourcing with data structure requirements"/>
+      <doc path="docs/stories/story-3.4.md" title="Story 3.4: Content Filtering &amp; Quality Ranking" section="Learnings from Previous Story" snippet="filterAndRankResults() returns RankedVideo[] with 5-8 suggestions per scene, duration field already parsed to integer seconds, rank 1-8 (filtered), generate-visuals endpoint modified to integrate filtering"/>
+      <doc path="docs/epics.md" title="AI Video Generator - Development Epics" section="Epic 3 Story 3.5" snippet="Visual Suggestions Database &amp; Workflow Integration - Store suggestions with duration tracking, workflow integration after Epic 2, automatic trigger, state advancement to visual-curation (lines 758-809)"/>
+    </docs>
+
+    <code>
+      <artifact path="ai-video-generator/src/types/visual-suggestions.ts" kind="types" symbol="VisualSuggestion" reason="TypeScript interface matching database schema"/>
+      <artifact path="ai-video-generator/src/lib/db/queries.ts" kind="database" symbol="saveVisualSuggestions" reason="Existing query patterns for batch inserts and transactions"/>
+      <artifact path="ai-video-generator/src/lib/db/init.ts" kind="database" symbol="initDatabase" reason="Database initialization and migration patterns"/>
+      <artifact path="ai-video-generator/src/lib/db/migrations/" kind="migrations" reason="Existing migration file patterns for schema changes"/>
+      <artifact path="ai-video-generator/src/lib/youtube/filter-results.ts" kind="integration" symbol="filterAndRankResults" reason="Story 3.5 saves output from Story 3.4 filtering - need RankedVideo interface and output format with duration, rank fields"/>
+      <artifact path="ai-video-generator/src/app/api/projects/[id]/generate-visuals/route.ts" kind="api" symbol="POST" reason="Task 5 extends this endpoint to save filtered results to database after filterAndRankResults() call"/>
+    </code>
+
+    <interfaces>
+      <interface name="VisualSuggestion" kind="TypeScript Interface">
+        interface VisualSuggestion { id: string; sceneId: string; videoId: string; title: string; thumbnailUrl: string; channelTitle: string; embedUrl: string; rank: number; duration?: number; defaultSegmentPath?: string; downloadStatus: DownloadStatus; createdAt: string; }
+      </interface>
+      <interface name="POST /api/projects/[id]/generate-visuals" kind="REST endpoint">
+        Request: { projectId: string } → Response: { success: boolean; scenesProcessed: number; suggestionsGenerated: number; errors?: string[] }
+      </interface>
+      <interface name="GET /api/projects/[id]/visual-suggestions" kind="REST endpoint">
+        Request: { projectId: string, sceneId?: string } → Response: { suggestions: VisualSuggestion[]; totalScenes: number; scenesWithSuggestions: number; }
+      </interface>
+    </interfaces>
+
+    <dependencies>
+      <node>
+        <package>better-sqlite3</package>
+        <package>drizzle-orm</package>
+        <package>next (App Router)</package>
+      </node>
+      <testing>
+        <package>vitest</package>
+      </testing>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Database: Use SQLite with better-sqlite3, enforce foreign key constraints</constraint>
+    <constraint>Schema: Foreign key CASCADE delete, composite unique constraint on (sceneId, videoId)</constraint>
+    <constraint>Schema: CHECK constraint for download_status enum values at database level</constraint>
+    <constraint>Queries: Use transactions for batch inserts (atomicity)</constraint>
+    <constraint>Workflow: Automatic trigger after Epic 2 Story 2.5 voiceover completion</constraint>
+    <constraint>Workflow: Idempotency check prevents duplicate visual sourcing</constraint>
+    <constraint>State: ProjectStep enum must include 'visual-sourcing' and 'visual-curation'</constraint>
+    <constraint>Error handling: Per-scene error handling, partial success support, retry skips completed scenes</constraint>
+  </constraints>
+
+  <tests>
+    <standards>
+      Tests use Vitest framework. Unit tests in src/lib/**/__tests__/, integration tests in tests/db/ and tests/api/. Database tests use in-memory SQLite.
+    </standards>
+    <locations>
+      <location>ai-video-generator/tests/db/visual-suggestions.test.ts</location>
+      <location>ai-video-generator/tests/api/generate-visuals.test.ts</location>
+      <location>ai-video-generator/tests/integration/</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Test foreign key cascade delete removes suggestions when scene deleted</idea>
+      <idea ac="AC1">Test composite unique constraint prevents duplicate (sceneId, videoId)</idea>
+      <idea ac="AC1">Test CHECK constraint rejects invalid download_status values</idea>
+      <idea ac="AC5">Test saveVisualSuggestions transaction rollback on error</idea>
+      <idea ac="AC6">Test getVisualSuggestions returns empty array for non-existent scene</idea>
+      <idea ac="AC8">Test helper functions with zero scenes, partial suggestions</idea>
+      <idea ac="AC12">Test idempotency - calling visual sourcing twice doesn't duplicate</idea>
+      <idea ac="AC14">Test retry skips scenes with existing suggestions</idea>
+    </ideas>
+  </tests>
+
+</story-context>

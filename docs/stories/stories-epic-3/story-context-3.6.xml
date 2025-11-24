@@ -1,0 +1,1048 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>3.6</story-id>
+    <story-title>Default Segment Download Service</story-title>
+    <epic-id>3</epic-id>
+    <epic-title>Visual Content Sourcing (YouTube API)</epic-title>
+    <generated-date>2025-11-17</generated-date>
+    <generated-by>SM Agent (story-context workflow)</generated-by>
+    <status>Ready</status>
+  </metadata>
+
+  <story-overview>
+    <goal>
+      Automatically download default video segments (first N seconds) for instant preview capability in Visual Curation UI
+    </goal>
+    <description>
+      This story implements the automatic download service for default video segments that enable instant preview functionality in the Visual Curation UI (Epic 4). After Story 3.5 saves filtered visual suggestions to the database, this story downloads the first N seconds of each suggested video using yt-dlp, a robust Python-based YouTube downloader. The default segment download service ensures users can preview actual footage immediately when curating visuals, without waiting for custom segment selection. Each segment is downloaded with a 5-second buffer beyond the scene's voiceover duration to provide adequate coverage for timing adjustments.
+    </description>
+    <dependencies>
+      <dependency id="3.3" title="YouTube Video Search &amp; Result Retrieval" status="COMPLETED">
+        Provides YouTube video search and metadata retrieval including video IDs that will be downloaded
+      </dependency>
+      <dependency id="3.4" title="Relevance Filtering &amp; Ranking" status="COMPLETED">
+        Filters visual suggestions by duration (1x-3x ratio, 5-minute max) and ranks by relevance
+      </dependency>
+      <dependency id="3.5" title="Database Persistence &amp; Visual Suggestion Retrieval" status="COMPLETED">
+        Saves filtered visual suggestions to database with visual_suggestions table and download_status tracking
+      </dependency>
+    </dependencies>
+    <workflow-position>
+      <previous-step>Story 3.5 - Database persistence saves visual suggestions</previous-step>
+      <current-step>Story 3.6 - Download default video segments for instant preview</current-step>
+      <next-step>Epic 4 - Visual Curation UI with instant preview playback</next-step>
+    </workflow-position>
+  </story-overview>
+
+  <related-documentation>
+    <prd-references>
+      <reference>
+        <feature>Feature 1.5 - AI-Powered Visual Sourcing</feature>
+        <acceptance-criteria>AC6 - Default Segment Download (lines 235-238)</acceptance-criteria>
+        <requirement>
+          System must automatically download the first N seconds of each suggested video (where N = scene voiceover duration + 5 second buffer) using yt-dlp with 720p resolution and segment range selection. Downloads stored in .cache/videos/{projectId}/scene-{sceneNumber}-default.mp4 format with download status tracking.
+        </requirement>
+      </reference>
+      <reference>
+        <feature>Feature 1.5 - AI-Powered Visual Sourcing</feature>
+        <acceptance-criteria>AC7 - Instant Preview Availability (lines 239-242)</acceptance-criteria>
+        <requirement>
+          Downloaded segments must be immediately available for preview in the Visual Curation UI without requiring user-triggered downloads. All video previews must play immediately when user opens the curation interface.
+        </requirement>
+      </reference>
+    </prd-references>
+
+    <architecture-references>
+      <reference section="Epic 3: Visual Content Sourcing">
+        <file>docs/architecture.md</file>
+        <description>YouTube API integration architecture, LLM provider abstraction for scene analysis, database schema extensions for visual_suggestions table</description>
+      </reference>
+      <reference section="File Storage Strategy">
+        <file>docs/architecture.md</file>
+        <description>.cache/videos/{projectId}/ directory structure for downloaded video segments</description>
+      </reference>
+    </architecture-references>
+
+    <tech-spec-references>
+      <reference>
+        <file>docs/sprint-artifacts/tech-spec-epic-3.md</file>
+        <section>Default Segment Download Service (Story 3.6) - lines 229-298</section>
+        <description>
+          Complete technical specification for yt-dlp integration, download workflow, file naming conventions, error recovery strategy, and performance targets. Includes command execution patterns, security considerations (command injection prevention), and integration with Epic 4 curation UI.
+        </description>
+      </reference>
+    </tech-spec-references>
+  </related-documentation>
+
+  <existing-code-context>
+    <note>
+      Stories 3.1-3.5 are planned but not yet implemented. The following represents the expected interfaces and file locations that Story 3.6 will integrate with once they are created.
+    </note>
+
+    <planned-file>
+      <path>src/lib/youtube/client.ts</path>
+      <story-origin>Story 3.1</story-origin>
+      <description>YouTube Data API v3 client with authentication, quota management, and searchVideos() method</description>
+      <expected-interface>
+        <![CDATA[
+interface YouTubeClient {
+  searchVideos(query: string, options?: SearchOptions): Promise<YouTubeVideo[]>;
+  getVideoDetails(videoId: string): Promise<YouTubeVideoDetails>;
+}
+
+interface YouTubeVideo {
+  videoId: string;
+  title: string;
+  channelTitle: string;
+  thumbnailUrl: string;
+  description: string;
+  publishedAt: string;
+  viewCount: number;
+  durationSeconds: number;
+}
+        ]]>
+      </expected-interface>
+      <integration-notes>
+        Story 3.6 will use videoId from search results to construct YouTube URLs for yt-dlp downloads
+      </integration-notes>
+    </planned-file>
+
+    <planned-file>
+      <path>src/lib/youtube/analyze-scene.ts</path>
+      <story-origin>Story 3.2</story-origin>
+      <description>LLM-based scene analysis for visual theme extraction and search query generation</description>
+      <expected-interface>
+        <![CDATA[
+interface SceneAnalysis {
+  mainSubject: string;
+  setting: string;
+  mood: string;
+  action: string;
+  keywords: string[];
+  primaryQuery: string;
+  alternativeQueries: string[];
+  contentType: ContentType;
+}
+
+enum ContentType {
+  GAMEPLAY = 'gameplay',
+  TUTORIAL = 'tutorial',
+  NATURE = 'nature',
+  B_ROLL = 'b_roll',
+  DOCUMENTARY = 'documentary',
+  URBAN = 'urban',
+  ABSTRACT = 'abstract'
+}
+
+async function analyzeSceneForVisuals(sceneText: string): Promise<SceneAnalysis>
+        ]]>
+      </expected-interface>
+      <integration-notes>
+        Story 3.6 doesn't directly use scene analysis, but relies on the search results it produces
+      </integration-notes>
+    </planned-file>
+
+    <planned-file>
+      <path>src/lib/youtube/filter-results.ts</path>
+      <story-origin>Story 3.4</story-origin>
+      <description>Duration-based filtering (1x-3x ratio, 5-minute max) and relevance ranking</description>
+      <expected-interface>
+        <![CDATA[
+function filterByDuration(
+  results: YouTubeVideo[],
+  sceneDuration: number
+): YouTubeVideo[] {
+  const minDuration = sceneDuration; // 1x ratio
+  const maxDuration = Math.min(sceneDuration * 3, 300); // 3x or 5 min max
+
+  return results.filter(video => {
+    const duration = video.durationSeconds;
+    return duration >= minDuration && duration <= maxDuration;
+  });
+}
+
+function rankByRelevance(
+  videos: YouTubeVideo[],
+  sceneAnalysis: SceneAnalysis
+): YouTubeVideo[]
+        ]]>
+      </expected-interface>
+      <integration-notes>
+        Story 3.6 downloads segments from filtered and ranked suggestions saved by Story 3.5. Duration filtering ensures videos are appropriate length (1x-3x scene duration, max 5 minutes).
+      </integration-notes>
+    </planned-file>
+
+    <planned-file>
+      <path>src/lib/db/queries.ts</path>
+      <story-origin>Story 3.5</story-origin>
+      <description>Database queries for visual suggestions persistence and retrieval</description>
+      <expected-interface>
+        <![CDATA[
+async function saveVisualSuggestions(
+  sceneId: string,
+  suggestions: VisualSuggestion[]
+): Promise<void>
+
+async function getVisualSuggestionsByScene(
+  sceneId: string
+): Promise<VisualSuggestion[]>
+
+async function getVisualSuggestionsByProject(
+  projectId: string
+): Promise<VisualSuggestion[]>
+
+async function updateDownloadStatus(
+  suggestionId: string,
+  status: DownloadStatus,
+  filePath?: string
+): Promise<void>
+        ]]>
+      </expected-interface>
+      <integration-notes>
+        Story 3.6 will query visual_suggestions table to get pending downloads, then update download_status and default_segment_path fields after successful downloads
+      </integration-notes>
+    </planned-file>
+
+    <planned-file>
+      <path>src/types/visual-suggestions.ts</path>
+      <story-origin>Story 3.5</story-origin>
+      <description>TypeScript interfaces for visual suggestions and download tracking</description>
+      <expected-interface>
+        <![CDATA[
+interface VisualSuggestion {
+  id: string;
+  sceneId: string;
+  videoId: string;
+  title: string;
+  channelTitle: string;
+  thumbnailUrl: string;
+  durationSeconds: number;
+  viewCount: number;
+  relevanceScore: number;
+  rank: number;
+  downloadStatus: DownloadStatus;
+  defaultSegmentPath: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+enum DownloadStatus {
+  PENDING = 'pending',
+  QUEUED = 'queued',
+  DOWNLOADING = 'downloading',
+  COMPLETE = 'complete',
+  ERROR = 'error'
+}
+        ]]>
+      </expected-interface>
+      <integration-notes>
+        Story 3.6 implements the download workflow that updates downloadStatus through its lifecycle: pending → queued → downloading → complete/error
+      </integration-notes>
+    </planned-file>
+
+    <planned-file>
+      <path>src/lib/db/schema.ts</path>
+      <story-origin>Stories 3.3, 3.5</story-origin>
+      <description>Database schema with visual_suggestions table for download tracking</description>
+      <expected-schema>
+        <![CDATA[
+CREATE TABLE visual_suggestions (
+  id TEXT PRIMARY KEY,
+  scene_id TEXT NOT NULL,
+  video_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  channel_title TEXT NOT NULL,
+  thumbnail_url TEXT NOT NULL,
+  duration_seconds INTEGER NOT NULL,
+  view_count INTEGER NOT NULL,
+  relevance_score REAL NOT NULL,
+  rank INTEGER NOT NULL,
+  download_status TEXT NOT NULL DEFAULT 'pending',
+  default_segment_path TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_visual_suggestions_scene ON visual_suggestions(scene_id);
+CREATE INDEX idx_visual_suggestions_download_status ON visual_suggestions(download_status);
+        ]]>
+      </expected-schema>
+      <integration-notes>
+        Story 3.6 uses download_status and default_segment_path fields for tracking download lifecycle. Indexes support efficient querying by scene and download status.
+      </integration-notes>
+    </planned-file>
+
+    <database-context>
+      <table name="scenes">
+        <description>Stores script scenes with voiceover audio and duration information</description>
+        <relevant-columns>
+          <column name="id">Primary key referenced by visual_suggestions.scene_id</column>
+          <column name="project_id">Foreign key to projects table, used for file path construction</column>
+          <column name="scene_number">Used for file naming: scene-{sceneNumber}-default.mp4</column>
+          <column name="duration">Voiceover duration in seconds, used to calculate segment download duration (duration + 5s buffer)</column>
+          <column name="script_text">Scene text content (not directly used in Story 3.6)</column>
+        </relevant-columns>
+      </table>
+
+      <table name="visual_suggestions">
+        <description>Stores YouTube video suggestions for each scene with download tracking</description>
+        <story-3.6-columns>
+          <column name="id">Primary key for download job identification</column>
+          <column name="scene_id">Foreign key to scenes table (used to fetch scene duration and scene_number)</column>
+          <column name="video_id">YouTube video ID (11 characters) used to construct download URL</column>
+          <column name="duration_seconds">Video duration used for validation (already filtered 1x-3x in Story 3.4)</column>
+          <column name="download_status">Lifecycle tracking: pending → queued → downloading → complete/error</column>
+          <column name="default_segment_path">RELATIVE path to downloaded segment (e.g., .cache/videos/proj1/scene-01-default.mp4)</column>
+          <column name="updated_at">Timestamp updated with each status change</column>
+        </story-3.6-columns>
+      </table>
+    </database-context>
+  </existing-code-context>
+
+  <new-files-to-create>
+    <file>
+      <path>src/lib/youtube/download-segment.ts</path>
+      <description>Core download service function using yt-dlp with segment extraction, retry logic, and security hardening</description>
+      <key-functions>
+        <function name="downloadDefaultSegment">
+          Executes yt-dlp command using spawn() with args array (prevents command injection). Downloads first N seconds of YouTube video with 720p quality cap. Validates videoId format and sanitizes outputPath.
+        </function>
+        <function name="downloadWithRetry">
+          Retry wrapper with exponential backoff (max 3 attempts, delays: 1s, 2s, 4s). Only retries retryable errors (network timeout, HTTP 429/503). Skips retry for permanent failures (video unavailable, invalid URL).
+        </function>
+        <function name="validateVideoId">
+          Security validation: YouTube video IDs must match /^[a-zA-Z0-9_-]{11}$/ pattern to prevent command injection.
+        </function>
+        <function name="sanitizeOutputPath">
+          Security validation: Ensures output path is within .cache/videos/{projectId}/ directory to prevent path traversal attacks.
+        </function>
+      </key-functions>
+      <interfaces>
+        <![CDATA[
+interface DownloadSegmentOptions {
+  videoId: string;
+  segmentDuration: number;  // Duration in seconds (voiceover + 5s buffer)
+  outputPath: string;        // Full file path including filename
+  maxHeight?: number;        // Default: 720
+}
+
+interface DownloadSegmentResult {
+  success: boolean;
+  filePath?: string;
+  error?: string;
+  retryable?: boolean;
+}
+
+interface RetryOptions {
+  maxRetries: number;       // Default: 3
+  baseDelay: number;        // Default: 1000ms
+  maxDelay: number;         // Default: 8000ms
+}
+        ]]>
+      </interfaces>
+      <security-notes>
+        CRITICAL: Use spawn() with argument array, NEVER exec() with string interpolation. Example: spawn('yt-dlp', [url, '--download-sections', duration, ...]) prevents command injection attacks.
+      </security-notes>
+    </file>
+
+    <file>
+      <path>src/lib/youtube/download-queue.ts</path>
+      <description>Background job queue with max 3 concurrent downloads, queue state persistence, and crash recovery</description>
+      <key-classes>
+        <class name="DownloadQueue">
+          Manages parallel downloads with concurrency control, persists queue state to .cache/queue-state.json, implements crash recovery by loading queue state on startup and cleaning stale "downloading" statuses.
+        </class>
+      </key-classes>
+      <interfaces>
+        <![CDATA[
+interface DownloadJob {
+  id: string;
+  suggestionId: string;
+  videoId: string;
+  segmentDuration: number;
+  outputPath: string;        // RELATIVE path for database storage
+  projectId: string;
+  sceneNumber: number;
+  status: 'queued' | 'downloading' | 'complete' | 'error';
+  retryCount: number;
+  error?: string;
+}
+
+class DownloadQueue {
+  private queue: DownloadJob[] = [];
+  private activeDownloads: Set<string> = new Set();
+  private maxConcurrent: number = 3;
+  private processingLock: Map<string, boolean> = new Map();
+
+  async enqueueJob(job: DownloadJob): Promise<void>;
+  private async processQueue(): Promise<void>;
+  async getQueueStatus(projectId: string): { total: number; completed: number; failed: number };
+  private async saveQueueState(): Promise<void>;
+  private async loadQueueState(): Promise<void>;
+  private async cleanStaleDownloadStatus(): Promise<void>;
+  async initialize(): Promise<void>;
+}
+        ]]>
+      </interfaces>
+      <persistence-notes>
+        Queue state saved to .cache/queue-state.json after every enqueue/dequeue. On server startup, loadQueueState() restores queue and cleanStaleDownloadStatus() resets interrupted downloads from "downloading" to "queued" for crash recovery.
+      </persistence-notes>
+      <transaction-notes>
+        All database status updates wrapped in db.transaction() with row locking (FOR UPDATE) to prevent partial state updates and duplicate job processing. Rollback handling verifies file exists before updating database.
+      </transaction-notes>
+    </file>
+
+    <file>
+      <path>src/app/api/health/yt-dlp/route.ts</path>
+      <description>Health check endpoint to verify yt-dlp availability and version before allowing downloads</description>
+      <endpoint>GET /api/health/yt-dlp</endpoint>
+      <response-schema>
+        <![CDATA[
+{
+  available: boolean;
+  version?: string;              // e.g., "2024.03.10"
+  supportsDownloadSections: boolean;
+  error?: string;
+}
+        ]]>
+      </response-schema>
+      <implementation-notes>
+        Executes "yt-dlp --version" using spawn(), parses version from stdout, verifies version >= 2023.03.04 (required for --download-sections flag). Called at server startup (logs warning if unavailable), before enqueuing downloads (returns 503 if unavailable), and optionally every 5 minutes for monitoring.
+      </implementation-notes>
+    </file>
+
+    <file>
+      <path>src/app/api/projects/[id]/download-segments/route.ts</path>
+      <description>Download orchestration endpoint with disk space validation and yt-dlp health check</description>
+      <endpoint>POST /api/projects/[id]/download-segments</endpoint>
+      <request-schema>
+        <![CDATA[
+{
+  projectId: string
+}
+        ]]>
+      </request-schema>
+      <response-schema>
+        <![CDATA[
+{
+  success: boolean;
+  totalJobs: number;
+  queued: number;
+  alreadyDownloaded: number;
+  message: string;
+  error?: string;
+}
+        ]]>
+      </response-schema>
+      <workflow>
+        1. Check yt-dlp health (return 503 if unavailable)
+        2. Load pending visual suggestions from database (download_status = 'pending')
+        3. PROACTIVE disk space check: estimate required space (suggestions.length * 5MB + 100MB buffer)
+        4. Return HTTP 507 if insufficient disk space with clear error message
+        5. For each pending suggestion: fetch scene data, calculate segment duration (scene.duration + 5s), build output path with zero-padded scene number
+        6. Create .cache/videos/{projectId}/ directory if needed
+        7. Enqueue DownloadJob for each suggestion
+        8. Update visual_suggestions.download_status = 'queued' with database transaction
+        9. Return response with job counts
+      </workflow>
+      <disk-space-validation>
+        Uses statfs() to check available disk space BEFORE enqueuing jobs. Prevents partial downloads and provides user-friendly error message showing required vs available MB.
+      </disk-space-validation>
+    </file>
+
+    <file>
+      <path>src/app/api/projects/[id]/download-progress/route.ts</path>
+      <description>Progress tracking API for monitoring download status during batch operations</description>
+      <endpoint>GET /api/projects/[id]/download-progress</endpoint>
+      <response-schema>
+        <![CDATA[
+{
+  total: number;
+  completed: number;
+  downloading: number;
+  queued: number;
+  failed: number;
+  message: string;  // e.g., "Downloaded 12/40 segments"
+}
+        ]]>
+      </response-schema>
+      <implementation-notes>
+        Queries visual_suggestions table with JOIN to scenes, aggregates counts by download_status. Results cached briefly (5-10 seconds) to reduce database load during UI polling. Used for progress bars and status updates in curation UI.
+      </implementation-notes>
+    </file>
+
+    <file>
+      <path>src/lib/youtube/cleanup-cache.ts</path>
+      <description>Cache cleanup service with 7-day retention policy and database synchronization</description>
+      <key-functions>
+        <function name="cleanupOldSegments">
+          Scans .cache/videos/ directory, deletes files older than retention period (default 7 days), updates database to reset download_status = 'pending' and clear default_segment_path for deleted files.
+        </function>
+        <function name="syncDatabaseAfterCleanup">
+          Parses deleted filenames using regex to extract projectId and sceneNumber, queries database for matching visual_suggestions, updates status with database transactions.
+        </function>
+        <function name="findOrphanedFiles">
+          Identifies files in cache without corresponding database record, logs orphaned files for investigation.
+        </function>
+      </key-functions>
+      <interfaces>
+        <![CDATA[
+interface CleanupOptions {
+  retentionDays: number;    // Default: 7
+  dryRun?: boolean;         // Preview mode without deleting
+}
+
+interface CleanupResult {
+  filesDeleted: number;
+  spaceFreed: number;       // Bytes
+  databaseUpdates: number;
+  orphanedFiles: number;
+  errors: string[];
+}
+        ]]>
+      </interfaces>
+      <database-sync-notes>
+        Uses filename regex pattern: .cache/videos/([^/]+)/scene-(\d+)-default\.mp4 to extract projectId and sceneNumber. Maps deleted files back to database records via JOIN query with scenes table.
+      </database-sync-notes>
+    </file>
+  </new-files-to-create>
+
+  <key-technical-requirements>
+    <requirement id="1" priority="critical">
+      <title>Command Injection Prevention</title>
+      <description>
+        Use child_process.spawn() with argument array for yt-dlp execution, NEVER exec() with string interpolation. Validate videoId against /^[a-zA-Z0-9_-]{11}$/ regex. Sanitize outputPath to prevent path traversal attacks.
+      </description>
+      <security-impact>High - Prevents malicious code execution via crafted video IDs or file paths</security-impact>
+    </requirement>
+
+    <requirement id="2" priority="critical">
+      <title>Database Transaction Handling</title>
+      <description>
+        Wrap all download_status updates in db.transaction() with row locking (FOR UPDATE clause). Verify file exists after download before updating database. Implement rollback handling if file write fails after DB update.
+      </description>
+      <data-integrity-impact>Prevents partial state updates and race conditions in parallel download processing</data-integrity-impact>
+    </requirement>
+
+    <requirement id="3" priority="critical">
+      <title>Queue State Persistence</title>
+      <description>
+        Save queue state to .cache/queue-state.json after every enqueue/dequeue operation. On server startup: load queue state, reset stale "downloading" statuses to "queued", resume processing pending jobs.
+      </description>
+      <reliability-impact>Enables crash recovery - downloads resume after server restart without data loss</reliability-impact>
+    </requirement>
+
+    <requirement id="4" priority="high">
+      <title>Proactive Disk Space Validation</title>
+      <description>
+        Check available disk space BEFORE enqueuing jobs using statfs(). Estimate required space: suggestions.length * 5MB + 100MB buffer. Return HTTP 507 if insufficient space with clear error message.
+      </description>
+      <user-experience-impact>Prevents failed downloads mid-process and provides actionable feedback to user</user-experience-impact>
+    </requirement>
+
+    <requirement id="5" priority="high">
+      <title>yt-dlp Health Check</title>
+      <description>
+        Implement GET /api/health/yt-dlp endpoint to verify yt-dlp availability and version. Call at server startup, before enqueuing downloads, and optionally every 5 minutes. Return HTTP 503 if yt-dlp unavailable.
+      </description>
+      <operational-readiness-impact>Ensures external dependency is available before attempting downloads, provides clear error guidance</operational-readiness-impact>
+    </requirement>
+
+    <requirement id="6" priority="high">
+      <title>File Path Strategy</title>
+      <description>
+        Store RELATIVE paths in database (.cache/videos/proj1/scene-01-default.mp4). Resolve to ABSOLUTE paths at runtime for yt-dlp execution. Resolve to URLs for UI playback (/cache/videos/proj1/scene-01-default.mp4).
+      </description>
+      <portability-impact>Enables project portability across different environments and simplifies database migrations</portability-impact>
+    </requirement>
+
+    <requirement id="7" priority="medium">
+      <title>Zero-Padding Scene Numbers</title>
+      <description>
+        Format scene numbers with sceneNumber.toString().padStart(2, '0') for consistent alphabetical sorting. Examples: 1 → "01", 5 → "05", 10 → "10", 99 → "99". Handle edge case for scene > 99.
+      </description>
+      <file-organization-impact>Ensures proper file ordering in directory listings and simplifies file management</file-organization-impact>
+    </requirement>
+
+    <requirement id="8" priority="medium">
+      <title>Retry Logic with Exponential Backoff</title>
+      <description>
+        Max 3 retry attempts for retryable errors (network timeout, HTTP 429/503). Exponential backoff delays: 1s, 2s, 4s. Skip retry for permanent failures (video unavailable, invalid URL). Log all retry attempts.
+      </description>
+      <network-resilience-impact>Handles transient network issues gracefully while avoiding unnecessary retries for permanent failures</network-resilience-impact>
+    </requirement>
+
+    <requirement id="9" priority="medium">
+      <title>Parallel Download Concurrency Control</title>
+      <description>
+        Limit to max 3 concurrent downloads using Set-based tracking. Implement processing lock (Map) to prevent duplicate job processing. Process queue continuously as slots become available.
+      </description>
+      <performance-impact>Balances download speed with network/CPU usage, prevents overwhelming system resources</performance-impact>
+    </requirement>
+
+    <requirement id="10" priority="low">
+      <title>Cache Cleanup with Database Synchronization</title>
+      <description>
+        7-day retention policy for downloaded segments. Parse deleted filenames to extract projectId and sceneNumber. Update database to reset download_status = 'pending' and clear default_segment_path. Identify orphaned files.
+      </description>
+      <storage-management-impact>Maintains disk space health while keeping database synchronized with filesystem state</storage-management-impact>
+    </requirement>
+  </key-technical-requirements>
+
+  <acceptance-criteria-summary>
+    <criteria-group name="Core Functionality">
+      <criterion id="AC1">yt-dlp installed and accessible via PATH with version >= 2023.03.04</criterion>
+      <criterion id="AC1.5">GET /api/health/yt-dlp endpoint returns availability, version, and download-sections support</criterion>
+      <criterion id="AC2">downloadDefaultSegment() uses spawn() with args array, validates inputs, downloads segments with 5s buffer</criterion>
+      <criterion id="AC3">Retry logic with exponential backoff (max 3 attempts, delays: 1s, 2s, 4s) for retryable errors only</criterion>
+      <criterion id="AC4">DownloadQueue processes jobs in FIFO order with max 3 concurrent downloads</criterion>
+      <criterion id="AC4.5">Queue state persists to .cache/queue-state.json and resumes after server restart</criterion>
+      <criterion id="AC5">POST /api/projects/[id]/download-segments validates disk space before enqueuing, returns HTTP 507 if insufficient</criterion>
+      <criterion id="AC6">Download status updates use db.transaction() with row locking, store RELATIVE paths in database</criterion>
+      <criterion id="AC7">GET /api/projects/[id]/download-progress returns accurate counts with message (e.g., "Downloaded 12/40 segments")</criterion>
+      <criterion id="AC8">File naming: .cache/videos/{projectId}/scene-{sceneNumber}-default.mp4 with zero-padded scene numbers</criterion>
+      <criterion id="AC9">cleanupOldSegments() deletes files older than 7 days, updates database status, identifies orphaned files</criterion>
+    </criteria-group>
+
+    <criteria-group name="Error Handling">
+      <criterion id="AC10">Video unavailable → download_status = 'error' immediately (no retry)</criterion>
+      <criterion id="AC11">Network timeout → retry with exponential backoff (max 3 attempts)</criterion>
+      <criterion id="AC12">Disk space full → proactive check before enqueuing, returns HTTP 507 with clear message</criterion>
+      <criterion id="AC13">Invalid YouTube URL → download_status = 'error' immediately (no retry)</criterion>
+      <criterion id="AC14">YouTube rate limit (HTTP 429) → pause queue for 15 minutes, retry after cooldown</criterion>
+      <criterion id="AC15">Max 3 concurrent downloads enforced, no race conditions via transaction locking</criterion>
+    </criteria-group>
+
+    <criteria-group name="Security">
+      <criterion id="Security-1">Command injection prevented via spawn() with args array (NOT exec() with string interpolation)</criterion>
+      <criterion id="Security-2">videoId validation: /^[a-zA-Z0-9_-]{11}$/ regex (YouTube format)</criterion>
+      <criterion id="Security-3">outputPath sanitization prevents path traversal attacks (must be within .cache/videos/{projectId}/)</criterion>
+    </criteria-group>
+
+    <criteria-group name="Integration">
+      <criterion id="Integration-1">Downloads segments from visual_suggestions table populated by Story 3.5</criterion>
+      <criterion id="Integration-2">Uses scene.duration from scenes table to calculate segment duration (duration + 5s buffer)</criterion>
+      <criterion id="Integration-3">Prepares downloaded segments for Epic 4 Visual Curation UI instant preview</criterion>
+      <criterion id="Integration-4">Updates workflow state: visual-sourcing → visual-curation (after downloads complete)</criterion>
+    </criteria-group>
+  </acceptance-criteria-summary>
+
+  <implementation-notes>
+    <note category="Performance">
+      <title>Download Speed Optimization</title>
+      <description>
+        720p resolution cap reduces file size (typically 5-15MB per 30s segment) and download time (2-10 seconds per video). Max 3 concurrent downloads balances speed with network bandwidth constraints.
+      </description>
+    </note>
+
+    <note category="Storage">
+      <title>Disk Space Estimates</title>
+      <description>
+        Average segment size: 3-5 MB for 10-15 seconds at 720p. Project with 10 scenes, 5 suggestions each = 50 segments × 4 MB = 200 MB. 7-day retention with daily cleanup maintains storage health.
+      </description>
+    </note>
+
+    <note category="File Naming">
+      <title>Scene Number Padding Edge Cases</title>
+      <description>
+        padStart(2, '0') supports up to 99 scenes (01-99). For scene > 99, either skip padding (100 → "100") or increase width (100 → "0100"). Recommend no padding for edge case to avoid breaking alphabetical sorting.
+      </description>
+    </note>
+
+    <note category="Error Recovery">
+      <title>Classification Strategy</title>
+      <description>
+        Retryable errors: Network timeout, connection refused, HTTP 429 (rate limit), HTTP 503 (service unavailable). Permanent errors: Video unavailable (HTTP 404), private/deleted video, invalid URL, disk space full, unsupported format. Only retryable errors trigger exponential backoff.
+      </description>
+    </note>
+
+    <note category="Database Transactions">
+      <title>Transaction Isolation</title>
+      <description>
+        Use FOR UPDATE clause when querying visual_suggestions to lock row during status update. Prevents race condition where two workers might process same job concurrently. Verify file exists on filesystem before committing transaction to prevent database-filesystem desync.
+      </description>
+    </note>
+
+    <note category="Queue Persistence">
+      <title>Crash Recovery Scenarios</title>
+      <description>
+        Server crash during download: loadQueueState() restores queue, cleanStaleDownloadStatus() resets "downloading" → "queued", processQueue() resumes jobs. Database transaction rollback ensures no partial state (either both file exists AND status=complete, or neither).
+      </description>
+    </note>
+
+    <note category="Testing">
+      <title>Manual Test Scenarios</title>
+      <description>
+        1. Download 5+ segments for test project (verify parallel downloads, max 3 concurrent)
+        2. Trigger retry scenario (disconnect network mid-download, verify exponential backoff)
+        3. Test crash recovery (stop server mid-download, restart, verify queue resumes)
+        4. Test disk space validation (low disk space scenario, verify HTTP 507 response)
+        5. Test transaction rollback (simulate file write failure after DB update)
+        6. Test command injection prevention (malicious videoId with shell metacharacters)
+        7. Test path traversal prevention (malicious projectId with ../ characters)
+      </description>
+    </note>
+
+    <note category="Integration">
+      <title>Epic 4 Handoff</title>
+      <description>
+        After Story 3.6 completes downloads, Epic 4 Visual Curation UI can immediately preview segments without waiting for downloads. "Use Default Segment" button requires NO download (file already exists at default_segment_path). Custom segment selection in Epic 4 will create additional downloads with custom time ranges.
+      </description>
+    </note>
+  </implementation-notes>
+
+  <technical-patterns>
+    <pattern name="Command Execution Security">
+      <description>Always use spawn() with argument array for external command execution</description>
+      <example>
+        <![CDATA[
+// CORRECT - Safe from injection
+const args = [
+  `https://youtube.com/watch?v=${videoId}`,
+  '--download-sections', `*0-${segmentDuration}`,
+  '-f', 'best[height<=720]',
+  '-o', outputPath
+];
+const process = spawn('yt-dlp', args);
+
+// WRONG - Vulnerable to command injection (DO NOT USE)
+const command = `yt-dlp "https://youtube.com/watch?v=${videoId}" --download-sections "*0-${segmentDuration}" -f "best[height<=720]" -o "${outputPath}"`;
+exec(command); // NEVER DO THIS
+        ]]>
+      </example>
+    </pattern>
+
+    <pattern name="Database Transaction Pattern">
+      <description>Wrap all status updates in transactions with row locking</description>
+      <example>
+        <![CDATA[
+async function updateDownloadStatus(
+  suggestionId: string,
+  status: string,
+  filePath?: string
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    // Lock row to prevent concurrent updates
+    const [suggestion] = await tx.execute(`
+      SELECT id FROM visual_suggestions
+      WHERE id = ?
+      FOR UPDATE
+    `, [suggestionId]);
+
+    if (!suggestion) {
+      throw new Error(`Suggestion ${suggestionId} not found`);
+    }
+
+    // Update status
+    await tx.execute(`
+      UPDATE visual_suggestions
+      SET download_status = ?,
+          default_segment_path = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [status, filePath || null, suggestionId]);
+  });
+}
+        ]]>
+      </example>
+    </pattern>
+
+    <pattern name="File Path Resolution">
+      <description>Store relative paths in DB, resolve to absolute for execution, resolve to URL for UI</description>
+      <example>
+        <![CDATA[
+// Store relative path in DB
+const relativePath = `.cache/videos/${projectId}/scene-${sceneNumber.toString().padStart(2, '0')}-default.mp4`;
+await db.execute(`UPDATE visual_suggestions SET default_segment_path = ?`, [relativePath]);
+
+// Resolve to absolute for yt-dlp
+const absolutePath = path.resolve(process.cwd(), relativePath);
+spawn('yt-dlp', [..., '-o', absolutePath]);
+
+// Resolve to URL for UI
+const videoUrl = relativePath.replace('.cache/', '/cache/');
+        ]]>
+      </example>
+    </pattern>
+
+    <pattern name="Queue State Persistence">
+      <description>Save queue state after every significant change for crash recovery</description>
+      <example>
+        <![CDATA[
+private async saveQueueState(): Promise<void> {
+  const state = {
+    queue: this.queue,
+    activeDownloads: Array.from(this.activeDownloads),
+    timestamp: new Date().toISOString()
+  };
+  await fs.writeFile('.cache/queue-state.json', JSON.stringify(state, null, 2));
+}
+
+private async loadQueueState(): Promise<void> {
+  try {
+    const stateFile = await fs.readFile('.cache/queue-state.json', 'utf-8');
+    const state = JSON.parse(stateFile);
+    this.queue = state.queue || [];
+    // Don't restore activeDownloads - these were in-progress when crashed
+  } catch (error) {
+    // File doesn't exist or invalid - start with empty queue
+    this.queue = [];
+  }
+}
+        ]]>
+      </example>
+    </pattern>
+
+    <pattern name="Exponential Backoff Retry">
+      <description>Retry transient failures with increasing delays</description>
+      <example>
+        <![CDATA[
+async function downloadWithRetry(
+  options: DownloadSegmentOptions,
+  retryOptions: RetryOptions = { maxRetries: 3, baseDelay: 1000, maxDelay: 8000 }
+): Promise<DownloadSegmentResult> {
+  for (let attempt = 0; attempt <= retryOptions.maxRetries; attempt++) {
+    const result = await downloadDefaultSegment(options);
+
+    if (result.success || !result.retryable) {
+      return result;
+    }
+
+    if (attempt < retryOptions.maxRetries) {
+      const delay = Math.min(retryOptions.baseDelay * Math.pow(2, attempt), retryOptions.maxDelay);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  return { success: false, error: 'Max retries exhausted', retryable: false };
+}
+        ]]>
+      </example>
+    </pattern>
+  </technical-patterns>
+
+  <testing-strategy>
+    <unit-tests>
+      <test name="downloadDefaultSegment - Valid Input">
+        Given valid videoId and segmentDuration, when downloadDefaultSegment() is called, then yt-dlp command executes with correct arguments and returns success with file path
+      </test>
+      <test name="downloadDefaultSegment - Invalid Video ID">
+        Given videoId with invalid format (not 11 chars alphanumeric), when downloadDefaultSegment() is called, then validation fails and returns error immediately without executing yt-dlp
+      </test>
+      <test name="downloadDefaultSegment - Path Traversal Attempt">
+        Given outputPath with ../ characters, when sanitizeOutputPath() is called, then validation fails and throws error preventing path traversal attack
+      </test>
+      <test name="downloadWithRetry - Retryable Error">
+        Given downloadDefaultSegment() returns retryable error (network timeout), when downloadWithRetry() is called, then 3 retry attempts occur with exponential backoff delays (1s, 2s, 4s)
+      </test>
+      <test name="downloadWithRetry - Permanent Error">
+        Given downloadDefaultSegment() returns permanent error (video unavailable), when downloadWithRetry() is called, then no retry attempts occur and error is returned immediately
+      </test>
+      <test name="DownloadQueue - Concurrency Limit">
+        Given 10 jobs enqueued, when processQueue() executes, then max 3 downloads run concurrently at any time (verified via activeDownloads.size)
+      </test>
+      <test name="DownloadQueue - State Persistence">
+        Given queue with 5 pending jobs, when saveQueueState() is called, then .cache/queue-state.json contains all job data with timestamp
+      </test>
+      <test name="DownloadQueue - Crash Recovery">
+        Given queue state file with 3 pending jobs and 2 "downloading" jobs, when initialize() is called, then queue is restored and "downloading" statuses reset to "queued"
+      </test>
+      <test name="validateVideoId - Valid YouTube ID">
+        Given videoId "dQw4w9WgXcQ" (11 chars alphanumeric), when validateVideoId() is called, then validation passes and returns true
+      </test>
+      <test name="validateVideoId - Invalid YouTube ID">
+        Given videoId with shell metacharacters "test; rm -rf /", when validateVideoId() is called, then validation fails and returns false
+      </test>
+    </unit-tests>
+
+    <integration-tests>
+      <test name="POST /api/projects/[id]/download-segments - Success">
+        Given project with 3 scenes and 5 visual suggestions per scene (15 total), when POST request is sent, then 15 download jobs are enqueued and response shows totalJobs=15, queued=15
+      </test>
+      <test name="POST /api/projects/[id]/download-segments - Insufficient Disk Space">
+        Given system with 50MB free disk space and 15 suggestions requiring ~75MB, when POST request is sent, then HTTP 507 response is returned with clear error message showing required vs available MB
+      </test>
+      <test name="POST /api/projects/[id]/download-segments - yt-dlp Unavailable">
+        Given yt-dlp not installed on system, when POST request is sent, then HTTP 503 response is returned with installation guide link
+      </test>
+      <test name="GET /api/health/yt-dlp - Available">
+        Given yt-dlp installed with version 2024.03.10, when GET request is sent, then response shows available=true, version="2024.03.10", supportsDownloadSections=true
+      </test>
+      <test name="GET /api/health/yt-dlp - Unavailable">
+        Given yt-dlp not installed, when GET request is sent, then response shows available=false with error message
+      </test>
+      <test name="GET /api/projects/[id]/download-progress - Active Downloads">
+        Given 15 total suggestions with 5 complete, 3 downloading, 5 queued, 2 failed, when GET request is sent, then response shows correct counts and message "Downloaded 5/15 segments"
+      </test>
+      <test name="Database Transaction - Concurrent Updates">
+        Given 2 workers attempting to update same suggestion concurrently, when updateDownloadStatus() is called from both workers, then row locking prevents race condition and only one update succeeds
+      </test>
+      <test name="Database Transaction - Rollback on File Write Failure">
+        Given download completes but file write fails, when handleDownloadComplete() is called, then transaction rolls back and download_status remains "downloading" (not "complete")
+      </test>
+    </integration-tests>
+
+    <manual-tests>
+      <test name="Parallel Downloads">
+        Download 5+ segments for test project, verify max 3 concurrent downloads via process monitoring, verify all segments complete successfully
+      </test>
+      <test name="Retry Scenario">
+        Disconnect network mid-download, verify exponential backoff occurs (check logs for retry attempts with 1s, 2s, 4s delays), reconnect network, verify download completes
+      </test>
+      <test name="Crash Recovery">
+        Start download batch, stop server mid-download, restart server, verify queue resumes processing and incomplete downloads retry
+      </test>
+      <test name="Disk Space Validation">
+        Fill disk to low space (< 100MB free), attempt download batch, verify HTTP 507 response with clear error message
+      </test>
+      <test name="Cleanup Service">
+        Download segments, manually change file modification time to 8 days ago, run cleanupOldSegments(), verify files deleted and database updated (download_status → 'pending', default_segment_path → null)
+      </test>
+      <test name="Security - Command Injection">
+        Manually insert malicious videoId "test; rm -rf /" into database, attempt download, verify validation rejects videoId before executing yt-dlp
+      </test>
+      <test name="Security - Path Traversal">
+        Manually insert malicious projectId "../../../etc/passwd" into database, attempt download, verify path sanitization prevents file write outside .cache/videos/
+      </test>
+    </manual-tests>
+  </testing-strategy>
+
+  <epic-workflow-integration>
+    <workflow-step number="1">
+      <story>Story 3.1</story>
+      <action>Initialize YouTube Data API v3 client with authentication</action>
+    </workflow-step>
+    <workflow-step number="2">
+      <story>Story 3.2</story>
+      <action>Analyze scene text using LLM to extract visual themes and generate search queries</action>
+    </workflow-step>
+    <workflow-step number="3">
+      <story>Story 3.3</story>
+      <action>Search YouTube for videos matching scene queries, retrieve metadata including video IDs and durations</action>
+    </workflow-step>
+    <workflow-step number="4">
+      <story>Story 3.4</story>
+      <action>Filter search results by duration (1x-3x scene duration, max 5 minutes), rank by relevance</action>
+    </workflow-step>
+    <workflow-step number="5">
+      <story>Story 3.5</story>
+      <action>Save top N filtered suggestions per scene to visual_suggestions table with download_status = 'pending'</action>
+    </workflow-step>
+    <workflow-step number="6">
+      <story>Story 3.6 (THIS STORY)</story>
+      <action>Download default video segments (first N seconds) for instant preview capability using yt-dlp with queue management and crash recovery</action>
+    </workflow-step>
+    <workflow-step number="7">
+      <story>Epic 4</story>
+      <action>User curates visuals in UI with instant preview playback of downloaded segments, selects final clips for each scene</action>
+    </workflow-step>
+  </epic-workflow-integration>
+
+  <dependencies-external>
+    <dependency name="yt-dlp">
+      <type>External System Binary</type>
+      <version>2023.03.04 or higher (required for --download-sections flag)</version>
+      <installation>
+        - macOS: brew install yt-dlp
+        - Linux: pip install yt-dlp OR package manager (apt, yum, etc.)
+        - Windows: Download from GitHub releases OR pip install yt-dlp
+      </installation>
+      <health-check>GET /api/health/yt-dlp endpoint verifies availability before allowing downloads</health-check>
+      <error-handling>Returns HTTP 503 with installation guide link if yt-dlp unavailable</error-handling>
+    </dependency>
+
+    <dependency name="Node.js child_process">
+      <type>Built-in Module</type>
+      <usage>spawn() for secure command execution without shell injection risk</usage>
+    </dependency>
+
+    <dependency name="Node.js fs/promises">
+      <type>Built-in Module</type>
+      <usage>File operations (writeFile, readFile, access, statfs) for queue persistence and disk space checks</usage>
+    </dependency>
+
+    <dependency name="Node.js path">
+      <type>Built-in Module</type>
+      <usage>Path resolution (resolve, relative) for converting relative ↔ absolute paths</usage>
+    </dependency>
+  </dependencies-external>
+
+  <risk-assessment>
+    <risk level="high">
+      <title>yt-dlp Installation Variance Across OS</title>
+      <description>Installation method differs by OS (Homebrew, pip, package manager, manual download)</description>
+      <mitigation>Health check endpoint verifies yt-dlp availability before allowing downloads, returns clear installation instructions if unavailable</mitigation>
+    </risk>
+
+    <risk level="high">
+      <title>YouTube Rate Limiting</title>
+      <description>Excessive download requests may trigger YouTube API quota limits or IP-based rate limiting</description>
+      <mitigation>HTTP 429 detection pauses queue for 15-minute cooldown, exponential backoff for retries, user alert if quota consistently exceeded</mitigation>
+    </risk>
+
+    <risk level="medium">
+      <title>Disk Space Management</title>
+      <description>Large batch downloads may fill disk if insufficient space available</description>
+      <mitigation>Proactive disk space check before enqueuing (suggestions * 5MB + 100MB buffer), returns HTTP 507 if insufficient, 7-day cache cleanup with daily schedule</mitigation>
+    </risk>
+
+    <risk level="medium">
+      <title>Parallel Download Coordination</title>
+      <description>Race conditions in concurrent download processing could cause duplicate processing or partial state updates</description>
+      <mitigation>Database transactions with row locking (FOR UPDATE), processingLock Map prevents duplicate job processing, queue state persistence for crash recovery</mitigation>
+    </risk>
+
+    <risk level="medium">
+      <title>Command Injection Vulnerability</title>
+      <description>Malicious video IDs or file paths could execute arbitrary shell commands if not properly sanitized</description>
+      <mitigation>spawn() with args array (NOT exec() with string interpolation), videoId validation (/^[a-zA-Z0-9_-]{11}$/), outputPath sanitization (prevent path traversal)</mitigation>
+    </risk>
+
+    <risk level="low">
+      <title>Crash Recovery Complexity</title>
+      <description>Server crash during downloads could leave partial state (files downloaded but DB not updated, or vice versa)</description>
+      <mitigation>Queue state persistence to .cache/queue-state.json, stale status cleanup on startup, database transactions ensure atomicity (file + DB update together or neither)</mitigation>
+    </risk>
+
+    <risk level="low">
+      <title>Network Timeouts</title>
+      <description>Slow network connections may cause download timeouts and user frustration</description>
+      <mitigation>Retry logic with exponential backoff (max 3 attempts), network errors classified as retryable, progress tracking API shows real-time status</mitigation>
+    </risk>
+  </risk-assessment>
+
+  <future-enhancements>
+    <enhancement priority="high">
+      <title>Custom Segment Downloads</title>
+      <description>Extend download service to support user-specified time ranges (e.g., "30-45s" instead of default "0-N")</description>
+      <epic>Epic 4 - Visual Curation UI</epic>
+      <technical-notes>Add customSegmentPath field to visual_suggestions table, extend downloadSegment() to accept startTime parameter, update file naming: scene-{sceneNumber}-custom-{startTimestamp}s.mp4</technical-notes>
+    </enhancement>
+
+    <enhancement priority="medium">
+      <title>Progress Bars for Individual Downloads</title>
+      <description>Parse yt-dlp stdout to extract download progress percentage and show in UI</description>
+      <technical-notes>Listen to yt-dlp stdout stream, parse "[download] X.Y% of ~Z.ZZMiB at KKK.KKKKiB/s ETA MM:SS", emit progress events via WebSocket or SSE</technical-notes>
+    </enhancement>
+
+    <enhancement priority="medium">
+      <title>Download Scheduling</title>
+      <description>Schedule downloads for off-peak hours to reduce server load during active usage</description>
+      <technical-notes>Add scheduled_time field to download_jobs, implement cron-based queue processor, allow user to configure download schedule preferences</technical-notes>
+    </enhancement>
+
+    <enhancement priority="low">
+      <title>CDN Integration</title>
+      <description>Upload downloaded segments to CDN for faster delivery in production environments</description>
+      <technical-notes>Add post-download hook to upload to S3/CloudFront, update default_segment_path to CDN URL, implement cache invalidation on cleanup</technical-notes>
+    </enhancement>
+
+    <enhancement priority="low">
+      <title>Queue Monitoring Dashboard</title>
+      <description>Admin dashboard showing queue health, average download time, error rates, and disk usage</description>
+      <technical-notes>Add metrics collection to DownloadQueue class, create admin API endpoint for metrics retrieval, build dashboard UI with charts (queue depth over time, error rates, avg download duration)</technical-notes>
+    </enhancement>
+  </future-enhancements>
+</story-context>

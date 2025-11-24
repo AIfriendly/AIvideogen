@@ -1,0 +1,228 @@
+<story-context id="bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>6</storyId>
+    <title>Visual Curation Workflow Integration & Error Recovery</title>
+    <status>Ready</status>
+    <generatedAt>2025-11-22</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-4.6.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user who has generated voiceovers and visual suggestions for my project</asA>
+    <iWant>to navigate seamlessly through the workflow with clear progress indicators and error recovery options</iWant>
+    <soThat>I can move forward and backward in the video creation process without losing my progress or encountering confusing states</soThat>
+    <tasks>
+      <task id="1">Create NavigationBreadcrumb Component with Controlled Navigation (AC: #9, #7)</task>
+      <task id="2">Create UnsavedChangesModal Component - PREREQUISITE: Install AlertDialog (AC: #7)</task>
+      <task id="3">Create useSessionPersistence Hook (AC: #6)</task>
+      <task id="4">Update VisualCurationClient with Navigation and Session Persistence (AC: #4, #5, #6, #7, #8, #9)</task>
+      <task id="5">Implement Missing Audio File Error Handling (AC: #8)</task>
+      <task id="6">Update Visual Curation Page with Workflow Validation (AC: #2, #3)</task>
+      <task id="7">Add "Continue to Visual Curation" Button to Voiceover Preview (AC: #1)</task>
+      <task id="8">Implement Browser Navigation Warning (AC: #7)</task>
+      <task id="9">Unit Testing - Navigation Components (AC: #4, #9)</task>
+      <task id="10">Unit Testing - UnsavedChangesModal (AC: #7)</task>
+      <task id="11">Unit Testing - useSessionPersistence Hook (AC: #6)</task>
+      <task id="12">Integration Testing - Workflow Validation (AC: #2, #3)</task>
+      <task id="13">Integration Testing - Navigation and Session (AC: #4, #5, #6, #7)</task>
+      <task id="14">Edge Case Testing (AC: #8)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">After Epic 2 voiceover generation, "Continue to Visual Curation" button appears and navigates to /projects/[id]/visual-curation</criterion>
+    <criterion id="2">Direct URL access to /projects/[id]/visual-curation works if projects.current_step = 'visual-curation'</criterion>
+    <criterion id="3">If user accesses page with wrong workflow step (e.g., current_step = 'voice'), redirect to correct step with warning</criterion>
+    <criterion id="4">"Back to Script Preview" link navigates to Epic 2 Story 2.6 preview page</criterion>
+    <criterion id="5">"Regenerate Visuals" button triggers POST /api/projects/[id]/generate-visuals (Epic 3 Story 3.5)</criterion>
+    <criterion id="6">Scroll position and open preview state persist across page reloads (localStorage)</criterion>
+    <criterion id="7">Warning modal appears if user navigates away with incomplete selections</criterion>
+    <criterion id="8">Edge case handling: if scene has no audio_file_path, display error message with option to regenerate voiceovers</criterion>
+    <criterion id="9">Breadcrumb navigation shows: Project > Script > Voiceover > Visual Curation</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>Feature 1.6 Visual Curation UI</section>
+        <snippet>User interface for scene-by-scene script review, video clip selection, and assembly trigger. Requires completion indicator and workflow navigation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Epic-to-Architecture Mapping, Database Schema</section>
+        <snippet>Defines projects.current_step workflow states, navigation patterns between pages, and database constraints for visual curation workflow.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-4.md</path>
+        <title>Epic 4 Technical Specification</title>
+        <section>Story 4.6 Acceptance Criteria, Workflows and Sequencing, NFR Reliability</section>
+        <snippet>Detailed workflow validation flow, session persistence strategy, navigation interception patterns, and error recovery flows for edge cases.</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-specification.md</path>
+        <title>UX Design Specification</title>
+        <section>Visual Curation Interface, Navigation Patterns</section>
+        <snippet>Desktop-first responsive design (1920px primary, 768px tablet), shadcn/ui components, breadcrumb navigation, and modal patterns.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Breakdown</title>
+        <section>Epic 4 Story 4.6</section>
+        <snippet>Story definition with workflow integration tasks: navigation flow, session persistence, error recovery, and progress tracking.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>ai-video-generator/src/app/projects/[id]/visual-curation/page.tsx</path>
+        <kind>page</kind>
+        <symbol>VisualCurationPage</symbol>
+        <lines>1-50</lines>
+        <reason>Server component to modify with workflow validation and redirect logic</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/app/projects/[id]/visual-curation/VisualCurationClient.tsx</path>
+        <kind>component</kind>
+        <symbol>VisualCurationClient</symbol>
+        <lines>1-500</lines>
+        <reason>Main client component to add navigation buttons, breadcrumb, session persistence, and error handling</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/stores/curation-store.ts</path>
+        <kind>store</kind>
+        <symbol>useCurationStore</symbol>
+        <lines>1-100</lines>
+        <reason>Zustand store for selection state - getSelectionCount() used for incomplete selection detection</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/components/features/curation/ConfirmationModal.tsx</path>
+        <kind>component</kind>
+        <symbol>ConfirmationModal</symbol>
+        <lines>1-80</lines>
+        <reason>Pattern reference for AlertDialog/Dialog usage in UnsavedChangesModal</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/components/features/curation/AssemblyTriggerButton.tsx</path>
+        <kind>component</kind>
+        <symbol>AssemblyTriggerButton</symbol>
+        <lines>1-100</lines>
+        <reason>Pattern reference for navigation button with loading state</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/hooks/use-toast.ts</path>
+        <kind>hook</kind>
+        <symbol>useToast</symbol>
+        <lines>1-50</lines>
+        <reason>Toast notifications for warnings and error messages</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/db/queries.ts</path>
+        <kind>service</kind>
+        <symbol>getProject</symbol>
+        <lines>varies</lines>
+        <reason>Database query for project.current_step validation</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>next</package>
+        <version>16.0.1</version>
+        <usage>App Router, server components, redirect, notFound</usage>
+      </node>
+      <node>
+        <package>react</package>
+        <version>19.2.0</version>
+        <usage>useState, useEffect, useCallback hooks</usage>
+      </node>
+      <node>
+        <package>zustand</package>
+        <version>5.0.8</version>
+        <usage>State management for curation store</usage>
+      </node>
+      <node>
+        <package>@radix-ui/react-dialog</package>
+        <version>1.1.15</version>
+        <usage>AlertDialog for UnsavedChangesModal (needs install: npx shadcn@latest add alert-dialog)</usage>
+      </node>
+      <node>
+        <package>lucide-react</package>
+        <version>0.552.0</version>
+        <usage>Icons: ChevronRight, Home, FileText, Mic, Film, ArrowLeft, ArrowRight, RefreshCw, AlertTriangle, Loader2</usage>
+      </node>
+      <node>
+        <package>better-sqlite3</package>
+        <version>12.4.1</version>
+        <usage>Database queries for workflow validation</usage>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Desktop-first responsive design: 1920px primary, 768px tablet minimum</constraint>
+    <constraint type="pattern">Use shadcn/ui components for buttons, dialogs, alerts</constraint>
+    <constraint type="pattern">Use controlled navigation pattern for in-app link interception</constraint>
+    <constraint type="storage">localStorage keys must be project-scoped: visual-curation-session-{projectId}</constraint>
+    <constraint type="storage">Session state expires after 1 hour to prevent stale data</constraint>
+    <constraint type="navigation">Server-side redirect for workflow validation (not client-side)</constraint>
+    <constraint type="api">Use existing generate-visuals API endpoint from Epic 3</constraint>
+    <constraint type="testing">Vitest for unit/integration tests, Testing Library for component tests</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>NavigationBreadcrumbProps</name>
+      <kind>component-props</kind>
+      <signature>{ projectId: string; projectName: string; currentStep: 'script' | 'voiceover' | 'visual-curation'; onNavigate?: (href: string) => void }</signature>
+      <path>ai-video-generator/src/components/features/curation/NavigationBreadcrumb.tsx</path>
+    </interface>
+    <interface>
+      <name>UnsavedChangesModalProps</name>
+      <kind>component-props</kind>
+      <signature>{ isOpen: boolean; onClose: () => void; onConfirmLeave: () => void; selectionCount: number; totalScenes: number }</signature>
+      <path>ai-video-generator/src/components/features/curation/UnsavedChangesModal.tsx</path>
+    </interface>
+    <interface>
+      <name>useSessionPersistence</name>
+      <kind>hook</kind>
+      <signature>(projectId: string) => { saveScrollPosition: (position: number) => void; savePreviewState: (suggestionId: string | null) => void; restoreState: () => SessionState | null; clearState: () => void }</signature>
+      <path>ai-video-generator/src/lib/hooks/useSessionPersistence.ts</path>
+    </interface>
+    <interface>
+      <name>POST /api/projects/[id]/generate-visuals</name>
+      <kind>REST-endpoint</kind>
+      <signature>POST with no body, returns { success: boolean, message: string }</signature>
+      <path>ai-video-generator/src/app/api/projects/[id]/generate-visuals/route.ts</path>
+    </interface>
+    <interface>
+      <name>redirect</name>
+      <kind>next-function</kind>
+      <signature>redirect(url: string): never</signature>
+      <path>next/navigation</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Use Vitest as test runner with Testing Library for React components. Tests should follow AAA pattern (Arrange, Act, Assert). Mock localStorage for hook tests. Mock next/navigation for router tests. Use MSW for API mocking in integration tests. Maintain 70%+ coverage for UI components, 80%+ for state management and validation logic.</standards>
+    <locations>
+      <location>ai-video-generator/tests/components/curation/</location>
+      <location>ai-video-generator/tests/hooks/</location>
+      <location>ai-video-generator/tests/integration/</location>
+      <location>ai-video-generator/tests/edge-cases/</location>
+    </locations>
+    <ideas>
+      <idea acId="1">Test "Continue to Visual Curation" button renders when visuals_generated is true</idea>
+      <idea acId="2">Test direct URL access allowed when current_step is 'visual-curation'</idea>
+      <idea acId="3">Test redirect to voice-selection when current_step is 'voice'</idea>
+      <idea acId="4">Test "Back to Script Preview" navigation with and without selections</idea>
+      <idea acId="5">Test regenerate visuals API call and scene refresh</idea>
+      <idea acId="6">Test scroll position save/restore with localStorage mocking</idea>
+      <idea acId="7">Test UnsavedChangesModal shows correct missing count, test controlled navigation</idea>
+      <idea acId="8">Test AudioErrorAlert renders when scene has null audio_file_path</idea>
+      <idea acId="9">Test NavigationBreadcrumb renders all steps with correct links</idea>
+    </ideas>
+  </tests>
+</story-context>

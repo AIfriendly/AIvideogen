@@ -4,7 +4,7 @@
 
 **Project:** AI Video Generator (Level 2)
 **Repository:** https://github.com/AIfriendly/AIvideogen
-**Last Updated:** 2025-11-01
+**Last Updated:** 2025-11-22
 
 ---
 
@@ -347,7 +347,7 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 **Goal:** Integrate FOSS TTS engine and create voice profile infrastructure
 
 **Tasks:**
-- Research and select FOSS TTS engine (kokproTTS)
+- Research and select FOSS TTS engine (kokoroTTS)
 - Install and configure TTS engine dependencies
 - Create voice profile data structure (lib/tts/voice-profiles.ts)
 - Generate preview audio samples for each voice profile
@@ -560,21 +560,23 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 ## Epic 3: Visual Content Sourcing (YouTube API)
 
-**Goal:** Intelligently source and suggest relevant B-roll footage for each script scene using YouTube as the primary content source.
+**Goal:** Intelligently source and suggest relevant B-roll footage for each script scene using YouTube as the primary content source, with duration filtering and automatic default segment downloads for instant preview.
 
 **Features Included:**
-- 1.4. AI-Powered Visual Sourcing (YouTube API Integration)
+- 1.5. AI-Powered Visual Sourcing (YouTube API Integration with Duration Filtering and Default Segment Downloads)
 
-**User Value:** Creators save hours of manual footage searching by receiving AI-curated visual suggestions from YouTube's massive content library, including gaming footage, tutorials, nature content, and more.
+**User Value:** Creators save hours of manual footage searching by receiving AI-curated visual suggestions from YouTube's massive content library, including gaming footage, tutorials, nature content, and more. Duration filtering ensures videos are appropriate for scene length, and automatic segment downloads enable instant preview without waiting.
 
 **Technical Approach:**
 - Primary Source: YouTube Data API v3
 - Search queries generated from scene text analysis
+- Duration filtering: 1x-3x ratio with 5-minute max cap
+- Automatic default segment download using yt-dlp
 - Filter for appropriate licensing (Creative Commons when possible)
 - Support for niche content (gaming, tutorials, vlogs, etc.)
 - Handle YouTube API quotas and rate limiting
 
-**Story Count Estimate:** 4-5 stories
+**Story Count Estimate:** 8 stories (6 original + 2 enhancement stories for advanced filtering)
 
 **Dependencies:**
 - Epic 2 (needs script structure as input)
@@ -586,6 +588,9 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 - Handles various content types (general footage, gaming, educational)
 - Respects YouTube API quotas and implements appropriate error handling
 - Suggestion quality meets user expectations
+- **Pure B-roll results with no commentary, captions, or reaction content**
+- **Google Cloud Vision API validates content relevance and quality**
+- **Audio stripped from all downloaded segments**
 
 ---
 
@@ -698,10 +703,17 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 ---
 
 #### Story 3.4: Content Filtering & Quality Ranking
-**Goal:** Filter and rank YouTube search results to prioritize high-quality, appropriate content
+**Goal:** Filter and rank YouTube search results to prioritize high-quality, appropriate content with duration filtering to ensure videos are suitable for scene length
 
 **Tasks:**
 - Implement content filtering logic (lib/youtube/filter-results.ts)
+- **Duration Filtering (PRIMARY FILTER):**
+  - Implement filterByDuration() function
+  - Filter videos based on 1x-3x duration ratio relative to scene voiceover duration
+  - Apply 5-minute (300 second) maximum duration cap regardless of scene length
+  - Examples: 10s scene accepts 10s-30s videos; 90s scene accepts 90s-270s videos; 120s scene accepts 120s-300s (NOT 360s)
+  - Fetch video duration via YouTube API videos.list (contentDetails.duration ISO 8601 format)
+  - Parse ISO 8601 duration to seconds for comparison
 - Filter by licensing preference:
   - Priority 1: Creative Commons licensed videos
   - Priority 2: Standard YouTube license (embeddable)
@@ -720,8 +732,13 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
   - Nature: prioritize documentary-style content
 - Limit final suggestions to 5-8 videos per scene (top-ranked)
 - Add configuration options for filtering preferences (lib/youtube/filter-config.ts)
+- Implement fallback logic: If insufficient results after duration filtering, relax duration threshold (1x-5x ratio, then remove cap)
 
 **Acceptance Criteria:**
+- **Duration filtering applied FIRST before other filters**
+- **Given scene with 30s voiceover, only videos 30s-90s (1x-3x) pass duration filter**
+- **Given scene with 180s voiceover, max duration capped at 300s (5 min), NOT 540s (3x)**
+- **ISO 8601 duration parsing correctly converts "PT1M30S" to 90 seconds**
 - Creative Commons videos ranked higher than standard license (when available)
 - Videos with <1000 views filtered out (spam prevention)
 - Title spam detection removes videos with >5 emojis or >50% ALL CAPS
@@ -729,7 +746,9 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 - Gaming content filtering successfully identifies "gameplay only" videos
 - Final suggestions limited to 5-8 top-ranked videos per scene
 - Filtering preferences configurable via filter-config.ts
-- Edge case: If no videos pass filters, relax criteria incrementally (remove view count threshold, then title filters)
+- **Fallback 1:** If <3 videos pass strict duration filter (1x-3x), relax to 1x-5x ratio
+- **Fallback 2:** If still <3 videos, remove 5-minute cap and accept any video ≥1x scene duration
+- **Fallback 3:** If no videos pass filters, relax criteria incrementally (remove view count threshold, then title filters)
 - **Test Case:** When all results fail initial filters (e.g., all videos <1000 views), system relaxes view count threshold first, then title spam filters, ensuring at least 1-3 suggestions returned if any results exist from Story 3.3
 
 **References:**
@@ -740,7 +759,7 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 ---
 
 #### Story 3.5: Visual Suggestions Database & Workflow Integration
-**Goal:** Store visual suggestions in database and integrate visual sourcing step into project workflow
+**Goal:** Store visual suggestions in database with duration and segment download tracking, and integrate visual sourcing step into project workflow
 
 **Tasks:**
 - Create visual_suggestions table in database:
@@ -749,12 +768,16 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
   - video_id (YouTube video ID)
   - title, thumbnail_url, channel_title, embed_url
   - rank (suggestion ranking 1-8)
+  - **duration INTEGER (video duration in seconds from Story 3.4)**
+  - **default_segment_path TEXT (path to downloaded default segment from Story 3.6)**
+  - **download_status TEXT DEFAULT 'pending' (pending, downloading, complete, error from Story 3.6)**
   - created_at timestamp
 - Add index on visual_suggestions(scene_id)
 - Implement database query functions (lib/db/queries.ts):
   - saveVisualSuggestions(sceneId, suggestions[])
   - getVisualSuggestions(sceneId)
   - getVisualSuggestionsByProject(projectId)
+  - **updateSegmentDownloadStatus(suggestionId, status, filePath)**
 - Update projects table: Add visuals_generated boolean flag
 - Update POST /api/projects/[id]/generate-visuals to save suggestions to database
 - Implement GET /api/projects/[id]/visual-suggestions endpoint to retrieve suggestions
@@ -766,9 +789,13 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 **Acceptance Criteria:**
 - visual_suggestions table created with all required fields and foreign key constraints
+- **duration column stores video duration in seconds (INTEGER, nullable for backward compatibility)**
+- **default_segment_path column stores file path to downloaded segment (TEXT, NULL until download completes)**
+- **download_status column defaults to 'pending' and updates to 'downloading', 'complete', or 'error'**
 - Index on scene_id improves query performance
-- saveVisualSuggestions() stores 5-8 suggestions per scene with ranking
-- getVisualSuggestions(sceneId) retrieves suggestions ordered by rank
+- saveVisualSuggestions() stores 5-8 suggestions per scene with ranking and duration
+- getVisualSuggestions(sceneId) retrieves suggestions ordered by rank with duration and download status
+- **updateSegmentDownloadStatus() successfully updates status and file path for a suggestion**
 - projects.visuals_generated flag updated on completion
 - VisualSourcing loading screen displays during visual generation process
 - Progress indicator shows "Analyzing scene 2/5..." dynamically
@@ -780,8 +807,193 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 **References:**
 - PRD Feature 1.5 AC2 (Data Structure) lines 202-205
-- Story 3.4 (visual_suggestions table schema) lines 743-756
+- Story 3.4 (visual_suggestions table schema) lines 760-769
 - Epic 2 Story 2.6 (UI workflow integration) lines 530-558
+
+---
+
+#### Story 3.6: Default Segment Download Service
+**Goal:** Automatically download default video segments (first N seconds) for instant preview capability in Visual Curation UI
+
+**Tasks:**
+- Install yt-dlp dependency (Python-based YouTube downloader)
+- Create downloadDefaultSegment() service function (lib/youtube/download-segment.ts)
+- Implement yt-dlp command execution:
+  - Command: `yt-dlp "https://youtube.com/watch?v=${videoId}" --download-sections "*0-${segmentDuration}" -f "best[height<=720]" -o "${outputPath}"`
+  - segmentDuration = scene voiceover duration + 5 second buffer
+  - outputPath = `.cache/videos/{projectId}/scene-{sceneNumber}-default.mp4`
+  - Resolution: 720p max for performance
+- Create POST /api/projects/[id]/download-segments endpoint
+- For each visual suggestion after Story 3.5 saves to database:
+  - Calculate segment duration (scene.duration + 5 seconds)
+  - Queue download job for each suggestion (max 5-8 per scene)
+  - Update visual_suggestions.download_status = 'downloading'
+  - Execute yt-dlp download
+  - Save file to .cache/videos/{projectId}/ directory
+  - Update visual_suggestions.default_segment_path and download_status = 'complete'
+- Implement error handling:
+  - Retry logic: Max 3 attempts with exponential backoff (1s, 2s, 4s delays)
+  - Permanent failure: Update download_status = 'error' after max retries
+  - Quota/rate limit handling: Pause downloads and resume later
+- Create background job queue for parallel downloads (limit 3 concurrent downloads)
+- Add progress tracking: Track X/Y segments downloaded per project
+- Clean up old cached segments (retention policy: 7 days)
+
+**Acceptance Criteria:**
+- yt-dlp installed and accessible via system PATH or bundled
+- downloadDefaultSegment() successfully downloads first N seconds of YouTube video
+- **Given scene with 8s voiceover, download captures first 13 seconds (8s + 5s buffer)**
+- **Given scene with 120s voiceover, download captures first 125 seconds (120s + 5s buffer)**
+- Downloaded segments saved to `.cache/videos/{projectId}/scene-{sceneNumber}-default.mp4`
+- File naming convention prevents conflicts (scene number unique per project)
+- **Resolution capped at 720p** (format: "best[height<=720]")
+- POST /api/projects/[id]/download-segments processes all suggestions for all scenes
+- download_status updates correctly: pending → downloading → complete (or error)
+- default_segment_path populated with file path on successful download
+- **Retry logic:** Failed downloads retry max 3 times with exponential backoff
+- **Permanent failures:** After 3 retries, download_status = 'error' and download stops
+- **Parallel downloads:** Max 3 concurrent downloads to avoid overwhelming network/CPU
+- Progress tracking: API returns "Downloaded 12/40 segments" status
+- **Cached files:** Segments remain available for 7 days, then auto-deleted to save disk space
+- **Error scenarios handled:**
+  - Video unavailable/deleted: Mark as error immediately (no retry)
+  - Network timeout: Retry with backoff
+  - Disk space full: Pause downloads, alert user
+  - Invalid YouTube URL: Mark as error immediately (no retry)
+
+**References:**
+- PRD Feature 1.5 (Default Segment Download) lines 203-208
+- PRD Feature 1.5 AC6 (Default Segment Download) lines 235-238
+- PRD Feature 1.5 AC7 (Instant Preview) lines 239-242
+- Story 3.5 (database schema extensions) lines 767-768
+- Architecture lines 610-685 (yt-dlp implementation details)
+
+---
+
+#### Story 3.2b: Enhanced Search Query Generation
+**Goal:** Improve query relevance with content-type awareness, entity extraction, and platform-optimized search patterns for pure B-roll results
+
+**Tasks:**
+- Update visual search prompt (lib/llm/prompts/visual-search-prompt.ts) for content-type detection
+- Implement content-type classification: gaming, historical, conceptual, nature, tutorial
+- Add entity extraction logic for specific subjects (boss names, historical events, concepts)
+- Generate platform-optimized YouTube search queries with B-roll quality terms
+- Implement automatic negative term injection (-reaction, -review, -commentary, -tier list, -vlog)
+- Add B-roll quality terms (+cinematic, +4K, +no commentary, +gameplay only, +stock footage)
+- Create content-type specific query templates (gaming: "no commentary gameplay only", historical: "documentary footage")
+- Update tests for diverse content types (gaming, historical, conceptual)
+
+**Acceptance Criteria:**
+- Given scene "The epic battle against Ornstein and Smough tests every player's skill":
+  - Content type detected: gaming
+  - Entities extracted: "Ornstein and Smough", "Dark Souls"
+  - Query includes: "dark souls ornstein smough boss fight no commentary gameplay only"
+  - Negative terms applied: -reaction -review -tier list
+- Given scene "The storming of the Winter Palace marked the beginning of Soviet rule":
+  - Content type detected: historical
+  - Entities extracted: "Winter Palace", "Russian Revolution"
+  - Query includes: "russian revolution winter palace historical footage documentary"
+- Given scene "Towering skyscrapers loom over empty streets as autonomous drones patrol":
+  - Content type detected: conceptual
+  - Query includes: "dystopian city AI robots cinematic 4K"
+- All queries include appropriate negative terms for content type
+- Manual review of 10 sample scenes shows relevant search results
+- Query generation completes within 5 seconds per scene
+
+**References:**
+- PRD Feature 1.5 (Enhanced Query Generation) lines 200-204
+- PRD Feature 1.5 AC8 (Enhanced Query Generation) lines 262-265
+
+---
+
+#### Story 3.7: Computer Vision Content Filtering
+**Goal:** Filter low-quality B-roll using Google Cloud Vision API (face detection, OCR, label verification) and local processing (keyword filtering, audio stripping)
+
+**Tasks:**
+- **Tier 1 - Local Filtering:**
+  - Implement keyword filtering for titles/descriptions (lib/youtube/filter-results.ts)
+  - Filter patterns: "reaction", "reacts", "commentary", "my thoughts", "review", "tier list", "ranking", "explained", "vlog"
+  - Prioritize B-roll indicators: "stock footage", "cinematic", "4K", "no text", "gameplay only"
+  - Add audio stripping to segment download using FFmpeg (-an flag)
+  - Update yt-dlp download command or add post-processing step
+- **Tier 2 - Google Cloud Vision API:**
+  - Set up Google Cloud Vision API credentials and client library (@google-cloud/vision)
+  - Create vision API client (lib/vision/client.ts) with quota management
+  - **Implement thumbnail pre-filtering: analyze YouTube thumbnails first to pre-filter candidates before downloading (reduces bandwidth and API calls)**
+  - Implement frame extraction from downloaded video segments using FFmpeg (3 frames: 10%, 50%, 90% duration)
+  - Implement FACE_DETECTION to identify talking heads (filter if face bounding box area >15% of total frame area)
+  - Implement TEXT_DETECTION (OCR) to identify burned-in captions/overlays
+  - Implement LABEL_DETECTION to verify content matches scene theme (at least 1 of top 3 expected labels)
+  - Create label matching logic (scene keywords → expected Vision API labels generated by LLM)
+  - Implement quality ranking based on CV results (fewer faces, less text, better label match = higher rank)
+- **Error Handling & Fallback:**
+  - Implement API quota tracking (1,000 units/month free tier)
+  - Add graceful fallback to Tier 1 filtering when API quota exceeded
+  - Implement retry logic with exponential backoff for API failures
+  - Add logging for CV analysis results
+- **Database & Integration:**
+  - Add cv_score column to visual_suggestions table for ranking
+  - Update filtering pipeline to run CV analysis after initial keyword filtering
+  - Create POST /api/projects/[id]/cv-filter endpoint for manual re-filtering
+- **Testing:**
+  - Create mocked Vision API responses for unit tests
+  - Add benchmark tests for face detection accuracy (20 talking head vs 20 B-roll videos)
+  - Add benchmark tests for OCR accuracy (20 captioned vs 20 clean videos)
+  - Verify filtering adds <5 seconds per video suggestion
+- **Frontend - Silent Video Indicator (VideoPreviewPlayer):**
+  - Remove volume control from VideoPreviewPlayer component
+  - Add static mute icon (🔇) with tooltip "Audio removed for preview"
+  - Position icon bottom-left of controls bar, before time display
+  - Style icon with muted color (Slate 400, not alarming)
+  - Remove keyboard shortcuts for volume (M, Up/Down arrows)
+  - Update accessibility labels per UX spec v3.4
+
+**Acceptance Criteria:**
+- **Keyword Filtering:**
+  - Videos with "reaction", "commentary", "vlog" in titles filtered out
+  - Videos with "cinematic", "4K", "stock footage" prioritized in ranking
+- **Audio Stripping:**
+  - All downloaded segments have no audio track (verify with ffprobe)
+  - Audio stripping adds <1 second to download time
+- **Thumbnail Pre-Filtering:**
+  - YouTube thumbnails analyzed before downloading video segments
+  - Videos with faces in thumbnails pre-filtered (reduces downloads by ~30-50%)
+  - Thumbnail analysis uses same FACE_DETECTION and TEXT_DETECTION features
+- **Face Detection:**
+  - Videos with face bounding box area >15% of total frame area filtered out
+  - Face detection correctly identifies >80% of talking head videos (benchmark test)
+  - Pure B-roll videos (no faces) pass filter
+  - Multiple faces summed for total area calculation
+- **Text/Caption Detection:**
+  - Videos with burned-in captions detected and filtered/ranked lower
+  - OCR correctly identifies >80% of captioned videos (benchmark test)
+  - Clean B-roll videos pass filter
+- **Label Verification:**
+  - Scene "mountain landscape" → video must have labels like "mountain", "landscape", "nature"
+  - Scene "Dark Souls boss fight" → video must have labels like "video game", "combat", "fantasy", "dark souls boss"
+  - Mismatched content filtered out or ranked significantly lower
+- **API Quota & Fallback:**
+  - System tracks API usage against 1,000 units/month limit
+  - When quota exceeded, system falls back to keyword-only filtering
+  - Fallback does not cause visual sourcing to fail
+- **Performance:**
+  - CV filtering completes in <5 seconds per video suggestion
+  - Frame extraction uses FFmpeg efficiently (3 frames only)
+- **Manual Validation:**
+  - Manual review of 10 sample scenes shows 80%+ pure B-roll results
+  - Significant improvement over pre-enhancement filtering
+- **Silent Video Indicator (Frontend):**
+  - VideoPreviewPlayer displays 🔇 icon in bottom-left of controls
+  - Hovering icon shows tooltip: "Audio removed for preview"
+  - No volume slider or unmute option available
+  - Icon uses muted color (Slate 400, not red/alarming)
+  - Keyboard shortcuts M, Up/Down arrows do not trigger any action
+
+**References:**
+- PRD Feature 1.5 (Pure B-Roll Content Filtering) lines 210-213
+- PRD Feature 1.5 (Google Cloud Vision API Integration) lines 214-220
+- PRD Feature 1.5 AC9-AC14 lines 266-289
+- UX Design Specification v3.4, Section 8.13 (VideoPreviewPlayer Silent Video Indicator)
 
 ---
 
@@ -790,11 +1002,11 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 **Goal:** Provide an intuitive UI for creators to review scripts, preview suggested clips, and finalize visual selections.
 
 **Features Included:**
-- 1.5. Visual Curation UI
+- 1.6. Visual Curation UI
 
 **User Value:** Creators maintain creative control through an easy-to-use interface for selecting the perfect visuals.
 
-**Story Count Estimate:** 5-6 stories
+**Story Count:** 6 stories
 
 **Dependencies:**
 - Epic 2 (displays script)
@@ -806,6 +1018,195 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 - Users can select one clip per scene
 - Assembly trigger only activates when all scenes have selections
 - Data passes correctly to assembly module
+
+---
+
+### Epic 4 Stories
+
+#### Story 4.1: Scene-by-Scene UI Layout & Script Display
+**Goal:** Create the foundational UI structure for the visual curation page with scene-by-scene layout
+
+**Tasks:**
+- Create VisualCuration.tsx page component at /projects/[id]/visual-curation
+- Implement scene-by-scene layout with numbered sections (Scene 1, Scene 2, etc.)
+- Display script text for each scene from database (scenes table)
+- Add navigation to visual curation page after Epic 3 visual sourcing completes
+- Implement loading states for fetching scenes and suggestions
+- Add responsive design for desktop and tablet viewing
+- Create GET /api/projects/[id]/scenes endpoint to retrieve all scenes with text and audio
+- Implement error handling for missing scenes or failed data retrieval
+
+**Acceptance Criteria:**
+- VisualCuration page displays after visual sourcing completes (projects.current_step = 'visual-curation')
+- All scenes displayed in sequential order (Scene 1, Scene 2, Scene 3...)
+- Each scene section shows scene number and complete script text
+- Scene data loads from database via GET /api/projects/[id]/scenes endpoint
+- Loading indicator displays while fetching scene data
+- Error messages display if scenes cannot be loaded
+- Layout is responsive and readable on desktop (1920px) and tablet (768px) screens
+- Empty state displays if no scenes exist for project
+
+**References:**
+- PRD Feature 1.6 AC1 (Scene and Clip Display) lines 263-266
+- Epic 3 Story 3.5 (visual_suggestions database) lines 758-809
+
+---
+
+#### Story 4.2: Visual Suggestions Display & Gallery
+**Goal:** Display AI-generated video clip suggestions for each scene with thumbnails and metadata
+
+**Tasks:**
+- Create VisualSuggestionGallery.tsx component
+- Fetch visual suggestions per scene from GET /api/projects/[id]/visual-suggestions endpoint
+- Display 5-8 suggested video clips per scene in grid layout
+- Show YouTube thumbnail for each suggestion
+- Display video metadata: title, channel, duration
+- Add visual indicator for download status (pending, downloading, complete, error)
+- Implement empty state for scenes with no suggestions (YouTube returned 0 results)
+- Add retry functionality for failed visual sourcing
+- Handle loading states for suggestions still being processed
+
+**Acceptance Criteria:**
+- Each scene section displays its suggested video clips in a gallery grid (2-3 columns)
+- Each suggestion card shows: YouTube thumbnail, video title, channel name, duration
+- Suggestions ordered by rank (1-8) from Story 3.4 filtering
+- Download status indicator visible per suggestion (pending/downloading/complete/error icon)
+- **Empty State (Epic 3 Story 3.5 AC6):** If scene has 0 suggestions, display message: "No clips found for this scene. The script may be too abstract or specific. Try editing the script text."
+- **Retry Functionality (Epic 3 Story 3.5 AC7):** If visual sourcing failed, "Retry Visual Sourcing" button appears
+- Loading skeleton displays while suggestions are being fetched
+- Graceful degradation if thumbnails fail to load (show placeholder image)
+
+**References:**
+- PRD Feature 1.6 AC1 (Scene and Clip Display) lines 263-266
+- Epic 3 Story 3.5 (visual_suggestions table) lines 760-809
+- Epic 3 Story 3.4 (ranking and filtering) lines 703-756
+
+---
+
+#### Story 4.3: Video Preview & Playback Functionality
+**Goal:** Enable users to preview suggested video clips directly in the browser using downloaded segments
+
+**Tasks:**
+- Implement VideoPreviewPlayer.tsx component with HTML5 video player
+- Load default video segment from default_segment_path (downloaded in Epic 3 Story 3.6)
+- Add play/pause controls, progress bar, and volume controls
+- Implement click-to-preview: clicking a suggestion opens preview modal/inline player
+- Display video title and channel in preview mode
+- Add "Close Preview" functionality to return to gallery view
+- Implement fallback to YouTube embed iframe if segment download failed (download_status = 'error')
+- Add keyboard shortcuts (Space = play/pause, Esc = close preview)
+- Optimize video loading (lazy load segments, preload on hover)
+
+**Acceptance Criteria:**
+- Clicking a suggestion card opens video preview player
+- **Default Segment Playback (Epic 3 Story 3.6):** Video plays downloaded segment from `.cache/videos/{projectId}/scene-{sceneNumber}-default.mp4`
+- **Instant Playback (PRD Feature 1.5 AC7):** Video starts immediately without additional downloads
+- Play/pause, progress bar, and volume controls functional
+- **Fallback for Failed Downloads:** If default_segment_path is NULL or download_status = 'error', player embeds YouTube iframe instead
+- Keyboard shortcuts work (Space = play/pause, Esc = close)
+- Multiple previews can be watched sequentially (no need to reload page)
+- Video player responsive and works on desktop and tablet
+
+**References:**
+- PRD Feature 1.6 AC1 (Scene and Clip Display) lines 263-266
+- PRD Feature 1.5 AC7 (Instant Preview) lines 239-242
+- Epic 3 Story 3.6 (default segment download) lines 812-867
+
+---
+
+#### Story 4.4: Clip Selection Mechanism & State Management
+**Goal:** Allow users to select exactly one video clip per scene and persist selections
+
+**Tasks:**
+- Implement clip selection logic in curation-store.ts (Zustand state management)
+- Add visual selection indicator (checkmark, border highlight, or "Selected" badge) to chosen clip
+- Enforce one selection per scene (selecting new clip deselects previous)
+- Persist selections in state during session
+- Create POST /api/projects/[id]/select-clip endpoint to save selections to database
+- Add selected_clip_id column to scenes table (foreign key to visual_suggestions)
+- Update selection state immediately on user click (optimistic UI update)
+- Save selection to database asynchronously
+- Display selection count progress (e.g., "3/5 scenes selected")
+
+**Acceptance Criteria:**
+- Clicking a suggestion card marks it as "Selected" with visual indicator (checkmark icon, blue border)
+- Selecting a different clip for the same scene deselects the previous one automatically
+- Selection state persists during page session (stored in Zustand store)
+- POST /api/projects/[id]/select-clip saves selection to database (scenes.selected_clip_id)
+- Selection count indicator displays: "Scenes Selected: 3/5" at top of page
+- Optimistic UI update (selection appears immediately, saved in background)
+- Error handling: if save fails, show toast notification and revert UI state
+- All scenes default to "No selection" state initially
+
+**References:**
+- PRD Feature 1.6 AC2 (Clip Selection) lines 267-270
+- Epic 2 Story 2.2 (scenes table schema) lines 372-396
+
+---
+
+#### Story 4.5: Assembly Trigger & Validation Workflow
+**Goal:** Provide "Assemble Video" button that validates all selections and triggers video assembly
+
+**Tasks:**
+- Create AssemblyTrigger.tsx component with "Assemble Video" button
+- Implement selection validation (check all scenes have selected_clip_id)
+- Disable button if incomplete selections (show tooltip: "Select clips for all X scenes")
+- Enable button only when all scenes have selections
+- Add confirmation modal: "Ready to assemble? This will create your final video with the selected clips."
+- Create POST /api/projects/[id]/assemble endpoint to trigger Epic 5 assembly process
+- Update projects.current_step = 'editing' (or 'export') when assembly starts
+- Display assembly progress indicator (placeholder for Epic 5 implementation)
+- Navigate to assembly status page after trigger
+- Implement error handling for assembly trigger failures
+
+**Acceptance Criteria:**
+- "Assemble Video" button displays at bottom of page (sticky footer)
+- **Incomplete Selection (PRD Feature 1.6 AC4):** Button disabled if any scene missing selection, tooltip shows: "Select clips for all 5 scenes to continue"
+- **Complete Selection (PRD Feature 1.6 AC3):** Button enabled when all scenes have selections
+- Clicking enabled button shows confirmation modal with scene count and selections summary
+- **Assembly Trigger (PRD Feature 1.6 AC3):** Confirming modal calls POST /api/projects/[id]/assemble with complete scene data:
+  - scene_number, script text, selected clip video_id, voiceover audio_file_path, clip duration
+- Assembly endpoint updates projects.current_step and returns assembly job ID
+- User navigated to assembly status/progress page (placeholder until Epic 5)
+- Error toast displays if assembly trigger fails
+- Button shows loading spinner while assembly request processes
+
+**References:**
+- PRD Feature 1.6 AC3 (Finalization Trigger) lines 271-274
+- PRD Feature 1.6 AC4 (Incomplete Selection Prevention) lines 275-277
+- Epic 5 (Video Assembly & Output) lines 893-917
+
+---
+
+#### Story 4.6: Visual Curation Workflow Integration & Error Recovery
+**Goal:** Integrate visual curation page into project workflow with error recovery and edge case handling
+
+**Tasks:**
+- Update project navigation flow: Voiceover Preview (Epic 2) → Visual Sourcing (Epic 3) → Visual Curation
+- Implement "Continue to Visual Curation" button in Epic 2 Story 2.6 script preview
+- Add direct navigation to visual curation from project page if projects.current_step = 'visual-curation'
+- Implement "Back to Script Preview" navigation for users to review script again
+- Add "Regenerate Visuals" option to re-run Epic 3 visual sourcing if unsatisfied with suggestions
+- Implement session persistence: save scroll position and preview state in localStorage
+- Add project save reminder if user navigates away with incomplete selections
+- Handle edge cases: script modified after visual sourcing, deleted suggestions, missing audio files
+- Implement progress tracking in projects table (current_step workflow validation)
+
+**Acceptance Criteria:**
+- After Epic 2 voiceover generation, "Continue to Visual Curation" button appears and navigates to /projects/[id]/visual-curation
+- Direct URL access to /projects/[id]/visual-curation works if projects.current_step = 'visual-curation'
+- If user accesses page with wrong workflow step (e.g., current_step = 'voice'), redirect to correct step with warning
+- "Back to Script Preview" link navigates to Epic 2 Story 2.6 preview page
+- "Regenerate Visuals" button triggers POST /api/projects/[id]/generate-visuals (Epic 3 Story 3.5)
+- Scroll position and open preview state persist across page reloads (localStorage)
+- Warning modal appears if user navigates away with incomplete selections: "You haven't selected clips for all scenes. Progress will be saved."
+- Edge case handling: if scene has no audio_file_path, display error message with option to regenerate voiceovers
+- Breadcrumb navigation shows: Project → Script → Voiceover → Visual Curation
+
+**References:**
+- PRD Feature 1.6 (Visual Curation UI) lines 244-277
+- Epic 2 Story 2.6 (Script Preview) lines 530-558
+- Epic 3 Story 3.5 (Workflow Integration) lines 758-809
 
 ---
 
@@ -835,17 +1236,205 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 ---
 
+### Epic 5 Stories
+
+#### Story 5.1: Video Processing Infrastructure Setup
+**Implements:** FR-7.01, FR-7.05
+
+**Goal:** Set up FFmpeg-based video processing infrastructure for video assembly operations
+
+**Tasks:**
+- Install and configure FFmpeg as system dependency
+- Create VideoProcessor service class (lib/video/processor.ts)
+- Implement FFmpeg command builder utility for common operations
+- Create video processing queue for managing assembly jobs
+- Implement job status tracking (pending, processing, complete, error)
+- Add database schema for assembly jobs (assembly_jobs table)
+- Create POST /api/projects/[id]/assemble endpoint to initiate assembly
+- Implement error handling for FFmpeg failures (codec issues, file not found, etc.)
+- Add logging for video processing operations
+- Create temporary file management for intermediate outputs
+
+**Acceptance Criteria:**
+- FFmpeg installed and accessible via system PATH
+- VideoProcessor service successfully initializes
+- Assembly job created in database when POST /api/projects/[id]/assemble called
+- Job status updates correctly: pending → processing → complete (or error)
+- FFmpeg commands execute successfully for basic operations (probe, trim, concat)
+- Error messages provide actionable guidance (e.g., "FFmpeg not found - install FFmpeg and add to PATH")
+- Temporary files cleaned up after processing completes
+- Assembly endpoint validates all scenes have selected clips before starting
+
+**References:**
+- PRD Feature 1.7 (Automated Video Assembly) lines 346-369
+- PRD FR-7.01 (Receive scene data)
+- PRD FR-7.05 (Render to MP4)
+- Epic 4 Story 4.5 (Assembly trigger)
+
+---
+
+#### Story 5.2: Scene Video Trimming & Preparation
+**Implements:** FR-7.02
+
+**Goal:** Trim selected video clips to match voiceover duration for each scene
+
+**Tasks:**
+- Create trimVideo() function in VideoProcessor service
+- Load scene data from database (selected_clip_id, audio duration)
+- For each scene, retrieve the selected video segment from cache
+- Calculate trim points based on voiceover audio duration
+- Execute FFmpeg trim command: `ffmpeg -i input.mp4 -t {duration} -c copy output.mp4`
+- Handle edge cases: video shorter than audio (loop or extend), video much longer (trim from start)
+- Save trimmed clips to temporary directory with scene identification
+- Update assembly job progress (e.g., "Trimming scene 2/5...")
+- Implement parallel trimming for performance (max 3 concurrent)
+- Add validation that trimmed clip duration matches audio duration (±0.5s tolerance)
+
+**Acceptance Criteria:**
+- Given scene with 10s voiceover and 30s video clip, system trims video to exactly 10 seconds
+- Trimmed clips saved to temp directory: `.cache/assembly/{jobId}/scene-{n}-trimmed.mp4`
+- All scenes trimmed before proceeding to concatenation
+- Progress indicator shows current scene being trimmed
+- **Edge case - short video:** If video is shorter than audio, system either loops video or extends final frame
+- **Edge case - missing video:** If selected clip file missing, assembly fails with clear error message
+- Trimming completes within 30 seconds per scene for typical clip lengths
+- Video quality preserved (no re-encoding unless necessary)
+
+**References:**
+- PRD Feature 1.7 AC1 (Successful Video Assembly) lines 355-369
+- PRD FR-7.02 (Trim clips to voiceover duration)
+- Epic 3 Story 3.6 (Downloaded segments in cache)
+
+---
+
+#### Story 5.3: Video Concatenation & Audio Overlay
+**Implements:** FR-7.03, FR-7.04, FR-7.06
+
+**Goal:** Concatenate trimmed scenes and overlay voiceover audio to create final video
+
+**Tasks:**
+- Create concatenateScenes() function in VideoProcessor service
+- Generate FFmpeg concat demuxer file listing all trimmed clips in order
+- Execute FFmpeg concat command to join all scenes into single video
+- Create overlayAudio() function for voiceover integration
+- For each scene, overlay corresponding voiceover audio onto video track
+- Ensure audio/video synchronization (voiceover starts at scene start)
+- Handle audio format conversion if needed (MP3 → AAC for MP4 container)
+- Render final output as H.264 MP4 with AAC audio
+- Save final video to output directory: `public/videos/{projectId}/final.mp4`
+- Update project record with final video path and duration
+- Update assembly job status to 'complete'
+
+**Acceptance Criteria:**
+- Given 3 trimmed scenes (5s, 7s, 8s), final video is exactly 20 seconds
+- Scenes appear in correct order (Scene 1 → Scene 2 → Scene 3)
+- Voiceover audio plays in sync with corresponding scene visuals
+- **Audio sync test:** Voiceover words align with scene timing (no drift)
+- Final video format: H.264 video codec, AAC audio codec, MP4 container
+- Final video saved to `public/videos/{projectId}/final.mp4`
+- Project record updated with video_path and total_duration
+- Assembly job marked as 'complete' with completion timestamp
+- Final video playable in standard video players (VLC, browser)
+- Video file size reasonable for duration (approximately 5-10 MB per minute at 720p)
+
+**References:**
+- PRD Feature 1.7 (Automated Video Assembly) lines 346-369
+- PRD FR-7.03 (Concatenate clips in order)
+- PRD FR-7.04 (Overlay voiceover audio)
+- PRD FR-7.06 (Make video available for download)
+
+---
+
+#### Story 5.4: Automated Thumbnail Generation
+**Implements:** FR-8.01, FR-8.02, FR-8.03, FR-8.04, FR-8.05
+
+**Goal:** Generate eye-catching thumbnail with title text overlay
+
+**Tasks:**
+- Create ThumbnailGenerator service class (lib/video/thumbnail.ts)
+- Implement frame extraction from video using FFmpeg
+- Select compelling frame: analyze multiple candidates (10%, 30%, 50%, 70% duration)
+- Score frames based on visual interest (contrast, color variance, face detection optional)
+- Create title text overlay using Canvas API or ImageMagick
+- Design text styling: large readable font, contrasting outline/shadow, positioned for visibility
+- Ensure text doesn't obscure key visual elements (position in upper or lower third)
+- Render final thumbnail at 1920x1080 (16:9 aspect ratio)
+- Save as high-quality JPEG: `public/videos/{projectId}/thumbnail.jpg`
+- Update project record with thumbnail_path
+- Add POST /api/projects/[id]/generate-thumbnail endpoint (auto-triggered after video assembly)
+
+**Acceptance Criteria:**
+- Thumbnail generated automatically after video assembly completes
+- Frame selected from assembled video (not arbitrary scene)
+- **Title text:** Video title displayed prominently and legibly
+- **Text styling:** High contrast (white text with black outline or similar)
+- **Positioning:** Text in upper or lower third, not covering center of frame
+- Thumbnail dimensions: exactly 1920x1080 pixels (16:9)
+- File format: JPEG with quality 85+
+- Thumbnail saved to `public/videos/{projectId}/thumbnail.jpg`
+- Project record updated with thumbnail_path
+- Thumbnail visually appealing and suitable for YouTube/social media
+- Generation completes within 10 seconds
+
+**References:**
+- PRD Feature 1.8 (Automated Thumbnail Generation) lines 370-393
+- PRD FR-8.01 to FR-8.05 (Thumbnail requirements)
+
+---
+
+#### Story 5.5: Export UI & Download Workflow
+**Implements:** FR-7.06, FR-8.05
+
+**Goal:** Display completed video and thumbnail with download options
+
+**Tasks:**
+- Create ExportPage.tsx component at /projects/[id]/export
+- Display video player with final assembled video
+- Display generated thumbnail preview
+- Add "Download Video" button that saves to user's Downloads folder
+  - Filename format: `{video-title}.mp4` (sanitized for filesystem)
+- Add "Download Thumbnail" button linking to thumbnail file
+- Show video metadata: duration, file size, resolution
+- Show project summary: topic, scene count, voice used
+- Add "Create New Video" button to start fresh project
+- Add "Back to Visual Curation" for re-selection if needed
+- Implement loading state during assembly (show progress from job status)
+- Update project workflow: current_step = 'complete' after export page viewed
+- Add share-ready copy for social media (title, description suggestion)
+
+**Acceptance Criteria:**
+- Export page displays after assembly completes (projects.current_step = 'export')
+- Video player shows final assembled video with playback controls
+- Thumbnail preview displays at appropriate size
+- "Download Video" button saves MP4 to user's Downloads folder with sanitized filename (e.g., "mars-colonization.mp4")
+- "Download Thumbnail" button downloads JPEG file
+- Video metadata displayed: "Duration: 2:34 | Size: 45 MB | Resolution: 1280x720"
+- Loading state shows assembly progress: "Assembling video... Trimming scenes (2/5)"
+- Error state shows if assembly failed with retry option
+- "Create New Video" navigates to home/new project
+- Project marked as 'complete' in database
+- Page is shareable (direct URL access works if assembly complete)
+
+**References:**
+- PRD Feature 1.7 AC2 (Download Availability) lines 366-369
+- PRD Feature 1.8 AC1 (Thumbnail Generation) lines 384-393
+- Epic 4 Story 4.5 (Assembly trigger flow)
+
+---
+
 ## Epic Summary
 
-| Epic | Name | Story Est. | Dependencies | Phase |
-|------|------|------------|--------------|-------|
+| Epic | Name | Stories | Dependencies | Phase |
+|------|------|---------|--------------|-------|
 | 1 | Conversational Topic Discovery | 7 | None | Foundation |
-| 2 | Content Generation Pipeline + Voice Selection | 5-6 | Epic 1 | Core |
-| 3 | Visual Content Sourcing (YouTube API) | 4-5 | Epic 2 | Core |
-| 4 | Visual Curation Interface | 5-6 | Epic 2, 3 | Core |
-| 5 | Video Assembly & Output | 4-5 | Epic 2, 4 | Delivery |
+| 2 | Content Generation Pipeline + Voice Selection | 6 | Epic 1 | Core |
+| 3 | Visual Content Sourcing (YouTube API + Duration Filtering + Segment Downloads + Advanced CV Filtering) | 8 | Epic 2 | Core |
+| 4 | Visual Curation Interface | 6 | Epic 2, 3 | Core |
+| 5 | Video Assembly & Output | 5 | Epic 2, 4 | Delivery |
 
-**Total Estimated Stories:** 26-29 stories
+**Total Stories:** 32 stories
+
+**Note:** Epic 3 includes Stories 3.2b and 3.7 which add advanced content filtering (moved from post-MVP Feature 2.2 to MVP).
 
 **Recommended Development Order:**
 1. Epic 1 → Epic 2 → Epic 3 → Epic 4 → Epic 5

@@ -1,0 +1,342 @@
+<story-context id="5-1-video-processing-infrastructure" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>1</storyId>
+    <title>Video Processing Infrastructure Setup</title>
+    <status>Ready for Development</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-5.1.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>system administrator</asA>
+    <iWant>the video processing infrastructure properly configured</iWant>
+    <soThat>subsequent stories can perform video assembly operations reliably</soThat>
+    <tasks>
+      <task id="1" title="Create Shared Type Definitions">
+        <file>src/types/assembly.ts</file>
+        <subtasks>
+          <subtask>Define AssemblyJob interface with all status fields</subtask>
+          <subtask>Define AssemblyScene interface for input data</subtask>
+          <subtask>Define AssemblyRequest and AssemblyResult interfaces</subtask>
+          <subtask>Define ThumbnailOptions interface</subtask>
+          <subtask>Define FFmpegProgress interface</subtask>
+          <subtask>Define AssemblyError and AssemblyErrorCode types</subtask>
+          <subtask>Export all types for use by other stories</subtask>
+        </subtasks>
+      </task>
+      <task id="2" title="Create Assembly Constants">
+        <file>lib/video/constants.ts</file>
+        <subtasks>
+          <subtask>Define VIDEO_ASSEMBLY_CONFIG with codec, bitrate, resolution settings</subtask>
+          <subtask>Define ASSEMBLY_JOB_STATUS constants</subtask>
+          <subtask>Define path constants for TEMP_DIR and OUTPUT_DIR</subtask>
+          <subtask>Define timeout and stage constants</subtask>
+        </subtasks>
+      </task>
+      <task id="3" title="Create FFmpegClient Base Class">
+        <file>lib/video/ffmpeg.ts</file>
+        <subtasks>
+          <subtask>Implement constructor with FFmpeg path verification</subtask>
+          <subtask>Implement getVideoDuration() method using ffprobe</subtask>
+          <subtask>Implement getAudioDuration() method using ffprobe</subtask>
+          <subtask>Implement probe() method for general file metadata</subtask>
+          <subtask>Add error handling for FFmpeg not found</subtask>
+        </subtasks>
+      </task>
+      <task id="4" title="Create Database Migration">
+        <file>lib/db/migrations/008_assembly_jobs.ts</file>
+        <subtasks>
+          <subtask>Create assembly_jobs table with all required columns</subtask>
+          <subtask>Add foreign key constraint to projects table</subtask>
+          <subtask>Create indexes on project_id and status</subtask>
+          <subtask>Add columns to projects table</subtask>
+        </subtasks>
+      </task>
+      <task id="5" title="Update Database Queries">
+        <file>lib/db/queries.ts</file>
+        <subtasks>
+          <subtask>Add createAssemblyJob() function</subtask>
+          <subtask>Add getAssemblyJob() function</subtask>
+          <subtask>Add getAssemblyJobByProjectId() function</subtask>
+          <subtask>Add updateAssemblyJobProgress() function</subtask>
+          <subtask>Add failAssemblyJob() function</subtask>
+          <subtask>Add completeAssemblyJob() function</subtask>
+        </subtasks>
+      </task>
+      <task id="6" title="Create VideoAssembler Class">
+        <file>lib/video/assembler.ts</file>
+        <subtasks>
+          <subtask>Implement createJob() method with validation</subtask>
+          <subtask>Implement updateJobProgress() method</subtask>
+          <subtask>Implement getJobStatus() method</subtask>
+          <subtask>Implement failJob() and completeJob() methods</subtask>
+          <subtask>Add temporary directory management</subtask>
+        </subtasks>
+      </task>
+      <task id="7" title="Create Assembly API Endpoint">
+        <file>app/api/projects/[id]/assemble/route.ts</file>
+        <subtasks>
+          <subtask>Create POST handler for assembly initiation</subtask>
+          <subtask>Validate project exists and all scenes have selected clips</subtask>
+          <subtask>Check for existing pending/processing jobs</subtask>
+          <subtask>Create new assembly job and return job_id</subtask>
+        </subtasks>
+      </task>
+      <task id="8" title="Create Assembly Status Endpoint">
+        <file>app/api/projects/[id]/assembly-status/route.ts</file>
+        <subtasks>
+          <subtask>Create GET handler for status polling</subtask>
+          <subtask>Validate project exists and retrieve assembly job</subtask>
+          <subtask>Return AssemblyJob data with proper error handling</subtask>
+        </subtasks>
+      </task>
+      <task id="9" title="Write Unit Tests">
+        <files>
+          <file>tests/unit/video/ffmpeg.test.ts</file>
+          <file>tests/unit/video/assembler.test.ts</file>
+        </files>
+        <subtasks>
+          <subtask>Test FFmpegClient initialization and path verification</subtask>
+          <subtask>Test getVideoDuration/getAudioDuration with valid/invalid files</subtask>
+          <subtask>Test VideoAssembler job lifecycle and state transitions</subtask>
+          <subtask>Mock FFmpeg commands for isolation</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" title="FFmpeg Installation Verification">
+      <given>the video processing infrastructure is being set up</given>
+      <when>the system initializes</when>
+      <then>FFmpeg must be installed and accessible via system PATH</then>
+      <and>error messages must provide actionable guidance</and>
+    </criterion>
+    <criterion id="AC2" title="Assembly Job Creation">
+      <given>a valid project with all scenes having selected clips</given>
+      <when>POST /api/projects/[id]/assemble is called with valid scene data</when>
+      <then>an assembly job must be created in the database with status 'pending'</then>
+      <and>the response must include the job_id and initial status</and>
+    </criterion>
+    <criterion id="AC3" title="Job Status Updates">
+      <given>an assembly job exists</given>
+      <when>the job progresses through stages</when>
+      <then>job status must update correctly: pending to processing to complete (or error)</then>
+      <and>progress percentage (0-100) must update accurately</and>
+    </criterion>
+    <criterion id="AC4" title="Scene Validation">
+      <given>a request to POST /api/projects/[id]/assemble</given>
+      <when>any scene is missing a selected_clip_id</when>
+      <then>the endpoint must return SCENE_NOT_FOUND error</then>
+      <and>the assembly must not start</and>
+    </criterion>
+    <criterion id="AC5" title="Duplicate Job Prevention">
+      <given>an assembly job already exists for a project with status pending or processing</given>
+      <when>POST /api/projects/[id]/assemble is called</when>
+      <then>the endpoint must return JOB_ALREADY_EXISTS error</then>
+      <and>the existing job must not be affected</and>
+    </criterion>
+    <criterion id="AC6" title="Basic FFmpeg Operations">
+      <given>a valid video or audio file path</given>
+      <when>FFmpegClient.probe() or getDuration() is called</when>
+      <then>the operation must complete successfully and return accurate file metadata</then>
+    </criterion>
+    <criterion id="AC7" title="Temporary File Management">
+      <given>assembly operations create temporary files</given>
+      <when>the assembly completes (success or error)</when>
+      <then>temporary files must be cleaned up and disk space must be reclaimed</then>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>1.7. Automated Video Assembly</section>
+        <snippet>FR-7.01 through FR-7.06 define video assembly requirements including receiving scene data, trimming clips to audio duration, concatenating in order, overlaying audio, and rendering final MP4.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/parallel-spec-epic-5.md</path>
+        <title>Parallel Epic Technical Specification: Video Assembly</title>
+        <section>Story Contract Matrix - Story 5.1</section>
+        <snippet>Defines complete file ownership, API contracts, database ownership, and interface implementations for Story 5.1 enabling parallel execution with Stories 5.2-5.5.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Video Processing Layer</section>
+        <snippet>FFmpeg-based video processing with local filesystem storage (.cache/ for temp, public/videos/ for output).</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>ai-video-generator/src/types/assembly.ts</path>
+        <kind>types</kind>
+        <symbol>AssemblyJob, AssemblyScene, AssemblyJobResponse</symbol>
+        <reason>Shared type definitions created by this story, used by all Epic 5 stories</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/video/ffmpeg.ts</path>
+        <kind>service</kind>
+        <symbol>FFmpegClient</symbol>
+        <reason>FFmpeg wrapper class with probe, duration methods created by this story</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/video/assembler.ts</path>
+        <kind>service</kind>
+        <symbol>VideoAssembler</symbol>
+        <reason>Assembly job lifecycle management created by this story</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/video/constants.ts</path>
+        <kind>config</kind>
+        <symbol>VIDEO_ASSEMBLY_CONFIG</symbol>
+        <reason>Assembly configuration constants created by this story</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/db/migrations/008_assembly_jobs.ts</path>
+        <kind>migration</kind>
+        <symbol>migrate008AssemblyJobs</symbol>
+        <reason>Database migration for assembly_jobs table created by this story</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/db/queries.ts</path>
+        <kind>queries</kind>
+        <symbol>createAssemblyJob, getAssemblyJob, getAssemblyJobByProjectId</symbol>
+        <reason>Assembly job query functions added by this story</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/db/client.ts</path>
+        <kind>database</kind>
+        <symbol>db</symbol>
+        <reason>Read-only dependency for database access</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/types/database.ts</path>
+        <kind>types</kind>
+        <symbol>Project, Scene</symbol>
+        <reason>Read-only dependency for existing database types</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/app/api/projects/[id]/assemble/route.ts</path>
+        <kind>api</kind>
+        <symbol>POST handler</symbol>
+        <reason>Assembly initiation endpoint modified by this story</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/app/api/projects/[id]/assembly-status/route.ts</path>
+        <kind>api</kind>
+        <symbol>GET handler</symbol>
+        <reason>Assembly status polling endpoint created by this story</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>better-sqlite3</package>
+        <version>^11.x</version>
+        <purpose>Database operations for assembly_jobs table</purpose>
+      </node>
+      <node>
+        <package>uuid</package>
+        <version>^9.x</version>
+        <purpose>Generate unique job IDs</purpose>
+      </node>
+      <system>
+        <package>FFmpeg</package>
+        <version>7.x</version>
+        <purpose>Video processing commands (probe, duration)</purpose>
+      </system>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="file_ownership">Only create/modify files listed in Story Contract exclusive_create and exclusive_modify sections</constraint>
+    <constraint type="naming">Use assembly- prefix for files, Assembly prefix for classes, asm- for CSS</constraint>
+    <constraint type="imports">Only import from read_only_dependencies: lib/db/client.ts, src/types/database.ts</constraint>
+    <constraint type="database">Only create assembly_jobs table and add specified columns to projects</constraint>
+    <constraint type="merge_order">This story is FIRST in merge order - creates shared infrastructure for Stories 5.2-5.5</constraint>
+    <constraint type="api">Error responses must use AssemblyError format with specific error codes</constraint>
+    <constraint type="state_machine">Assembly jobs follow: PENDING to PROCESSING to COMPLETE/ERROR</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>POST /api/projects/[id]/assemble</name>
+      <kind>REST endpoint</kind>
+      <signature>Request: { scenes: AssemblyScene[] }, Response: { job_id: string, status: string }</signature>
+      <path>ai-video-generator/src/app/api/projects/[id]/assemble/route.ts</path>
+    </interface>
+    <interface>
+      <name>GET /api/projects/[id]/assembly-status</name>
+      <kind>REST endpoint</kind>
+      <signature>Response: AssemblyJobResponse</signature>
+      <path>ai-video-generator/src/app/api/projects/[id]/assembly-status/route.ts</path>
+    </interface>
+    <interface>
+      <name>FFmpegClient.probe</name>
+      <kind>method</kind>
+      <signature>probe(filePath: string): Promise&lt;FFProbeResult&gt;</signature>
+      <path>ai-video-generator/src/lib/video/ffmpeg.ts</path>
+    </interface>
+    <interface>
+      <name>FFmpegClient.getVideoDuration</name>
+      <kind>method</kind>
+      <signature>getVideoDuration(videoPath: string): Promise&lt;number&gt;</signature>
+      <path>ai-video-generator/src/lib/video/ffmpeg.ts</path>
+    </interface>
+    <interface>
+      <name>FFmpegClient.getAudioDuration</name>
+      <kind>method</kind>
+      <signature>getAudioDuration(audioPath: string): Promise&lt;number&gt;</signature>
+      <path>ai-video-generator/src/lib/video/ffmpeg.ts</path>
+    </interface>
+    <interface>
+      <name>VideoAssembler.createJob</name>
+      <kind>method</kind>
+      <signature>createJob(projectId: string, totalScenes: number): Promise&lt;string&gt;</signature>
+      <path>ai-video-generator/src/lib/video/assembler.ts</path>
+    </interface>
+    <interface>
+      <name>VideoAssembler.updateJobProgress</name>
+      <kind>method</kind>
+      <signature>updateJobProgress(jobId: string, progress: number, stage: string, currentScene?: number): void</signature>
+      <path>ai-video-generator/src/lib/video/assembler.ts</path>
+    </interface>
+    <interface>
+      <name>VideoAssembler.getJobStatus</name>
+      <kind>method</kind>
+      <signature>getJobStatus(jobId: string): AssemblyJob | null</signature>
+      <path>ai-video-generator/src/lib/video/assembler.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest framework with vi.mock for mocking dependencies. Tests should isolate FFmpeg commands using child_process mocks. Database tests can use real better-sqlite3 with test data cleanup in afterEach hooks. Tests should verify both success and error paths including edge cases.
+    </standards>
+    <locations>
+      <location>tests/unit/video/ffmpeg.test.ts</location>
+      <location>tests/unit/video/assembler.test.ts</location>
+      <location>tests/api/*.test.ts (for API endpoint tests)</location>
+    </locations>
+    <ideas>
+      <idea acId="AC1">Test FFmpegClient initialization with missing FFmpeg binary - should throw descriptive error</idea>
+      <idea acId="AC1">Test getVersion() returns valid version string</idea>
+      <idea acId="AC2">Test createAssemblyJob creates record with pending status and returns job_id</idea>
+      <idea acId="AC2">Test POST /assemble with valid project creates job in database</idea>
+      <idea acId="AC3">Test updateJobProgress transitions status from pending to processing</idea>
+      <idea acId="AC3">Test completeJob sets status to complete with 100% progress</idea>
+      <idea acId="AC3">Test failJob sets status to error with error message</idea>
+      <idea acId="AC4">Test POST /assemble returns INCOMPLETE_SELECTIONS when scenes missing clips</idea>
+      <idea acId="AC5">Test POST /assemble returns JOB_ALREADY_EXISTS when active job exists</idea>
+      <idea acId="AC6">Test probe() returns correct duration and format info</idea>
+      <idea acId="AC6">Test getVideoDuration/getAudioDuration return accurate seconds</idea>
+      <idea acId="AC6">Test probe() with non-existent file throws FILE_NOT_FOUND</idea>
+      <idea acId="AC7">Test completeJob cleans up temp directory</idea>
+      <idea acId="AC7">Test failJob cleans up temp directory</idea>
+    </ideas>
+  </tests>
+</story-context>

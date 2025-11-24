@@ -854,4 +854,77 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 
 ## Post-Implementation Updates
 
-(Section reserved for updates after initial implementation)
+### Bug Fix: TTS File Timing Race Condition & Timeout Issues (2025-11-18)
+
+**Issue:**
+Production logs showed TTS voiceover generation failures for scenes 2-4:
+```
+Error [TTSError]: Voice generation timed out. Please try again. (Scene 1)
+Error [TTSError]: Failed to parse service response: ENOENT: no such file or directory (Scenes 2-4)
+```
+
+**Root Causes:**
+1. **File Timing Race Condition**: Python TTS service returned JSON success response before MP3 file was written to disk
+   - Service writes: `[TTS] File written to: ...mp3` (after delay)
+   - Application reads: `[DEBUG TTS] File exists check: false` (immediate)
+   - Result: ENOENT error when trying to read file
+
+2. **Timeout Too Aggressive**:
+   - WARM_TIMEOUT set to 45 seconds
+   - Observed generation times: 45-53 seconds for typical scenes
+   - First scene timed out at 45s, completed at 53s
+
+**Fix Applied (Commit: eff6f91):**
+
+**Part 1: Added Retry Logic for File Reads**
+```typescript
+// src/lib/tts/kokoro-provider.ts:428-461
+const waitForFile = async (path: string, maxRetries = 10, delayMs = 100): Promise<void> => {
+  for (let i = 0; i < maxRetries; i++) {
+    if (existsSync(path)) {
+      // File exists, give it 50ms to finish writing
+      await new Promise(resolve => setTimeout(resolve, 50));
+      return;
+    }
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+  }
+  throw new Error(`File not found after ${maxRetries} retries: ${path}`);
+};
+```
+- Polls for file existence up to 1 second (10 × 100ms)
+- Additional 50ms settling time after file appears
+- Graceful error if file never appears
+
+**Part 2: Increased Timeouts**
+```typescript
+// src/lib/tts/kokoro-provider.ts:96-100
+private readonly COLD_START_TIMEOUT = parseInt(
+  process.env.TTS_TIMEOUT_MS_COLD || '120000'  // 120s (was 60s)
+);
+private readonly WARM_TIMEOUT = parseInt(
+  process.env.TTS_TIMEOUT_MS_WARM || '90000'  // 90s (was 45s)
+);
+```
+- COLD_START_TIMEOUT: 60s → 120s (2x increase)
+- WARM_TIMEOUT: 45s → 90s (2x increase)
+- Accommodates longer scenes and file I/O delays
+
+**Impact:**
+- Asynchronous file I/O handled gracefully with retry mechanism
+- Timeout buffer allows for 50s+ generation times
+- Reduced intermittent TTS failures from race conditions
+- Better error messages when files truly unavailable
+
+**Testing:**
+- Manual verification: All 4 scenes should now generate successfully
+- No more "File not available" errors
+- No more premature timeouts
+
+**Files Modified:**
+- `src/lib/tts/kokoro-provider.ts` - Retry logic and increased timeouts
+
+**Environment Variables (Optional Override):**
+```bash
+TTS_TIMEOUT_MS_COLD=120000  # Default: 120 seconds
+TTS_TIMEOUT_MS_WARM=90000   # Default: 90 seconds
+```

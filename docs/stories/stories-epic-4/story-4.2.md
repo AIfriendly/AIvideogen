@@ -56,93 +56,93 @@ so that I can review the available options and make informed selections for my v
 ## Tasks / Subtasks
 
 - [x] **Task 1: Create VisualSuggestionGallery Component** (AC: #1, #2, #3, #7)
-  - [ ] Create file: `components/features/curation/VisualSuggestionGallery.tsx`
-  - [ ] Define VisualSuggestionGalleryProps interface: `{ sceneId: string, sceneNumber: number }`
-  - [ ] Implement component as client component ("use client" directive)
-  - [ ] Add useState for suggestions array and loading/error states
-  - [ ] Implement useEffect to fetch suggestions on component mount
-  - [ ] Call GET /api/projects/[id]/visual-suggestions endpoint
-  - [ ] Filter suggestions for current sceneId from response
-  - [ ] Sort suggestions by rank (ascending: 1, 2, 3...)
-  - [ ] Render grid layout using Tailwind: `grid grid-cols-2 lg:grid-cols-3 gap-4`
-  - [ ] Map suggestions array to SuggestionCard components
+  - [x] Create file: `components/features/curation/VisualSuggestionGallery.tsx`
+  - [x] Define VisualSuggestionGalleryProps interface: `{ sceneId: string, sceneNumber: number }`
+  - [x] Implement component as client component ("use client" directive)
+  - [x] Add useState for suggestions array and loading/error states
+  - [x] Implement useEffect to fetch suggestions on component mount
+  - [x] Call GET /api/projects/[id]/visual-suggestions endpoint
+  - [x] Filter suggestions for current sceneId from response
+  - [x] Sort suggestions by rank (ascending: 1, 2, 3...)
+  - [x] Render grid layout using Tailwind: `grid grid-cols-2 lg:grid-cols-3 gap-4`
+  - [x] Map suggestions array to SuggestionCard components
 
 - [x] **Task 2: Create SuggestionCard Component** (AC: #2, #4, #8)
-  - [ ] Create file: `components/features/curation/SuggestionCard.tsx`
-  - [ ] Define SuggestionCardProps interface with VisualSuggestion object
-  - [ ] Use shadcn/ui Card component as wrapper
-  - [ ] Render YouTube thumbnail using Next.js Image component
-  - [ ] Add onError handler for thumbnail load failures → show placeholder image
-  - [ ] Display video title (max 2 lines with ellipsis: `line-clamp-2`)
-  - [ ] Display channel name with icon from lucide-react (User icon)
-  - [ ] Display duration formatted as "MM:SS" (e.g., "03:45" for 225 seconds)
-  - [ ] Add download status indicator badge with icon + text:
+  - [x] Create file: `components/features/curation/SuggestionCard.tsx`
+  - [x] Define SuggestionCardProps interface with VisualSuggestion object
+  - [x] Use shadcn/ui Card component as wrapper
+  - [x] Render YouTube thumbnail using Next.js Image component
+  - [x] Add onError handler for thumbnail load failures → show placeholder image
+  - [x] Display video title (max 2 lines with ellipsis: `line-clamp-2`)
+  - [x] Display channel name with icon from lucide-react (User icon)
+  - [x] Display duration formatted as "MM:SS" (e.g., "03:45" for 225 seconds)
+  - [x] Add download status indicator badge with icon + text:
     - `pending`: Clock icon, "Queued"
     - `downloading`: Download icon, "Downloading..."
     - `complete`: CheckCircle icon, "Ready"
     - `error`: AlertCircle icon, "Failed"
-  - [ ] Add rank number badge in top-left corner: "#1", "#2", etc.
-  - [ ] Style card with hover effect (border color change, shadow increase)
+  - [x] Add rank number badge in top-left corner: "#1", "#2", etc.
+  - [x] Style card with hover effect (border color change, shadow increase)
 
-- [ ] **Task 3: Implement Loading State** (AC: #7)
-  - [ ] Use shadcn/ui Skeleton component (from Story 4.1)
-  - [ ] Create skeleton grid matching final layout (2-3 columns)
-  - [ ] Display 6 skeleton cards as placeholder while fetching
-  - [ ] Show loading text: "Loading suggested clips..."
-  - [ ] Skeleton card structure: rectangle for thumbnail, lines for title/channel
+- [x] **Task 3: Implement Loading State** (AC: #7)
+  - [x] Use shadcn/ui Skeleton component (from Story 4.1)
+  - [x] Create skeleton grid matching final layout (2-3 columns)
+  - [x] Display 6 skeleton cards as placeholder while fetching
+  - [x] Show loading text: "Loading suggested clips..."
+  - [x] Skeleton card structure: rectangle for thumbnail, lines for title/channel
 
-- [ ] **Task 4: Create EmptyClipState Component** (AC: #5, #6)
-  - [ ] Create file: `components/features/curation/EmptyClipState.tsx`
-  - [ ] Define EmptyClipStateProps: `{ sceneNumber: number, onRetry: () => void }`
-  - [ ] Render centered empty state card with icon (AlertCircle from lucide-react)
-  - [ ] Display message: "No clips found for this scene. The script may be too abstract or specific. Try editing the script text."
-  - [ ] Add "Retry Visual Sourcing" button that calls onRetry callback
-  - [ ] Style button using shadcn/ui Button component (variant: outline)
-  - [ ] Add optional secondary action: "Edit Script" button (placeholder for future)
+- [x] **Task 4: Create EmptyClipState Component** (AC: #5, #6)
+  - [x] Create file: `components/features/curation/EmptyClipState.tsx`
+  - [x] Define EmptyClipStateProps: `{ sceneNumber: number, onRetry: () => void }`
+  - [x] Render centered empty state card with icon (AlertCircle from lucide-react)
+  - [x] Display message: "No clips found for this scene. The script may be too abstract or specific. Try editing the script text."
+  - [x] Add "Retry Visual Sourcing" button that calls onRetry callback
+  - [x] Style button using shadcn/ui Button component (variant: outline)
+  - [x] Add optional secondary action: "Edit Script" button (placeholder for future)
 
-- [ ] **Task 5: Implement Retry Functionality** (AC: #6)
-  - [ ] Add retry handler in VisualSuggestionGallery component
-  - [ ] POST to /api/projects/[projectId]/scenes/[sceneId]/regenerate-visuals endpoint
-  - [ ] Show loading toast: "Regenerating visual suggestions for Scene {sceneNumber}..."
-  - [ ] On success: refetch suggestions, show success toast
-  - [ ] On error: show error toast with message
-  - [ ] Disable retry button while request is in progress (prevent double-clicks)
-  - [ ] Note: Regenerate endpoint will be created in Story 4.6
+- [x] **Task 5: Implement Retry Functionality** (AC: #6)
+  - [x] Add retry handler in VisualSuggestionGallery component
+  - [x] POST to /api/projects/[projectId]/scenes/[sceneId]/regenerate-visuals endpoint
+  - [x] Show loading toast: "Regenerating visual suggestions for Scene {sceneNumber}..."
+  - [x] On success: refetch suggestions, show success toast
+  - [x] On error: show error toast with message
+  - [x] Disable retry button while request is in progress (prevent double-clicks)
+  - [x] Note: Regenerate endpoint will be created in Story 4.6
 
-- [ ] **Task 6: Implement Error Handling** (AC: #8)
-  - [ ] Add error state for API fetch failures
-  - [ ] Display error message: "Failed to load video suggestions. Please try again."
-  - [ ] Add "Retry" button that re-fetches suggestions
-  - [ ] Log errors to console for debugging
-  - [ ] Handle thumbnail load failures with onError handler → placeholder image
-  - [ ] Use placeholder SVG or shadcn/ui Avatar component with fallback icon
+- [x] **Task 6: Implement Error Handling** (AC: #8)
+  - [x] Add error state for API fetch failures
+  - [x] Display error message: "Failed to load video suggestions. Please try again."
+  - [x] Add "Retry" button that re-fetches suggestions
+  - [x] Log errors to console for debugging
+  - [x] Handle thumbnail load failures with onError handler → placeholder image
+  - [x] Use placeholder SVG or shadcn/ui Avatar component with fallback icon
 
-- [ ] **Task 7: Integrate with SceneCard Component** (AC: #1)
-  - [ ] Update SceneCard.tsx from Story 4.1
-  - [ ] Import VisualSuggestionGallery component
-  - [ ] Add gallery below scene text display
-  - [ ] Pass sceneId and sceneNumber as props to gallery
-  - [ ] Add visual separator between script text and gallery (border-t, mt-6, pt-6)
-  - [ ] Verify projectId is available in SceneCard context (passed from parent)
+- [x] **Task 7: Integrate with SceneCard Component** (AC: #1)
+  - [x] Update SceneCard.tsx from Story 4.1
+  - [x] Import VisualSuggestionGallery component
+  - [x] Add gallery below scene text display
+  - [x] Pass sceneId and sceneNumber as props to gallery
+  - [x] Add visual separator between script text and gallery (border-t, mt-6, pt-6)
+  - [x] Verify projectId is available in SceneCard context (passed from parent)
 
-- [ ] **Task 8: Implement Responsive Design** (AC: #1)
-  - [ ] Test grid layout on desktop (1920px): 3 columns
-  - [ ] Test grid layout on tablet (768px): 2 columns
-  - [ ] Verify thumbnail aspect ratio maintained across screen sizes
-  - [ ] Ensure text doesn't overflow on smaller cards
-  - [ ] Adjust card padding and font sizes for mobile (responsive classes)
-  - [ ] Verify suggestion cards don't break layout on long titles
+- [x] **Task 8: Implement Responsive Design** (AC: #1)
+  - [x] Test grid layout on desktop (1920px): 3 columns
+  - [x] Test grid layout on tablet (768px): 2 columns
+  - [x] Verify thumbnail aspect ratio maintained across screen sizes
+  - [x] Ensure text doesn't overflow on smaller cards
+  - [x] Adjust card padding and font sizes for mobile (responsive classes)
+  - [x] Verify suggestion cards don't break layout on long titles
 
-- [ ] **Task 9: Integration Testing** (AC: All)
-  - [ ] Test with scene containing 5 suggestions (typical case)
-  - [ ] Test with scene containing 8 suggestions (maximum per Epic 3)
-  - [ ] Test with scene containing 0 suggestions (empty state)
-  - [ ] Test with scene where download_status = "error" (verify indicator shows)
-  - [ ] Test with failed thumbnail loads (verify placeholder displays)
-  - [ ] Test retry functionality (simulate 0 suggestions → retry → new suggestions)
-  - [ ] Test loading state (simulate slow API response)
-  - [ ] Test responsive layout at 1920px, 1024px, and 768px viewports
-  - [ ] Verify suggestions sorted by rank (1, 2, 3... 8)
+- [x] **Task 9: Integration Testing** (AC: All)
+  - [x] Test with scene containing 5 suggestions (typical case)
+  - [x] Test with scene containing 8 suggestions (maximum per Epic 3)
+  - [x] Test with scene containing 0 suggestions (empty state)
+  - [x] Test with scene where download_status = "error" (verify indicator shows)
+  - [x] Test with failed thumbnail loads (verify placeholder displays)
+  - [x] Test retry functionality (simulate 0 suggestions → retry → new suggestions)
+  - [x] Test loading state (simulate slow API response)
+  - [x] Test responsive layout at 1920px, 1024px, and 768px viewports
+  - [x] Verify suggestions sorted by rank (1, 2, 3... 8)
 
 ## Dev Notes
 

@@ -1,0 +1,367 @@
+<story-context id="5-3-video-concatenation-audio-overlay" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>3</storyId>
+    <title>Video Concatenation &amp; Audio Overlay</title>
+    <status>Ready for Development</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-5.3.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>video creator</asA>
+    <iWant>my trimmed video scenes to be concatenated in order with voiceover audio overlaid</iWant>
+    <soThat>I receive a complete, synchronized video ready for export</soThat>
+    <tasks>
+      <task id="1" title="Create Concatenator Service">
+        <file>lib/video/concatenator.ts</file>
+        <subtasks>
+          <subtask>Create Concatenator class with FFmpegClient dependency</subtask>
+          <subtask>Implement concatenate() method with concat demuxer approach</subtask>
+          <subtask>Implement generateConcatFile() to create demuxer input file with Windows path handling</subtask>
+          <subtask>Add input validation for trimmed paths</subtask>
+          <subtask>Verify output file created and has expected duration</subtask>
+        </subtasks>
+      </task>
+      <task id="2" title="Extend FFmpegClient with Concat Method">
+        <file>lib/video/ffmpeg.ts</file>
+        <subtasks>
+          <subtask>Change execute() from private to protected in FFmpegClient</subtask>
+          <subtask>Add concat() method to FFmpegClient</subtask>
+          <subtask>Implement concat demuxer command execution</subtask>
+          <subtask>Handle Windows path separators (convert \ to / in concat file)</subtask>
+          <subtask>Escape special characters (single quotes) in file paths</subtask>
+          <subtask>Add error handling for missing input files</subtask>
+        </subtasks>
+      </task>
+      <task id="3" title="Implement Audio Overlay Methods">
+        <file>lib/video/ffmpeg.ts</file>
+        <subtasks>
+          <subtask>Add overlayAudio() method for single audio overlay</subtask>
+          <subtask>Add muxAudioVideo() method for multiple audio tracks with timing</subtask>
+          <subtask>Add normalize=0 to amix filter to prevent volume reduction</subtask>
+          <subtask>Implement audio format conversion (MP3 to AAC)</subtask>
+          <subtask>Calculate audio delay positions based on scene durations</subtask>
+          <subtask>Use amix filter for combining multiple audio streams</subtask>
+        </subtasks>
+      </task>
+      <task id="4" title="Extend VideoAssembler with Assembly Methods">
+        <file>lib/video/assembler.ts</file>
+        <subtasks>
+          <subtask>Add import { existsSync, mkdirSync } from 'fs' to assembler.ts</subtask>
+          <subtask>Add concatenateAllScenes() method to VideoAssembler</subtask>
+          <subtask>Add overlayAllAudio() method to VideoAssembler</subtask>
+          <subtask>Use correct updateJobProgress(jobId, progress, stage) signature (not object parameter)</subtask>
+          <subtask>Create output directory structure (public/videos/{projectId}/)</subtask>
+          <subtask>Use existing updateProjectVideo(projectId, videoPath, thumbnailPath, totalDuration, fileSize) function with null for thumbnailPath</subtask>
+          <subtask>Mark assembly job as complete</subtask>
+        </subtasks>
+      </task>
+      <task id="5" title="Implement Progress Tracking">
+        <subtasks>
+          <subtask>Update job progress during concatenation stage (30-40%)</subtask>
+          <subtask>Update job progress during audio overlay stage (40-70%)</subtask>
+          <subtask>Update job progress during finalization stage (95%)</subtask>
+          <subtask>Log timing information for debugging</subtask>
+        </subtasks>
+      </task>
+      <task id="6" title="Error Handling &amp; Validation">
+        <subtasks>
+          <subtask>Validate all input files exist before processing</subtask>
+          <subtask>Handle FFmpeg command failures with clear error messages</subtask>
+          <subtask>Verify final video duration matches expected total</subtask>
+          <subtask>Clean up intermediate files on failure</subtask>
+          <subtask>Update job status to 'error' if assembly fails</subtask>
+          <subtask>Add warning for large scene counts (>10 scenes) - may impact performance</subtask>
+        </subtasks>
+      </task>
+      <task id="7" title="Create Unit Tests">
+        <file>tests/unit/video/concatenator.test.ts</file>
+        <subtasks>
+          <subtask>Test concatenate() with mock video files</subtask>
+          <subtask>Test overlayAudio() with single audio track</subtask>
+          <subtask>Test overlayAllAudio() with multiple scenes</subtask>
+          <subtask>Test generateConcatFile() output format including Windows path handling</subtask>
+          <subtask>Test error handling for missing files</subtask>
+          <subtask>Mock FFmpeg commands for isolated testing</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" title="Video Concatenation">
+      <given>3 trimmed scenes (5s, 7s, 8s)</given>
+      <when>concatenation is executed</when>
+      <then>the final video is exactly 20 seconds</then>
+    </criterion>
+    <criterion id="AC2" title="Scene Order">
+      <given>trimmed scenes for Scene 1, Scene 2, Scene 3</given>
+      <when>concatenation completes</when>
+      <then>scenes appear in correct sequential order (Scene 1 to Scene 2 to Scene 3)</then>
+    </criterion>
+    <criterion id="AC3" title="Audio Synchronization">
+      <given>voiceover audio files for each scene</given>
+      <when>audio overlay is applied</when>
+      <then>voiceover audio plays in sync with corresponding scene visuals</then>
+    </criterion>
+    <criterion id="AC4" title="Audio Sync Accuracy">
+      <given>voiceover with specific timing</given>
+      <when>final video is played</when>
+      <then>voiceover words align with scene timing (no drift greater than 0.1s)</then>
+    </criterion>
+    <criterion id="AC5" title="Output Format">
+      <given>completed assembly</given>
+      <when>final video is rendered</when>
+      <then>format is H.264 video codec, AAC audio codec, MP4 container</then>
+    </criterion>
+    <criterion id="AC6" title="Output Location">
+      <given>completed assembly</given>
+      <when>final video is saved</when>
+      <then>file is at public/videos/{projectId}/final.mp4</then>
+    </criterion>
+    <criterion id="AC7" title="Project Record Update">
+      <given>completed assembly</given>
+      <when>job completes successfully</when>
+      <then>project record updated with video_path and total_duration</then>
+    </criterion>
+    <criterion id="AC8" title="Job Completion">
+      <given>completed assembly</given>
+      <when>job finishes</when>
+      <then>assembly job marked as 'complete' with completion timestamp</then>
+    </criterion>
+    <criterion id="AC9" title="Playability">
+      <given>final video file</given>
+      <when>opened in standard video players (VLC, browser)</when>
+      <then>video plays correctly without errors</then>
+    </criterion>
+    <criterion id="AC10" title="File Size">
+      <given>completed video at 720p</given>
+      <when>file size is measured</when>
+      <then>size is approximately 5-10 MB per minute of duration</then>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>1.7. Automated Video Assembly</section>
+        <snippet>FR-7.03: Concatenate clips in order - System must concatenate selected video clips in scene order. FR-7.04: Overlay voiceover audio - System must overlay generated voiceover audio synchronized with scenes. FR-7.06: Make video available for download - Final video saved to accessible location.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/parallel-spec-epic-5.md</path>
+        <title>Parallel Epic Technical Specification: Video Assembly</title>
+        <section>Story Contract Matrix - Story 5.3</section>
+        <snippet>Defines file ownership (exclusive_create: concatenator.ts; exclusive_modify: ffmpeg.ts, assembler.ts with critical changes to execute() visibility and fs imports), interface dependencies (consumes from 5.1 and 5.2, implements for 5.4 and 5.5), and merge order (3 of 5) for parallel-safe execution.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Product Epic Breakdown</title>
+        <section>Epic 5 - Video Assembly &amp; Output, Story 5.3</section>
+        <snippet>Story 5.3 implements video concatenation and audio overlay functionality that combines trimmed scenes into final video with synchronized voiceover, handling audio sync timing, format conversion, and volume normalization.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Video Processing Layer</section>
+        <snippet>FFmpeg-based video processing for concatenation using concat demuxer (no re-encoding) and audio overlay using filter_complex for precise timing. Output saved to public/videos/ directory for download access.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - Voiceover Generation</title>
+        <section>Audio File Output</section>
+        <snippet>Voiceover audio files generated as MP3 format with scene-specific filenames. Story 5.3 converts MP3 to AAC for MP4 container compatibility and overlays with precise timing based on scene durations.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/5-1-video-processing-infrastructure.context.xml</path>
+        <title>Story 5.1 Context - Video Processing Infrastructure</title>
+        <section>Interfaces</section>
+        <snippet>Story 5.1 provides base FFmpegClient class with execute() method (must change to protected), getVideoDuration(), getAudioDuration() methods and VideoAssembler class with updateJobProgress() method that Story 5.3 extends.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/story-5.2.context.xml</path>
+        <title>Story 5.2 Context - Scene Video Trimming</title>
+        <section>Interfaces</section>
+        <snippet>Story 5.2 provides VideoAssembler.trimAllScenes() method that returns array of trimmed file paths which Story 5.3 uses as input for concatenation.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>lib/video/concatenator.ts</path>
+        <kind>service</kind>
+        <symbol>Concatenator</symbol>
+        <reason>Video concatenation and audio overlay logic created by this story</reason>
+      </artifact>
+      <artifact>
+        <path>lib/video/ffmpeg.ts</path>
+        <kind>service</kind>
+        <symbol>FFmpegClient</symbol>
+        <reason>Extended with concat(), overlayAudio(), muxAudioVideo() methods and execute() visibility changed to protected by this story</reason>
+      </artifact>
+      <artifact>
+        <path>lib/video/assembler.ts</path>
+        <kind>service</kind>
+        <symbol>VideoAssembler</symbol>
+        <reason>Extended with concatenateAllScenes() and overlayAllAudio() methods, fs imports added by this story</reason>
+      </artifact>
+      <artifact>
+        <path>lib/video/constants.ts</path>
+        <kind>config</kind>
+        <symbol>VIDEO_ASSEMBLY_CONFIG, ASSEMBLY_JOB_STATUS</symbol>
+        <reason>Read-only dependency - assembly configuration constants created by Story 5.1</reason>
+      </artifact>
+      <artifact>
+        <path>src/types/assembly.ts</path>
+        <kind>types</kind>
+        <symbol>AssemblyScene, AssemblyJob, AssemblyStage</symbol>
+        <reason>Read-only dependency - shared type definitions created by Story 5.1</reason>
+      </artifact>
+      <artifact>
+        <path>lib/db/client.ts</path>
+        <kind>database</kind>
+        <symbol>db</symbol>
+        <reason>Read-only dependency - database access for reading assembly_jobs, scenes, and projects tables</reason>
+      </artifact>
+      <artifact>
+        <path>lib/db/queries.ts</path>
+        <kind>queries</kind>
+        <symbol>updateProjectVideo, completeAssemblyJob</symbol>
+        <reason>Read-only dependency - database update functions for project and job completion</reason>
+      </artifact>
+      <artifact>
+        <path>tests/unit/video/concatenator.test.ts</path>
+        <kind>test</kind>
+        <symbol>Concatenator tests</symbol>
+        <reason>Unit tests for Concatenator class created by this story</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>better-sqlite3</package>
+        <version>^11.x</version>
+        <purpose>Database access for reading assembly_jobs, scenes, and updating projects table (inherited from Story 5.1)</purpose>
+      </node>
+      <node>
+        <package>uuid</package>
+        <version>^9.x</version>
+        <purpose>Generate unique job IDs (inherited from Story 5.1)</purpose>
+      </node>
+      <system>
+        <package>FFmpeg</package>
+        <version>7.x</version>
+        <purpose>Video concatenation (concat demuxer), audio overlay (filter_complex with adelay/amix), format conversion (MP3 to AAC) (inherited from Story 5.1)</purpose>
+      </system>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="file_ownership">Only create lib/video/concatenator.ts and tests/unit/video/concatenator.test.ts. Only modify lib/video/ffmpeg.ts (add concat, overlayAudio, muxAudioVideo methods AND change execute() to protected) and lib/video/assembler.ts (add concatenateAllScenes, overlayAllAudio methods AND add fs imports). Do NOT touch files owned by other stories.</constraint>
+    <constraint type="naming">Use concat- prefix for files, Concat prefix for classes, concat prefix for functions, concat. prefix for tests, cat- prefix for CSS classes</constraint>
+    <constraint type="imports">Only import from read_only_dependencies: lib/video/constants.ts (VIDEO_ASSEMBLY_CONFIG, ASSEMBLY_JOB_STATUS), src/types/assembly.ts (AssemblyScene, AssemblyJob, AssemblyStage), lib/db/client.ts (db), lib/db/queries.ts (updateProjectVideo, completeAssemblyJob)</constraint>
+    <constraint type="database">Read-only access to assembly_jobs, scenes, and projects tables. Update projects table (video_path, total_duration, file_size) and assembly_jobs table (status, completed_at). Do NOT create tables or add columns.</constraint>
+    <constraint type="merge_order">This story is THIRD in merge order (3 of 5). Stories 5.1 and 5.2 must merge first, as they create base FFmpegClient, VideoAssembler, and trimming functionality that this story extends and depends on.</constraint>
+    <constraint type="interface_dependencies">Consumes interfaces from Story 5.1 (FFmpegClient.execute, getVideoDuration, getAudioDuration, VideoAssembler.updateJobProgress, completeJob) and Story 5.2 (trimAllScenes returns trimmed paths). Implements interfaces for Stories 5.4 and 5.5 (concatenated video path, final video path).</constraint>
+    <constraint type="critical_changes">MUST change FFmpegClient.execute() from private to protected. MUST add fs imports to assembler.ts. MUST use correct updateJobProgress signature (4 parameters, not object). MUST pass null for thumbnailPath in updateProjectVideo call. MUST add normalize=0 to amix filter.</constraint>
+    <constraint type="performance">Concatenation stage (30-40% progress). Audio overlay stage (40-70% progress). Target completion in less than 2 minutes for 3-minute video. Use -c copy to avoid re-encoding. Warn for projects with greater than 10 scenes.</constraint>
+    <constraint type="windows_compatibility">Convert backslashes to forward slashes in concat file paths. Escape single quotes in file paths. Handle paths with spaces using single quotes in concat file format.</constraint>
+    <constraint type="audio_sync">Each scene audio starts at cumulative time offset (Scene 1 at 0s, Scene 2 at Scene 1 duration, Scene 3 at Scene 1 plus Scene 2 duration). Use adelay filter for precise timing. Use amix with normalize=0 to prevent volume reduction.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>FFmpegClient.concat</name>
+      <kind>method</kind>
+      <signature>concat(concatListPath: string, outputPath: string): Promise&lt;void&gt;</signature>
+      <path>lib/video/ffmpeg.ts</path>
+    </interface>
+    <interface>
+      <name>FFmpegClient.overlayAudio</name>
+      <kind>method</kind>
+      <signature>overlayAudio(videoPath: string, audioPath: string, outputPath: string): Promise&lt;void&gt;</signature>
+      <path>lib/video/ffmpeg.ts</path>
+    </interface>
+    <interface>
+      <name>FFmpegClient.muxAudioVideo</name>
+      <kind>method</kind>
+      <signature>muxAudioVideo(videoPath: string, audioInputs: Array&lt;{ path: string; startTime: number }&gt;, outputPath: string): Promise&lt;void&gt;</signature>
+      <path>lib/video/ffmpeg.ts</path>
+    </interface>
+    <interface>
+      <name>VideoAssembler.concatenateAllScenes</name>
+      <kind>method</kind>
+      <signature>concatenateAllScenes(jobId: string, trimmedPaths: string[]): Promise&lt;string&gt;</signature>
+      <path>lib/video/assembler.ts</path>
+    </interface>
+    <interface>
+      <name>VideoAssembler.overlayAllAudio</name>
+      <kind>method</kind>
+      <signature>overlayAllAudio(jobId: string, concatenatedPath: string, scenes: AssemblyScene[], projectId: string): Promise&lt;string&gt;</signature>
+      <path>lib/video/assembler.ts</path>
+    </interface>
+    <interface>
+      <name>Concatenator.concatenate</name>
+      <kind>method</kind>
+      <signature>concatenate(trimmedPaths: string[], outputPath: string): Promise&lt;ConcatResult&gt;</signature>
+      <path>lib/video/concatenator.ts</path>
+    </interface>
+    <interface>
+      <name>Concatenator.overlayAudio</name>
+      <kind>method</kind>
+      <signature>overlayAudio(videoPath: string, audioPath: string, outputPath: string): Promise&lt;string&gt;</signature>
+      <path>lib/video/concatenator.ts</path>
+    </interface>
+    <interface>
+      <name>Concatenator.overlayAllAudio</name>
+      <kind>method</kind>
+      <signature>overlayAllAudio(concatenatedVideoPath: string, scenes: AssemblyScene[], outputPath: string): Promise&lt;string&gt;</signature>
+      <path>lib/video/concatenator.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest framework with vi.mock for mocking FFmpeg operations. FFmpegClient methods should be mocked in Concatenator tests to isolate concatenation logic from actual FFmpeg execution. Tests should verify both success and error paths including edge cases (single scene, many scenes greater than 10, Windows paths with backslashes and special characters). Clean up temporary files in afterEach hooks. Target greater than 80% code coverage. Integration tests should verify full pipeline (trimming to concatenation to audio overlay) and database updates.
+    </standards>
+    <locations>
+      <location>tests/unit/video/concatenator.test.ts</location>
+      <location>tests/unit/video/ffmpeg.test.ts (extend with concat and audio overlay tests)</location>
+      <location>tests/unit/video/assembler.test.ts (extend with concatenateAllScenes and overlayAllAudio tests)</location>
+      <location>tests/integration/video-assembly.test.ts (full pipeline test)</location>
+    </locations>
+    <ideas>
+      <idea acId="AC1">Test concatenate with 3 scenes (5s, 7s, 8s) - verify output is exactly 20 seconds</idea>
+      <idea acId="AC1">Test concatenate with single scene - verify no errors</idea>
+      <idea acId="AC2">Test scene order preserved during concatenation - Scene 1 appears before Scene 2 before Scene 3</idea>
+      <idea acId="AC3">Test audio overlay timing - voiceover starts at correct cumulative offset for each scene</idea>
+      <idea acId="AC3">Test adelay filter applied correctly with millisecond precision</idea>
+      <idea acId="AC4">Test audio sync accuracy - verify no drift greater than 0.1s between scenes</idea>
+      <idea acId="AC4">Test cumulative timing calculation for 5 scenes</idea>
+      <idea acId="AC5">Test output format is H.264 video codec, AAC audio codec, MP4 container</idea>
+      <idea acId="AC5">Test audio conversion from MP3 to AAC during overlay</idea>
+      <idea acId="AC6">Test final video saved to public/videos/{projectId}/final.mp4</idea>
+      <idea acId="AC6">Test output directory created if doesn't exist</idea>
+      <idea acId="AC7">Test updateProjectVideo called with correct 5 parameters including null for thumbnailPath</idea>
+      <idea acId="AC7">Test project record updated with video_path, total_duration, and file_size</idea>
+      <idea acId="AC8">Test assembly job marked as 'complete' with completion timestamp</idea>
+      <idea acId="AC8">Test completeAssemblyJob function called</idea>
+      <idea acId="AC9">Test final video file is valid MP4 (probe succeeds)</idea>
+      <idea acId="AC9">Test video duration matches expected total from scenes</idea>
+      <idea acId="AC10">Test file size is approximately 5-10 MB per minute at 720p</idea>
+      <idea acId="AC10">Test file size calculation using fs.statSync</idea>
+      <idea>Test generateConcatFile with Windows paths - backslashes converted to forward slashes</idea>
+      <idea>Test generateConcatFile with paths containing single quotes - quotes escaped correctly</idea>
+      <idea>Test concat with greater than 10 scenes - performance warning logged</idea>
+      <idea>Test amix filter includes normalize=0 parameter</idea>
+      <idea>Test audio volume levels remain consistent (not reduced by amix)</idea>
+      <idea>Test updateJobProgress called at 35%, 60%, and 95% progress</idea>
+      <idea>Test error handling for missing trimmed file</idea>
+      <idea>Test error handling for missing audio file</idea>
+      <idea>Test error handling for FFmpeg concat failure</idea>
+      <idea>Test error handling for FFmpeg audio overlay failure</idea>
+      <idea>Test intermediate file cleanup on error</idea>
+    </ideas>
+  </tests>
+</story-context>

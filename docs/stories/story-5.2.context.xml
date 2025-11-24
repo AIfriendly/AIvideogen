@@ -1,0 +1,282 @@
+<story-context id="5-2-scene-video-trimming" v="1.0">
+  <metadata>
+    <epicId>5</epicId>
+    <storyId>2</storyId>
+    <title>Scene Video Trimming &amp; Preparation</title>
+    <status>Ready for Development</status>
+    <generatedAt>2025-11-24</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-5.2.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>video creator</asA>
+    <iWant>my selected video clips to be automatically trimmed to match the voiceover duration</iWant>
+    <soThat>each scene's visuals sync perfectly with the narration</soThat>
+    <tasks>
+      <task id="1" title="Create Trimmer Service">
+        <file>lib/video/trimmer.ts</file>
+        <subtasks>
+          <subtask>Create Trimmer class with FFmpegClient dependency injection</subtask>
+          <subtask>Implement trimScene() method with duration comparison</subtask>
+          <subtask>Implement handleShortVideo() for edge cases (loop strategy)</subtask>
+          <subtask>Add validation for input file existence</subtask>
+        </subtasks>
+      </task>
+      <task id="2" title="Extend FFmpegClient with Trim Methods">
+        <file>lib/video/ffmpeg.ts</file>
+        <subtasks>
+          <subtask>Add trimVideo() method with -c copy optimization</subtask>
+          <subtask>Add trimToAudioDuration() convenience method</subtask>
+          <subtask>Implement re-encode fallback if copy codec fails</subtask>
+          <subtask>Add duration tolerance validation (±0.5s)</subtask>
+        </subtasks>
+      </task>
+      <task id="3" title="Extend VideoAssembler with trimAllScenes">
+        <file>lib/video/assembler.ts</file>
+        <subtasks>
+          <subtask>Add trimAllScenes() method to VideoAssembler class</subtask>
+          <subtask>Implement progress tracking with updateJobProgress()</subtask>
+          <subtask>Create temporary directory structure for trimmed files</subtask>
+          <subtask>Return array of trimmed file paths for concatenation</subtask>
+        </subtasks>
+      </task>
+      <task id="4" title="Implement Edge Case Handling">
+        <subtasks>
+          <subtask>Handle video shorter than audio using loop strategy</subtask>
+          <subtask>Handle missing input file with clear error message</subtask>
+          <subtask>Handle codec compatibility issues with fallback</subtask>
+          <subtask>Add retry logic for transient failures</subtask>
+        </subtasks>
+      </task>
+      <task id="5" title="Create Unit Tests">
+        <file>tests/unit/video/trimmer.test.ts</file>
+        <subtasks>
+          <subtask>Test trimScene() with various duration combinations</subtask>
+          <subtask>Test handleShortVideo() edge case</subtask>
+          <subtask>Test error handling for missing files</subtask>
+          <subtask>Mock FFmpeg commands for isolated testing</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" title="Duration-Based Trimming">
+      <given>a scene with 10s voiceover and 30s video clip</given>
+      <when>trimming is executed</when>
+      <then>the system trims the video to exactly 10 seconds</then>
+    </criterion>
+    <criterion id="AC2" title="Trimmed Clip Storage">
+      <given>trimmed video clips</given>
+      <when>trimming completes</when>
+      <then>clips are saved to temp directory: .cache/assembly/{jobId}/scene-{n}-trimmed.mp4</then>
+    </criterion>
+    <criterion id="AC3" title="Sequential Processing">
+      <given>a project with multiple scenes</given>
+      <when>trimming is initiated</when>
+      <then>all scenes are trimmed before proceeding to concatenation</then>
+    </criterion>
+    <criterion id="AC4" title="Progress Tracking">
+      <given>an ongoing trimming operation</given>
+      <when>each scene is processed</when>
+      <then>progress indicator shows "Trimming scene X/Y..."</then>
+    </criterion>
+    <criterion id="AC5" title="Short Video Edge Case">
+      <given>a video shorter than the voiceover duration</given>
+      <when>trimming is executed</when>
+      <then>the system either loops the video or extends the final frame</then>
+    </criterion>
+    <criterion id="AC6" title="Missing Video Error">
+      <given>a missing selected clip file</given>
+      <when>trimming is attempted</when>
+      <then>assembly fails with clear error message identifying the missing file</then>
+    </criterion>
+    <criterion id="AC7" title="Performance">
+      <given>typical clip lengths (5-60 seconds)</given>
+      <when>trimming is executed</when>
+      <then>each scene completes within 30 seconds</then>
+    </criterion>
+    <criterion id="AC8" title="Quality Preservation">
+      <given>any trimming operation</given>
+      <when>using copy codec is possible</when>
+      <then>video quality is preserved without re-encoding</then>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>1.7. Automated Video Assembly</section>
+        <snippet>FR-7.02: Trim clips to voiceover duration - System must trim each selected video clip to exactly match its corresponding voiceover audio segment duration, ensuring perfect synchronization between visuals and narration.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/parallel-spec-epic-5.md</path>
+        <title>Parallel Epic Technical Specification: Video Assembly</title>
+        <section>Story Contract Matrix - Story 5.2</section>
+        <snippet>Defines file ownership (exclusive_create: trimmer.ts; exclusive_modify: ffmpeg.ts, assembler.ts), interface dependencies (consumes from 5.1, implements for 5.3), and merge order (2 of 5) for parallel-safe execution.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Product Epic Breakdown</title>
+        <section>Epic 5 - Video Assembly &amp; Output, Story 5.2</section>
+        <snippet>Story 5.2 implements video trimming functionality that prepares selected clips for concatenation, handling edge cases where videos are longer or shorter than voiceover audio.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Video Processing Layer</section>
+        <snippet>FFmpeg-based video processing with local filesystem storage (.cache/ for temp files, public/videos/ for output). Video operations use -c copy codec when possible to preserve quality and improve performance.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-3.md</path>
+        <title>Technical Specification: Epic 3 - Visual Sourcing &amp; Downloading</title>
+        <section>Downloaded Clip Storage</section>
+        <snippet>Downloaded video segments stored in .cache/clips/ directory with structure: {projectId}/{sceneId}/{clipId}.mp4. Story 5.2 reads from this location for trimming operations.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/5-1-video-processing-infrastructure.context.xml</path>
+        <title>Story 5.1 Context - Video Processing Infrastructure</title>
+        <section>Interfaces</section>
+        <snippet>Story 5.1 provides base FFmpegClient class with getVideoDuration(), getAudioDuration(), probe() methods and VideoAssembler class with updateJobProgress() method that Story 5.2 extends.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>lib/video/trimmer.ts</path>
+        <kind>service</kind>
+        <symbol>Trimmer</symbol>
+        <reason>Video trimming logic and edge case handling created by this story</reason>
+      </artifact>
+      <artifact>
+        <path>lib/video/ffmpeg.ts</path>
+        <kind>service</kind>
+        <symbol>FFmpegClient</symbol>
+        <reason>Extended with trimVideo() and trimToAudioDuration() methods by this story</reason>
+      </artifact>
+      <artifact>
+        <path>lib/video/assembler.ts</path>
+        <kind>service</kind>
+        <symbol>VideoAssembler</symbol>
+        <reason>Extended with trimAllScenes() method by this story</reason>
+      </artifact>
+      <artifact>
+        <path>lib/video/constants.ts</path>
+        <kind>config</kind>
+        <symbol>VIDEO_ASSEMBLY_CONFIG</symbol>
+        <reason>Read-only dependency - assembly configuration constants created by Story 5.1</reason>
+      </artifact>
+      <artifact>
+        <path>src/types/assembly.ts</path>
+        <kind>types</kind>
+        <symbol>AssemblyScene, AssemblyJob</symbol>
+        <reason>Read-only dependency - shared type definitions created by Story 5.1</reason>
+      </artifact>
+      <artifact>
+        <path>lib/db/client.ts</path>
+        <kind>database</kind>
+        <symbol>db</symbol>
+        <reason>Read-only dependency - database access for reading assembly_jobs and scenes tables</reason>
+      </artifact>
+      <artifact>
+        <path>tests/unit/video/trimmer.test.ts</path>
+        <kind>test</kind>
+        <symbol>Trimmer tests</symbol>
+        <reason>Unit tests for Trimmer class created by this story</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>better-sqlite3</package>
+        <version>^11.x</version>
+        <purpose>Database access for reading assembly_jobs and scenes tables (inherited from Story 5.1)</purpose>
+      </node>
+      <node>
+        <package>uuid</package>
+        <version>^9.x</version>
+        <purpose>Generate unique job IDs (inherited from Story 5.1)</purpose>
+      </node>
+      <system>
+        <package>FFmpeg</package>
+        <version>7.x</version>
+        <purpose>Video trimming commands: -t for duration, -stream_loop for short videos, -c copy for quality preservation (inherited from Story 5.1)</purpose>
+      </system>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="file_ownership">Only create lib/video/trimmer.ts and tests/unit/video/trimmer.test.ts. Only modify lib/video/ffmpeg.ts (add trim methods) and lib/video/assembler.ts (add trimAllScenes method). Do NOT touch files owned by other stories.</constraint>
+    <constraint type="naming">Use trim- prefix for files, Trim prefix for classes, trim prefix for functions, trim. prefix for tests, trm- prefix for CSS classes</constraint>
+    <constraint type="imports">Only import from read_only_dependencies: lib/video/constants.ts (VIDEO_ASSEMBLY_CONFIG), src/types/assembly.ts (AssemblyScene, AssemblyJob), lib/db/client.ts (db)</constraint>
+    <constraint type="database">Read-only access to assembly_jobs and scenes tables. Do NOT create tables or add columns.</constraint>
+    <constraint type="merge_order">This story is SECOND in merge order (2 of 5). Story 5.1 must merge first, as it creates base FFmpegClient and VideoAssembler classes that this story extends.</constraint>
+    <constraint type="interface_dependencies">Consumes interfaces from Story 5.1 (FFmpegClient.getVideoDuration, getAudioDuration, VideoAssembler.updateJobProgress). Implements interfaces for Story 5.3 (trimAllScenes returns array of trimmed file paths).</constraint>
+    <constraint type="performance">Each scene must trim within 30 seconds (AC7). Use -c copy codec to avoid re-encoding for performance and quality. Trimming phase represents 0-30% of total assembly progress.</constraint>
+    <constraint type="error_handling">Provide clear, actionable error messages with file paths. Handle missing files, corrupt videos, disk space issues, and codec compatibility problems. Clean up partial outputs on failure.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>FFmpegClient.trimToAudioDuration</name>
+      <kind>method</kind>
+      <signature>trimToAudioDuration(videoPath: string, audioPath: string, outputPath: string): Promise&lt;void&gt;</signature>
+      <path>lib/video/ffmpeg.ts</path>
+    </interface>
+    <interface>
+      <name>FFmpegClient.trimVideo</name>
+      <kind>method</kind>
+      <signature>trimVideo(videoPath: string, duration: number, outputPath: string): Promise&lt;void&gt;</signature>
+      <path>lib/video/ffmpeg.ts</path>
+    </interface>
+    <interface>
+      <name>VideoAssembler.trimAllScenes</name>
+      <kind>method</kind>
+      <signature>trimAllScenes(jobId: string, scenes: AssemblyScene[]): Promise&lt;string[]&gt;</signature>
+      <path>lib/video/assembler.ts</path>
+    </interface>
+    <interface>
+      <name>Trimmer.trimScene</name>
+      <kind>method</kind>
+      <signature>trimScene(scene: AssemblyScene, outputDir: string): Promise&lt;string&gt;</signature>
+      <path>lib/video/trimmer.ts</path>
+    </interface>
+    <interface>
+      <name>Trimmer.handleShortVideo</name>
+      <kind>private method</kind>
+      <signature>handleShortVideo(videoPath: string, targetDuration: number, actualDuration: number, outputPath: string): Promise&lt;void&gt;</signature>
+      <path>lib/video/trimmer.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest framework with vi.mock for mocking FFmpeg operations. FFmpegClient methods should be mocked in Trimmer tests to isolate trimming logic from actual FFmpeg execution. Tests should verify both success and error paths including edge cases (short videos, missing files, codec failures). Clean up temporary files in afterEach hooks. Target >80% code coverage.
+    </standards>
+    <locations>
+      <location>tests/unit/video/trimmer.test.ts</location>
+      <location>tests/unit/video/ffmpeg.test.ts (extend with trim method tests)</location>
+      <location>tests/unit/video/assembler.test.ts (extend with trimAllScenes tests)</location>
+    </locations>
+    <ideas>
+      <idea acId="AC1">Test trimScene with 30s video and 10s audio duration - verify output is exactly 10s</idea>
+      <idea acId="AC1">Test trimScene with video longer than audio - verify trimming from start</idea>
+      <idea acId="AC2">Test trimmed clips saved to correct temp directory path with scene number in filename</idea>
+      <idea acId="AC2">Test temp directory created if doesn't exist</idea>
+      <idea acId="AC3">Test trimAllScenes processes all scenes sequentially before returning</idea>
+      <idea acId="AC3">Test trimAllScenes returns array of trimmed file paths in correct order</idea>
+      <idea acId="AC4">Test updateJobProgress called for each scene with stage='trimming' and current_scene number</idea>
+      <idea acId="AC4">Test progress calculation: (sceneIndex / totalScenes) * 30 for 0-30% range</idea>
+      <idea acId="AC5">Test handleShortVideo with 5s video and 15s audio - verify loops 3 times then trims</idea>
+      <idea acId="AC5">Test handleShortVideo with very short 2s video and 30s audio - verify multiple loops</idea>
+      <idea acId="AC5">Test short video edge case uses -stream_loop FFmpeg parameter</idea>
+      <idea acId="AC6">Test trimScene with missing input file throws FILE_NOT_FOUND error with path</idea>
+      <idea acId="AC6">Test error message includes actionable guidance (e.g., "Video file not found at path/to/file.mp4")</idea>
+      <idea acId="AC7">Test trimVideo completes within 30 seconds for typical 30s clip (mock FFmpeg timing)</idea>
+      <idea acId="AC8">Test trimVideo uses -c copy codec by default for quality preservation</idea>
+      <idea acId="AC8">Test re-encode fallback when -c copy fails due to codec incompatibility</idea>
+      <idea acId="AC8">Test trimVideo with corrupt video file handles FFmpeg error gracefully</idea>
+    </ideas>
+  </tests>
+</story-context>

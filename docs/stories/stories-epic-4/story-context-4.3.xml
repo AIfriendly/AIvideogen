@@ -1,0 +1,1169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-id="4.3" generated="2025-11-20">
+  <metadata>
+    <title>Video Preview &amp; Playback Functionality</title>
+    <epic>Epic 4 - Visual Curation Interface</epic>
+    <status>Ready</status>
+    <dependencies>
+      <dependency status="DONE">Story 4.2 (Visual Suggestions Display &amp; Gallery)</dependency>
+      <dependency status="DONE">Epic 3 Story 3.6 (Default Segment Download Service)</dependency>
+      <dependency>Plyr library for accessible, lightweight HTML5 video playback (per UX specification)</dependency>
+    </dependencies>
+  </metadata>
+
+  <story-definition>
+    <![CDATA[
+# Story 4.3: Video Preview & Playback Functionality
+
+## Story Header
+- **ID:** 4.3
+- **Title:** Video Preview & Playback Functionality
+- **Goal:** Enable users to preview suggested video clips directly in the browser using downloaded segments
+- **Epic:** Epic 4 - Visual Curation Interface
+- **Status:** Ready
+- **Dependencies:**
+  - Story 4.2 (Visual Suggestions Display & Gallery) - DONE
+  - Epic 3 Story 3.6 (Default Segment Download Service) - DONE
+  - Plyr library for accessible, lightweight HTML5 video playback (per UX specification)
+
+## Context
+
+This story implements the video preview and playback functionality for the Visual Curation Interface, enabling users to preview suggested YouTube clips directly in the browser before making their final selection. Building upon Story 4.2's suggestion gallery, this story adds the VideoPreviewPlayer component that provides instant playback of pre-downloaded video segments from Epic 3's download service.
+
+The preview system prioritizes instant playback by loading video segments from the local cache (`.cache/videos/{projectId}/scene-{sceneNumber}-default.mp4`) when available (download_status = 'complete'). For suggestions where segment download failed (download_status = 'error'), the player gracefully falls back to embedding a YouTube iframe for streaming playback. This dual-mode approach ensures users can always preview clips regardless of download success.
+
+**Key Technical Components:**
+- VideoPreviewPlayer.tsx component at `components/features/curation/`
+- HTML5 video player with Plyr library for accessible controls
+- Click-to-preview: Clicking SuggestionCard opens preview modal/inline player
+- Play/pause, progress bar, and volume controls
+- Keyboard shortcuts (Space = play/pause, Esc = close preview)
+- YouTube iframe fallback for failed downloads
+- Lazy loading and hover preloading for performance optimization
+
+## Story
+
+As a user reviewing visual suggestions for my video project,
+I want to preview suggested video clips by clicking on them with instant playback and standard player controls,
+so that I can evaluate each clip's content and quality before selecting it for my final video assembly.
+
+## Acceptance Criteria
+
+1. Clicking a suggestion card opens video preview player
+2. **Default Segment Playback (Epic 3 Story 3.6):** Video plays downloaded segment from `.cache/videos/{projectId}/scene-{sceneNumber}-default.mp4`
+3. **Instant Playback (PRD Feature 1.5 AC7):** Video starts immediately without additional downloads
+4. Play/pause, progress bar, and volume controls functional
+5. **Fallback for Failed Downloads:** If default_segment_path is NULL or download_status = 'error', player embeds YouTube iframe instead
+6. Keyboard shortcuts work (Space = play/pause, Esc = close)
+7. Multiple previews can be watched sequentially (no need to reload page)
+8. Video player responsive and works on desktop and tablet
+    ]]>
+  </story-definition>
+
+  <technical-specifications>
+    <section title="Services &amp; Modules">
+      <![CDATA[
+| Module/Component | Responsibility | Inputs | Outputs | Owner/Story |
+|------------------|---------------|--------|---------|-------------|
+| **VideoPreviewPlayer.tsx** | HTML5 player for segment preview | suggestionId, segmentPath, videoId | Video playback UI with controls | Story 4.3 |
+
+File Location: `src/components/features/curation/VideoPreviewPlayer.tsx`
+      ]]>
+    </section>
+
+    <section title="Data Models - VisualSuggestion Interface">
+      <![CDATA[
+// Visual suggestion model (from Epic 3, consumed here)
+interface VisualSuggestion {
+  id: string;
+  scene_id: string;
+  video_id: string;  // YouTube video ID
+  title: string;
+  thumbnail_url: string;
+  channel_title: string;
+  embed_url: string;
+  rank: number;  // 1-8
+  duration: number;  // seconds
+  default_segment_path: string | null;  // Path to .cache/videos/ file
+  download_status: 'pending' | 'downloading' | 'complete' | 'error';
+  created_at: string;
+}
+      ]]>
+    </section>
+
+    <section title="APIs">
+      <![CDATA[
+**Video Segment API Route (to be created in Story 4.3):**
+
+GET /api/videos/[...path]
+
+- **Purpose:** Serve video files from .cache/videos/ directory
+- **Request:** GET /api/videos/videos/{projectId}/scene-{sceneNumber}-default.mp4
+- **Response 200:** Video stream with Content-Type: video/mp4
+- **Response 206:** Partial content for Range requests (video seeking)
+- **Response 404:** File not found
+- **Response 403:** Path traversal attempt blocked
+
+**Security Requirements:**
+- Validate requested path is within .cache/videos/ directory
+- Prevent path traversal attacks (normalize and validate paths)
+- Support HTTP Range requests for video seeking
+      ]]>
+    </section>
+
+    <section title="Workflows - Clip Preview Sequence">
+      <![CDATA[
+**Clip Preview Flow (Story 4.3):**
+
+User clicks suggestion card
+↓
+onClick callback fires with suggestion data
+↓
+VisualCurationClient sets selectedSuggestion state
+↓
+Dialog opens with VideoPreviewPlayer
+↓
+Check download_status and segmentPath
+↓
+IF download_status == 'complete' && segmentPath exists:
+  → Construct URL: strip .cache/ prefix, prepend /api/videos/
+  → Load video from /api/videos/videos/{projectId}/scene-{n}-default.mp4
+  → Instant playback (no network delay for download)
+ELSE IF download_status == 'error' || segmentPath == null:
+  → Embed YouTube iframe with autoplay
+  → Streaming playback (~2-3 second delay)
+↓
+Display VideoPreviewPlayer with controls
+↓
+User closes preview → Cleanup Plyr instance → Clear selectedSuggestion state
+      ]]>
+    </section>
+
+    <section title="NFR Performance Targets">
+      <![CDATA[
+**Video Playback Performance:**
+- Video segment loading: <100ms from source set to first frame rendered (for pre-downloaded/cached files)
+- Plyr player initialization: <50ms per player instance
+- YouTube iframe fallback: <3 seconds stream start
+- Support simultaneous preview of multiple clips (user can open/close players rapidly)
+      ]]>
+    </section>
+
+    <section title="Story 4.3 Acceptance Criteria (from Tech Spec)">
+      <![CDATA[
+### Story 4.3: Video Preview Player
+1. Clicking a suggestion card opens video preview player
+2. **Default Segment Playback:** Video plays downloaded segment from `.cache/videos/{projectId}/scene-{sceneNumber}-default.mp4`
+3. **Instant Playback:** Video starts immediately without additional downloads
+4. Play/pause, progress bar, and volume controls functional
+5. **Fallback for Failed Downloads:** If default_segment_path is NULL or download_status = 'error', player embeds YouTube iframe instead
+6. Keyboard shortcuts work (Space = play/pause, Esc = close)
+7. Multiple previews can be watched sequentially (no need to reload page)
+8. Video player responsive and works on desktop and tablet
+      ]]>
+    </section>
+  </technical-specifications>
+
+  <architecture>
+    <section title="Project Structure Patterns">
+      <![CDATA[
+ai-video-generator/
+├── .cache/                    # Temporary files (git-ignored)
+│   ├── audio/                 # Generated voiceover audio
+│   ├── videos/                # Downloaded YouTube clips
+│   │   └── {projectId}/       # Project-specific videos
+│   │       └── scene-{sceneNumber}-default.mp4
+│   ├── projects/              # Project working directories
+│   └── output/                # Final rendered videos
+│
+├── app/                       # Next.js App Router
+│   └── api/                   # API Routes
+│       └── videos/            # Video serving endpoint (Story 4.3)
+│           └── [...path]/     # Catch-all route for video files
+│               └── route.ts
+│
+├── components/                # React components
+│   └── features/              # Feature-specific components
+│       └── curation/          # Epic 4: Visual curation
+│           ├── VisualCuration.tsx      # Story 4.1
+│           ├── SceneCard.tsx           # Story 4.1
+│           ├── VisualSuggestionGallery.tsx  # Story 4.2
+│           ├── SuggestionCard.tsx      # Story 4.2 (to be modified)
+│           ├── VideoPreviewPlayer.tsx  # Story 4.3 (NEW)
+│           ├── EmptyClipState.tsx      # Story 4.2
+│           └── ...
+      ]]>
+    </section>
+
+    <section title="Component Organization">
+      <![CDATA[
+**Video Player Component (Story 4.3):**
+- Plyr library for HTML5 video playback
+- Controls: play/pause, progress bar, volume, fullscreen
+- Keyboard shortcuts: Space, Esc
+- YouTube iframe fallback
+
+**Technology Stack:**
+- Video Player: Plyr (Latest) - FOSS
+- Dialog/Modal: shadcn/ui Dialog (@radix-ui/react-dialog)
+- Icons: lucide-react (X, Play, Pause)
+- Styling: Tailwind CSS v4
+      ]]>
+    </section>
+
+    <section title="Database Schema - visual_suggestions Table">
+      <![CDATA[
+-- Visual suggestions from AI sourcing (Epic 3)
+CREATE TABLE visual_suggestions (
+  id TEXT PRIMARY KEY,
+  scene_id TEXT NOT NULL,
+  video_id TEXT NOT NULL, -- YouTube video ID
+  title TEXT NOT NULL,
+  thumbnail_url TEXT,
+  channel_title TEXT,
+  embed_url TEXT NOT NULL,
+  rank INTEGER NOT NULL, -- Ranking from 1-8 (top suggestions)
+  duration INTEGER, -- Video duration in seconds (Epic 3 Story 3.4)
+  default_segment_path TEXT, -- Path to downloaded default segment (Epic 3 Story 3.6)
+  download_status TEXT DEFAULT 'pending', -- pending, downloading, complete, error (Epic 3 Story 3.6)
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_visual_suggestions_scene ON visual_suggestions(scene_id);
+
+-- Scenes table (selected_clip_id for Story 4.4)
+CREATE TABLE scenes (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  scene_number INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  audio_file_path TEXT,
+  duration INTEGER,
+  selected_clip_id TEXT, -- Selected visual suggestion (Epic 4 Story 4.4)
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (selected_clip_id) REFERENCES visual_suggestions(id),
+  UNIQUE(project_id, scene_number)
+);
+      ]]>
+    </section>
+  </architecture>
+
+  <prd-requirements>
+    <section title="Feature 1.5 AC7 - Instant Preview">
+      <![CDATA[
+**AC7: Instant Preview Availability**
+- **Given** default segments have been downloaded for all suggested videos.
+- **When** the user opens the Visual Curation UI.
+- **Then** all video previews must play immediately without requiring additional downloads.
+
+**Functional Requirement:**
+- Downloaded segments must be immediately available for preview in the Visual Curation UI without requiring user-triggered downloads.
+      ]]>
+    </section>
+
+    <section title="Feature 1.6 AC1 - Scene and Clip Display">
+      <![CDATA[
+**AC1: Scene and Clip Display**
+- **Given** the system has generated a 3-scene script with 4 suggested clips per scene.
+- **When** the user opens the Visual Curation UI.
+- **Then** the UI must display 3 distinct sections, one for each scene, with each section showing the scene's text and its 4 suggested video clips.
+
+**User Story:**
+As a creator, I want to preview the suggested video clips, so that I can see them in motion before making a selection.
+
+**Functional Requirement:**
+- The UI must allow the user to play/preview each suggested video clip.
+      ]]>
+    </section>
+  </prd-requirements>
+
+  <code-artifacts>
+    <file path="src/components/features/curation/SuggestionCard.tsx" description="To be modified - add onClick prop">
+      <![CDATA[
+/**
+ * SuggestionCard Component - Epic 4, Story 4.2
+ *
+ * Displays an individual YouTube video suggestion with thumbnail, metadata, and download status.
+ * Used in the VisualSuggestionGallery to show visual clip options for each scene.
+ *
+ * Features:
+ * - YouTube thumbnail with fallback on error
+ * - Video title, channel name, duration display
+ * - Rank badge (e.g., #1, #2)
+ * - Download status indicator (pending/downloading/complete/error)
+ * - Hover effects for better UX
+ * - 16:9 aspect ratio for thumbnails
+ */
+
+import * as React from 'react';
+import Image from 'next/image';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { type VisualSuggestion } from '@/types/visual-suggestions';
+import {
+  User,
+  Clock,
+  Download,
+  CheckCircle,
+  AlertCircle,
+  Video,
+} from 'lucide-react';
+
+/**
+ * Props for SuggestionCard component
+ */
+interface SuggestionCardProps {
+  suggestion: VisualSuggestion;
+  className?: string;
+  // TODO Story 4.3: Add onClick prop for preview trigger
+  // onClick?: () => void;
+}
+
+/**
+ * Format duration from seconds to MM:SS format
+ */
+function formatDuration(seconds: number | undefined): string {
+  if (!seconds || seconds === 0) {
+    return '--:--';
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Get download status badge configuration
+ */
+function getDownloadStatusBadge(status: VisualSuggestion['downloadStatus']) {
+  switch (status) {
+    case 'pending':
+      return {
+        variant: 'outline' as const,
+        icon: Clock,
+        text: 'Queued',
+        className: 'text-slate-600 dark:text-slate-400',
+      };
+    case 'downloading':
+      return {
+        variant: 'info' as const,
+        icon: Download,
+        text: 'Downloading...',
+        className: 'animate-pulse',
+      };
+    case 'complete':
+      return {
+        variant: 'success' as const,
+        icon: CheckCircle,
+        text: 'Ready',
+        className: '',
+      };
+    case 'error':
+      return {
+        variant: 'error' as const,
+        icon: AlertCircle,
+        text: 'Failed',
+        className: '',
+      };
+    default:
+      return {
+        variant: 'outline' as const,
+        icon: Clock,
+        text: 'Pending',
+        className: '',
+      };
+  }
+}
+
+/**
+ * SuggestionCard Component
+ */
+export function SuggestionCard({ suggestion, className }: SuggestionCardProps) {
+  const [thumbnailError, setThumbnailError] = React.useState(false);
+  const statusBadge = getDownloadStatusBadge(suggestion.downloadStatus);
+  const StatusIcon = statusBadge.icon;
+
+  return (
+    <Card
+      className={`relative overflow-hidden transition-all hover:shadow-lg hover:border-blue-400 dark:hover:border-blue-600 ${className || ''}`}
+    >
+      {/* Rank Badge - Top Left */}
+      <div className="absolute top-2 left-2 z-10">
+        <Badge
+          variant="default"
+          className="bg-blue-600 text-white font-bold shadow-md"
+        >
+          #{suggestion.rank}
+        </Badge>
+      </div>
+
+      {/* Download Status Badge - Top Right */}
+      <div className="absolute top-2 right-2 z-10">
+        <Badge variant={statusBadge.variant} className={statusBadge.className}>
+          <StatusIcon className="w-3 h-3 mr-1" />
+          {statusBadge.text}
+        </Badge>
+      </div>
+
+      <CardContent className="p-0">
+        {/* Thumbnail */}
+        <div className="relative w-full aspect-video bg-slate-200 dark:bg-slate-800">
+          {!thumbnailError ? (
+            <Image
+              src={suggestion.thumbnailUrl}
+              alt={suggestion.title}
+              fill
+              className="object-cover"
+              onError={() => setThumbnailError(true)}
+              unoptimized
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-200 dark:bg-slate-800">
+              <Video className="w-12 h-12 text-slate-400 dark:text-slate-600" />
+            </div>
+          )}
+        </div>
+
+        {/* Metadata */}
+        <div className="p-3 space-y-2">
+          <h3
+            className="text-sm font-semibold text-slate-900 dark:text-slate-100 line-clamp-2 leading-tight"
+            title={suggestion.title}
+          >
+            {suggestion.title}
+          </h3>
+
+          <div className="flex items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-400">
+            <div className="flex items-center gap-1 min-w-0 flex-1">
+              <User className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate" title={suggestion.channelTitle}>
+                {suggestion.channelTitle}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <Clock className="w-3 h-3" />
+              <span className="font-medium">{formatDuration(suggestion.duration)}</span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+      ]]>
+    </file>
+
+    <file path="src/components/features/curation/VisualSuggestionGallery.tsx" description="Integration point for SuggestionCard onClick">
+      <![CDATA[
+/**
+ * VisualSuggestionGallery Component - Epic 4, Story 4.2
+ *
+ * Displays AI-generated visual suggestions for a specific scene in a responsive grid layout.
+ * Story 4.3 will need to pass onClick handlers through this component to SuggestionCard.
+ */
+
+'use client';
+
+import * as React from 'react';
+import { type VisualSuggestion } from '@/types/visual-suggestions';
+import { SuggestionCard } from './SuggestionCard';
+import { EmptyClipState } from './EmptyClipState';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { AlertCircle } from 'lucide-react';
+
+interface VisualSuggestionGalleryProps {
+  projectId: string;
+  sceneId: string;
+  sceneNumber: number;
+  className?: string;
+  // TODO Story 4.3: Add onSuggestionClick prop
+  // onSuggestionClick?: (suggestion: VisualSuggestion) => void;
+}
+
+interface VisualSuggestionsApiResponse {
+  suggestions: VisualSuggestion[];
+  totalScenes: number;
+  scenesWithSuggestions: number;
+}
+
+function LoadingSkeleton() {
+  return (
+    <div>
+      <div className="mb-3">
+        <Skeleton className="w-40 h-5" />
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="space-y-3">
+            <Skeleton className="w-full aspect-video rounded-lg" />
+            <Skeleton className="w-full h-4" />
+            <Skeleton className="w-3/4 h-4" />
+            <div className="flex justify-between items-center">
+              <Skeleton className="w-20 h-3" />
+              <Skeleton className="w-12 h-3" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-8 md:py-12 px-4 border border-dashed rounded-lg bg-red-50/50 dark:bg-red-900/10">
+      <div className="bg-red-50 dark:bg-red-900/20 rounded-full p-4 md:p-6 mb-4">
+        <AlertCircle className="w-10 h-10 md:w-12 md:h-12 text-red-600 dark:text-red-400" />
+      </div>
+      <h3 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2 text-center">
+        Failed to Load Video Suggestions
+      </h3>
+      <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400 text-center max-w-md mb-6">
+        {message}
+      </p>
+      <Button
+        onClick={onRetry}
+        variant="outline"
+        className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700"
+      >
+        Retry
+      </Button>
+    </div>
+  );
+}
+
+export function VisualSuggestionGallery({
+  projectId,
+  sceneId,
+  sceneNumber,
+  className,
+}: VisualSuggestionGalleryProps) {
+  const [suggestions, setSuggestions] = React.useState<VisualSuggestion[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const fetchSuggestions = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/api/projects/${projectId}/visual-suggestions?sceneId=${sceneId}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch suggestions: ${response.statusText}`);
+      }
+
+      const data: VisualSuggestionsApiResponse = await response.json();
+
+      const sceneSuggestions = (data.suggestions || [])
+        .filter((s) => s.sceneId === sceneId)
+        .sort((a, b) => a.rank - b.rank);
+
+      setSuggestions(sceneSuggestions);
+    } catch (err) {
+      console.error('[VisualSuggestionGallery] Error fetching suggestions:', err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to load video suggestions. Please try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, sceneId, sceneNumber]);
+
+  const handleRetry = React.useCallback(async () => {
+    await fetchSuggestions();
+  }, [fetchSuggestions]);
+
+  React.useEffect(() => {
+    fetchSuggestions();
+  }, [fetchSuggestions]);
+
+  return (
+    <div className={className}>
+      {loading && <LoadingSkeleton />}
+
+      {!loading && error && <ErrorState message={error} onRetry={fetchSuggestions} />}
+
+      {!loading && !error && suggestions.length === 0 && (
+        <EmptyClipState sceneNumber={sceneNumber} onRetry={handleRetry} />
+      )}
+
+      {!loading && !error && suggestions.length > 0 && (
+        <div>
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              Suggested Video Clips ({suggestions.length})
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            {suggestions.map((suggestion) => (
+              <SuggestionCard key={suggestion.id} suggestion={suggestion} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+      ]]>
+    </file>
+
+    <file path="src/app/projects/[id]/visual-curation/VisualCurationClient.tsx" description="State management location for selectedSuggestion">
+      <![CDATA[
+/**
+ * Visual Curation Client Component - Epic 4, Story 4.1
+ *
+ * Client-side component for the visual curation page.
+ * Story 4.3 will add selectedSuggestion state here for preview management.
+ */
+
+'use client';
+
+import * as React from 'react';
+import { type Project, type Scene } from '@/lib/db/queries';
+import { SceneCard } from '@/components/features/curation/SceneCard';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
+
+interface VisualCurationClientProps {
+  project: Project;
+}
+
+interface ScenesApiResponse {
+  success: boolean;
+  data?: {
+    scenes: Scene[];
+  };
+  error?: {
+    message: string;
+    code: string;
+  };
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-4 md:space-y-6">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="rounded-lg border bg-card p-6 space-y-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Skeleton className="w-8 h-8 md:w-10 md:h-10 rounded-full" />
+              <Skeleton className="w-24 h-6 md:w-32 md:h-7" />
+            </div>
+            <Skeleton className="w-12 h-5 md:w-16 md:h-6" />
+          </div>
+          <Skeleton className="w-full h-16 md:h-20" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 md:py-16 px-4">
+      <div className="bg-slate-100 dark:bg-slate-800 rounded-full p-6 md:p-8 mb-4 md:mb-6">
+        <svg
+          className="w-12 h-12 md:w-16 md:h-16 text-slate-400 dark:text-slate-600"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
+        </svg>
+      </div>
+      <h3 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
+        No Scenes Found
+      </h3>
+      <p className="text-sm md:text-base text-slate-600 dark:text-slate-400 text-center max-w-md">
+        This project doesn't have any scenes yet.
+      </p>
+    </div>
+  );
+}
+
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 md:py-16 px-4">
+      <div className="bg-red-50 dark:bg-red-900/20 rounded-full p-6 md:p-8 mb-4 md:mb-6">
+        <svg
+          className="w-12 h-12 md:w-16 md:h-16 text-red-600 dark:text-red-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      </div>
+      <h3 className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
+        Failed to Load Scenes
+      </h3>
+      <p className="text-sm md:text-base text-slate-600 dark:text-slate-400 text-center max-w-md mb-6">
+        {message}
+      </p>
+      <Button onClick={onRetry} className="bg-blue-600 hover:bg-blue-700">
+        Try Again
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Visual Curation Client Component
+ *
+ * Story 4.3 will add:
+ * - const [selectedSuggestion, setSelectedSuggestion] = useState<VisualSuggestion | null>(null);
+ * - Dialog component with VideoPreviewPlayer
+ * - Pass setSelectedSuggestion through SceneCard -> VisualSuggestionGallery -> SuggestionCard
+ */
+export function VisualCurationClient({ project }: VisualCurationClientProps) {
+  const [scenes, setScenes] = React.useState<Scene[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const fetchScenes = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}/scenes`);
+      const data: ScenesApiResponse = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error?.message || 'Failed to fetch scenes');
+      }
+
+      setScenes(data.data?.scenes || []);
+    } catch (err) {
+      console.error('Error fetching scenes:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
+  }, [project.id]);
+
+  React.useEffect(() => {
+    fetchScenes();
+  }, [fetchScenes]);
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      <header className="border-b bg-background dark:bg-slate-900 sticky top-0 z-10">
+        <div className="container flex h-16 items-center gap-4 px-4 md:px-6 lg:px-8">
+          <div className="flex-1">
+            <h1 className="text-lg md:text-xl font-semibold text-slate-900 dark:text-slate-100">
+              {project.name}
+            </h1>
+            <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400">
+              Visual Curation - Select clips for each scene
+            </p>
+          </div>
+        </div>
+      </header>
+
+      <main className="flex flex-1 flex-col p-4 md:p-6 lg:p-8 bg-slate-50 dark:bg-slate-950">
+        <div className="max-w-4xl mx-auto w-full">
+          {loading && <LoadingSkeleton />}
+
+          {!loading && error && <ErrorState message={error} onRetry={fetchScenes} />}
+
+          {!loading && !error && scenes.length === 0 && <EmptyState />}
+
+          {!loading && !error && scenes.length > 0 && (
+            <div className="space-y-4 md:space-y-6">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 md:p-4">
+                <p className="text-xs md:text-sm text-blue-800 dark:text-blue-300">
+                  <strong>Review each scene below.</strong> Browse the AI-suggested video clips.
+                  Click on a clip to preview it, then select your favorite.
+                </p>
+              </div>
+
+              {scenes.map((scene) => (
+                <SceneCard key={scene.id} scene={scene} projectId={project.id} />
+              ))}
+
+              <div className="pt-4 md:pt-6 border-t">
+                <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400 text-center">
+                  Total Scenes: <strong>{scenes.length}</strong> | Total Duration:{' '}
+                  <strong>
+                    {Math.floor(
+                      scenes.reduce((sum, s) => sum + (s.duration || 0), 0)
+                    )}s
+                  </strong>
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
+      ]]>
+    </file>
+
+    <file path="src/types/visual-suggestions.ts" description="VisualSuggestion type definition">
+      <![CDATA[
+/**
+ * Visual Suggestions Type Definitions
+ *
+ * TypeScript interfaces and types for visual suggestions system.
+ */
+
+/**
+ * Visual suggestion data structure
+ */
+export interface VisualSuggestion {
+  id: string;
+  sceneId: string;
+  videoId: string;
+  title: string;
+  thumbnailUrl: string;
+  channelTitle: string;
+  embedUrl: string;
+  rank: number;
+  duration?: number; // Video duration in seconds
+  defaultSegmentPath?: string; // Path to downloaded segment (Story 3.6)
+  downloadStatus: DownloadStatus;
+  createdAt: string;
+}
+
+/**
+ * Download status enum for visual suggestions
+ */
+export type DownloadStatus = 'pending' | 'downloading' | 'complete' | 'error';
+
+/**
+ * Constant array for runtime validation
+ */
+export const DOWNLOAD_STATUS_VALUES: DownloadStatus[] = [
+  'pending',
+  'downloading',
+  'complete',
+  'error',
+];
+
+/**
+ * Type guard for download status validation
+ */
+export function isValidDownloadStatus(status: string): status is DownloadStatus {
+  return DOWNLOAD_STATUS_VALUES.includes(status as DownloadStatus);
+}
+      ]]>
+    </file>
+  </code-artifacts>
+
+  <dependencies>
+    <section title="Story 4.1 Patterns (Completed)">
+      <![CDATA[
+**State Management in VisualCurationClient:**
+- State managed with useState hooks
+- Error handling with retry buttons
+- Loading states with skeleton components
+- SceneCard receives projectId prop
+
+**Component Integration Pattern:**
+- VisualCurationClient fetches scenes
+- Renders SceneCard for each scene
+- SceneCard contains VisualSuggestionGallery
+
+**Error Handling Pattern:**
+- Error state UI with error icon (AlertCircle) and message
+- "Retry" button that re-fetches data
+- Console logging for debugging
+
+**Files Created in Story 4.1:**
+- `src/app/api/projects/[id]/scenes/route.ts`
+- `src/components/ui/skeleton.tsx`
+- `src/components/features/curation/SceneCard.tsx`
+- `src/app/projects/[id]/visual-curation/VisualCurationClient.tsx`
+      ]]>
+    </section>
+
+    <section title="Story 4.2 Patterns (Completed)">
+      <![CDATA[
+**SuggestionCard Component Structure:**
+- Displays thumbnail, title, channel, duration, and status badges
+- Hover effects already implemented (border color change, shadow increase)
+- Card structure: 16:9 thumbnail, metadata below
+- Story 4.3 adds onClick prop to open VideoPreviewPlayer
+
+**Download Status Integration:**
+- Story 4.2 displays download status badges (pending/downloading/complete/error)
+- Story 4.3 uses same status to determine local vs YouTube playback
+- Status field: `downloadStatus` from VisualSuggestion interface
+- Path field: `defaultSegmentPath` (relative path or null)
+
+**Data Available in SuggestionCard:**
+- `suggestion.videoId` - YouTube video ID for iframe fallback
+- `suggestion.title` - Display in player header
+- `suggestion.channelTitle` - Display in player header
+- `suggestion.defaultSegmentPath` - Path to local video segment
+- `suggestion.downloadStatus` - Determines playback mode
+
+**Files Created in Story 4.2:**
+- `src/components/features/curation/VisualSuggestionGallery.tsx`
+- `src/components/features/curation/SuggestionCard.tsx`
+- `src/components/features/curation/EmptyClipState.tsx`
+- `src/components/ui/badge.tsx`
+      ]]>
+    </section>
+
+    <section title="Epic 3 Story 3.6 Patterns (Download Service)">
+      <![CDATA[
+**Download Path Convention:**
+- Paths stored as RELATIVE in database: `.cache/videos/{projectId}/scene-{sceneNumber}-default.mp4`
+- Scene numbers zero-padded to 2 digits (01, 02, 03...)
+- File paths stored for portability
+
+**Download Status Tracking:**
+- `pending`: Queued but not started
+- `downloading`: In progress
+- `complete`: Downloaded successfully
+- `error`: Download failed (network, yt-dlp error, YouTube restriction)
+
+**Integration with Story 4.3:**
+- Story 4.3 resolves relative paths for HTML5 video player
+- Path resolution: Strip `.cache/` prefix, use `/api/videos/{path}`
+- Example: `.cache/videos/proj1/scene-01-default.mp4` -> `/api/videos/videos/proj1/scene-01-default.mp4`
+      ]]>
+    </section>
+  </dependencies>
+
+  <ux-specifications>
+    <section title="Video Preview Modal Specifications">
+      <![CDATA[
+**Modal/Lightbox Design:**
+- **Desktop (1024px+):** Player opens in lightbox modal (max-width 800px, centered)
+- **Tablet (768-1023px):** Player opens fullscreen with close button top-right
+- **Background:** `#0f172a` (Slate 900, 80% opacity), blur 4px
+- **Modal Container:** `#1e293b` (Slate 800)
+- **Border Radius:** 16px
+- **Box Shadow:** 0 8px 24px rgba(0,0,0,0.4)
+- **Padding:** 24px (lg)
+
+**Video Player Controls (Plyr):**
+- **Progress Bar:**
+  - Height: 6px (8px on hover)
+  - Background: Slate 700 (#334155)
+  - Fill: Indigo 500 (#6366f1)
+  - Scrubber handle: 14px circle
+- **Volume Control:**
+  - Icon states: High, Medium, Muted
+  - Slider: Vertical, 0-100%
+- **Time Display:**
+  - Format: "MM:SS / MM:SS"
+  - Color: Slate 300 (#cbd5e1)
+  - Font size: 0.875rem (14px)
+
+**Interaction Patterns:**
+- Click suggestion card -> Open preview player modal/lightbox
+- Video loads -> Show spinner, then auto-play on load
+- Hover video -> Show controls (play/pause, progress bar, volume)
+- Click outside player OR press ESC -> Close preview, return to gallery
+- Video completes -> Pause at end, show replay button
+- Error loading -> Show fallback YouTube embed with iframe
+
+**Behavior:**
+- **Lazy Loading:** Only load video when user clicks to preview
+- **Preload on Hover (Optional):** Start loading when user hovers >500ms
+- **Auto-Pause Previous:** If user opens new preview, pause/close previous
+      ]]>
+    </section>
+
+    <section title="Keyboard Shortcuts">
+      <![CDATA[
+**MVP Implementation (Story 4.3):**
+- **Space:** Play/Pause toggle
+- **Esc:** Close preview player, return to gallery
+
+**Post-MVP (Future Enhancement):**
+- **Left/Right Arrow:** Rewind/Forward 5 seconds
+- **Up/Down Arrow:** Volume up/down 10%
+- **M:** Mute/Unmute
+- **F:** Fullscreen toggle
+
+**Implementation Notes:**
+- Use global keydown event listener (document level)
+- Only active when preview modal is open
+- Prevent default Space behavior (page scroll)
+- Clean up listener on unmount
+- Disable Plyr's built-in keyboard controls to avoid conflicts
+      ]]>
+    </section>
+
+    <section title="Accessibility Requirements">
+      <![CDATA[
+- ARIA role: `region` with label "Video preview player"
+- ARIA label for video: "{title} by {channel}, duration {duration}"
+- ARIA label for play/pause: "Play video" / "Pause video"
+- ARIA label for progress bar: "Video progress, {percentage}% played"
+- ARIA label for volume: "Volume control, current volume {percentage}%"
+- Keyboard: Tab to controls, Space/Enter for play/pause
+- Screen reader: Announces playback state, time remaining
+- Focus indicators visible on all controls
+      ]]>
+    </section>
+  </ux-specifications>
+
+  <implementation-guidance>
+    <section title="Key Implementation Notes">
+      <![CDATA[
+**1. Path Resolution Strategy (CRITICAL):**
+```
+Database stores: .cache/videos/{projectId}/scene-{sceneNumber}-default.mp4
+                 |
+Strip .cache/ prefix
+                 |
+API URL: /api/videos/videos/{projectId}/scene-{sceneNumber}-default.mp4
+                 |
+API route reconstructs: path.join(process.cwd(), '.cache', ...params.path)
+                       = .cache/videos/{projectId}/scene-{sceneNumber}-default.mp4
+```
+
+**2. URL Construction Helper:**
+```typescript
+function constructVideoUrl(segmentPath: string): string {
+  // Strip .cache/ prefix if present
+  const cleanPath = segmentPath.startsWith('.cache/')
+    ? segmentPath.substring(7) // Remove ".cache/" (7 characters)
+    : segmentPath;
+  return `/api/videos/${cleanPath}`;
+}
+```
+
+**3. State Management Pattern:**
+- Lift selectedSuggestion state to VisualCurationClient.tsx
+- Pattern: `const [selectedSuggestion, setSelectedSuggestion] = useState<VisualSuggestion | null>(null)`
+- Pass callback through: VisualCurationClient -> SceneCard -> VisualSuggestionGallery -> SuggestionCard
+- VideoPreviewPlayer renders in VisualCurationClient when selectedSuggestion is not null
+
+**4. Plyr Configuration:**
+```typescript
+const plyrOptions = {
+  controls: ['play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen'],
+  keyboard: { focused: false, global: false }, // We handle keyboard shortcuts manually
+  clickToPlay: true,
+  hideControls: true,
+  resetOnEnd: false,
+};
+```
+
+**5. Video API Route Security:**
+```typescript
+// Security: Validate path is within .cache directory
+const normalizedPath = path.normalize(filePath);
+const cachePath = path.normalize(path.join(process.cwd(), '.cache'));
+if (!normalizedPath.startsWith(cachePath)) {
+  return new Response('Forbidden', { status: 403 });
+}
+```
+
+**6. Range Request Support (for video seeking):**
+```typescript
+const range = request.headers.get('range');
+if (range) {
+  const parts = range.replace(/bytes=/, '').split('-');
+  const start = parseInt(parts[0], 10);
+  const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+  // Return 206 Partial Content
+}
+```
+      ]]>
+    </section>
+
+    <section title="Files to Create">
+      <![CDATA[
+1. `src/components/features/curation/VideoPreviewPlayer.tsx` - Main player component
+2. `src/app/api/videos/[...path]/route.ts` - Video serving API route
+      ]]>
+    </section>
+
+    <section title="Files to Modify">
+      <![CDATA[
+1. `src/components/features/curation/SuggestionCard.tsx`
+   - Add onClick prop to SuggestionCardProps interface
+   - Add cursor-pointer class and aria-label
+   - Wire onClick to Card's onClick event
+
+2. `src/app/projects/[id]/visual-curation/VisualCurationClient.tsx`
+   - Add selectedSuggestion state
+   - Import Dialog from shadcn/ui
+   - Render VideoPreviewPlayer inside Dialog when selectedSuggestion is set
+   - Pass setSelectedSuggestion through component tree
+
+3. `src/components/features/curation/VisualSuggestionGallery.tsx`
+   - Add onSuggestionClick prop
+   - Pass onClick handler to each SuggestionCard
+      ]]>
+    </section>
+
+    <section title="Testing Requirements">
+      <![CDATA[
+**Unit Testing (Vitest):**
+- Test VideoPreviewPlayer component rendering with local segment props
+- Test VideoPreviewPlayer component rendering with YouTube fallback props
+- Test player mode selection (local vs YouTube based on downloadStatus)
+- Test close button click handler
+- Test keyboard shortcut handlers (Space, Escape)
+- Test video URL construction (path prefix stripping)
+
+**API Testing:**
+- Test GET /api/videos/[...path] returns video file
+- Test 404 for non-existent files
+- Test path traversal attack prevention (403 response)
+- Test Content-Type header is video/mp4
+- Test Range request support (HTTP 206)
+- Test paths with traversal patterns: `../`, `..%2F`, `....//`
+
+**Integration Testing:**
+- Test full flow: Click card -> Open preview -> Play video -> Close preview
+- Test YouTube fallback when download_status = 'error'
+- Test keyboard shortcuts with modal open
+- Test responsive layout at 1920px and 768px
+- Test performance: <100ms playback for local segments
+
+**Manual Testing:**
+- Verify Plyr controls are accessible and functional
+- Test video quality and playback smoothness
+- Verify YouTube iframe loads correctly with autoplay
+- Test touch controls on tablet
+      ]]>
+    </section>
+
+    <section title="Actionable Items Summary">
+      <![CDATA[
+1. Install Plyr package: `npm install plyr` and `npm install @types/plyr --save-dev`
+2. Add onClick prop to SuggestionCardProps interface
+3. Add selectedSuggestion state to VisualCurationClient.tsx
+4. Create VideoPreviewPlayer.tsx with Plyr integration
+5. Create video serving API route with path validation and Range request support
+6. Render VideoPreviewPlayer inside shadcn/ui Dialog when selectedSuggestion is set
+7. Implement keyboard shortcuts (Space for play/pause, Escape for close)
+8. Wrap VideoPreviewPlayer in error boundary
+9. Test both local playback and YouTube fallback scenarios
+10. Add security tests for path traversal prevention
+      ]]>
+    </section>
+  </implementation-guidance>
+</story-context>

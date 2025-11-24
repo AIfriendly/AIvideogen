@@ -3,7 +3,7 @@ node_modules/
 venv/
 __pycache__/
 *.pyc
-
+credentials/
 # Environment variables
 .env
 .env.local
@@ -22,7 +22,7 @@ __pycache__/
 out/
 dist/
 build/
-
+.bmad/
 # Cache directories
 .cache/
 .turbo/

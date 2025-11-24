@@ -1,0 +1,179 @@
+<story-context id="story-3.2b-enhanced-search-query-generation" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>3.2b</storyId>
+    <title>Enhanced Search Query Generation</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-22</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-3.2b.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>creator generating video content</asA>
+    <iWant>the AI to generate highly relevant, content-type aware search queries with proper negative filters</iWant>
+    <soThat>I receive pure B-roll footage without commentary, reactions, or irrelevant content that doesn't match my script's subject matter</soThat>
+    <tasks>
+      <task id="1">Update Visual Search Prompt Template - Modify lib/llm/prompts/visual-search-prompt.ts with content-type classification, entity extraction, B-roll quality terms, and negative term generation</task>
+      <task id="2">Implement Content-Type Classification - Create content type enum (gaming, historical, conceptual, nature, tutorial, general) and classification logic</task>
+      <task id="3">Implement Entity Extraction - Add instructions for extracting game titles, boss names, historical events, concepts</task>
+      <task id="4">Implement Negative Term Injection - Create negative term mappings per content type and automatic injection</task>
+      <task id="5">Implement B-Roll Quality Term Addition - Create B-roll indicator mappings per content type</task>
+      <task id="6">Update Query Generation Function - Modify analyzeSceneForVisuals() to extract content type, entities, and apply terms</task>
+      <task id="7">Update Tests - Add test cases for all content types, negative terms, and B-roll quality terms</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Gaming Content Detection - Scene "Ornstein and Smough" generates query with "dark souls ornstein smough boss fight no commentary gameplay only" and negative terms -reaction -review -tier list</criterion>
+    <criterion id="AC2">Historical Content Detection - Scene "Winter Palace" generates query with "russian revolution winter palace historical footage documentary" and appropriate negative terms</criterion>
+    <criterion id="AC3">Conceptual Content Detection - Scene "dystopian city AI robots" generates query with "dystopian city AI robots cinematic 4K" and B-roll quality terms</criterion>
+    <criterion id="AC4">Negative Term Injection - All queries include content-type appropriate negative terms (gaming: -reaction -review -tier list -ranking -commentary)</criterion>
+    <criterion id="AC5">B-Roll Quality Terms - Gaming: "no commentary", "gameplay only"; Historical: "documentary", "archive"; Conceptual: "cinematic", "4K"</criterion>
+    <criterion id="AC6">Performance - Query generation completes within 5 seconds per scene</criterion>
+    <criterion id="AC7">Manual Validation - 10 sample scenes show improved B-roll quality in search results</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-3.md</path>
+        <title>Epic 3 Technical Specification</title>
+        <section>Enhanced Query Generation (Story 3.2b)</section>
+        <snippet>Content-type detection, entity extraction, platform-optimized queries with negative terms and B-roll quality terms. Includes full implementation details for EntityExtractor and QueryOptimizer classes.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>Feature 1.5 - Visual Content Sourcing</section>
+        <snippet>Enhanced query generation with content-type awareness for better B-roll relevance. Negative term injection for pure footage results.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epics Document</title>
+        <section>Story 3.2b - Enhanced Search Query Generation</section>
+        <snippet>Improve query relevance with content-type awareness, entity extraction, and platform-optimized search patterns for pure B-roll results.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>ai-video-generator/src/lib/llm/prompts/visual-search-prompt.ts</path>
+        <kind>prompt-template</kind>
+        <symbol>VISUAL_SEARCH_PROMPT, buildVisualSearchPrompt</symbol>
+        <lines>all</lines>
+        <reason>Primary file to modify - add content-type detection, entity extraction instructions, B-roll quality terms, and negative term rules</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/lib/youtube/analyze-scene.ts</path>
+        <kind>service</kind>
+        <symbol>analyzeSceneForVisuals, normalizeAnalysis</symbol>
+        <lines>all</lines>
+        <reason>Update to parse new fields (entities, enhancedQuery) and apply negative/quality terms post-processing</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/lib/youtube/types.ts</path>
+        <kind>types</kind>
+        <symbol>ContentType, SceneAnalysis</symbol>
+        <lines>1-120</lines>
+        <reason>Add new content types (GAMING, HISTORICAL, CONCEPTUAL), entities and enhancedQuery fields to SceneAnalysis</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/lib/youtube/keyword-extractor.ts</path>
+        <kind>utility</kind>
+        <symbol>createFallbackAnalysis</symbol>
+        <lines>all</lines>
+        <reason>May need to update fallback analysis to include default entities and enhanced query</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/lib/llm/factory.ts</path>
+        <kind>factory</kind>
+        <symbol>createLLMProvider</symbol>
+        <lines>all</lines>
+        <reason>Existing LLM provider abstraction used for enhanced prompt processing</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/tests/unit/llm</path>
+        <kind>test-directory</kind>
+        <symbol>visual-search tests</symbol>
+        <lines>all</lines>
+        <reason>Add tests for content-type detection, entity extraction, negative terms, and B-roll quality terms</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <node>
+        <package>better-sqlite3</package>
+        <version>12.4.1</version>
+        <usage>Database storage for enhanced query results</usage>
+      </node>
+      <node>
+        <package>ollama</package>
+        <version>1.0.4</version>
+        <usage>Local LLM provider for content-type detection and entity extraction</usage>
+      </node>
+      <node>
+        <package>@google/generative-ai</package>
+        <version>0.27.0</version>
+        <usage>Gemini LLM provider for enhanced prompt processing</usage>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Use existing LLM provider abstraction (createLLMProvider) - do not create new LLM integration</constraint>
+    <constraint>Query length must stay within YouTube API limits (approximately 500 characters)</constraint>
+    <constraint>Entity extraction must complete within overall 5-second performance target</constraint>
+    <constraint>Maintain backward compatibility with existing SceneAnalysis interface (new fields are optional)</constraint>
+    <constraint>All negative terms should be content-type specific, not hardcoded for all queries</constraint>
+    <constraint>Default content type should be 'general' if detection fails</constraint>
+    <constraint>Preserve existing prompt engineering techniques (role definition, examples, JSON format)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>ContentType Enum</name>
+      <kind>enum</kind>
+      <signature>enum ContentType { GAMEPLAY, GAMING, TUTORIAL, NATURE, B_ROLL, DOCUMENTARY, HISTORICAL, URBAN, ABSTRACT, CONCEPTUAL }</signature>
+      <path>ai-video-generator/src/lib/youtube/types.ts</path>
+    </interface>
+    <interface>
+      <name>SceneAnalysis</name>
+      <kind>interface</kind>
+      <signature>interface SceneAnalysis { mainSubject: string; setting: string; mood: string; action: string; keywords: string[]; primaryQuery: string; alternativeQueries: string[]; contentType: ContentType; entities?: string[]; enhancedQuery?: string; expectedLabels?: string[]; }</signature>
+      <path>ai-video-generator/src/lib/youtube/types.ts</path>
+    </interface>
+    <interface>
+      <name>analyzeSceneForVisuals</name>
+      <kind>function</kind>
+      <signature>async function analyzeSceneForVisuals(sceneText: string): Promise&lt;SceneAnalysis&gt;</signature>
+      <path>ai-video-generator/src/lib/youtube/analyze-scene.ts</path>
+    </interface>
+    <interface>
+      <name>buildVisualSearchPrompt</name>
+      <kind>function</kind>
+      <signature>function buildVisualSearchPrompt(sceneText: string): string</signature>
+      <path>ai-video-generator/src/lib/llm/prompts/visual-search-prompt.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>Tests use Vitest with @testing-library for component tests. Unit tests focus on pure functions with mocked LLM responses. Integration tests verify end-to-end scene analysis flow. Mock LLM provider for deterministic testing. Test files located alongside source files or in tests/ directory.</standards>
+    <locations>
+      <location>ai-video-generator/tests/unit/llm/</location>
+      <location>ai-video-generator/tests/integration/</location>
+      <location>ai-video-generator/src/lib/youtube/__tests__/</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1">Test gaming scene with "Ornstein and Smough" text - verify entities extraction, content type = gaming, query includes "no commentary gameplay only", negative terms include -reaction -review</idea>
+      <idea ac="AC2">Test historical scene with "Winter Palace" text - verify content type = historical, query includes "documentary footage archive"</idea>
+      <idea ac="AC3">Test conceptual scene with "dystopian city" text - verify content type = conceptual, query includes "cinematic 4K"</idea>
+      <idea ac="AC4">Test negative term injection for each content type - verify correct terms applied based on type</idea>
+      <idea ac="AC5">Test B-roll quality terms for each content type - verify correct terms applied</idea>
+      <idea ac="AC6">Performance test - verify analysis completes in &lt;5s (mock LLM with realistic delay)</idea>
+      <idea>Test fallback to "general" content type when detection fails</idea>
+      <idea>Test query length stays within 500 character limit</idea>
+      <idea>Test backward compatibility - existing code using SceneAnalysis still works with optional fields</idea>
+    </ideas>
+  </tests>
+</story-context>

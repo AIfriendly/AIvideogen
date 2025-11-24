@@ -1,0 +1,525 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML - Story 4.5
+  Assembly Trigger & Validation Workflow
+  Generated: 2025-11-21
+
+  This file provides the Dev agent with all context needed to implement Story 4.5.
+  It includes user story, tasks, acceptance criteria, code artifacts, dependencies,
+  interfaces, and testing standards.
+-->
+<storyContext>
+  <!-- Metadata -->
+  <metadata>
+    <epicId>4</epicId>
+    <storyId>4.5</storyId>
+    <title>Assembly Trigger and Validation Workflow</title>
+    <goal>Provide "Assemble Video" button that validates all selections and triggers video assembly</goal>
+    <status>ready-for-dev</status>
+    <dependencies>
+      <dependency status="DONE">Story 4.4 - Clip Selection Mechanism and State Management</dependency>
+      <dependency status="DONE">Story 4.2 - Visual Suggestions Display and Gallery</dependency>
+      <dependency status="DONE">Epic 3 Story 3.5 - visual_suggestions database</dependency>
+      <dependency status="EXISTS">scenes table with selected_clip_id column</dependency>
+    </dependencies>
+  </metadata>
+
+  <!-- User Story -->
+  <userStory>
+    <asA>user who has selected clips for all scenes in the visual curation interface</asA>
+    <iWant>to trigger the video assembly process with a clear confirmation step</iWant>
+    <soThat>I can finalize my video production with confidence that all my selections will be used correctly</soThat>
+  </userStory>
+
+  <!-- Tasks from Story File -->
+  <tasks>
+    <task id="1" ac="1,2,3,9">
+      <title>Create AssemblyTriggerButton Component</title>
+      <subtasks>
+        <subtask>Create file: src/components/features/curation/AssemblyTriggerButton.tsx</subtask>
+        <subtask>Implement sticky footer positioning with fixed bottom-0 left-0 right-0</subtask>
+        <subtask>Import useCurationStore and get selection state (selections, totalScenes)</subtask>
+        <subtask>Implement disabled state with tooltip using Tooltip component</subtask>
+        <subtask>Add loading state with Loader2 spinner icon</subtask>
+        <subtask>Display selection progress: "X/Y scenes selected"</subtask>
+        <subtask>Export component</subtask>
+      </subtasks>
+    </task>
+
+    <task id="2" ac="4">
+      <title>Create ConfirmationModal Component</title>
+      <subtasks>
+        <subtask>Create file: src/components/features/curation/ConfirmationModal.tsx</subtask>
+        <subtask>Use Dialog component for modal</subtask>
+        <subtask>Implement modal content with assembly summary</subtask>
+        <subtask>Display scene count and confirmation text</subtask>
+        <subtask>Add Cancel and Confirm buttons with loading states</subtask>
+        <subtask>Disable close actions while loading</subtask>
+        <subtask>Export component</subtask>
+      </subtasks>
+    </task>
+
+    <task id="3" ac="5,6">
+      <title>Create POST /api/projects/[id]/assemble Endpoint</title>
+      <subtasks>
+        <subtask>Create file: src/app/api/projects/[id]/assemble/route.ts</subtask>
+        <subtask>Define AssemblyScene and AssemblyResponse interfaces</subtask>
+        <subtask>Implement POST handler with proper error handling</subtask>
+        <subtask>Verify project exists before operations (404 handler)</subtask>
+        <subtask>Validate all scenes have selections before proceeding</subtask>
+        <subtask>Generate unique assembly job ID</subtask>
+        <subtask>Update projects.current_step to 'editing'</subtask>
+        <subtask>Return assemblyJobId and status</subtask>
+        <subtask>Wrap in try-catch for database error handling</subtask>
+      </subtasks>
+    </task>
+
+    <task id="4" ac="1,7">
+      <title>Integrate AssemblyTriggerButton in VisualCurationClient</title>
+      <subtasks>
+        <subtask>Import AssemblyTriggerButton and ConfirmationModal in VisualCurationClient.tsx</subtask>
+        <subtask>Add state for modal visibility and loading (showConfirmModal, isAssembling)</subtask>
+        <subtask>Add modal open handler from button</subtask>
+        <subtask>Implement assembly trigger function with fetch POST</subtask>
+        <subtask>Render AssemblyTriggerButton at bottom of page</subtask>
+        <subtask>Render ConfirmationModal with proper props</subtask>
+        <subtask>Add padding-bottom to main content to account for sticky footer</subtask>
+      </subtasks>
+    </task>
+
+    <task id="5" ac="7">
+      <title>Create Assembly Status Placeholder Page</title>
+      <subtasks>
+        <subtask>Create file: src/app/projects/[id]/assembly/page.tsx</subtask>
+        <subtask>Implement placeholder page with async params handling</subtask>
+        <subtask>Display job ID from URL params</subtask>
+        <subtask>Show placeholder progress indicator</subtask>
+        <subtask>Add note about Epic 5 implementation</subtask>
+      </subtasks>
+    </task>
+
+    <task id="6" ac="8">
+      <title>Implement Error Handling</title>
+      <subtasks>
+        <subtask>Add toast notifications for assembly errors</subtask>
+        <subtask>Handle network failures gracefully</subtask>
+        <subtask>Display specific error messages from API response</subtask>
+        <subtask>Implement retry logic in toast action</subtask>
+        <subtask>Handle edge cases: incomplete selections after validation (race condition)</subtask>
+      </subtasks>
+    </task>
+
+    <task id="7" ac="all">
+      <title>Unit Testing - AssemblyTriggerButton</title>
+      <subtasks>
+        <subtask>Create test file: tests/components/assembly-trigger-button.test.tsx</subtask>
+        <subtask>Test button disabled when selections incomplete</subtask>
+        <subtask>Test button enabled when all selections complete</subtask>
+        <subtask>Test tooltip displays correct missing count</subtask>
+        <subtask>Test loading state shows spinner</subtask>
+        <subtask>Test click triggers onAssembleClick callback</subtask>
+      </subtasks>
+    </task>
+
+    <task id="8" ac="4">
+      <title>Unit Testing - ConfirmationModal</title>
+      <subtasks>
+        <subtask>Create test file: tests/components/confirmation-modal.test.tsx</subtask>
+        <subtask>Test modal renders when open</subtask>
+        <subtask>Test modal closes on cancel click</subtask>
+        <subtask>Test confirm button triggers onConfirm callback</subtask>
+        <subtask>Test loading state disables buttons</subtask>
+        <subtask>Test scene count displays correctly</subtask>
+      </subtasks>
+    </task>
+
+    <task id="9" ac="5,6">
+      <title>API Testing - POST /api/projects/[id]/assemble</title>
+      <subtasks>
+        <subtask>Create test file: tests/api/assemble.test.ts</subtask>
+        <subtask>Test POST returns 200 with valid project and all selections</subtask>
+        <subtask>Test POST returns 400 when selections incomplete</subtask>
+        <subtask>Test projects.current_step is updated to 'editing'</subtask>
+        <subtask>Test response includes assemblyJobId</subtask>
+        <subtask>Test error handling for missing project (404)</subtask>
+      </subtasks>
+    </task>
+
+    <task id="10" ac="all">
+      <title>Integration Testing</title>
+      <subtasks>
+        <subtask>Test full flow: Button click -> Modal -> Confirm -> API -> Navigation</subtask>
+        <subtask>Test button state updates as selections change</subtask>
+        <subtask>Test error toast displays on API failure</subtask>
+        <subtask>Test navigation to assembly page with job ID</subtask>
+        <subtask>Test modal closes after successful assembly</subtask>
+      </subtasks>
+    </task>
+  </tasks>
+
+  <!-- Acceptance Criteria -->
+  <acceptanceCriteria>
+    <criterion id="1">"Assemble Video" button displays at bottom of page (sticky footer)</criterion>
+    <criterion id="2" prdRef="Feature 1.6 AC4">Button disabled if any scene missing selection, tooltip shows: "Select clips for all X scenes to continue"</criterion>
+    <criterion id="3" prdRef="Feature 1.6 AC3">Button enabled when all scenes have selections</criterion>
+    <criterion id="4">Clicking enabled button shows confirmation modal with scene count and selections summary</criterion>
+    <criterion id="5" prdRef="Feature 1.6 AC3">Confirming modal calls POST /api/projects/[id]/assemble with complete scene data including scene_number, script text, selected clip video_id, voiceover audio_file_path, clip duration</criterion>
+    <criterion id="6">Assembly endpoint updates projects.current_step and returns assembly job ID</criterion>
+    <criterion id="7">User navigated to assembly status/progress page (placeholder until Epic 5)</criterion>
+    <criterion id="8">Error toast displays if assembly trigger fails</criterion>
+    <criterion id="9">Button shows loading spinner while assembly request processes</criterion>
+  </acceptanceCriteria>
+
+  <!-- Documentation Artifacts -->
+  <documentationArtifacts>
+    <doc type="prd" path="docs/prd.md">
+      <reference>Feature 1.6 AC3 (Finalization Trigger) - lines 271-274</reference>
+      <reference>Feature 1.6 AC4 (Incomplete Selection Prevention) - lines 275-277</reference>
+    </doc>
+    <doc type="techSpec" path="docs/sprint-artifacts/tech-spec-epic-3.md">
+      <reference>API patterns and data models</reference>
+      <reference>Error handling patterns</reference>
+    </doc>
+    <doc type="architecture" path="docs/architecture.md">
+      <reference>Epic-to-Architecture-Mapping - Story 4.5 API and workflow</reference>
+      <reference>Database-Schema - projects and scenes tables</reference>
+      <reference>API-Endpoints - /assemble endpoint specification</reference>
+    </doc>
+    <doc type="epics" path="docs/epics.md">
+      <reference>Epic 4 Story 4.5 - lines 1017-1047 - Original story definition</reference>
+      <reference>Epic 5 - lines 1083-1106 - Video Assembly and Output (target of trigger)</reference>
+    </doc>
+  </documentationArtifacts>
+
+  <!-- Code Artifacts -->
+  <codeArtifacts>
+    <!-- Files to Modify -->
+    <file action="modify" path="src/app/projects/[id]/visual-curation/VisualCurationClient.tsx">
+      <description>Main visual curation client component - add AssemblyTriggerButton integration</description>
+      <imports>
+        <import>useCurationStore, type ClipSelection from @/lib/stores/curation-store</import>
+        <import>type Project, type Scene from @/lib/db/queries</import>
+        <import>type VisualSuggestion from @/types/visual-suggestions</import>
+        <import>Dialog, DialogContent, DialogTitle from @/components/ui/dialog</import>
+        <import>Button from @/components/ui/button</import>
+      </imports>
+      <existingState>
+        <item>scenes: Scene[]</item>
+        <item>loading: boolean</item>
+        <item>error: string | null</item>
+        <item>selectedSuggestion: VisualSuggestion | null</item>
+      </existingState>
+      <storeIntegration>
+        <item>selections from useCurationStore</item>
+        <item>setProject, setTotalScenes, loadSelections, getSelectionCount</item>
+        <item>selectionCount and allSelected derived state</item>
+      </storeIntegration>
+    </file>
+
+    <!-- Files to Create -->
+    <file action="create" path="src/components/features/curation/AssemblyTriggerButton.tsx">
+      <description>Sticky footer button component for triggering video assembly</description>
+      <props>
+        <prop name="onAssembleClick" type="() => void" required="true">Callback when button clicked</prop>
+        <prop name="isLoading" type="boolean" required="true">Loading state for spinner</prop>
+      </props>
+      <imports>
+        <import>useCurationStore from @/lib/stores/curation-store</import>
+        <import>Button from @/components/ui/button</import>
+        <import>Film, Loader2 from lucide-react</import>
+      </imports>
+      <stateFromStore>
+        <item>selections.size for count</item>
+        <item>totalScenes for total</item>
+        <item>allSelected derived boolean</item>
+      </stateFromStore>
+    </file>
+
+    <file action="create" path="src/components/features/curation/ConfirmationModal.tsx">
+      <description>Assembly confirmation dialog with selection summary</description>
+      <props>
+        <prop name="isOpen" type="boolean" required="true">Modal visibility state</prop>
+        <prop name="onClose" type="() => void" required="true">Close callback</prop>
+        <prop name="onConfirm" type="() => void" required="true">Confirm callback</prop>
+        <prop name="isLoading" type="boolean" required="true">Loading state</prop>
+        <prop name="sceneCount" type="number" required="true">Total scene count</prop>
+        <prop name="selections" type="Map&lt;string, ClipSelection&gt;" required="true">Current selections</prop>
+      </props>
+      <imports>
+        <import>Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter from @/components/ui/dialog</import>
+        <import>Button from @/components/ui/button</import>
+        <import>Loader2, Check from lucide-react</import>
+        <import>type ClipSelection from @/lib/stores/curation-store</import>
+      </imports>
+    </file>
+
+    <file action="create" path="src/app/api/projects/[id]/assemble/route.ts">
+      <description>API endpoint to trigger video assembly process</description>
+      <exports>
+        <export>POST - trigger assembly and return job ID</export>
+      </exports>
+      <imports>
+        <import>NextRequest, NextResponse from next/server</import>
+        <import>getProject from @/lib/db/queries</import>
+        <import>db from @/lib/db/client</import>
+        <import>initializeDatabase from @/lib/db/init</import>
+      </imports>
+      <responseFormats>
+        <format status="200">{ assemblyJobId, status: 'queued', message, sceneCount }</format>
+        <format status="400">{ error: 'Not all scenes have clip selections', selectedCount, totalCount }</format>
+        <format status="404">{ error: 'Project not found' }</format>
+        <format status="500">{ error: 'Failed to trigger assembly' }</format>
+      </responseFormats>
+    </file>
+
+    <file action="create" path="src/app/projects/[id]/assembly/page.tsx">
+      <description>Placeholder page for assembly status (Epic 5 implementation)</description>
+      <exports>
+        <export>default - AssemblyPage server component</export>
+      </exports>
+      <params>
+        <param name="params" type="Promise&lt;{ id: string }&gt;">Project ID from URL</param>
+        <param name="searchParams" type="Promise&lt;{ jobId?: string }&gt;">Job ID from query string</param>
+      </params>
+      <imports>
+        <import>Loader2 from lucide-react</import>
+      </imports>
+    </file>
+
+    <!-- Reference Files -->
+    <file action="reference" path="src/lib/stores/curation-store.ts">
+      <description>Zustand store for clip selection state management</description>
+      <exports>
+        <export>useCurationStore - hook for accessing store</export>
+        <export>ClipSelection - type for selection data</export>
+      </exports>
+      <keyMethods>
+        <method name="setProject">Set current project ID</method>
+        <method name="setTotalScenes">Set total scene count</method>
+        <method name="loadSelections">Load selections from DB</method>
+        <method name="getSelectionCount">Get current selection count</method>
+        <method name="getAllSelected">Check if all scenes selected</method>
+      </keyMethods>
+    </file>
+
+    <file action="reference" path="src/types/visual-suggestions.ts">
+      <description>TypeScript types for visual suggestions</description>
+      <exports>
+        <export>VisualSuggestion - suggestion data structure</export>
+        <export>DownloadStatus - pending | downloading | complete | error</export>
+      </exports>
+    </file>
+
+    <file action="reference" path="src/app/api/projects/[id]/select-clip/route.ts">
+      <description>Reference for API endpoint patterns</description>
+      <patterns>
+        <pattern>Async params handling: const { id: projectId } = await params</pattern>
+        <pattern>Project validation with getProject</pattern>
+        <pattern>Error response structure with success, error, code</pattern>
+        <pattern>Database validation before operations</pattern>
+      </patterns>
+    </file>
+  </codeArtifacts>
+
+  <!-- Dependencies -->
+  <dependencies>
+    <npm>
+      <package name="next" version="16.0.1">Framework and API routes</package>
+      <package name="react" version="19.2.0">UI library</package>
+      <package name="zustand" version="5.0.8">State management</package>
+      <package name="lucide-react" version="0.552.0">Icons (Film, Loader2, Check, AlertCircle)</package>
+      <package name="better-sqlite3" version="12.4.1">Database access</package>
+    </npm>
+    <shadcnUi>
+      <component name="Button">Primary action button</component>
+      <component name="Dialog">Modal dialog container</component>
+      <note>Tooltip component not installed - need to install or create custom</note>
+    </shadcnUi>
+    <internal>
+      <dependency path="src/lib/db/client.ts">Database connection</dependency>
+      <dependency path="src/lib/db/queries.ts">Query functions (getProject)</dependency>
+      <dependency path="src/lib/db/init.ts">Database initialization</dependency>
+      <dependency path="src/lib/stores/curation-store.ts">Selection state</dependency>
+    </internal>
+  </dependencies>
+
+  <!-- Interfaces -->
+  <interfaces>
+    <!-- Existing Types -->
+    <interface name="ClipSelection" source="src/lib/stores/curation-store.ts">
+      <property name="sceneId" type="string" />
+      <property name="suggestionId" type="string" />
+      <property name="videoId" type="string" />
+    </interface>
+
+    <interface name="Scene" source="src/lib/db/queries.ts">
+      <property name="id" type="string" />
+      <property name="project_id" type="string" />
+      <property name="scene_number" type="number" />
+      <property name="text" type="string" />
+      <property name="sanitized_text" type="string | null" />
+      <property name="audio_file_path" type="string | null" />
+      <property name="duration" type="number | null" />
+      <property name="selected_clip_id" type="string | null">Epic 4 Story 4.4 - FK to visual_suggestions</property>
+      <property name="created_at" type="string" />
+      <property name="updated_at" type="string" />
+    </interface>
+
+    <interface name="Project" source="src/lib/db/queries.ts">
+      <property name="id" type="string" />
+      <property name="name" type="string" />
+      <property name="current_step" type="string">Workflow state (chat, voice, script, voiceover, visual-sourcing, visual-curation, editing, complete)</property>
+      <property name="status" type="string" />
+      <property name="visuals_generated" type="boolean" />
+    </interface>
+
+    <interface name="VisualSuggestion" source="src/types/visual-suggestions.ts">
+      <property name="id" type="string" />
+      <property name="sceneId" type="string" />
+      <property name="videoId" type="string" />
+      <property name="title" type="string" />
+      <property name="duration" type="number | undefined" />
+      <property name="downloadStatus" type="DownloadStatus" />
+    </interface>
+
+    <!-- New Types for This Story -->
+    <interface name="AssemblyTriggerButtonProps" new="true">
+      <property name="onAssembleClick" type="() => void" />
+      <property name="isLoading" type="boolean" />
+    </interface>
+
+    <interface name="ConfirmationModalProps" new="true">
+      <property name="isOpen" type="boolean" />
+      <property name="onClose" type="() => void" />
+      <property name="onConfirm" type="() => void" />
+      <property name="isLoading" type="boolean" />
+      <property name="sceneCount" type="number" />
+      <property name="selections" type="Map&lt;string, ClipSelection&gt;" />
+    </interface>
+
+    <interface name="AssemblyScene" new="true">
+      <property name="sceneId" type="string" />
+      <property name="sceneNumber" type="number" />
+      <property name="scriptText" type="string" />
+      <property name="audioFilePath" type="string" />
+      <property name="selectedClipId" type="string" />
+      <property name="videoId" type="string" />
+      <property name="clipDuration" type="number" />
+    </interface>
+
+    <interface name="AssemblyResponse" new="true">
+      <property name="assemblyJobId" type="string" />
+      <property name="status" type="'queued' | 'processing' | 'complete' | 'error'" />
+      <property name="message" type="string" />
+      <property name="sceneCount" type="number" />
+    </interface>
+  </interfaces>
+
+  <!-- Constraints -->
+  <constraints>
+    <architectural>
+      <constraint>Use Next.js App Router async params pattern: const { id } = await params</constraint>
+      <constraint>Follow existing API response pattern with success/error fields</constraint>
+      <constraint>Use better-sqlite3 for database queries with parameterized SQL</constraint>
+      <constraint>Integrate with Zustand curation-store for selection state</constraint>
+      <constraint>Use shadcn/ui components for consistent UI</constraint>
+    </architectural>
+    <validation>
+      <constraint>Validate all scenes have selections server-side before assembly</constraint>
+      <constraint>Verify project exists before any operations</constraint>
+      <constraint>Use valid current_step value 'editing' (not 'assembly')</constraint>
+    </validation>
+    <ui>
+      <constraint>Sticky footer z-index should be z-40 (below modals)</constraint>
+      <constraint>Add pb-24 padding to main content for footer clearance</constraint>
+      <constraint>Dialog uses portal, renders above sticky footer</constraint>
+      <constraint>Use dark theme classes for slate-800/900 backgrounds</constraint>
+    </ui>
+    <errorHandling>
+      <constraint>Server-side validation prevents race conditions</constraint>
+      <constraint>Display specific error messages from API response</constraint>
+      <constraint>Use toast.error with retry action option</constraint>
+    </errorHandling>
+  </constraints>
+
+  <!-- Testing Standards -->
+  <testingStandards>
+    <framework>Vitest for unit and integration tests</framework>
+    <testingLibrary>@testing-library/react for component tests</testingLibrary>
+    <patterns>
+      <pattern>BDD format with Given-When-Then</pattern>
+      <pattern>Test IDs for traceability: 4.5-UNIT-xxx, 4.5-API-xxx</pattern>
+      <pattern>Use vi.spyOn for mocking, avoid try-catch scaffolding</pattern>
+      <pattern>Use factories for test data creation</pattern>
+      <pattern>Priority levels P0/P1/P2/P3 based on risk</pattern>
+    </patterns>
+    <mocking>
+      <mock>useCurationStore.setState for state manipulation</mock>
+      <mock>vi.spyOn(queries, 'getProject') for database mocks</mock>
+      <mock>global.fetch for API call mocks</mock>
+    </mocking>
+    <coverageFocus>
+      <area>Button disabled/enabled state transitions</area>
+      <area>Modal rendering and interactions</area>
+      <area>API validation and error responses</area>
+      <area>Navigation after successful assembly</area>
+      <area>Loading states throughout flow</area>
+    </coverageFocus>
+  </testingStandards>
+
+  <!-- Test Ideas -->
+  <testIdeas>
+    <unit priority="P0">
+      <test>AssemblyTriggerButton disabled when not all scenes selected</test>
+      <test>AssemblyTriggerButton enabled when all scenes selected</test>
+      <test>Tooltip displays correct missing count message</test>
+      <test>Loading spinner appears during processing</test>
+      <test>ConfirmationModal renders correct scene count</test>
+      <test>Modal buttons disabled during loading</test>
+    </unit>
+    <api priority="P0">
+      <test>POST /assemble returns 200 with assemblyJobId for valid request</test>
+      <test>POST /assemble returns 400 when selections incomplete</test>
+      <test>POST /assemble returns 404 for missing project</test>
+      <test>POST /assemble updates projects.current_step to 'editing'</test>
+    </api>
+    <integration priority="P1">
+      <test>Full flow: Button click -> Modal -> Confirm -> API -> Navigation</test>
+      <test>Button state updates reactively as selections change</test>
+      <test>Error toast displays with retry action on failure</test>
+      <test>Modal closes after successful assembly</test>
+      <test>Navigation includes jobId in query params</test>
+    </integration>
+    <manual>
+      <test>Verify sticky footer positioning and z-index</test>
+      <test>Test tooltip hover behavior on disabled button</test>
+      <test>Verify modal animation and focus management</test>
+      <test>Test loading spinner visibility and positioning</test>
+      <test>Verify navigation to assembly page with job ID</test>
+    </manual>
+  </testIdeas>
+
+  <!-- Implementation Notes -->
+  <implementationNotes>
+    <note category="tooltip">
+      Tooltip component may need to be installed via shadcn/ui CLI or implemented manually.
+      Use Radix UI Tooltip primitive if not available in project.
+    </note>
+    <note category="toast">
+      Project uses sonner for toast notifications (installed in Story 4.4).
+      Import toast from sonner and use toast.success/toast.error patterns.
+    </note>
+    <note category="navigation">
+      Use Next.js router.push for client-side navigation after assembly.
+      Import useRouter from next/navigation in client component.
+    </note>
+    <note category="currentStep">
+      Valid current_step values: 'chat', 'voice', 'script', 'voiceover', 'visual-sourcing', 'visual-curation', 'editing', 'complete'.
+      Use 'editing' for post-assembly state (not 'assembly').
+    </note>
+    <note category="jobId">
+      Generate job ID with pattern: job-{timestamp}-{random}.
+      Example: job-1700000000000-abc123xyz
+    </note>
+  </implementationNotes>
+</storyContext>

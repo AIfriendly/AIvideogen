@@ -5,14 +5,14 @@
 **Type:** Level 2 Greenfield Software Project
 **Author:** Winston (BMAD Architect Agent)
 **Date:** 2025-11-12
-**Version:** 1.2
-**Last Updated:** 2025-11-15 (Updated Story 3.2: Scene Text Analysis with detailed implementation and fallback mechanism)
+**Version:** 1.5
+**Last Updated:** 2025-11-22 (Added Stories 3.2b and 3.7 - Enhanced Query Generation and Computer Vision Content Filtering with Google Cloud Vision API integration, audio stripping, and cv_score database extension)
 
 ---
 
 ## Executive Summary
 
-The AI Video Generator is a desktop-first web application built with Next.js 15.5 that automates end-to-end video creation from conversational brainstorming to final rendered output. The architecture leverages flexible LLM provider support (local Ollama + Llama 3.2 or cloud Google Gemini 2.5 with free tier), KokoroTTS for local voice synthesis, and integrates YouTube Data API for B-roll sourcing. The system is designed as a single-user local application with a hybrid state management approach (Zustand + SQLite), providing fast performance and complete privacy while maintaining a clear migration path to cloud multi-tenant deployment.
+The AI Video Generator is a desktop-first web application built with Next.js 15.5 that automates end-to-end video creation from conversational brainstorming to final rendered output. The architecture leverages flexible LLM provider support (local Ollama + Llama 3.2 or cloud Google Gemini 2.5 with free tier), KokoroTTS for local voice synthesis, YouTube Data API for B-roll sourcing, and a sophisticated visual curation interface for scene-by-scene clip selection. The system is designed as a single-user local application with a hybrid state management approach (Zustand + SQLite), providing fast performance, instant video preview capabilities through pre-downloaded segments, and complete privacy while maintaining a clear migration path to cloud multi-tenant deployment.
 
 The primary technology stack is FOSS (Free and Open-Source Software) compliant per PRD requirements. Optional cloud services (Google Gemini) are available for users who prefer cloud-based LLM with generous free tiers (1,500 requests/day) over local setup.
 
@@ -96,9 +96,10 @@ This establishes the base architecture with:
 | **Text-to-Speech** | KokoroTTS | 82M model | ✅ | Epic 2 | 48+ voices, fast (3.2x XTTS), high quality (4.35 MOS) |
 | **YouTube Downloader** | yt-dlp | 2025.10.22 | ✅ | Epic 3 | Industry standard, actively maintained, robust |
 | **Video Processing** | FFmpeg | 7.1.2 | ✅ | Epic 5 | Direct via child_process, future-proof, full control |
-| **Video Player** | Plyr | Latest | ✅ | Epic 4 | Lightweight, accessible, per UX spec recommendation |
+| **Video Player** | Plyr | 3.7.8 | ✅ | Epic 4 | Lightweight, accessible, per UX spec recommendation |
 | **API Layer** | Next.js API Routes | 15.5 | ✅ | All | Built-in, REST-style, server-side execution |
 | **File Storage** | Local Filesystem | N/A | ✅ | All | `.cache/` directory for temporary files |
+| **Testing** | Vitest | 2.1.x | ✅ | All | Native ESM, fast execution, Vite-powered, jest-compatible API |
 
 ---
 
@@ -129,11 +130,12 @@ This establishes the base architecture with:
 - **YouTube Data API:** v3 (for B-roll search and metadata)
 - **Ollama Server:** http://localhost:11434 (local LLM runtime, primary)
 - **Google Gemini API:** generativelanguage.googleapis.com (cloud LLM, optional)
+- **Google Cloud Vision API:** vision.googleapis.com (content analysis for B-roll filtering, 1,000 units/month free tier)
 
 ### Development Tools
 - **Linting:** ESLint (Next.js config)
 - **Formatting:** Prettier (recommended)
-- **Testing:** To be determined (Vitest or Jest recommended)
+- **Testing:** Vitest 2.1.x (native ESM support, fast, Vite-powered)
 - **Version Control:** Git
 
 ---
@@ -206,11 +208,17 @@ ai-video-generator/
 │       ├── visual-sourcing/   # Epic 3: Visual sourcing loading
 │       │   └── VisualSourcingLoader.tsx
 │       │
-│       ├── curation/          # Epic 4: Visual curation
-│       │   ├── SceneCard.tsx
-│       │   ├── VideoPreviewThumbnail.tsx
-│       │   ├── ProgressTracker.tsx
-│       │   └── ClipGrid.tsx
+│       ├── curation/          # Epic 4: Visual curation (6 stories)
+│       │   ├── VisualCuration.tsx      # Story 4.1: Main page component
+│       │   ├── SceneCard.tsx           # Story 4.1: Scene-by-scene layout
+│       │   ├── VisualSuggestionGallery.tsx  # Story 4.2: Clip suggestions grid
+│       │   ├── VideoPreviewPlayer.tsx  # Story 4.3: HTML5 player with controls
+│       │   ├── ClipSelectionCard.tsx   # Story 4.4: Individual clip selection
+│       │   ├── AssemblyTriggerButton.tsx    # Story 4.5: Sticky footer button
+│       │   ├── ProgressTracker.tsx     # Story 4.1: Scene completion tracker
+│       │   ├── EmptyClipState.tsx      # Story 4.2: No clips found fallback
+│       │   ├── NavigationBreadcrumb.tsx     # Story 4.6: Workflow navigation
+│       │   └── ConfirmationModal.tsx   # Story 4.5: Assembly confirmation
 │       │
 │       └── assembly/          # Epic 5: Video assembly
 │           ├── AssemblyProgress.tsx
@@ -234,7 +242,14 @@ ai-video-generator/
 │   │   ├── client.ts          # YouTubeAPIClient class
 │   │   ├── analyze-scene.ts   # Scene text analysis for search
 │   │   ├── filter-results.ts  # Content filtering & ranking
-│   │   └── filter-config.ts   # Filtering preferences config
+│   │   ├── filter-config.ts   # Filtering preferences config
+│   │   ├── entity-extractor.ts # Entity extraction for specific subjects (Story 3.2b)
+│   │   └── query-optimizer.ts  # Platform-optimized query generation (Story 3.2b)
+│   │
+│   ├── vision/                # Google Cloud Vision API (Epic 3 Story 3.7)
+│   │   ├── client.ts          # VisionAPIClient class
+│   │   ├── analyze-content.ts # Face detection, OCR, label verification
+│   │   └── frame-extractor.ts # FFmpeg frame extraction for analysis
 │   │
 │   ├── video/                 # Video processing
 │   │   ├── downloader.ts      # yt-dlp wrapper
@@ -523,10 +538,36 @@ When LLM is unavailable, keyword extraction provides:
 - `lib/youtube/filter-config.ts` - Configuration preferences
 
 **Filtering Criteria:**
+- **Duration:** Videos must be between 1x-3x scene voiceover duration (max 5 minutes)
 - **Licensing:** Creative Commons preferred, Standard embeddable accepted
 - **Quality:** Minimum 1000 views (spam prevention)
 - **Title Spam:** Remove videos with >5 emojis or >50% ALL CAPS
 - **Content Type:** Gaming = "gameplay no commentary", Nature = documentary-style
+
+**Duration Filtering Logic:**
+```typescript
+// lib/youtube/filter-results.ts
+function filterByDuration(
+  results: YouTubeVideo[],
+  sceneDuration: number
+): YouTubeVideo[] {
+  const minDuration = sceneDuration; // 1x ratio
+  const maxDuration = Math.min(sceneDuration * 3, 300); // 3x or 5 min max
+
+  return results.filter(video => {
+    const duration = video.durationSeconds;
+    return duration >= minDuration && duration <= maxDuration;
+  });
+}
+```
+
+**Duration Calculation:**
+- Scene voiceover duration obtained from `scenes.duration` column (in seconds)
+- Minimum: Equal to scene duration (1x ratio)
+- Maximum: 3x scene duration OR 5 minutes (300s), whichever is smaller
+- Example: 10s scene → accepts 10s-30s videos (max 30s)
+- Example: 90s scene → accepts 90s-270s videos (max 270s = 4.5 min)
+- Example: 120s scene → accepts 120s-300s videos (max 300s = 5 min, NOT 360s)
 
 **Ranking Algorithm:**
 - Relevance score (from YouTube API)
@@ -538,9 +579,10 @@ When LLM is unavailable, keyword extraction provides:
 
 **Fallback Logic:**
 - If all results filtered out:
-  1. Relax view count threshold
-  2. Relax title spam filters
-  3. Return at least 1-3 suggestions if any results exist
+  1. Relax duration threshold (1x-4x instead of 1x-3x)
+  2. Relax view count threshold
+  3. Relax title spam filters
+  4. Return at least 1-3 suggestions if any results exist
 
 #### Story 3.5: Visual Suggestions Database & Workflow Integration
 **Components:**
@@ -576,67 +618,1845 @@ getVisualSuggestionsByProject(projectId: string): Suggestion[]
 **Key Flow:**
 1. For each scene, analyze text for visual keywords using LLM
 2. Query YouTube Data API v3 with generated search terms
-3. Filter and rank results (Creative Commons preferred, quality checks)
+3. Filter and rank results (Creative Commons preferred, duration checks, quality checks)
 4. Store top 5-8 clip suggestions per scene in database
 5. Handle edge cases: zero results (empty state), API failures (retry), quota exceeded (error message)
+
+#### Story 3.6: Default Segment Download Service
+**Goal:** Download default video segments (first N seconds) for instant preview in Epic 4 curation UI
+
+**Components:**
+- `lib/video/downloader.ts` - yt-dlp wrapper with segment support
+- `app/api/projects/[id]/download-default-segments/route.ts` - Batch download endpoint
+
+**Database Extensions:**
+- `visual_suggestions` table extended with:
+  - `duration INTEGER` (video duration in seconds)
+  - `default_segment_path TEXT` (path to downloaded default segment)
+  - `download_status TEXT` (pending, downloading, complete, error)
+
+**yt-dlp Default Segment Download:**
+```typescript
+// lib/video/downloader.ts
+async function downloadDefaultSegment(
+  videoId: string,
+  sceneDuration: number,
+  sceneNumber: number,
+  projectId: string
+): Promise<string> {
+  const bufferSeconds = 5;
+  const segmentDuration = sceneDuration + bufferSeconds;
+  const outputPath = `.cache/videos/${projectId}/scene-${sceneNumber}-default.mp4`;
+
+  // yt-dlp command: download first N seconds with audio stripped
+  const command = `yt-dlp "https://youtube.com/watch?v=${videoId}" \
+    --download-sections "*0-${segmentDuration}" \
+    -f "best[height<=720]" \
+    --postprocessor-args "ffmpeg:-an" \
+    -o "${outputPath}"`;
+  // Note: --postprocessor-args "ffmpeg:-an" strips audio track (Story 3.7 requirement)
+
+  await execCommand(command);
+  return outputPath;
+}
+```
+
+**File Naming Convention:**
+```
+Default segments:  .cache/videos/{projectId}/scene-{sceneNumber}-default.mp4
+Custom segments:   .cache/videos/{projectId}/scene-{sceneNumber}-custom-{startTimestamp}s.mp4
+                   (Custom segments handled in Epic 4)
+```
+
+**Key Flow:**
+```
+1. After Story 3.4 filters and ranks suggestions (top 5-8 per scene)
+2. For each scene's top suggestions:
+   - Verify duration <= 3x scene duration (already filtered in Story 3.4)
+   - Calculate segment duration: scene duration + 5s buffer
+   - Download first N seconds using yt-dlp --download-sections "*0-{N}"
+   - Save to .cache/videos/{projectId}/scene-{sceneNumber}-default.mp4
+   - Update visual_suggestions.default_segment_path and download_status = 'complete'
+3. Progress indicator: "Downloading preview clips... 12/24 complete"
+4. On completion: Users can immediately preview actual footage in Epic 4 curation UI
+5. Error handling: Network failures, YouTube restrictions → Mark download_status = 'error', continue with other clips
+```
+
+**Benefits:**
+- ✅ Users preview actual footage (not just thumbnails) before selecting (Epic 4)
+- ✅ "Use Default Segment" button in Epic 4 requires NO download (file already exists)
+- ✅ Faster Epic 4 curation workflow (no waiting for downloads during selection)
+- ✅ Default segments use first N seconds (0:00 start) - predictable, fast
+
+**Download Parameters:**
+- **Format:** `best[height<=720]` (HD quality, manageable file size)
+- **Segment:** `*0-{duration}` (from 0:00 to scene_duration + 5s)
+- **Buffer:** 5 seconds extra to allow trimming flexibility in Epic 5
+- **Quality vs Size:** 720p strikes balance between preview quality and download speed
+
+**Error Recovery:**
+- Failed downloads don't block other scenes (continue processing)
+- Retry logic: 3 attempts with exponential backoff (2s, 4s, 8s)
+- Permanent failures (restricted videos) → Mark error, skip retry
+- User can manually retry failed downloads in Epic 4 UI
+
+#### Story 3.2b: Enhanced Search Query Generation
+
+**Goal:** Improve query relevance with content-type awareness, entity extraction, and platform-optimized search patterns for pure B-roll results.
+
+**Components:**
+- `lib/youtube/entity-extractor.ts` - Entity extraction for specific subjects
+- `lib/youtube/query-optimizer.ts` - Platform-optimized query generation
+- `lib/llm/prompts/visual-search-prompt.ts` - Updated with content-type detection
+
+**Content-Type Detection:**
+```typescript
+// lib/youtube/analyze-scene.ts - Extended ContentType enum
+enum ContentType {
+  GAMING = 'gaming',        // Gaming footage, boss fights, gameplay
+  HISTORICAL = 'historical', // Documentary, archive footage
+  CONCEPTUAL = 'conceptual', // Abstract visualization, futuristic
+  NATURE = 'nature',        // Wildlife, landscapes
+  TUTORIAL = 'tutorial',    // How-to, educational
+  B_ROLL = 'b_roll',        // Generic background footage (default)
+}
+
+// Content-type specific query patterns
+const CONTENT_TYPE_PATTERNS = {
+  gaming: {
+    qualityTerms: ['no commentary', 'gameplay only', '4K'],
+    negativeTerms: ['-reaction', '-review', '-tier list', '-ranking'],
+  },
+  historical: {
+    qualityTerms: ['documentary', 'archive footage', 'historical'],
+    negativeTerms: ['-explained', '-reaction', '-my thoughts'],
+  },
+  conceptual: {
+    qualityTerms: ['cinematic', '4K', 'stock footage', 'futuristic'],
+    negativeTerms: ['-vlog', '-reaction', '-review'],
+  },
+  // ... other content types
+};
+```
+
+**Entity Extraction:**
+```typescript
+// lib/youtube/entity-extractor.ts
+interface ExtractedEntities {
+  primarySubject: string;    // e.g., "Ornstein and Smough"
+  gameTitle?: string;        // e.g., "Dark Souls"
+  historicalEvent?: string;  // e.g., "Russian Revolution"
+  conceptKeywords: string[]; // e.g., ["dystopian", "AI", "robots"]
+}
+
+async function extractEntities(sceneText: string, contentType: ContentType): Promise<ExtractedEntities> {
+  // Use LLM to extract specific entities based on content type
+  const prompt = `Extract specific entities from this scene text for ${contentType} video search:
+  "${sceneText}"
+
+  Return JSON with: primarySubject, gameTitle (if gaming), historicalEvent (if historical), conceptKeywords`;
+
+  const llm = getLLMProvider();
+  const response = await llm.chat([{ role: 'user', content: prompt }]);
+  return JSON.parse(response);
+}
+```
+
+**Query Optimization:**
+```typescript
+// lib/youtube/query-optimizer.ts
+function optimizeQuery(
+  entities: ExtractedEntities,
+  contentType: ContentType
+): string[] {
+  const patterns = CONTENT_TYPE_PATTERNS[contentType];
+  const baseTerms = [entities.primarySubject];
+
+  // Add content-type specific context
+  if (contentType === 'gaming' && entities.gameTitle) {
+    baseTerms.push(entities.gameTitle);
+  }
+
+  // Build optimized queries
+  const primaryQuery = [
+    ...baseTerms,
+    ...patterns.qualityTerms.slice(0, 2),
+  ].join(' ') + ' ' + patterns.negativeTerms.join(' ');
+
+  const alternativeQueries = [
+    `${entities.primarySubject} ${patterns.qualityTerms[0]}`,
+    `${baseTerms.join(' ')} cinematic`,
+  ];
+
+  return [primaryQuery, ...alternativeQueries];
+}
+```
+
+**Example Query Generation:**
+
+| Scene Text | Content Type | Generated Query |
+|------------|--------------|-----------------|
+| "The epic battle against Ornstein and Smough tests every player's skill" | GAMING | `dark souls ornstein smough boss fight no commentary gameplay only -reaction -review -tier list` |
+| "The storming of the Winter Palace marked the beginning of Soviet rule" | HISTORICAL | `russian revolution winter palace historical documentary archive footage -explained -reaction` |
+| "Towering skyscrapers loom over empty streets as autonomous drones patrol" | CONCEPTUAL | `dystopian city AI robots cinematic 4K stock footage -vlog -reaction` |
+
+**Integration with Story 3.2:**
+- Story 3.2b extends analyzeSceneForVisuals() to call entity extraction
+- Query optimizer runs after content-type detection
+- Negative terms automatically injected based on content type
+- Fallback to basic keyword extraction if entity extraction fails
+
+---
+
+#### Story 3.7: Computer Vision Content Filtering
+
+**Goal:** Filter low-quality B-roll using Google Cloud Vision API (face detection, OCR, label verification) and local processing (keyword filtering, audio stripping).
+
+**Components:**
+- `lib/vision/client.ts` - Google Cloud Vision API client
+- `lib/vision/analyze-content.ts` - Content analysis functions
+- `lib/vision/frame-extractor.ts` - FFmpeg frame extraction
+- `lib/youtube/filter-results.ts` - Extended with CV filtering
+
+**Architecture Pattern: Two-Tier Filtering**
+
+```
+                    YouTube Search Results
+                            ↓
+              ┌─────────────────────────────┐
+              │   TIER 1: Local Filtering   │  (Free, Fast)
+              │   - Keyword filtering       │
+              │   - Title/description scan  │
+              │   - Duration filtering      │
+              └─────────────────────────────┘
+                            ↓
+                   Filtered Candidates
+                            ↓
+              ┌─────────────────────────────┐
+              │   TIER 2: Vision API        │  (Cloud, Metered)
+              │   - Thumbnail pre-filter    │
+              │   - Face detection          │
+              │   - OCR text detection      │
+              │   - Label verification      │
+              └─────────────────────────────┘
+                            ↓
+                   Ranked Suggestions
+                   (with cv_score)
+```
+
+**Vision API Client:**
+```typescript
+// lib/vision/client.ts
+import vision from '@google-cloud/vision';
+
+export class VisionAPIClient {
+  private client: vision.ImageAnnotatorClient;
+  private quotaTracker: QuotaTracker;
+
+  constructor() {
+    this.client = new vision.ImageAnnotatorClient({
+      keyFilename: process.env.GOOGLE_CLOUD_VISION_KEY_FILE,
+      // Or use API key: apiKey: process.env.GOOGLE_CLOUD_VISION_API_KEY
+    });
+    this.quotaTracker = new QuotaTracker(1000); // 1,000 units/month free tier
+  }
+
+  async analyzeThumbnail(thumbnailUrl: string): Promise<ThumbnailAnalysis> {
+    // Pre-filter using thumbnail before downloading video
+    await this.quotaTracker.checkQuota(3); // 3 units per image
+
+    const [result] = await this.client.annotateImage({
+      image: { source: { imageUri: thumbnailUrl } },
+      features: [
+        { type: 'FACE_DETECTION' },
+        { type: 'TEXT_DETECTION' },
+        { type: 'LABEL_DETECTION', maxResults: 10 },
+      ],
+    });
+
+    return {
+      faceArea: this.calculateFaceArea(result.faceAnnotations),
+      hasText: (result.textAnnotations?.length || 0) > 0,
+      labels: result.labelAnnotations?.map(l => l.description) || [],
+    };
+  }
+
+  async analyzeVideoFrames(
+    framePaths: string[],
+    expectedLabels: string[]
+  ): Promise<VideoAnalysis> {
+    // Analyze 3 frames (10%, 50%, 90% of video duration)
+    const analyses = await Promise.all(
+      framePaths.map(path => this.analyzeFrame(path))
+    );
+
+    return {
+      avgFaceArea: this.average(analyses.map(a => a.faceArea)),
+      hasTextOverlay: analyses.some(a => a.hasText),
+      labelMatches: this.countLabelMatches(analyses, expectedLabels),
+      cvScore: this.calculateCVScore(analyses, expectedLabels),
+    };
+  }
+
+  private calculateFaceArea(faces: vision.protos.google.cloud.vision.v1.IFaceAnnotation[]): number {
+    if (!faces || faces.length === 0) return 0;
+
+    // Calculate total face bounding box area as percentage of frame
+    let totalArea = 0;
+    for (const face of faces) {
+      const box = face.boundingPoly?.vertices;
+      if (box && box.length >= 4) {
+        const width = Math.abs((box[1].x || 0) - (box[0].x || 0));
+        const height = Math.abs((box[2].y || 0) - (box[1].y || 0));
+        totalArea += (width * height) / (1920 * 1080); // Normalized to 1080p
+      }
+    }
+    return totalArea;
+  }
+
+  private calculateCVScore(
+    analyses: FrameAnalysis[],
+    expectedLabels: string[]
+  ): number {
+    // Higher score = better B-roll quality
+    let score = 100;
+
+    // Penalize for faces (talking heads)
+    const avgFaceArea = this.average(analyses.map(a => a.faceArea));
+    if (avgFaceArea > 0.15) score -= 50; // >15% = major penalty
+    else if (avgFaceArea > 0.05) score -= 20; // >5% = minor penalty
+
+    // Penalize for text overlays (captions)
+    if (analyses.some(a => a.hasText)) score -= 30;
+
+    // Reward for label matches
+    const matchCount = this.countLabelMatches(analyses, expectedLabels);
+    score += matchCount * 10; // +10 per matching label
+
+    return Math.max(0, Math.min(100, score));
+  }
+}
+```
+
+**Quota Management:**
+```typescript
+// lib/vision/quota-tracker.ts
+export class QuotaTracker {
+  private monthlyLimit: number;
+  private currentUsage: number = 0;
+
+  constructor(monthlyLimit: number) {
+    this.monthlyLimit = monthlyLimit;
+    this.loadUsageFromDB();
+  }
+
+  async checkQuota(unitsNeeded: number): Promise<void> {
+    if (this.currentUsage + unitsNeeded > this.monthlyLimit) {
+      throw new QuotaExceededError(
+        `Vision API quota exceeded (${this.currentUsage}/${this.monthlyLimit} units used). ` +
+        'Falling back to keyword-only filtering. ' +
+        'Upgrade quota at https://console.cloud.google.com/apis/api/vision.googleapis.com'
+      );
+    }
+    this.currentUsage += unitsNeeded;
+    await this.saveUsageToDB();
+  }
+
+  getUsagePercentage(): number {
+    return (this.currentUsage / this.monthlyLimit) * 100;
+  }
+}
+```
+
+**Face Detection Filtering:**
+```typescript
+// lib/vision/analyze-content.ts
+function filterByFaceDetection(
+  analysis: ThumbnailAnalysis | VideoAnalysis,
+  threshold: number = 0.15 // 15% of frame area
+): FilterResult {
+  if (analysis.avgFaceArea > threshold) {
+    return {
+      pass: false,
+      reason: `Face detected covering ${(analysis.avgFaceArea * 100).toFixed(1)}% of frame (threshold: ${threshold * 100}%)`,
+    };
+  }
+  return { pass: true };
+}
+```
+
+**Label Verification:**
+```typescript
+// lib/vision/analyze-content.ts
+async function generateExpectedLabels(
+  sceneText: string,
+  contentType: ContentType
+): Promise<string[]> {
+  // Use LLM to generate expected Vision API labels for scene
+  const prompt = `For this ${contentType} scene: "${sceneText}"
+  Generate 5 expected Google Cloud Vision API labels that should appear in matching B-roll footage.
+  Return as JSON array of strings.`;
+
+  const llm = getLLMProvider();
+  const response = await llm.chat([{ role: 'user', content: prompt }]);
+  return JSON.parse(response);
+}
+
+function verifyLabels(
+  detectedLabels: string[],
+  expectedLabels: string[]
+): LabelVerification {
+  const matches = expectedLabels.filter(expected =>
+    detectedLabels.some(detected =>
+      detected.toLowerCase().includes(expected.toLowerCase()) ||
+      expected.toLowerCase().includes(detected.toLowerCase())
+    )
+  );
+
+  return {
+    pass: matches.length >= 1, // At least 1 of top 3 expected labels
+    matchCount: matches.length,
+    matchedLabels: matches,
+    expectedLabels,
+  };
+}
+```
+
+**Frame Extraction:**
+```typescript
+// lib/vision/frame-extractor.ts
+async function extractFrames(
+  videoPath: string,
+  outputDir: string
+): Promise<string[]> {
+  // Extract 3 frames at 10%, 50%, 90% of video duration
+  const duration = await getVideoDuration(videoPath);
+  const timestamps = [
+    duration * 0.1,
+    duration * 0.5,
+    duration * 0.9,
+  ];
+
+  const framePaths: string[] = [];
+  for (let i = 0; i < timestamps.length; i++) {
+    const outputPath = `${outputDir}/frame-${i}.jpg`;
+    await execCommand(
+      `ffmpeg -ss ${timestamps[i]} -i "${videoPath}" -vframes 1 -q:v 2 "${outputPath}"`
+    );
+    framePaths.push(outputPath);
+  }
+
+  return framePaths;
+}
+```
+
+**Integration with Filtering Pipeline:**
+```typescript
+// lib/youtube/filter-results.ts - Extended
+async function filterAndRankResults(
+  results: YouTubeVideo[],
+  sceneText: string,
+  sceneDuration: number,
+  contentType: ContentType
+): Promise<RankedSuggestion[]> {
+  // TIER 1: Local filtering (free, fast)
+  let filtered = filterByDuration(results, sceneDuration);
+  filtered = filterByKeywords(filtered, contentType);
+  filtered = filterByViewCount(filtered, 1000);
+  filtered = filterByTitleSpam(filtered);
+
+  // TIER 2: Vision API filtering (cloud, metered)
+  const visionClient = new VisionAPIClient();
+  const expectedLabels = await generateExpectedLabels(sceneText, contentType);
+
+  const analyzed: RankedSuggestion[] = [];
+
+  for (const video of filtered) {
+    try {
+      // Step 1: Thumbnail pre-filter (faster, cheaper)
+      const thumbnailAnalysis = await visionClient.analyzeThumbnail(video.thumbnailUrl);
+
+      // Quick reject if thumbnail shows talking head
+      if (thumbnailAnalysis.faceArea > 0.15) {
+        continue; // Skip downloading this video
+      }
+
+      // Step 2: Full video frame analysis (after download)
+      // This happens in Story 3.6 after segment download
+
+      analyzed.push({
+        ...video,
+        cv_score: calculateCVScore(thumbnailAnalysis, expectedLabels),
+        thumbnailAnalysis,
+      });
+    } catch (error) {
+      if (error instanceof QuotaExceededError) {
+        // Fallback to keyword-only filtering
+        console.warn('Vision API quota exceeded, using keyword-only filtering');
+        analyzed.push({ ...video, cv_score: 50 }); // Neutral score
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  // Rank by cv_score (higher = better B-roll)
+  return analyzed.sort((a, b) => b.cv_score - a.cv_score);
+}
+```
+
+**Database Extension:**
+```sql
+-- Add cv_score column to visual_suggestions table (Migration v8)
+ALTER TABLE visual_suggestions ADD COLUMN cv_score REAL;
+
+-- cv_score ranges from 0-100:
+-- 100 = Perfect B-roll (no faces, no text, matching labels)
+-- 50 = Neutral (keyword-only filtering, no CV analysis)
+-- 0 = Poor quality (talking heads, captions, mismatched content)
+```
+
+**Error Handling & Fallback:**
+```typescript
+// Graceful degradation when Vision API unavailable
+async function filterWithFallback(
+  results: YouTubeVideo[],
+  sceneText: string,
+  sceneDuration: number,
+  contentType: ContentType
+): Promise<RankedSuggestion[]> {
+  try {
+    return await filterAndRankResults(results, sceneText, sceneDuration, contentType);
+  } catch (error) {
+    if (error instanceof QuotaExceededError ||
+        error.message.includes('GOOGLE_CLOUD_VISION')) {
+      // Fall back to Tier 1 filtering only
+      console.warn('Vision API unavailable, using keyword-only filtering');
+
+      let filtered = filterByDuration(results, sceneDuration);
+      filtered = filterByKeywords(filtered, contentType);
+
+      return filtered.map(video => ({
+        ...video,
+        cv_score: 50, // Neutral score for keyword-only filtering
+      }));
+    }
+    throw error;
+  }
+}
+```
+
+**Performance Considerations:**
+- **Thumbnail Pre-Filtering:** ~200ms per thumbnail (reduces video downloads by 30-50%)
+- **Video Frame Analysis:** ~500ms per video (3 frames)
+- **Total CV Processing:** <5 seconds per video suggestion
+- **Quota Efficiency:** 3 units per thumbnail, 9 units per video (3 frames × 3 features)
+
+**Environment Variables:**
+```bash
+# .env.local - Google Cloud Vision API Configuration
+GOOGLE_CLOUD_VISION_API_KEY=your_api_key_here
+# Or use service account:
+# GOOGLE_CLOUD_VISION_KEY_FILE=./service-account.json
+```
 
 ---
 
 ### Epic 4: Visual Curation Interface
-**Components:**
-- `components/features/curation/SceneCard.tsx` - Scene container
-- `components/features/curation/VideoPreviewThumbnail.tsx` - Clip preview
-- `components/features/curation/ProgressTracker.tsx` - Completion tracker
-- `components/features/curation/ClipGrid.tsx` - Clip display grid
+
+**Goal:** Provide a professional, intuitive interface for creators to review scripts, preview suggested video clips, and finalize visual selections scene-by-scene.
+
+**User Value:** Maintain creative control through easy-to-use curation workflow with instant video previews, progress tracking, and validation before final assembly.
+
+#### Story 4.1: Scene-by-Scene UI Layout & Script Display
+
+**Page Component:**
+- `app/projects/[id]/visual-curation/page.tsx` - Main curation page route
+- `components/features/curation/VisualCuration.tsx` - Container component
+
+**Layout Structure:**
+```typescript
+// VisualCuration.tsx component structure
+<div className="visual-curation">
+  {/* Sticky Navigation Header */}
+  <NavigationBreadcrumb
+    steps={['Project', 'Script', 'Voiceover', 'Visual Curation']}
+    currentStep="Visual Curation"
+  />
+
+  {/* Progress Tracker */}
+  <ProgressTracker
+    completed={selectedScenes}
+    total={totalScenes}
+  />
+
+  {/* Actions Bar */}
+  <div className="actions-bar">
+    <button onClick={backToScriptPreview}>← Back to Script Preview</button>
+    <button onClick={regenerateVisuals}>🔄 Regenerate Visuals</button>
+  </div>
+
+  {/* Scene Cards */}
+  {scenes.map(scene => (
+    <SceneCard
+      key={scene.id}
+      scene={scene}
+      suggestions={getSuggestionsForScene(scene.id)}
+      onClipSelect={handleClipSelection}
+    />
+  ))}
+
+  {/* Sticky Assembly Footer */}
+  <AssemblyTriggerButton
+    disabled={!allScenesComplete}
+    onClick={showAssemblyConfirmation}
+  />
+</div>
+```
+
+**SceneCard Component:**
+```typescript
+// components/features/curation/SceneCard.tsx
+interface SceneCardProps {
+  scene: Scene;
+  suggestions: VisualSuggestion[];
+  onClipSelect: (sceneId: string, suggestionId: string) => void;
+  selectedSuggestionId?: string;
+}
+
+export function SceneCard({ scene, suggestions, onClipSelect, selectedSuggestionId }: SceneCardProps) {
+  return (
+    <div className="scene-card">
+      {/* Header */}
+      <div className="scene-header">
+        <div className="scene-badge">Scene {scene.scene_number}</div>
+        <div className={`status-badge status-${getStatus()}`}>
+          {selectedSuggestionId ? '✓ Complete' : '⚠ Pending'}
+        </div>
+      </div>
+
+      {/* Script Text */}
+      <div className="scene-script">
+        {scene.text}
+      </div>
+
+      {/* Visual Suggestions Gallery */}
+      <VisualSuggestionGallery
+        suggestions={suggestions}
+        onSelect={(suggestionId) => onClipSelect(scene.id, suggestionId)}
+        selectedId={selectedSuggestionId}
+      />
+    </div>
+  );
+}
+```
+
+**API Endpoint:**
+```typescript
+// app/api/projects/[id]/scenes/route.ts
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const scenes = db.prepare(`
+    SELECT id, scene_number, text, audio_file_path, duration
+    FROM scenes
+    WHERE project_id = ?
+    ORDER BY scene_number ASC
+  `).all(params.id);
+
+  return Response.json({ success: true, data: scenes });
+}
+```
+
+**UX Specifications (from ux-design-specification.md):**
+- **Layout:** Desktop-first, max-width 1400px, centered
+- **Navigation:** Sticky header with breadcrumb navigation
+- **Scene Cards:** Sequential display (Scene 1, Scene 2, etc.)
+- **Progress:** Real-time completion tracker in header
+- **Colors:** Dark mode (Slate 900 background, Slate 800 cards)
+- **Typography:** Clear hierarchy (scene number, script text, metadata)
+- **Spacing:** Consistent 24px gaps between scene cards
+
+#### Story 4.2: Visual Suggestions Display & Gallery
+
+**Component:**
+```typescript
+// components/features/curation/VisualSuggestionGallery.tsx
+interface VisualSuggestionGalleryProps {
+  suggestions: VisualSuggestion[];
+  onSelect: (suggestionId: string) => void;
+  selectedId?: string;
+}
+
+export function VisualSuggestionGallery({ suggestions, onSelect, selectedId }: VisualSuggestionGalleryProps) {
+  if (suggestions.length === 0) {
+    return <EmptyClipState />;
+  }
+
+  return (
+    <div className="clip-grid">
+      {suggestions.map(suggestion => (
+        <ClipSelectionCard
+          key={suggestion.id}
+          suggestion={suggestion}
+          isSelected={suggestion.id === selectedId}
+          onSelect={() => onSelect(suggestion.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+// components/features/curation/ClipSelectionCard.tsx
+interface ClipSelectionCardProps {
+  suggestion: VisualSuggestion;
+  isSelected: boolean;
+  onSelect: () => void;
+}
+
+export function ClipSelectionCard({ suggestion, isSelected, onSelect }: ClipSelectionCardProps) {
+  return (
+    <div
+      className={`clip-card ${isSelected ? 'selected' : ''}`}
+      onClick={onSelect}
+    >
+      {/* Selection Checkmark */}
+      {isSelected && <div className="checkmark">✓</div>}
+
+      {/* YouTube Thumbnail */}
+      <img
+        src={suggestion.thumbnail_url}
+        alt={suggestion.title}
+        className="clip-thumbnail"
+      />
+
+      {/* Download Status Badge */}
+      <div className={`download-badge download-${suggestion.download_status}`}>
+        {getDownloadStatusLabel(suggestion.download_status)}
+      </div>
+
+      {/* Play Icon Overlay */}
+      <div className="play-icon">▶</div>
+
+      {/* Metadata Overlay */}
+      <div className="clip-overlay">
+        <div className="clip-title">{suggestion.title}</div>
+        <div className="clip-meta">
+          <span>{suggestion.channel_title}</span>
+          <span>{formatDuration(suggestion.duration)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// components/features/curation/EmptyClipState.tsx
+export function EmptyClipState() {
+  return (
+    <div className="empty-state">
+      <div className="empty-icon">🎬</div>
+      <div className="empty-title">No suitable video clips found for this scene</div>
+      <div className="empty-text">
+        The YouTube search returned no results. Try manual search or skip this scene.
+      </div>
+      <button onClick={handleManualSearch}>🔍 Search YouTube Manually</button>
+      <button onClick={handleSkipScene}>Skip This Scene</button>
+    </div>
+  );
+}
+```
+
+**API Endpoint:**
+```typescript
+// app/api/projects/[id]/visual-suggestions/route.ts
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  // Get all scenes for project
+  const scenes = db.prepare(`
+    SELECT id, scene_number FROM scenes WHERE project_id = ? ORDER BY scene_number
+  `).all(params.id);
+
+  // Get suggestions for each scene
+  const scenesSuggestions = scenes.map(scene => {
+    const suggestions = db.prepare(`
+      SELECT id, video_id, title, thumbnail_url, channel_title,
+             embed_url, rank, duration, default_segment_path, download_status
+      FROM visual_suggestions
+      WHERE scene_id = ?
+      ORDER BY rank ASC
+    `).all(scene.id);
+
+    return {
+      sceneId: scene.id,
+      sceneNumber: scene.scene_number,
+      suggestions
+    };
+  });
+
+  return Response.json({ success: true, data: scenesSuggestions });
+}
+```
+
+**UX Specifications:**
+- **Grid Layout:** 3 columns on desktop (1920px), 2 on tablet (768px), 1 on mobile
+- **Clip Cards:** 16:9 aspect ratio, thumbnail covers entire card
+- **Selection Visual:** 3px indigo border, checkmark badge, shadow glow
+- **Download Status Badges:**
+  - Complete: Green badge (✓ Ready)
+  - Downloading: Blue badge with percentage (⏳ 67%)
+  - Pending: Gray badge (⏳ Pending)
+  - Error: Red badge (⚠ Error)
+- **Hover State:** Scale 1.02, indigo border
+- **Empty State:** Centered, icon + message + CTA buttons
+
+#### Story 4.3: Video Preview & Playback Functionality
+
+**Component:**
+```typescript
+// components/features/curation/VideoPreviewPlayer.tsx
+interface VideoPreviewPlayerProps {
+  isOpen: boolean;
+  suggestion: VisualSuggestion | null;
+  onClose: () => void;
+}
+
+export function VideoPreviewPlayer({ isOpen, suggestion, onClose }: VideoPreviewPlayerProps) {
+  const [useFallback, setUseFallback] = useState(false);
+
+  useEffect(() => {
+    // Keyboard shortcut handlers
+    const handleKeyboard = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === ' ') togglePlayPause();
+    };
+    window.addEventListener('keydown', handleKeyboard);
+    return () => window.removeEventListener('keydown', handleKeyboard);
+  }, []);
+
+  if (!isOpen || !suggestion) return null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="video-player" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="video-header">
+          <div className="video-title">{suggestion.title}</div>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+
+        {/* Video Container */}
+        <div className="video-container">
+          {suggestion.download_status === 'complete' && !useFallback ? (
+            // HTML5 video player for downloaded segments
+            <video
+              controls
+              autoPlay
+              src={`/.cache/videos/${projectId}/${suggestion.default_segment_path}`}
+              onError={() => setUseFallback(true)}
+            >
+              <source type="video/mp4" />
+            </video>
+          ) : (
+            // YouTube iframe fallback for failed downloads
+            <iframe
+              src={suggestion.embed_url}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          )}
+        </div>
+
+        {/* Keyboard Shortcuts Hint */}
+        <div className="controls-hint">
+          Space: Play/Pause | Esc: Close
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+**Key Features:**
+- **Instant Playback:** Downloaded default segments play immediately (Story 3.6)
+- **Fallback Strategy:** If download failed, use YouTube iframe embed
+- **Keyboard Shortcuts:** Space (play/pause), Esc (close)
+- **HTML5 Controls:** Play/pause, progress bar, volume, fullscreen
+- **Click Outside:** Close modal on backdrop click
+- **Auto-open on Selection:** Preview opens automatically when user clicks clip
+
+**UX Specifications:**
+- **Modal Backdrop:** Slate 900 with 95% opacity, 8px blur
+- **Player Container:** Max-width 800px, 90% width, Slate 800 background
+- **Video Aspect Ratio:** 16:9
+- **Controls:** Default HTML5 video controls
+- **Close Button:** Top-right, 32px x 32px, hover effect
+
+#### Story 4.4: Clip Selection Mechanism & State Management
+
+**Zustand Store:**
+```typescript
+// stores/curation-store.ts
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+interface ClipSelection {
+  sceneId: string;
+  suggestionId: string;
+  videoId: string;
+}
+
+interface CurationState {
+  projectId: string | null;
+  selections: Map<string, ClipSelection>; // sceneId -> ClipSelection
+
+  // Actions
+  setProject: (projectId: string) => void;
+  selectClip: (sceneId: string, suggestionId: string, videoId: string) => void;
+  clearSelection: (sceneId: string) => void;
+  isSceneComplete: (sceneId: string) => boolean;
+  getCompletionProgress: () => { completed: number; total: number };
+  reset: () => void;
+}
+
+export const useCurationStore = create<CurationState>()(
+  persist(
+    (set, get) => ({
+      projectId: null,
+      selections: new Map(),
+
+      setProject: (projectId) => set({ projectId }),
+
+      selectClip: (sceneId, suggestionId, videoId) => {
+        set((state) => {
+          const newSelections = new Map(state.selections);
+          newSelections.set(sceneId, { sceneId, suggestionId, videoId });
+          return { selections: newSelections };
+        });
+
+        // Save to database asynchronously
+        saveClipSelection(get().projectId!, sceneId, suggestionId);
+      },
+
+      clearSelection: (sceneId) => {
+        set((state) => {
+          const newSelections = new Map(state.selections);
+          newSelections.delete(sceneId);
+          return { selections: newSelections };
+        });
+      },
+
+      isSceneComplete: (sceneId) => {
+        return get().selections.has(sceneId);
+      },
+
+      getCompletionProgress: () => {
+        const state = get();
+        // Assuming total scenes fetched from scenes list
+        return {
+          completed: state.selections.size,
+          total: totalScenes // from context
+        };
+      },
+
+      reset: () => set({ projectId: null, selections: new Map() }),
+    }),
+    {
+      name: 'curation-storage',
+    }
+  )
+);
+```
+
+**API Endpoint:**
+```typescript
+// app/api/projects/[id]/select-clip/route.ts
+export async function POST(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const { sceneId, suggestionId } = await request.json();
+
+  // Update scenes table with selected_clip_id
+  db.prepare(`
+    UPDATE scenes
+    SET selected_clip_id = ?
+    WHERE id = ?
+  `).run(suggestionId, sceneId);
+
+  return Response.json({ success: true });
+}
+```
+
+**Database Extension (Migration v7):**
+```sql
+-- Add selected_clip_id to scenes table
+ALTER TABLE scenes ADD COLUMN selected_clip_id TEXT;
+ALTER TABLE scenes ADD FOREIGN KEY (selected_clip_id) REFERENCES visual_suggestions(id);
+```
+
+**Selection Behavior:**
+- **One Selection Per Scene:** Selecting new clip automatically deselects previous
+- **Visual Feedback:** Checkmark badge, indigo border, shadow glow
+- **Optimistic UI:** Selection appears immediately, saved asynchronously
+- **Error Handling:** If save fails, toast notification + revert UI state
+- **Progress Tracking:** Real-time update of "3/5 scenes selected" counter
+
+#### Story 4.5: Assembly Trigger & Validation Workflow
+
+**Component:**
+```typescript
+// components/features/curation/AssemblyTriggerButton.tsx
+interface AssemblyTriggerButtonProps {
+  totalScenes: number;
+  completedScenes: number;
+  onTrigger: () => void;
+}
+
+export function AssemblyTriggerButton({ totalScenes, completedScenes, onTrigger }: AssemblyTriggerButtonProps) {
+  const isComplete = completedScenes === totalScenes;
+  const [showConfirmation, setShowConfirmation] = useState(false);
+
+  return (
+    <>
+      {/* Sticky Footer */}
+      <div className="assembly-footer">
+        <button
+          className="btn-assemble"
+          disabled={!isComplete}
+          onClick={() => setShowConfirmation(true)}
+        >
+          <span>🎬</span>
+          <span>Assemble Video</span>
+        </button>
+
+        {!isComplete && (
+          <div className="tooltip">
+            Select clips for all {totalScenes} scenes to continue
+          </div>
+        )}
+      </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmation && (
+        <ConfirmationModal
+          onConfirm={onTrigger}
+          onCancel={() => setShowConfirmation(false)}
+          sceneCount={totalScenes}
+        />
+      )}
+    </>
+  );
+}
+
+// components/features/curation/ConfirmationModal.tsx
+interface ConfirmationModalProps {
+  onConfirm: () => void;
+  onCancel: () => void;
+  sceneCount: number;
+}
+
+export function ConfirmationModal({ onConfirm, onCancel, sceneCount }: ConfirmationModalProps) {
+  return (
+    <div className="confirm-modal">
+      <div className="confirm-content">
+        <div className="confirm-icon">🎬</div>
+        <h2 className="confirm-title">Ready to Assemble Your Video?</h2>
+        <p className="confirm-message">
+          You've selected clips for all {sceneCount} scenes.
+          This will create your final video with synchronized voiceovers.
+        </p>
+        <div className="confirm-actions">
+          <button className="btn-cancel" onClick={onCancel}>Not Yet</button>
+          <button className="btn-confirm" onClick={onConfirm}>Assemble Video</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+**API Endpoint:**
+```typescript
+// app/api/projects/[id]/assemble/route.ts
+export async function POST(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  // Get all scenes with selections
+  const scenes = db.prepare(`
+    SELECT
+      s.id,
+      s.scene_number,
+      s.text,
+      s.audio_file_path,
+      s.duration,
+      vs.video_id,
+      vs.embed_url,
+      vs.default_segment_path
+    FROM scenes s
+    LEFT JOIN visual_suggestions vs ON s.selected_clip_id = vs.id
+    WHERE s.project_id = ?
+    ORDER BY s.scene_number ASC
+  `).all(params.id);
+
+  // Validate all scenes have selections
+  const incomplete = scenes.filter(s => !s.video_id);
+  if (incomplete.length > 0) {
+    return Response.json({
+      success: false,
+      error: `${incomplete.length} scenes missing clip selections`
+    }, { status: 400 });
+  }
+
+  // Update project workflow step
+  db.prepare(`
+    UPDATE projects
+    SET current_step = 'assembly'
+    WHERE id = ?
+  `).run(params.id);
+
+  // Trigger Epic 5 video assembly (async job)
+  const assemblyJobId = await triggerVideoAssembly(params.id, scenes);
+
+  return Response.json({
+    success: true,
+    data: { assemblyJobId, sceneCount: scenes.length }
+  });
+}
+```
+
+**UX Specifications:**
+- **Footer:** Sticky at bottom, 88px height, Slate 800 background
+- **Button State (Disabled):** Gray background, opacity 0.6, cursor not-allowed
+- **Button State (Enabled):** Indigo 500, hover effect (transform + shadow)
+- **Tooltip:** Positioned above button when disabled
+- **Modal:** Backdrop blur, center-aligned, 500px max-width
+- **Confirmation Flow:** Click → Modal → Confirm → Navigate to assembly page
+
+#### Story 4.6: Visual Curation Workflow Integration & Error Recovery
+
+**Navigation Flow:**
+```typescript
+// Workflow progression
+Epic 2 (Voiceover Preview)
+  ↓ [Continue to Visual Curation button]
+Epic 3 (Visual Sourcing) - Auto-triggered
+  ↓ [Progress: Analyzing scenes, searching YouTube, downloading segments]
+Epic 4 (Visual Curation) - Auto-navigate on completion
+  ↓ [User selects clips scene-by-scene]
+  ↓ [All scenes complete → Assemble Video button enabled]
+Epic 5 (Video Assembly) - Triggered by user
+```
+
+**Navigation Components:**
+```typescript
+// components/features/curation/NavigationBreadcrumb.tsx
+interface BreadcrumbStep {
+  label: string;
+  path?: string;
+}
+
+export function NavigationBreadcrumb({ steps, currentStep }: { steps: BreadcrumbStep[]; currentStep: string }) {
+  return (
+    <div className="breadcrumb">
+      {steps.map((step, index) => (
+        <React.Fragment key={step.label}>
+          {step.path ? (
+            <Link href={step.path} className="breadcrumb-link">
+              {step.label}
+            </Link>
+          ) : (
+            <span className={step.label === currentStep ? 'current' : ''}>
+              {step.label}
+            </span>
+          )}
+          {index < steps.length - 1 && <span>→</span>}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+```
+
+**Error Recovery:**
+```typescript
+// Regenerate visuals if unsatisfied with suggestions
+async function handleRegenerateVisuals(projectId: string) {
+  try {
+    // Clear existing suggestions
+    await fetch(`/api/projects/${projectId}/visual-suggestions`, {
+      method: 'DELETE'
+    });
+
+    // Trigger Epic 3 visual sourcing again
+    await fetch(`/api/projects/${projectId}/generate-visuals`, {
+      method: 'POST'
+    });
+
+    // Navigate to loading screen
+    router.push(`/projects/${projectId}/visual-sourcing`);
+  } catch (error) {
+    toast.error('Failed to regenerate visuals. Please try again.');
+  }
+}
+```
+
+**Session Persistence:**
+```typescript
+// localStorage for scroll position and preview state
+useEffect(() => {
+  // Save scroll position
+  const handleScroll = () => {
+    localStorage.setItem(
+      `curation-scroll-${projectId}`,
+      window.scrollY.toString()
+    );
+  };
+  window.addEventListener('scroll', handleScroll);
+
+  // Restore scroll position on mount
+  const savedScroll = localStorage.getItem(`curation-scroll-${projectId}`);
+  if (savedScroll) {
+    window.scrollTo(0, parseInt(savedScroll));
+  }
+
+  return () => window.removeEventListener('scroll', handleScroll);
+}, [projectId]);
+```
+
+**Edge Case Handling:**
+- **Missing Audio:** Display error + option to regenerate voiceovers
+- **Missing Suggestions:** Show empty state + manual search option
+- **Incomplete Selection Navigation:** Warning modal when leaving page
+- **Workflow Step Validation:** Redirect if accessed before Epic 3 complete
 
 **State:**
-- `stores/curation-store.ts` - Clip selections, progress
+- `stores/curation-store.ts` - Clip selections, progress, session data
 
-**Key Flow:**
-1. Display all scenes with script text
-2. Show 4-6 video clip options per scene (Plyr player)
-3. User selects one clip per scene
-4. Track progress (N/M scenes complete)
-5. "Assemble Video" button enables when all scenes selected
-
-**Matches UX Spec:**
-- Scene-Focused Timeline Dashboard design (lines 137-160)
-- 3-column clip grid on desktop
-- Plyr video player for previews
-- Dark mode theme (Slate colors)
+**UX Specifications (Complete Epic 4):**
+- **Layout:** Desktop-first (1920px), responsive tablet (768px), mobile (375px)
+- **Color System:** Dark mode (Slate 900/800/700), Indigo 500 accents
+- **Typography:** Inter font family, clear hierarchy
+- **Component Library:** shadcn/ui (Button, Card, Dialog, Progress)
+- **Video Player:** HTML5 with controls, YouTube iframe fallback
+- **Interactions:** Click to select, hover effects, keyboard shortcuts
+- **Progress Tracking:** Real-time completion counter, visual indicators
+- **Validation:** All scenes must have selections before assembly
+- **Accessibility:** WCAG AA compliant, keyboard navigation, ARIA labels
 
 ---
 
 ### Epic 5: Video Assembly & Output
+
+**Goal:** Automatically combine user selections into a final, downloadable video file with synchronized audio and visuals.
+
 **Backend:**
-- `app/api/assembly/route.ts` - Video assembly orchestration
-- `lib/video/ffmpeg.ts` - FFmpeg command utilities
-- `lib/video/assembler.ts` - Assembly pipeline logic
+- `app/api/projects/[id]/assemble/route.ts` - Assembly trigger endpoint
+- `app/api/projects/[id]/assembly-status/route.ts` - Progress polling endpoint
+- `app/api/projects/[id]/export/route.ts` - Export metadata endpoint
+- `lib/video/ffmpeg.ts` - FFmpeg command builder utilities
+- `lib/video/assembler.ts` - Assembly pipeline orchestration
+- `lib/video/thumbnail.ts` - Thumbnail generation logic
 
 **Components:**
-- `components/features/assembly/AssemblyProgress.tsx` - Progress UI
-- `components/features/assembly/VideoDownload.tsx` - Download link
+- `app/projects/[id]/assembly/page.tsx` - Assembly progress page route
+- `components/features/assembly/AssemblyProgress.tsx` - Progress UI with scene tracking
+- `app/projects/[id]/export/page.tsx` - Export page route
+- `components/features/export/ExportPage.tsx` - Video/thumbnail download UI
 
-**Key Flow:**
-1. Receive all scene selections (clip + voiceover audio)
-2. For each scene:
-   - Trim video clip to match voiceover duration (FFmpeg)
-3. Concatenate all trimmed clips in scene order (FFmpeg)
-4. Overlay voiceover audio on corresponding clips (FFmpeg)
-5. Render final MP4 to `.cache/output/`
-6. Generate thumbnail (extract frame + add title text)
-7. Provide download link to user
+---
 
-**FFmpeg Commands:**
+#### Story 5.1: Video Processing Infrastructure Setup
+
+**Database Extension (Migration v8):**
+```sql
+-- Assembly jobs table for tracking video assembly progress
+CREATE TABLE assembly_jobs (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  status TEXT DEFAULT 'pending', -- pending, processing, complete, error
+  progress INTEGER DEFAULT 0, -- 0-100 percentage
+  current_stage TEXT, -- 'trimming', 'concatenating', 'audio_overlay', 'thumbnail', 'finalizing'
+  current_scene INTEGER, -- Scene number being processed
+  total_scenes INTEGER,
+  error_message TEXT,
+  started_at TEXT,
+  completed_at TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_assembly_jobs_project ON assembly_jobs(project_id);
+CREATE INDEX idx_assembly_jobs_status ON assembly_jobs(status);
+```
+
+**FFmpeg Client:**
+```typescript
+// lib/video/ffmpeg.ts
+import { exec, spawn } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
+export class FFmpegClient {
+  private ffmpegPath: string = 'ffmpeg'; // Assumes ffmpeg in PATH
+
+  async getVideoDuration(videoPath: string): Promise<number> {
+    const { stdout } = await execAsync(
+      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`
+    );
+    return parseFloat(stdout.trim());
+  }
+
+  async trimToAudioDuration(
+    videoPath: string,
+    audioPath: string,
+    outputPath: string
+  ): Promise<void> {
+    const audioDuration = await this.getVideoDuration(audioPath);
+
+    await execAsync(
+      `ffmpeg -y -i "${videoPath}" -t ${audioDuration} -c:v libx264 -c:a aac "${outputPath}"`
+    );
+  }
+
+  async overlayAudio(
+    videoPath: string,
+    audioPath: string,
+    outputPath: string
+  ): Promise<void> {
+    // Remove original audio, add voiceover audio
+    await execAsync(
+      `ffmpeg -y -i "${videoPath}" -i "${audioPath}" -c:v copy -map 0:v:0 -map 1:a:0 "${outputPath}"`
+    );
+  }
+
+  async concatenateVideos(
+    inputPaths: string[],
+    outputPath: string
+  ): Promise<void> {
+    // Create concat list file
+    const listPath = outputPath.replace('.mp4', '-list.txt');
+    const listContent = inputPaths.map(p => `file '${p}'`).join('\n');
+    await writeFile(listPath, listContent);
+
+    await execAsync(
+      `ffmpeg -y -f concat -safe 0 -i "${listPath}" -c copy "${outputPath}"`
+    );
+
+    // Clean up list file
+    await unlink(listPath);
+  }
+
+  async extractFrame(
+    videoPath: string,
+    timestamp: number,
+    outputPath: string
+  ): Promise<void> {
+    await execAsync(
+      `ffmpeg -y -ss ${timestamp} -i "${videoPath}" -vframes 1 -q:v 2 "${outputPath}"`
+    );
+  }
+
+  async addTextOverlay(
+    imagePath: string,
+    text: string,
+    outputPath: string
+  ): Promise<void> {
+    // Add title text at bottom third of thumbnail
+    const escapedText = text.replace(/'/g, "'\\''");
+    await execAsync(
+      `ffmpeg -y -i "${imagePath}" -vf "drawtext=text='${escapedText}':fontsize=48:fontcolor=white:borderw=2:bordercolor=black:x=(w-text_w)/2:y=h*0.75" "${outputPath}"`
+    );
+  }
+}
+```
+
+**Environment Variables:**
 ```bash
-# Trim clip to audio duration
-ffmpeg -i clip.mp4 -i audio.mp3 -t $(duration audio.mp3) trimmed.mp4
+# .env.local
+FFMPEG_PATH=ffmpeg  # Path to FFmpeg executable (default: system PATH)
+```
 
-# Overlay audio on video
-ffmpeg -i trimmed.mp4 -i audio.mp3 -c:v copy -map 0:v:0 -map 1:a:0 scene.mp4
+---
 
-# Concatenate scenes
-ffmpeg -f concat -i filelist.txt -c copy final.mp4
+#### Story 5.2: Scene Video Trimming & Preparation
+
+**Assembler Pipeline:**
+```typescript
+// lib/video/assembler.ts
+import { FFmpegClient } from './ffmpeg';
+import db from '@/lib/db/client';
+
+interface AssemblyScene {
+  sceneNumber: number;
+  videoPath: string;      // Downloaded segment from Epic 3
+  audioPath: string;      // Generated voiceover from Epic 2
+  duration: number;       // Audio duration in seconds
+}
+
+export class VideoAssembler {
+  private ffmpeg = new FFmpegClient();
+  private projectId: string;
+  private jobId: string;
+  private outputDir: string;
+
+  constructor(projectId: string, jobId: string) {
+    this.projectId = projectId;
+    this.jobId = jobId;
+    this.outputDir = `.cache/assembly/${projectId}`;
+  }
+
+  async assembleVideo(scenes: AssemblyScene[]): Promise<string> {
+    await mkdir(this.outputDir, { recursive: true });
+
+    const trimmedPaths: string[] = [];
+
+    // Phase 1: Trim each scene to voiceover duration
+    for (let i = 0; i < scenes.length; i++) {
+      const scene = scenes[i];
+      await this.updateProgress('trimming', i + 1, scenes.length);
+
+      const trimmedPath = `${this.outputDir}/scene-${scene.sceneNumber}-trimmed.mp4`;
+      await this.ffmpeg.trimToAudioDuration(
+        scene.videoPath,
+        scene.audioPath,
+        trimmedPath
+      );
+
+      // Phase 2: Overlay audio on trimmed video
+      await this.updateProgress('audio_overlay', i + 1, scenes.length);
+
+      const withAudioPath = `${this.outputDir}/scene-${scene.sceneNumber}-audio.mp4`;
+      await this.ffmpeg.overlayAudio(
+        trimmedPath,
+        scene.audioPath,
+        withAudioPath
+      );
+
+      trimmedPaths.push(withAudioPath);
+    }
+
+    // Phase 3: Concatenate all scenes
+    await this.updateProgress('concatenating', scenes.length, scenes.length);
+
+    const finalPath = `.cache/output/${this.projectId}/final.mp4`;
+    await mkdir(`.cache/output/${this.projectId}`, { recursive: true });
+    await this.ffmpeg.concatenateVideos(trimmedPaths, finalPath);
+
+    return finalPath;
+  }
+
+  private async updateProgress(
+    stage: string,
+    currentScene: number,
+    totalScenes: number
+  ): Promise<void> {
+    // Calculate progress percentage
+    const stageWeight = {
+      trimming: 0.3,
+      audio_overlay: 0.3,
+      concatenating: 0.2,
+      thumbnail: 0.1,
+      finalizing: 0.1,
+    };
+
+    let progress = 0;
+    if (stage === 'trimming') {
+      progress = Math.round((currentScene / totalScenes) * 30);
+    } else if (stage === 'audio_overlay') {
+      progress = 30 + Math.round((currentScene / totalScenes) * 30);
+    } else if (stage === 'concatenating') {
+      progress = 60;
+    } else if (stage === 'thumbnail') {
+      progress = 80;
+    } else if (stage === 'finalizing') {
+      progress = 90;
+    }
+
+    db.prepare(`
+      UPDATE assembly_jobs
+      SET progress = ?, current_stage = ?, current_scene = ?, total_scenes = ?
+      WHERE id = ?
+    `).run(progress, stage, currentScene, totalScenes, this.jobId);
+  }
+}
+```
+
+---
+
+#### Story 5.3: Video Concatenation & Audio Overlay
+
+**Assembly Trigger API:**
+```typescript
+// app/api/projects/[id]/assemble/route.ts
+import { VideoAssembler } from '@/lib/video/assembler';
+import { ThumbnailGenerator } from '@/lib/video/thumbnail';
+import db from '@/lib/db/client';
+import { randomUUID } from 'crypto';
+
+export async function POST(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const projectId = params.id;
+
+  // Validate all scenes have selections
+  const scenes = db.prepare(`
+    SELECT
+      s.id,
+      s.scene_number,
+      s.text,
+      s.audio_file_path,
+      s.duration,
+      vs.default_segment_path
+    FROM scenes s
+    JOIN visual_suggestions vs ON s.selected_clip_id = vs.id
+    WHERE s.project_id = ?
+    ORDER BY s.scene_number ASC
+  `).all(projectId);
+
+  const incomplete = scenes.filter(s => !s.default_segment_path || !s.audio_file_path);
+  if (incomplete.length > 0) {
+    return Response.json({
+      success: false,
+      error: `${incomplete.length} scenes missing required files`
+    }, { status: 400 });
+  }
+
+  // Create assembly job
+  const jobId = randomUUID();
+  db.prepare(`
+    INSERT INTO assembly_jobs (id, project_id, status, total_scenes, started_at)
+    VALUES (?, ?, 'processing', ?, datetime('now'))
+  `).run(jobId, projectId, scenes.length);
+
+  // Update project step
+  db.prepare(`
+    UPDATE projects SET current_step = 'assembly' WHERE id = ?
+  `).run(projectId);
+
+  // Run assembly asynchronously
+  runAssembly(projectId, jobId, scenes).catch(error => {
+    db.prepare(`
+      UPDATE assembly_jobs
+      SET status = 'error', error_message = ?
+      WHERE id = ?
+    `).run(error.message, jobId);
+  });
+
+  return Response.json({
+    success: true,
+    data: { jobId, sceneCount: scenes.length }
+  });
+}
+
+async function runAssembly(
+  projectId: string,
+  jobId: string,
+  scenes: any[]
+): Promise<void> {
+  const assembler = new VideoAssembler(projectId, jobId);
+  const thumbnailGen = new ThumbnailGenerator(projectId);
+
+  // Assemble video
+  const assemblyScenes = scenes.map(s => ({
+    sceneNumber: s.scene_number,
+    videoPath: s.default_segment_path,
+    audioPath: s.audio_file_path,
+    duration: s.duration,
+  }));
+
+  const videoPath = await assembler.assembleVideo(assemblyScenes);
+
+  // Generate thumbnail
+  db.prepare(`
+    UPDATE assembly_jobs SET current_stage = 'thumbnail', progress = 80 WHERE id = ?
+  `).run(jobId);
+
+  const project = db.prepare('SELECT name, topic FROM projects WHERE id = ?').get(projectId);
+  const thumbnailPath = await thumbnailGen.generate(videoPath, project.name || project.topic);
+
+  // Get video metadata
+  const videoStats = await stat(videoPath);
+  const duration = await new FFmpegClient().getVideoDuration(videoPath);
+
+  // Save rendered video record
+  const videoId = randomUUID();
+  db.prepare(`
+    INSERT INTO rendered_videos (id, project_id, file_path, thumbnail_path, duration_seconds, file_size_bytes)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(videoId, projectId, videoPath, thumbnailPath, duration, videoStats.size);
+
+  // Complete job
+  db.prepare(`
+    UPDATE assembly_jobs
+    SET status = 'complete', progress = 100, current_stage = 'finalizing', completed_at = datetime('now')
+    WHERE id = ?
+  `).run(jobId);
+
+  // Update project step
+  db.prepare(`
+    UPDATE projects SET current_step = 'export' WHERE id = ?
+  `).run(projectId);
+}
+```
+
+**Assembly Status Polling API:**
+```typescript
+// app/api/projects/[id]/assembly-status/route.ts
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const job = db.prepare(`
+    SELECT id, status, progress, current_stage, current_scene, total_scenes, error_message
+    FROM assembly_jobs
+    WHERE project_id = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).get(params.id);
+
+  if (!job) {
+    return Response.json({
+      success: false,
+      error: 'No assembly job found'
+    }, { status: 404 });
+  }
+
+  return Response.json({
+    success: true,
+    data: {
+      jobId: job.id,
+      status: job.status,
+      progress: job.progress,
+      currentStage: job.current_stage,
+      currentScene: job.current_scene,
+      totalScenes: job.total_scenes,
+      error: job.error_message,
+    }
+  });
+}
+```
+
+---
+
+#### Story 5.4: Automated Thumbnail Generation
+
+**Thumbnail Generator:**
+```typescript
+// lib/video/thumbnail.ts
+import { FFmpegClient } from './ffmpeg';
+
+export class ThumbnailGenerator {
+  private ffmpeg = new FFmpegClient();
+  private projectId: string;
+
+  constructor(projectId: string) {
+    this.projectId = projectId;
+  }
+
+  async generate(videoPath: string, title: string): Promise<string> {
+    const outputDir = `.cache/output/${this.projectId}`;
+    const tempFramePath = `${outputDir}/thumbnail-temp.jpg`;
+    const finalPath = `${outputDir}/thumbnail.jpg`;
+
+    // Extract candidate frames at 10%, 30%, 50%, 70%
+    const duration = await this.ffmpeg.getVideoDuration(videoPath);
+    const timestamps = [0.1, 0.3, 0.5, 0.7].map(p => duration * p);
+
+    // Score frames and select best (simplified: use 30% mark)
+    // In production, use Vision API or heuristics to score visual appeal
+    const bestTimestamp = timestamps[1]; // 30% mark usually has good content
+
+    await this.ffmpeg.extractFrame(videoPath, bestTimestamp, tempFramePath);
+
+    // Add title text overlay
+    const displayTitle = this.formatTitle(title);
+    await this.ffmpeg.addTextOverlay(tempFramePath, displayTitle, finalPath);
+
+    // Clean up temp frame
+    await unlink(tempFramePath);
+
+    return finalPath;
+  }
+
+  private formatTitle(title: string): string {
+    // Truncate for thumbnail display
+    if (title.length > 40) {
+      return title.substring(0, 37) + '...';
+    }
+    return title;
+  }
+}
+```
+
+**Advanced Frame Selection (Future Enhancement):**
+```typescript
+// Frame scoring algorithm (can use Vision API labels)
+async function scoreFrame(framePath: string, expectedLabels: string[]): Promise<number> {
+  // Score based on:
+  // - Visual clarity (not too dark/bright)
+  // - Composition (rule of thirds)
+  // - Relevance to topic (label matching)
+  // - No text overlays or faces
+  return 50; // Placeholder
+}
+```
+
+---
+
+#### Story 5.5: Export UI & Download Workflow
+
+**Export Metadata API:**
+```typescript
+// app/api/projects/[id]/export/route.ts
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  // Get rendered video info
+  const video = db.prepare(`
+    SELECT id, file_path, thumbnail_path, duration_seconds, file_size_bytes, created_at
+    FROM rendered_videos
+    WHERE project_id = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).get(params.id);
+
+  if (!video) {
+    return Response.json({
+      success: false,
+      error: 'No rendered video found'
+    }, { status: 404 });
+  }
+
+  // Get project metadata
+  const project = db.prepare(`
+    SELECT name, topic FROM projects WHERE id = ?
+  `).get(params.id);
+
+  // Count scenes
+  const sceneCount = db.prepare(`
+    SELECT COUNT(*) as count FROM scenes WHERE project_id = ?
+  `).get(params.id).count;
+
+  return Response.json({
+    success: true,
+    data: {
+      video: {
+        path: video.file_path,
+        thumbnailPath: video.thumbnail_path,
+        durationSeconds: video.duration_seconds,
+        fileSizeBytes: video.file_size_bytes,
+        createdAt: video.created_at,
+      },
+      project: {
+        name: project.name,
+        topic: project.topic,
+        sceneCount,
+      },
+      download: {
+        videoFilename: sanitizeFilename(project.name || project.topic) + '.mp4',
+        thumbnailFilename: sanitizeFilename(project.name || project.topic) + '-thumbnail.jpg',
+      }
+    }
+  });
+}
+
+function sanitizeFilename(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
+    .replace(/\s+/g, '-')          // Spaces to hyphens
+    .substring(0, 50);             // Truncate
+}
+```
+
+**Video File Download API:**
+```typescript
+// app/api/videos/[...path]/route.ts
+import { readFile, stat } from 'fs/promises';
+import path from 'path';
+
+export async function GET(
+  request: Request,
+  { params }: { params: { path: string[] } }
+) {
+  const filePath = path.join(process.cwd(), '.cache', ...params.path);
+
+  try {
+    const fileStats = await stat(filePath);
+    const fileContent = await readFile(filePath);
+
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = ext === '.mp4' ? 'video/mp4' :
+                        ext === '.jpg' ? 'image/jpeg' :
+                        'application/octet-stream';
+
+    return new Response(fileContent, {
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': fileStats.size.toString(),
+        'Content-Disposition': `attachment; filename="${path.basename(filePath)}"`,
+      },
+    });
+  } catch (error) {
+    return Response.json({ success: false, error: 'File not found' }, { status: 404 });
+  }
+}
+```
+
+**Key Integration Points:**
+- Epic 4 Story 4.5 triggers assembly via POST `/api/projects/[id]/assemble`
+- Assembly Progress UI polls GET `/api/projects/[id]/assembly-status`
+- Export Page fetches metadata via GET `/api/projects/[id]/export`
+- Downloads served via GET `/api/videos/[...path]`
+
+**UX Specifications (from ux-design-specification.md Section 7.6-7.7):**
+- Assembly Progress: Scene-by-scene status tracking with stage messages
+- Export Page: Video player with preview, thumbnail sidebar, download buttons
+- Metadata: Duration, file size, resolution, topic, scene count
+- Actions: Download Video, Download Thumbnail, Create New Video, Back to Curation
+
+**Workflow States:**
+```
+'visual-curation' → 'assembly' → 'export' → 'complete'
+```
+
+---
+
+### Epic 5 Database Schema Summary
+
+**New Tables:**
+- `assembly_jobs` - Tracks assembly progress and status
+
+**Extended Tables:**
+- `rendered_videos` - Already exists (line 3061)
+
+**Migration v8:**
+```sql
+-- Add assembly_jobs table
+CREATE TABLE IF NOT EXISTS assembly_jobs (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  status TEXT DEFAULT 'pending',
+  progress INTEGER DEFAULT 0,
+  current_stage TEXT,
+  current_scene INTEGER,
+  total_scenes INTEGER,
+  error_message TEXT,
+  started_at TEXT,
+  completed_at TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_assembly_jobs_project ON assembly_jobs(project_id);
+CREATE INDEX IF NOT EXISTS idx_assembly_jobs_status ON assembly_jobs(status);
 ```
 
 ---
@@ -907,6 +2727,16 @@ GEMINI_MODEL=gemini-2.5-flash
 # - gemini-flash-latest (auto-updates)
 # - gemini-pro-latest (auto-updates)
 # Note: Gemini 1.5 models are deprecated
+
+# ============================================
+# Google Cloud Vision API (Epic 3 Story 3.7)
+# ============================================
+# Get API key at: https://console.cloud.google.com/apis/api/vision.googleapis.com
+# Free tier: 1,000 units/month (thumbnail analysis ~3 units each)
+# NOTE: Store in .env.example as template, copy to .env.local with actual key
+GOOGLE_CLOUD_VISION_API_KEY=your_vision_api_key_here
+# Or use service account credentials file:
+# GOOGLE_CLOUD_VISION_KEY_FILE=./google-cloud-credentials.json
 ```
 
 **Usage in API Routes:**
@@ -1744,19 +3574,42 @@ CREATE TABLE messages (
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
+-- Scenes (Epic 2 - Script Generation & Voiceover, Epic 4 - Clip Selection)
+CREATE TABLE scenes (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  scene_number INTEGER NOT NULL,
+  text TEXT NOT NULL, -- Narration text for voiceover
+  audio_file_path TEXT, -- Generated voiceover MP3 (Epic 2)
+  duration INTEGER, -- Audio duration in seconds (Epic 2)
+  selected_clip_id TEXT, -- Selected visual suggestion (Epic 4 Story 4.4)
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (selected_clip_id) REFERENCES visual_suggestions(id),
+  UNIQUE(project_id, scene_number)
+);
+
+CREATE INDEX idx_scenes_project ON scenes(project_id);
+
 -- Visual suggestions from AI sourcing (Epic 3)
 CREATE TABLE visual_suggestions (
   id TEXT PRIMARY KEY,
   scene_id TEXT NOT NULL,
-  video_id TEXT NOT NULL,
+  video_id TEXT NOT NULL, -- YouTube video ID
   title TEXT NOT NULL,
   thumbnail_url TEXT,
   channel_title TEXT,
   embed_url TEXT NOT NULL,
-  rank INTEGER NOT NULL,
+  rank INTEGER NOT NULL, -- Ranking from 1-8 (top suggestions)
+  duration INTEGER, -- Video duration in seconds (Epic 3 Story 3.4)
+  default_segment_path TEXT, -- Path to downloaded default segment (Epic 3 Story 3.6)
+  download_status TEXT DEFAULT 'pending', -- pending, downloading, complete, error (Epic 3 Story 3.6)
+  cv_score REAL, -- Computer vision quality score 0-100 (Epic 3 Story 3.7)
   created_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
 );
+
+CREATE INDEX idx_visual_suggestions_scene ON visual_suggestions(scene_id);
 
 -- Clip selections
 CREATE TABLE clip_selections (
@@ -1921,6 +3774,261 @@ export function getProjectMessages(projectId: string): Message[] {
   `).all(projectId) as Message[];
 }
 ```
+
+### Database Migration Strategy
+
+**Purpose:** Manage schema changes across development iterations without data loss
+
+**Migration System:**
+```typescript
+// lib/db/migrations.ts
+import db from './client';
+
+interface Migration {
+  version: number;
+  name: string;
+  up: (db: Database) => void;
+}
+
+const migrations: Migration[] = [
+  {
+    version: 1,
+    name: 'initial_schema',
+    up: (db) => {
+      // Create base tables: projects, messages, system_prompts
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS system_prompts (...);
+        CREATE TABLE IF NOT EXISTS projects (...);
+        CREATE TABLE IF NOT EXISTS messages (...);
+        CREATE INDEX IF NOT EXISTS idx_messages_project ON messages(project_id);
+        CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_projects_last_active ON projects(last_active);
+      `);
+    }
+  },
+  {
+    version: 2,
+    name: 'add_scenes_table',
+    up: (db) => {
+      // Epic 2: Scenes for script and voiceover
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS scenes (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          scene_number INTEGER NOT NULL,
+          text TEXT NOT NULL,
+          audio_file_path TEXT,
+          duration INTEGER,
+          created_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+          UNIQUE(project_id, scene_number)
+        );
+        CREATE INDEX IF NOT EXISTS idx_scenes_project ON scenes(project_id);
+      `);
+    }
+  },
+  {
+    version: 3,
+    name: 'add_visual_suggestions',
+    up: (db) => {
+      // Epic 3: Visual suggestions from YouTube API
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS visual_suggestions (
+          id TEXT PRIMARY KEY,
+          scene_id TEXT NOT NULL,
+          video_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          thumbnail_url TEXT,
+          channel_title TEXT,
+          embed_url TEXT NOT NULL,
+          rank INTEGER NOT NULL,
+          created_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_visual_suggestions_scene ON visual_suggestions(scene_id);
+      `);
+    }
+  },
+  {
+    version: 4,
+    name: 'add_segment_downloads',
+    up: (db) => {
+      // Epic 3 Story 3.4 & 3.6: Duration filtering and default segment downloads
+      db.exec(`
+        ALTER TABLE visual_suggestions ADD COLUMN duration INTEGER;
+        ALTER TABLE visual_suggestions ADD COLUMN default_segment_path TEXT;
+        ALTER TABLE visual_suggestions ADD COLUMN download_status TEXT DEFAULT 'pending';
+      `);
+    }
+  },
+  {
+    version: 5,
+    name: 'add_clip_selections',
+    up: (db) => {
+      // Epic 4: User clip selections
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS clip_selections (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          scene_number INTEGER NOT NULL,
+          youtube_video_id TEXT NOT NULL,
+          clip_url TEXT NOT NULL,
+          downloaded_path TEXT,
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+          UNIQUE(project_id, scene_number)
+        );
+      `);
+    }
+  },
+  {
+    version: 6,
+    name: 'add_audio_and_rendered_videos',
+    up: (db) => {
+      // Epic 2 & 5: Audio files and final rendered videos
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS audio_files (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          scene_number INTEGER NOT NULL,
+          file_path TEXT NOT NULL,
+          voice_id TEXT NOT NULL,
+          duration_seconds REAL,
+          created_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+          UNIQUE(project_id, scene_number)
+        );
+
+        CREATE TABLE IF NOT EXISTS rendered_videos (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          file_path TEXT NOT NULL,
+          thumbnail_path TEXT,
+          duration_seconds REAL,
+          file_size_bytes INTEGER,
+          created_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+      `);
+    }
+  },
+  {
+    version: 7,
+    name: 'add_selected_clip_to_scenes',
+    up: (db) => {
+      // Epic 4 Story 4.4: Clip selection persistence
+      db.exec(`
+        ALTER TABLE scenes ADD COLUMN selected_clip_id TEXT
+          REFERENCES visual_suggestions(id);
+      `);
+    }
+  }
+];
+
+// Schema version tracking table
+function initializeVersionTracking(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_version (
+      version INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      applied_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+}
+
+// Get current schema version
+function getCurrentVersion(db: Database): number {
+  const result = db.prepare(
+    'SELECT COALESCE(MAX(version), 0) as version FROM schema_version'
+  ).get() as { version: number };
+  return result.version;
+}
+
+// Update schema version
+function updateVersion(db: Database, version: number, name: string): void {
+  db.prepare(
+    'INSERT INTO schema_version (version, name) VALUES (?, ?)'
+  ).run(version, name);
+}
+
+// Run all pending migrations
+export function runMigrations(): void {
+  initializeVersionTracking(db);
+  const currentVersion = getCurrentVersion(db);
+
+  console.log(`Current database version: ${currentVersion}`);
+
+  const pendingMigrations = migrations.filter(m => m.version > currentVersion);
+
+  if (pendingMigrations.length === 0) {
+    console.log('Database is up to date');
+    return;
+  }
+
+  console.log(`Running ${pendingMigrations.length} migration(s)...`);
+
+  // Run migrations in a transaction
+  db.transaction(() => {
+    for (const migration of pendingMigrations) {
+      console.log(`  Applying migration ${migration.version}: ${migration.name}`);
+      migration.up(db);
+      updateVersion(db, migration.version, migration.name);
+    }
+  })();
+
+  console.log('All migrations completed successfully');
+}
+```
+
+**Usage in Application Startup:**
+```typescript
+// app/layout.tsx or server initialization
+import { runMigrations } from '@/lib/db/migrations';
+
+// Run migrations on startup (server-side only)
+if (typeof window === 'undefined') {
+  runMigrations();
+}
+```
+
+**Migration Best Practices:**
+- ✅ **Never modify existing migrations** - Always create new ones
+- ✅ **Use IF NOT EXISTS** for CREATE TABLE statements (idempotent)
+- ✅ **Test migrations** with both empty and populated databases
+- ✅ **Include rollback plan** for production (manual SQL if needed)
+- ✅ **Version migrations sequentially** - No gaps in version numbers
+
+**Adding New Migration:**
+```typescript
+// When adding Epic 4 custom segment selection:
+{
+  version: 7,
+  name: 'add_custom_segment_tracking',
+  up: (db) => {
+    db.exec(`
+      ALTER TABLE clip_selections ADD COLUMN segment_start_timestamp INTEGER;
+      ALTER TABLE clip_selections ADD COLUMN is_custom_segment BOOLEAN DEFAULT false;
+    `);
+  }
+}
+```
+
+**Migration Status Check:**
+```typescript
+// lib/db/queries.ts
+export function getDatabaseVersion(): { version: number; name: string } {
+  return db.prepare(`
+    SELECT version, name FROM schema_version
+    ORDER BY version DESC LIMIT 1
+  `).get() as { version: number; name: string };
+}
+```
+
+**Benefits:**
+- ✅ Automated schema updates during development
+- ✅ No manual SQL execution required
+- ✅ Safe for team collaboration (consistent schema state)
+- ✅ Version history tracking
+- ✅ Idempotent (safe to run multiple times)
 
 ---
 
@@ -2409,6 +4517,106 @@ function CurationUI() {
   };
 }
 ```
+
+### UI Consistency Patterns
+
+#### Duration Badge Color-Coding (Epic 3 Story 3.6, Epic 4)
+
+**Purpose:** Provide consistent visual feedback on video duration suitability across all UI components
+
+**Color Logic:**
+```typescript
+// lib/utils/duration-badge.ts
+function getBadgeColor(
+  videoDuration: number,
+  sceneDuration: number
+): { background: string; text: string; tooltip: string } {
+  const ratio = videoDuration / sceneDuration;
+
+  if (ratio >= 1 && ratio <= 2) {
+    return {
+      background: '#10b981', // Green (Emerald 500)
+      text: '#ffffff',
+      tooltip: 'Ideal length for this scene'
+    };
+  } else if (ratio > 2 && ratio <= 3) {
+    return {
+      background: '#f59e0b', // Yellow (Amber 500)
+      text: '#000000',
+      tooltip: 'Acceptable length - some trimming needed'
+    };
+  } else if (ratio > 3) {
+    return {
+      background: '#ef4444', // Red (Red 500)
+      text: '#ffffff',
+      tooltip: 'Long video - consider shorter alternatives'
+    };
+  } else { // ratio < 1
+    return {
+      background: '#6b7280', // Gray (Gray 500)
+      text: '#ffffff',
+      tooltip: 'Video shorter than needed'
+    };
+  }
+}
+```
+
+**Usage Examples:**
+```typescript
+// Example 1: 10s scene, 15s video
+const badge1 = getBadgeColor(15, 10);
+// → { background: '#10b981', tooltip: 'Ideal length...' } (Green)
+
+// Example 2: 10s scene, 25s video
+const badge2 = getBadgeColor(25, 10);
+// → { background: '#f59e0b', tooltip: 'Acceptable length...' } (Yellow)
+
+// Example 3: 10s scene, 90s video
+const badge3 = getBadgeColor(90, 10);
+// → { background: '#ef4444', tooltip: 'Long video...' } (Red)
+
+// Example 4: 10s scene, 8s video
+const badge4 = getBadgeColor(8, 10);
+// → { background: '#6b7280', tooltip: 'Video shorter...' } (Gray)
+```
+
+**Ratio Thresholds:**
+- **1x-2x:** Green - Perfect range, minimal trimming needed
+- **2x-3x:** Yellow - Acceptable, will need noticeable trimming
+- **>3x:** Red - Very long, significant trimming or reconsider choice
+- **<1x:** Gray - Video too short, can't fill scene duration
+
+**Component Integration:**
+```typescript
+// components/features/curation/DurationBadge.tsx
+export function DurationBadge({ videoDuration, sceneDuration }: Props) {
+  const { background, text, tooltip } = getBadgeColor(videoDuration, sceneDuration);
+
+  return (
+    <div
+      className="absolute top-2 right-2 px-2 py-1 rounded text-xs font-semibold"
+      style={{ backgroundColor: background, color: text }}
+      title={tooltip}
+      aria-label={`${formatDuration(videoDuration)} - ${tooltip}`}
+    >
+      {formatDuration(videoDuration)}
+    </div>
+  );
+}
+```
+
+**Consistency Requirements:**
+- ✅ Use exact hex colors across all components
+- ✅ Same ratio thresholds everywhere (1x-2x, 2x-3x, >3x, <1x)
+- ✅ Consistent tooltip messages
+- ✅ Same formatting for duration display (e.g., "1:23" not "1m 23s")
+
+**Where Applied:**
+- Epic 3 Story 3.6: After default segment downloads (preview thumbnails)
+- Epic 4: Visual curation UI (all video suggestion thumbnails)
+- Visual suggestion database queries (for sorting/filtering by suitability)
+
+---
 
 ### Project Switching Workflow (Story 1.6)
 

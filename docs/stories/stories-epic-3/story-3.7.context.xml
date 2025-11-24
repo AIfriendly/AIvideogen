@@ -1,0 +1,238 @@
+<story-context id="story-3.7" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>3.7</storyId>
+    <title>Computer Vision Content Filtering</title>
+    <status>Ready for Dev</status>
+    <generatedAt>2025-11-22</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-3.7.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>creator generating video content</asA>
+    <iWant>the system to filter out low-quality videos using computer vision analysis (face detection, OCR, label verification) and strip audio from downloaded segments</iWant>
+    <soThat>I receive only pure B-roll footage without talking heads, captions, or irrelevant content, and can preview videos silently</soThat>
+    <tasks>
+      <task id="1">Implement Keyword Filtering (Tier 1) [AC33, AC34]</task>
+      <task id="2">Implement Audio Stripping [AC35, AC36]</task>
+      <task id="3">Set Up Google Cloud Vision API Client [AC47, AC48, AC49]</task>
+      <task id="4">Implement Thumbnail Pre-Filtering [AC37, AC38]</task>
+      <task id="5">Implement Frame Extraction [AC51, AC52]</task>
+      <task id="6">Implement Face, Text, and Label Detection [AC39-44]</task>
+      <task id="7">Implement CV Score Calculation and Database Integration [AC45, AC46]</task>
+      <task id="8">Create CV Filter API Endpoint [AC50]</task>
+      <task id="9">Implement Silent Video Indicator (Frontend) [AC54-57]</task>
+      <task id="10">Testing and Validation [AC40, AC42, AC53]</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="33">Keyword Filter removes "reaction", "commentary", "vlog" videos</ac>
+    <ac id="34">Keyword Filter prioritizes "stock footage", "cinematic", "4K" videos</ac>
+    <ac id="35">Audio Stripping: Downloaded .mp4 files have no audio track (FFmpeg -an flag)</ac>
+    <ac id="36">Audio stripping adds less than 1 second to download time</ac>
+    <ac id="37">Thumbnail pre-filtering analyzes thumbnails via Vision API before download</ac>
+    <ac id="38">Thumbnail pre-filtering reduces downloads by 30-50%</ac>
+    <ac id="39">Face detection filters videos with face area greater than 15% of frame</ac>
+    <ac id="40">Face detection identifies 80%+ of talking head videos correctly</ac>
+    <ac id="41">Text detection identifies burned-in captions and overlays</ac>
+    <ac id="42">OCR detection identifies 80%+ of captioned videos correctly</ac>
+    <ac id="43">Label verification matches at least 1 of top 3 expected labels</ac>
+    <ac id="44">Videos with 0 matching labels penalized by 0.3+ cv_score</ac>
+    <ac id="45">CV Score formula: base 1.0, -0.5 talking head, -0.2 small face, -0.3 captions, +0.3*matchScore</ac>
+    <ac id="46">cv_score stored in visual_suggestions.cv_score column (REAL, 0-1)</ac>
+    <ac id="47">API quota tracked against 1,000 units/month limit</ac>
+    <ac id="48">Fallback to keyword-only filtering when quota exceeded</ac>
+    <ac id="49">Visual sourcing continues without failure when API unavailable</ac>
+    <ac id="50">CV filtering completes in less than 5 seconds per video</ac>
+    <ac id="51">Frame extraction: 3 frames at 10%, 50%, 90% of video duration</ac>
+    <ac id="52">Actionable error message when FFmpeg not found</ac>
+    <ac id="53">Manual validation shows 80%+ pure B-roll results</ac>
+    <ac id="54">VideoPreviewPlayer displays static mute icon (🔇)</ac>
+    <ac id="55">Mute icon tooltip: "Audio removed for preview"</ac>
+    <ac id="56">No volume slider, mute button, or unmute option</ac>
+    <ac id="57">No keyboard shortcuts for M, Up Arrow, Down Arrow</ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>Feature 1.5 - AI-Powered Visual Sourcing</section>
+        <snippet>Pure B-Roll Content Filtering, Google Cloud Vision API Integration, Enhanced Query Generation for high-quality video suggestions.</snippet>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-3.md</path>
+        <title>Epic 3 Technical Specification</title>
+        <section>Story 3.7 - Computer Vision Content Filtering</section>
+        <snippet>Two-tier filtering architecture, VisionAPIClient, ContentAnalyzer, FrameExtractor classes, CV score calculation formula.</snippet>
+      </doc>
+      <doc>
+        <path>docs/ux-design-specification.md</path>
+        <title>UX Design Specification</title>
+        <section>Section 8.13 - VideoPreviewPlayer</section>
+        <snippet>Silent video indicator (🔇), tooltip "Audio removed for preview", position bottom-left, Slate 400 color.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epics Definition</title>
+        <section>Story 3.7 Tasks and Acceptance Criteria</section>
+        <snippet>Complete task breakdown for Tier 1 (local filtering), Tier 2 (Vision API), and frontend silent video indicator.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>ai-video-generator/src/lib/youtube/filter-results.ts</path>
+        <kind>service</kind>
+        <symbol>filterByContentType, CONTENT_TYPE_KEYWORDS, filterAndRankResults</symbol>
+        <lines>1-647</lines>
+        <reason>Add filterByKeywords() function with FILTER_PATTERNS and PRIORITY_PATTERNS for Tier 1 keyword filtering</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/lib/youtube/analyze-scene.ts</path>
+        <kind>service</kind>
+        <symbol>analyzeSceneForVisuals, generateEnhancedQuery, NEGATIVE_TERMS</symbol>
+        <lines>all</lines>
+        <reason>Contains entity extraction and enhanced query generation from Story 3.2b; needed for expected labels</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/components/features/curation/VideoPreviewPlayer.tsx</path>
+        <kind>component</kind>
+        <symbol>VideoPreviewPlayer, LocalVideoPlayer</symbol>
+        <lines>1-340</lines>
+        <reason>Modify Plyr controls to remove mute/volume, add static mute indicator for silent video</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/lib/db/queries.ts</path>
+        <kind>service</kind>
+        <symbol>database queries</symbol>
+        <lines>all</lines>
+        <reason>Add updateCVScore() function to update visual_suggestions.cv_score</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/lib/db/types.ts</path>
+        <kind>types</kind>
+        <symbol>type definitions</symbol>
+        <lines>all</lines>
+        <reason>Add VisionAnalysisResult interface</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/lib/youtube/types.ts</path>
+        <kind>types</kind>
+        <symbol>ContentType, VideoResult</symbol>
+        <lines>all</lines>
+        <reason>Has ContentType enum including GAMING, HISTORICAL, CONCEPTUAL for content-type aware filtering</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <node>
+        <package>@google-cloud/vision</package>
+        <version>^4.0.0</version>
+        <status>TO BE ADDED</status>
+      </node>
+      <node>
+        <package>googleapis</package>
+        <version>^166.0.0</version>
+        <status>installed</status>
+      </node>
+      <node>
+        <package>better-sqlite3</package>
+        <version>^12.4.1</version>
+        <status>installed</status>
+      </node>
+      <node>
+        <package>plyr</package>
+        <version>^3.8.3</version>
+        <status>installed</status>
+      </node>
+      <external>
+        <tool>FFmpeg</tool>
+        <usage>Frame extraction (-ss -vframes), audio stripping (-an), video duration (ffprobe)</usage>
+        <status>REQUIRED - must be in PATH</status>
+      </external>
+      <external>
+        <tool>yt-dlp</tool>
+        <usage>Video segment downloads with --postprocessor-args "ffmpeg:-an"</usage>
+        <status>REQUIRED - must be in PATH</status>
+      </external>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Use service account JSON for Vision API authentication (GOOGLE_APPLICATION_CREDENTIALS or explicit keyFilename)</constraint>
+    <constraint>Vision API quota: 1,000 units/month free tier (3 units per image for 3 features)</constraint>
+    <constraint>Performance: CV filtering must complete in less than 5 seconds per video</constraint>
+    <constraint>Fallback: Always gracefully degrade to keyword-only filtering when Vision API unavailable</constraint>
+    <constraint>Database: Add cv_score column migration to visual_suggestions table</constraint>
+    <constraint>Cross-platform: Use os.tmpdir() for temp file paths (not hardcoded /tmp/)</constraint>
+    <constraint>Plyr controls: Remove 'mute' and 'volume' from controls array (line 132 of VideoPreviewPlayer)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>VisionAPIClient</name>
+      <kind>class</kind>
+      <signature>constructor(), analyzeThumbnail(url), analyzeFrames(buffers), isQuotaExceeded(), getQuotaUsage()</signature>
+      <path>ai-video-generator/src/lib/vision/client.ts (TO BE CREATED)</path>
+    </interface>
+    <interface>
+      <name>ContentAnalyzer</name>
+      <kind>class</kind>
+      <signature>analyzeVideoContent(videoPath, expectedLabels), calculateCVScore(result)</signature>
+      <path>ai-video-generator/src/lib/vision/analyze-content.ts (TO BE CREATED)</path>
+    </interface>
+    <interface>
+      <name>FrameExtractor</name>
+      <kind>class</kind>
+      <signature>extractFrames(videoPath, count), getVideoDuration(videoPath), getFrameDimensions(videoPath)</signature>
+      <path>ai-video-generator/src/lib/vision/frame-extractor.ts (TO BE CREATED)</path>
+    </interface>
+    <interface>
+      <name>POST /api/projects/[id]/cv-filter</name>
+      <kind>REST endpoint</kind>
+      <signature>POST - triggers CV filtering for all suggestions with downloaded segments</signature>
+      <path>ai-video-generator/src/app/api/projects/[id]/cv-filter/route.ts (TO BE CREATED)</path>
+    </interface>
+    <interface>
+      <name>filterByKeywords</name>
+      <kind>function</kind>
+      <signature>filterByKeywords(results: VideoResult[]): VideoResult[]</signature>
+      <path>ai-video-generator/src/lib/youtube/filter-results.ts (TO BE ADDED)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Vitest for unit and integration tests. Mock external dependencies (Vision API, FFmpeg).
+      Use @testing-library/react for component tests. Test files in tests/ directory with
+      patterns: tests/unit/, tests/integration/, tests/components/. Each acceptance criterion
+      should have at least one test. Use test IDs (e.g., 3.7-UNIT-001) for traceability.
+    </standards>
+    <locations>
+      <location>tests/unit/youtube/keyword-filter.test.ts</location>
+      <location>tests/unit/vision/client.test.ts</location>
+      <location>tests/unit/vision/frame-extractor.test.ts</location>
+      <location>tests/unit/vision/analyze-content.test.ts</location>
+      <location>tests/integration/vision/cv-filter.integration.test.ts</location>
+      <location>tests/components/VideoPreviewPlayer.test.tsx</location>
+      <location>tests/api/cv-filter.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="33-34">Test filterByKeywords with titles containing "reaction", "commentary", "cinematic", "4K"</idea>
+      <idea ac="35-36">Test audio stripping produces file with no audio stream (verify with ffprobe)</idea>
+      <idea ac="37-38">Test thumbnail pre-filter reduces download count by mocking Vision API responses</idea>
+      <idea ac="39-40">Benchmark test with 20 talking head vs 20 B-roll samples for 80% accuracy</idea>
+      <idea ac="41-42">Benchmark test with 20 captioned vs 20 clean samples for 80% accuracy</idea>
+      <idea ac="43-44">Test label verification with matching and non-matching label sets</idea>
+      <idea ac="45-46">Test CV score calculation formula with various input combinations</idea>
+      <idea ac="47-49">Test quota tracking and fallback behavior when quota exceeded</idea>
+      <idea ac="50">Performance test: CV filtering completes in less than 5s per video</idea>
+      <idea ac="51-52">Test frame extraction at correct timestamps; test FFmpeg not found error</idea>
+      <idea ac="54-57">Test VideoPreviewPlayer renders mute icon, has tooltip, no volume controls</idea>
+    </ideas>
+  </tests>
+</story-context>
