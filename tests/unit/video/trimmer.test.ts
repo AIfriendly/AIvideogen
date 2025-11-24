@@ -2,9 +2,9 @@
 // Story 5.2: Scene Video Trimming & Preparation
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Trimmer } from '../../../lib/video/trimmer';
-import { FFmpegClient } from '../../../lib/video/ffmpeg';
-import { AssemblyScene } from '../../../src/types/assembly';
+import { Trimmer } from '@/lib/video/trimmer';
+import { FFmpegClient } from '@/lib/video/ffmpeg';
+import { AssemblyScene } from '@/types/assembly';
 import * as fs from 'fs';
 
 // Mock fs module with importOriginal
@@ -16,11 +16,8 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
-// Get reference to the mocked function
-const mockExistsSync = vi.mocked(fs.existsSync);
-
 // Mock FFmpegClient
-vi.mock('../../../lib/video/ffmpeg', () => ({
+vi.mock('@/lib/video/ffmpeg', () => ({
   FFmpegClient: vi.fn().mockImplementation(() => ({
     getVideoDuration: vi.fn(),
     getAudioDuration: vi.fn(),
@@ -29,7 +26,10 @@ vi.mock('../../../lib/video/ffmpeg', () => ({
   })),
 }));
 
-describe('Trimmer', () => {
+// Get reference to the mocked function
+const mockExistsSync = vi.mocked(fs.existsSync);
+
+describe('Trimmer [5.2-UNIT]', () => {
   let trimmer: Trimmer;
   let mockFfmpeg: {
     getVideoDuration: ReturnType<typeof vi.fn>;
@@ -71,8 +71,8 @@ describe('Trimmer', () => {
   });
 
   describe('trimScene', () => {
-    describe('normal trim operations', () => {
-      it('should trim video longer than audio duration', async () => {
+    describe('normal trim operations [P1]', () => {
+      it('[5.2-UNIT-001] should trim video longer than audio duration (AC1)', async () => {
         const scene = createScene({ duration: 10 });
         mockFfmpeg.getVideoDuration.mockResolvedValue(30);
 
@@ -86,7 +86,7 @@ describe('Trimmer', () => {
         expect(result).toBe('/output/scene-1-trimmed.mp4');
       });
 
-      it('should handle exact duration match within tolerance', async () => {
+      it('[5.2-UNIT-002] should handle exact duration match within tolerance (AC1)', async () => {
         const scene = createScene({ duration: 10 });
         mockFfmpeg.getVideoDuration.mockResolvedValue(10.3); // Within 0.5s tolerance
 
@@ -100,7 +100,7 @@ describe('Trimmer', () => {
         expect(mockFfmpeg.loopVideo).not.toHaveBeenCalled();
       });
 
-      it('should use correct output path format', async () => {
+      it('[5.2-UNIT-003] should use correct output path format (AC2)', async () => {
         const scene = createScene({ sceneNumber: 3, clipDuration: 15 });
         mockFfmpeg.getVideoDuration.mockResolvedValue(20);
 
@@ -110,8 +110,8 @@ describe('Trimmer', () => {
       });
     });
 
-    describe('edge cases - short videos', () => {
-      it('should loop video when shorter than audio duration', async () => {
+    describe('edge cases - short videos [P1]', () => {
+      it('[5.2-UNIT-004] should loop video when shorter than audio duration (AC5)', async () => {
         const scene = createScene({ clipDuration: 15 });
         mockFfmpeg.getVideoDuration.mockResolvedValue(5);
 
@@ -126,7 +126,7 @@ describe('Trimmer', () => {
         expect(mockFfmpeg.trimVideo).not.toHaveBeenCalled();
       });
 
-      it('should handle very short video with multiple loops needed', async () => {
+      it('[5.2-UNIT-005] should handle very short video with multiple loops needed (AC5)', async () => {
         const scene = createScene({ clipDuration: 30 });
         mockFfmpeg.getVideoDuration.mockResolvedValue(2);
 
@@ -141,8 +141,8 @@ describe('Trimmer', () => {
       });
     });
 
-    describe('error handling', () => {
-      it('should throw error for missing input file', async () => {
+    describe('error handling [P0]', () => {
+      it('[5.2-UNIT-006] should throw error for missing input file (AC6)', async () => {
         const scene = createScene({ defaultSegmentPath: '/missing/video.mp4' });
         mockExistsSync.mockReturnValue(false);
 
@@ -153,7 +153,7 @@ describe('Trimmer', () => {
         expect(mockFfmpeg.trimVideo).not.toHaveBeenCalled();
       });
 
-      it('should throw error when output not created', async () => {
+      it('[5.2-UNIT-007] should throw error when output not created (AC6)', async () => {
         const scene = createScene({ clipDuration: 10 });
         mockFfmpeg.getVideoDuration.mockResolvedValue(20);
 
@@ -167,7 +167,7 @@ describe('Trimmer', () => {
         );
       });
 
-      it('should include scene number in error messages', async () => {
+      it('[5.2-UNIT-008] should include scene number in error messages (AC6)', async () => {
         const scene = createScene({ sceneNumber: 5, defaultSegmentPath: '/bad/path.mp4' });
         mockExistsSync.mockReturnValue(false);
 
@@ -177,8 +177,8 @@ describe('Trimmer', () => {
       });
     });
 
-    describe('duration validation', () => {
-      it('should validate output duration matches expected', async () => {
+    describe('duration validation [P2]', () => {
+      it('[5.2-UNIT-009] should validate output duration matches expected', async () => {
         const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
         const scene = createScene({ duration: 10 });
@@ -195,7 +195,7 @@ describe('Trimmer', () => {
         consoleSpy.mockRestore();
       });
 
-      it('should not warn when output duration is within tolerance', async () => {
+      it('[5.2-UNIT-010] should not warn when output duration is within tolerance', async () => {
         const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
         const scene = createScene({ duration: 10 });
@@ -212,8 +212,8 @@ describe('Trimmer', () => {
     });
   });
 
-  describe('trimScenes (batch)', () => {
-    it('should trim multiple scenes in sequence', async () => {
+  describe('trimScenes (batch) [P1]', () => {
+    it('[5.2-UNIT-011] should trim multiple scenes in sequence (AC3)', async () => {
       const scenes = [
         createScene({ sceneNumber: 1, clipDuration: 10 }),
         createScene({ sceneNumber: 2, clipDuration: 15 }),
@@ -230,7 +230,7 @@ describe('Trimmer', () => {
       expect(results[2]).toBe('/output/scene-3-trimmed.mp4');
     });
 
-    it('should call progress callback for each scene', async () => {
+    it('[5.2-UNIT-012] should call progress callback for each scene (AC4)', async () => {
       const scenes = [
         createScene({ sceneNumber: 1 }),
         createScene({ sceneNumber: 2 }),
@@ -247,8 +247,8 @@ describe('Trimmer', () => {
     });
   });
 
-  describe('trimSceneWithDetails', () => {
-    it('should return detailed trim result', async () => {
+  describe('trimSceneWithDetails [P2]', () => {
+    it('[5.2-UNIT-013] should return detailed trim result', async () => {
       const scene = createScene({ clipDuration: 10 });
       mockFfmpeg.getVideoDuration
         .mockResolvedValueOnce(25)  // Original duration
@@ -264,7 +264,7 @@ describe('Trimmer', () => {
       });
     });
 
-    it('should indicate when video was looped', async () => {
+    it('[5.2-UNIT-014] should indicate when video was looped (AC5)', async () => {
       const scene = createScene({ clipDuration: 20 });
       mockFfmpeg.getVideoDuration
         .mockResolvedValueOnce(5)   // Original duration (short)

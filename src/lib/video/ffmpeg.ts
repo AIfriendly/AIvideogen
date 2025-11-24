@@ -286,9 +286,90 @@ export class FFmpegClient {
   }
 
   /**
+   * Concatenate multiple video files using concat demuxer
+   */
+  async concat(
+    listFilePath: string,
+    outputPath: string
+  ): Promise<void> {
+    const args = [
+      '-f', 'concat',
+      '-safe', '0',
+      '-i', listFilePath,
+      '-c', 'copy',
+      '-y',
+      outputPath,
+    ];
+    await this.execute(args);
+  }
+
+  /**
+   * Overlay audio onto video (replaces existing audio)
+   */
+  async overlayAudio(
+    videoPath: string,
+    audioPath: string,
+    outputPath: string
+  ): Promise<void> {
+    const args = [
+      '-i', videoPath,
+      '-i', audioPath,
+      '-c:v', 'copy',
+      '-c:a', VIDEO_ASSEMBLY_CONFIG.AUDIO_CODEC,
+      '-map', '0:v:0',
+      '-map', '1:a:0',
+      '-y',
+      outputPath,
+    ];
+    await this.execute(args);
+  }
+
+  /**
+   * Mux multiple audio files onto video with timing
+   * Each audio starts at its scene's start time
+   */
+  async muxAudioVideo(
+    videoPath: string,
+    audioInputs: { path: string; startTime: number }[],
+    outputPath: string
+  ): Promise<void> {
+    const inputArgs: string[] = ['-i', videoPath];
+    const filterParts: string[] = [];
+    const audioLabels: string[] = [];
+
+    audioInputs.forEach((audio, index) => {
+      inputArgs.push('-i', audio.path);
+      const label = `[a${index}]`;
+      // Delay audio to start at correct time (milliseconds)
+      const delayMs = Math.round(audio.startTime * 1000);
+      filterParts.push(`[${index + 1}:a]adelay=${delayMs}|${delayMs}${label}`);
+      audioLabels.push(label);
+    });
+
+    // Mix all audio streams with normalize=0 to prevent volume reduction
+    const mixFilter = `${audioLabels.join('')}amix=inputs=${audioInputs.length}:duration=longest:normalize=0[aout]`;
+    filterParts.push(mixFilter);
+
+    const filterComplex = filterParts.join(';');
+
+    const args = [
+      ...inputArgs,
+      '-filter_complex', filterComplex,
+      '-map', '0:v',
+      '-map', '[aout]',
+      '-c:v', 'copy',
+      '-c:a', VIDEO_ASSEMBLY_CONFIG.AUDIO_CODEC,
+      '-y',
+      outputPath,
+    ];
+
+    await this.execute(args);
+  }
+
+  /**
    * Execute FFmpeg command
    */
-  private execute(args: string[]): Promise<void> {
+  protected execute(args: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
       const process = spawn(this.ffmpegPath, args);
       let stderr = '';

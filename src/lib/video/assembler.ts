@@ -7,11 +7,13 @@
 
 import { randomUUID } from 'crypto';
 import { mkdir, rm } from 'fs/promises';
+import { existsSync, mkdirSync, statSync } from 'fs';
 import path from 'path';
 import db from '@/lib/db/client';
 import { FFmpegClient } from './ffmpeg';
+import { Concatenator } from './concatenator';
 import { VIDEO_ASSEMBLY_CONFIG, ASSEMBLY_JOB_STATUS } from './constants';
-import type { AssemblyJob, AssemblyJobStatus, AssemblyStage } from '@/types/assembly';
+import type { AssemblyJob, AssemblyJobStatus, AssemblyStage, AssemblyScene } from '@/types/assembly';
 
 /**
  * VideoAssembler class for managing assembly jobs
@@ -214,17 +216,105 @@ export class VideoAssembler {
   updateProjectVideo(
     projectId: string,
     videoPath: string,
-    thumbnailPath: string,
+    thumbnailPath: string | null,
     totalDuration: number,
     fileSize: number
   ): void {
     const stmt = db.prepare(`
       UPDATE projects
-      SET video_path = ?, thumbnail_path = ?, total_duration = ?, video_file_size = ?
+      SET video_path = ?, thumbnail_path = ?, video_total_duration = ?, video_file_size = ?
       WHERE id = ?
     `);
 
     stmt.run(videoPath, thumbnailPath, totalDuration, fileSize, projectId);
+  }
+
+  /**
+   * Assemble all trimmed scenes into final video with audio
+   * Story 5.3: Main assembly orchestration
+   */
+  async assembleScenes(
+    jobId: string,
+    projectId: string,
+    trimmedPaths: string[],
+    scenes: AssemblyScene[]
+  ): Promise<string> {
+    const outputDir = `${VIDEO_ASSEMBLY_CONFIG.OUTPUT_DIR}/${projectId}`;
+
+    // Ensure output directory exists
+    if (!existsSync(outputDir)) {
+      mkdirSync(outputDir, { recursive: true });
+    }
+
+    // Step 1: Concatenate all trimmed videos
+    this.updateJobProgress(jobId, 35, 'concatenating');
+    const concatenator = new Concatenator(this.ffmpeg);
+    const concatPath = `${VIDEO_ASSEMBLY_CONFIG.TEMP_DIR}/${jobId}/concatenated.mp4`;
+
+    await concatenator.concatenateVideos(trimmedPaths, concatPath);
+    console.log(`[VideoAssembler] Concatenated ${trimmedPaths.length} scenes`);
+
+    // Step 2: Overlay all audio tracks
+    this.updateJobProgress(jobId, 60, 'audio_overlay');
+    const finalPath = await this.overlayAllAudio(
+      jobId,
+      projectId,
+      concatPath,
+      scenes,
+      outputDir
+    );
+
+    // Step 3: Finalize and update records
+    this.updateJobProgress(jobId, 95, 'finalizing');
+    const finalDuration = await this.ffmpeg.getVideoDuration(finalPath);
+    const fileSize = statSync(finalPath).size;
+
+    // Update project with video info (thumbnail handled by Story 5.4)
+    this.updateProjectVideo(projectId, finalPath, null, finalDuration, fileSize);
+
+    return finalPath;
+  }
+
+  /**
+   * Overlay voiceover audio for all scenes onto concatenated video
+   */
+  private async overlayAllAudio(
+    jobId: string,
+    projectId: string,
+    videoPath: string,
+    scenes: AssemblyScene[],
+    outputDir: string
+  ): Promise<string> {
+    const finalPath = `${outputDir}/final.mp4`;
+
+    // Build audio inputs with timing
+    const audioInputs: { path: string; startTime: number }[] = [];
+    let currentTime = 0;
+
+    for (const scene of scenes) {
+      if (!existsSync(scene.audioFilePath)) {
+        throw new Error(
+          `Audio file not found for scene ${scene.sceneNumber}: ${scene.audioFilePath}`
+        );
+      }
+
+      audioInputs.push({
+        path: scene.audioFilePath,
+        startTime: currentTime,
+      });
+
+      currentTime += scene.clipDuration;
+    }
+
+    console.log(`[VideoAssembler] Overlaying ${audioInputs.length} audio tracks`);
+    await this.ffmpeg.muxAudioVideo(videoPath, audioInputs, finalPath);
+
+    // Validate output
+    if (!existsSync(finalPath)) {
+      throw new Error(`Audio overlay failed: output not created at ${finalPath}`);
+    }
+
+    return finalPath;
   }
 }
 
