@@ -19,6 +19,7 @@ export type AssemblyJobStatus = 'pending' | 'processing' | 'complete' | 'error';
  */
 export type AssemblyStage =
   | 'initializing'
+  | 'downloading'
   | 'trimming'
   | 'concatenating'
   | 'audio_overlay'

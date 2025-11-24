@@ -14,6 +14,9 @@ import { initializeDatabase } from '@/lib/db/init';
 import { videoAssembler } from '@/lib/video/assembler';
 import { Trimmer } from '@/lib/video/trimmer';
 import type { AssemblyScene } from '@/types/assembly';
+import { downloadWithRetry } from '@/lib/youtube/download-segment';
+import path from 'path';
+import { mkdir } from 'fs/promises';
 
 // Initialize database on first import (idempotent)
 initializeDatabase();
@@ -152,17 +155,47 @@ export async function POST(
     (async () => {
       try {
         // Update job to processing
-        videoAssembler.updateJobProgress(jobId, 5, 'trimming');
+        videoAssembler.updateJobProgress(jobId, 5, 'downloading');
 
-        // Step 1: Trim scenes to match audio duration (Story 5.2)
-        const trimmer = new Trimmer();
+        // Step 1: Download YouTube videos for each scene
         const tempDir = videoAssembler.getTempDir(jobId);
+        const downloadsDir = path.join(tempDir, 'downloads');
+        await mkdir(downloadsDir, { recursive: true });
+
+        console.log(`[Assembly] Downloading ${scenes.length} videos for job ${jobId}`);
+
+        for (let i = 0; i < scenes.length; i++) {
+          const scene = scenes[i];
+          const downloadProgress = 5 + ((i / scenes.length) * 15); // 5-20% for downloads
+          videoAssembler.updateJobProgress(jobId, downloadProgress, 'downloading', scene.sceneNumber);
+
+          // Download the YouTube video segment
+          const downloadPath = path.join(downloadsDir, `scene-${scene.sceneNumber}-source.mp4`);
+          const downloadResult = await downloadWithRetry({
+            videoId: scene.videoId,
+            segmentDuration: scene.clipDuration + 5, // Add 5s buffer for trimming
+            outputPath: downloadPath,
+            maxHeight: 720 // Default to 720p for performance
+          });
+
+          if (!downloadResult.success) {
+            throw new Error(`Failed to download video for scene ${scene.sceneNumber}: ${downloadResult.error}`);
+          }
+
+          // Add the downloaded file path to the scene object
+          scene.video_path = downloadResult.filePath || downloadPath;
+          console.log(`[Assembly] Downloaded scene ${scene.sceneNumber}: ${scene.video_path}`);
+        }
+
+        // Step 2: Trim scenes to match audio duration (Story 5.2)
+        videoAssembler.updateJobProgress(jobId, 20, 'trimming');
+        const trimmer = new Trimmer();
         const trimmedPaths = await trimmer.trimScenes(
           scenes,
           tempDir,
           (sceneNumber, total) => {
-            // Calculate progress: trimming is 5-35% of total progress
-            const trimProgress = 5 + ((sceneNumber / total) * 30);
+            // Calculate progress: trimming is 20-35% of total progress
+            const trimProgress = 20 + ((sceneNumber / total) * 15);
             videoAssembler.updateJobProgress(jobId, trimProgress, 'trimming', sceneNumber);
           }
         );
