@@ -157,6 +157,23 @@ async function runMigrations(): Promise<void> {
     console.log(`Migration ${migration007Name} already applied, skipping`);
   }
 
+  // Migration 008: Assembly Jobs Schema (Epic 5, Story 5.1)
+  const migration008Name = '008_assembly_jobs';
+  if (!isMigrationApplied(migration008Name)) {
+    console.log(`Applying migration: ${migration008Name}`);
+    try {
+      const { migrate008AssemblyJobs } = await import('./migrations/008_assembly_jobs');
+      migrate008AssemblyJobs();
+      markMigrationApplied(migration008Name);
+      console.log(`Migration ${migration008Name} applied successfully`);
+    } catch (error) {
+      console.error(`Failed to apply migration ${migration008Name}:`, error);
+      throw error;
+    }
+  } else {
+    console.log(`Migration ${migration008Name} already applied, skipping`);
+  }
+
   console.log('All migrations completed');
 }
 

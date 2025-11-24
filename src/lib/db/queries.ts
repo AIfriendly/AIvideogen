@@ -1177,3 +1177,215 @@ export function getScenesWithVisualSuggestions(projectId: string): string[] {
     );
   }
 }
+
+// ============================================================================
+// Assembly Job Query Functions (Epic 5, Story 5.1)
+// ============================================================================
+
+import type { AssemblyJob, AssemblyJobStatus, AssemblyStage } from '@/types/assembly';
+
+/**
+ * Create a new assembly job
+ * @param projectId Project ID
+ * @param totalScenes Number of scenes to process
+ * @returns Created assembly job
+ */
+export function createAssemblyJob(projectId: string, totalScenes: number): AssemblyJob {
+  try {
+    const id = randomUUID();
+    const stmt = db.prepare(`
+      INSERT INTO assembly_jobs (
+        id, project_id, status, progress, current_stage, current_scene,
+        total_scenes, error_message, started_at, completed_at, created_at
+      ) VALUES (?, ?, 'pending', 0, NULL, NULL, ?, NULL, NULL, NULL, datetime('now'))
+    `);
+
+    stmt.run(id, projectId, totalScenes);
+
+    // Retrieve and return the created job
+    const getStmt = db.prepare('SELECT * FROM assembly_jobs WHERE id = ?');
+    return getStmt.get(id) as AssemblyJob;
+  } catch (error) {
+    console.error('Error creating assembly job:', error);
+    throw new Error(
+      `Failed to create assembly job: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Retrieve an assembly job by ID
+ * @param id Job ID
+ * @returns Assembly job or null if not found
+ */
+export function getAssemblyJob(id: string): AssemblyJob | null {
+  try {
+    const stmt = db.prepare('SELECT * FROM assembly_jobs WHERE id = ?');
+    return (stmt.get(id) as AssemblyJob) || null;
+  } catch (error) {
+    console.error('Error fetching assembly job:', error);
+    throw new Error(
+      `Failed to fetch assembly job: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Retrieve the most recent assembly job for a project
+ * @param projectId Project ID
+ * @returns Assembly job or null if not found
+ */
+export function getAssemblyJobByProjectId(projectId: string): AssemblyJob | null {
+  try {
+    const stmt = db.prepare(`
+      SELECT * FROM assembly_jobs
+      WHERE project_id = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+    return (stmt.get(projectId) as AssemblyJob) || null;
+  } catch (error) {
+    console.error('Error fetching assembly job by project:', error);
+    throw new Error(
+      `Failed to fetch assembly job: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Check if a project has an active (pending/processing) assembly job
+ * @param projectId Project ID
+ * @returns True if active job exists
+ */
+export function hasActiveAssemblyJob(projectId: string): boolean {
+  try {
+    const stmt = db.prepare(`
+      SELECT COUNT(*) as count FROM assembly_jobs
+      WHERE project_id = ? AND status IN ('pending', 'processing')
+    `);
+    const result = stmt.get(projectId) as { count: number };
+    return result.count > 0;
+  } catch (error) {
+    console.error('Error checking for active assembly job:', error);
+    throw new Error(
+      `Failed to check for active assembly job: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Update assembly job progress
+ * @param id Job ID
+ * @param progress Progress percentage (0-100)
+ * @param stage Current processing stage
+ * @param currentScene Optional current scene number
+ */
+export function updateAssemblyJobProgress(
+  id: string,
+  progress: number,
+  stage: AssemblyStage,
+  currentScene?: number
+): void {
+  try {
+    // Get existing job to check if this is first update
+    const job = getAssemblyJob(id);
+    const shouldSetStarted = job && !job.started_at;
+
+    let sql = `
+      UPDATE assembly_jobs
+      SET progress = ?, current_stage = ?, status = 'processing'
+    `;
+    const params: (string | number)[] = [Math.min(100, Math.max(0, progress)), stage];
+
+    if (currentScene !== undefined) {
+      sql += ', current_scene = ?';
+      params.push(currentScene);
+    }
+
+    if (shouldSetStarted) {
+      sql += ', started_at = datetime(\'now\')';
+    }
+
+    sql += ' WHERE id = ?';
+    params.push(id);
+
+    const stmt = db.prepare(sql);
+    stmt.run(...params);
+  } catch (error) {
+    console.error('Error updating assembly job progress:', error);
+    throw new Error(
+      `Failed to update assembly job progress: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Mark assembly job as failed
+ * @param id Job ID
+ * @param errorMessage Error description
+ */
+export function failAssemblyJob(id: string, errorMessage: string): void {
+  try {
+    const stmt = db.prepare(`
+      UPDATE assembly_jobs
+      SET status = 'error', error_message = ?, completed_at = datetime('now')
+      WHERE id = ?
+    `);
+    stmt.run(errorMessage, id);
+  } catch (error) {
+    console.error('Error failing assembly job:', error);
+    throw new Error(
+      `Failed to mark assembly job as failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Mark assembly job as complete
+ * @param id Job ID
+ */
+export function completeAssemblyJob(id: string): void {
+  try {
+    const stmt = db.prepare(`
+      UPDATE assembly_jobs
+      SET status = 'complete', progress = 100, completed_at = datetime('now')
+      WHERE id = ?
+    `);
+    stmt.run(id);
+  } catch (error) {
+    console.error('Error completing assembly job:', error);
+    throw new Error(
+      `Failed to complete assembly job: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Update project with video output paths
+ * @param projectId Project ID
+ * @param videoPath Path to assembled video
+ * @param thumbnailPath Path to generated thumbnail
+ * @param totalDuration Total video duration in seconds
+ * @param fileSize Video file size in bytes
+ */
+export function updateProjectVideoPath(
+  projectId: string,
+  videoPath: string,
+  thumbnailPath: string,
+  totalDuration: number,
+  fileSize: number
+): void {
+  try {
+    const stmt = db.prepare(`
+      UPDATE projects
+      SET video_path = ?, thumbnail_path = ?, video_total_duration = ?, video_file_size = ?
+      WHERE id = ?
+    `);
+    stmt.run(videoPath, thumbnailPath, totalDuration, fileSize, projectId);
+  } catch (error) {
+    console.error('Error updating project video path:', error);
+    throw new Error(
+      `Failed to update project video path: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}

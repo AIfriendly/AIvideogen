@@ -1,16 +1,21 @@
 /**
- * Assembly Trigger API Endpoint - Epic 4, Story 4.5
+ * Assembly Trigger API Endpoint - Epic 4, Story 4.5 + Epic 5, Story 5.1
  *
  * POST /api/projects/[id]/assemble - Trigger video assembly
  *
- * Validates all scenes have clip selections and triggers the assembly process.
- * Returns a job ID for tracking the assembly progress (to be fully implemented in Epic 5).
+ * Validates all scenes have clip selections and creates an assembly job.
+ * Story 5.1: Integrated with assembly_jobs table and proper job management.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getProject } from '@/lib/db/queries';
+import {
+  getProject,
+  createAssemblyJob,
+  hasActiveAssemblyJob,
+} from '@/lib/db/queries';
 import db from '@/lib/db/client';
 import { initializeDatabase } from '@/lib/db/init';
+import { transformAssemblyJob } from '@/types/assembly';
 
 // Initialize database on first import (idempotent)
 initializeDatabase();
@@ -130,8 +135,20 @@ export async function POST(
       );
     }
 
-    // Generate unique assembly job ID
-    const assemblyJobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    // Check for existing active job (Story 5.1)
+    if (hasActiveAssemblyJob(projectId)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'An assembly job is already in progress for this project',
+          code: 'JOB_ALREADY_EXISTS',
+        },
+        { status: 409 }
+      );
+    }
+
+    // Create assembly job in database (Story 5.1)
+    const job = createAssemblyJob(projectId, scenes.length);
 
     // Update project status to 'editing' (valid current_step value)
     db.prepare(`
@@ -140,13 +157,11 @@ export async function POST(
       WHERE id = ?
     `).run(projectId);
 
-    console.log(`[Assembly Trigger] Started job ${assemblyJobId} for project ${projectId} with ${scenes.length} scenes`);
+    console.log(`[Assembly Trigger] Created job ${job.id} for project ${projectId} with ${scenes.length} scenes`);
 
-    // TODO: Queue assembly job for Epic 5 implementation
-    // For now, return job ID as placeholder
-
+    // Return job info (actual processing will be done by Stories 5.2-5.3)
     const response: AssemblyResponse = {
-      assemblyJobId,
+      assemblyJobId: job.id,
       status: 'queued',
       message: 'Video assembly started',
       sceneCount: scenes.length,
