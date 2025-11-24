@@ -1,52 +1,61 @@
 // Unit tests for Video Concatenator
 // Story 5.3: Video Concatenation & Audio Overlay
 
+// @vitest-environment node
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Use vi.hoisted to ensure mocks are available during hoisting
-const mocks = vi.hoisted(() => {
-  return {
-    existsSync: vi.fn(),
-    writeFileSync: vi.fn(),
-    unlinkSync: vi.fn(),
-  };
-});
+// Use vi.hoisted() to ensure mock functions are available during module hoisting
+const mocks = vi.hoisted(() => ({
+  mockExistsSync: vi.fn(),
+  mockWriteFileSync: vi.fn(),
+  mockUnlinkSync: vi.fn(),
+  mockConcat: vi.fn(),
+  mockGetVideoDuration: vi.fn(),
+}));
 
-// Mock fs module - explicit property assignment after spread
+// Mock fs module - must be before imports
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
   return {
     ...actual,
-    existsSync: mocks.existsSync,
-    writeFileSync: mocks.writeFileSync,
-    unlinkSync: mocks.unlinkSync,
+    existsSync: mocks.mockExistsSync,
+    writeFileSync: mocks.mockWriteFileSync,
+    unlinkSync: mocks.mockUnlinkSync,
   };
 });
+
+// Mock FFmpegClient
+vi.mock('@/lib/video/ffmpeg', () => ({
+  FFmpegClient: vi.fn().mockImplementation(() => ({
+    concat: mocks.mockConcat,
+    getVideoDuration: mocks.mockGetVideoDuration,
+  })),
+}));
 
 import { Concatenator } from '@/lib/video/concatenator';
 import { FFmpegClient } from '@/lib/video/ffmpeg';
 
 describe('Concatenator [5.3-UNIT]', () => {
   let concatenator: Concatenator;
-  let mockFfmpeg: {
-    concat: ReturnType<typeof vi.fn>;
-    getVideoDuration: ReturnType<typeof vi.fn>;
-  };
+  let mockFfmpeg: FFmpegClient;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockFfmpeg = {
-      concat: vi.fn(),
-      getVideoDuration: vi.fn(),
-    };
+    // Reset mock implementations - all files exist by default
+    mocks.mockExistsSync.mockReturnValue(true);
+    mocks.mockWriteFileSync.mockReturnValue(undefined);
+    mocks.mockUnlinkSync.mockReturnValue(undefined);
+    mocks.mockConcat.mockResolvedValue(undefined);
+    mocks.mockGetVideoDuration.mockResolvedValue(45.5);
 
-    concatenator = new Concatenator(mockFfmpeg as unknown as FFmpegClient);
-    mocks.existsSync.mockReturnValue(true);
+    mockFfmpeg = new FFmpegClient();
+    concatenator = new Concatenator(mockFfmpeg);
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    // Note: Don't use vi.restoreAllMocks() as it breaks hoisted mocks
   });
 
   describe('concatenateVideos', () => {
@@ -60,8 +69,8 @@ describe('Concatenator [5.3-UNIT]', () => {
 
       const result = await concatenator.concatenateVideos(inputPaths, outputPath);
 
-      expect(mocks.writeFileSync).toHaveBeenCalled();
-      expect(mockFfmpeg.concat).toHaveBeenCalled();
+      expect(mocks.mockWriteFileSync).toHaveBeenCalled();
+      expect(mocks.mockConcat).toHaveBeenCalled();
       expect(result).toBe(outputPath);
     });
 
@@ -71,7 +80,7 @@ describe('Concatenator [5.3-UNIT]', () => {
     });
 
     it('[5.3-UNIT-003] should throw error for missing input file', async () => {
-      mocks.existsSync.mockReturnValueOnce(false);
+      mocks.mockExistsSync.mockReturnValueOnce(false);
 
       await expect(
         concatenator.concatenateVideos(['/missing.mp4'], '/output.mp4')
@@ -84,7 +93,7 @@ describe('Concatenator [5.3-UNIT]', () => {
 
       await concatenator.concatenateVideos(inputPaths, outputPath);
 
-      expect(mocks.unlinkSync).toHaveBeenCalled();
+      expect(mocks.mockUnlinkSync).toHaveBeenCalled();
     });
 
     it('[5.3-UNIT-005] should handle Windows paths correctly', async () => {
@@ -93,16 +102,17 @@ describe('Concatenator [5.3-UNIT]', () => {
 
       await concatenator.concatenateVideos(inputPaths, outputPath);
 
-      const writeCall = mocks.writeFileSync.mock.calls[0];
+      const writeCall = mocks.mockWriteFileSync.mock.calls[0];
       const content = writeCall[1] as string;
       expect(content).toContain("file 'D:/temp/scene-1.mp4'");
     });
 
     it('[5.3-UNIT-006] should throw error when output not created', async () => {
-      mocks.existsSync
+      // Input exists, list file cleanup check passes, output doesn't exist
+      mocks.mockExistsSync
         .mockReturnValueOnce(true)  // Input check
-        .mockReturnValueOnce(true)  // List file cleanup check
-        .mockReturnValueOnce(false); // Output check
+        .mockReturnValueOnce(false) // Output check after concat
+        .mockReturnValueOnce(true); // List file cleanup check
 
       await expect(
         concatenator.concatenateVideos(['/input.mp4'], '/output.mp4')
@@ -112,12 +122,12 @@ describe('Concatenator [5.3-UNIT]', () => {
 
   describe('getTotalDuration', () => {
     it('[5.3-UNIT-007] should return duration from FFmpeg', async () => {
-      mockFfmpeg.getVideoDuration.mockResolvedValue(45.5);
+      mocks.mockGetVideoDuration.mockResolvedValue(45.5);
 
       const duration = await concatenator.getTotalDuration('/video.mp4');
 
       expect(duration).toBe(45.5);
-      expect(mockFfmpeg.getVideoDuration).toHaveBeenCalledWith('/video.mp4');
+      expect(mocks.mockGetVideoDuration).toHaveBeenCalledWith('/video.mp4');
     });
   });
 });

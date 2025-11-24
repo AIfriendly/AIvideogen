@@ -4,23 +4,38 @@
  * Tests for the FFmpegClient class functionality.
  */
 
+// @vitest-environment node
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { EventEmitter } from 'events';
 
-// Mock child_process
-vi.mock('child_process', () => ({
-  spawn: vi.fn(),
+// Use vi.hoisted() to ensure mock functions are available during module hoisting
+const mocks = vi.hoisted(() => ({
+  mockSpawn: vi.fn(),
+  mockAccess: vi.fn(),
 }));
 
-// Mock fs
-vi.mock('fs', () => ({
-  access: vi.fn(),
-  constants: { R_OK: 4 },
-}));
+// Mock child_process with importOriginal to preserve other exports
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    spawn: mocks.mockSpawn,
+  };
+});
+
+// Mock fs with importOriginal to preserve other exports
+// Note: access is callback-style, and ffmpeg.ts uses promisify(access)
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    access: mocks.mockAccess,
+    constants: actual.constants,
+  };
+});
 
 import { FFmpegClient } from '@/lib/video/ffmpeg';
-import { spawn } from 'child_process';
-import { access } from 'fs';
-import { EventEmitter } from 'events';
 
 describe('FFmpegClient', () => {
   let client: FFmpegClient;
@@ -28,6 +43,11 @@ describe('FFmpegClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     client = new FFmpegClient();
+
+    // Default mock: file exists (callback style - call cb with no error)
+    mocks.mockAccess.mockImplementation((_path: string, _mode: number, cb: Function) => {
+      cb(null);
+    });
   });
 
   describe('constructor', () => {
@@ -46,7 +66,7 @@ describe('FFmpegClient', () => {
       const mockProcess = new EventEmitter() as any;
       mockProcess.stdout = new EventEmitter();
 
-      (spawn as any).mockReturnValue(mockProcess);
+      mocks.mockSpawn.mockReturnValue(mockProcess);
 
       const versionPromise = client.getVersion();
 
@@ -61,7 +81,7 @@ describe('FFmpegClient', () => {
       const mockProcess = new EventEmitter() as any;
       mockProcess.stdout = new EventEmitter();
 
-      (spawn as any).mockReturnValue(mockProcess);
+      mocks.mockSpawn.mockReturnValue(mockProcess);
 
       const versionPromise = client.getVersion();
 
@@ -74,7 +94,7 @@ describe('FFmpegClient', () => {
       const mockProcess = new EventEmitter() as any;
       mockProcess.stdout = new EventEmitter();
 
-      (spawn as any).mockReturnValue(mockProcess);
+      mocks.mockSpawn.mockReturnValue(mockProcess);
 
       const versionPromise = client.getVersion();
 
@@ -89,12 +109,15 @@ describe('FFmpegClient', () => {
       const mockProcess = new EventEmitter() as any;
       mockProcess.stdout = new EventEmitter();
 
-      (spawn as any).mockReturnValue(mockProcess);
+      mocks.mockSpawn.mockReturnValue(mockProcess);
 
       const verifyPromise = client.verifyInstallation();
 
-      mockProcess.stdout.emit('data', Buffer.from('ffmpeg version 7.0.1'));
-      mockProcess.emit('close', 0);
+      // Simulate successful version output
+      setImmediate(() => {
+        mockProcess.stdout.emit('data', Buffer.from('ffmpeg version 7.0.1'));
+        mockProcess.emit('close', 0);
+      });
 
       const result = await verifyPromise;
       expect(result).toBe(true);
@@ -104,11 +127,14 @@ describe('FFmpegClient', () => {
       const mockProcess = new EventEmitter() as any;
       mockProcess.stdout = new EventEmitter();
 
-      (spawn as any).mockReturnValue(mockProcess);
+      mocks.mockSpawn.mockReturnValue(mockProcess);
 
       const verifyPromise = client.verifyInstallation();
 
-      mockProcess.emit('error', new Error('ENOENT'));
+      // Simulate error
+      setImmediate(() => {
+        mockProcess.emit('error', new Error('ENOENT'));
+      });
 
       const result = await verifyPromise;
       expect(result).toBe(false);
@@ -117,16 +143,17 @@ describe('FFmpegClient', () => {
 
   describe('probe', () => {
     it('should return probe result for valid file', async () => {
-      // Mock file exists
-      (access as any).mockImplementation((path: string, mode: number, cb: Function) => {
+      // Mock file exists (callback style)
+      mocks.mockAccess.mockImplementation((_path: string, _mode: number, cb: Function) => {
         cb(null);
       });
 
       const mockProcess = new EventEmitter() as any;
       mockProcess.stdout = new EventEmitter();
       mockProcess.stderr = new EventEmitter();
+      mockProcess.kill = vi.fn();
 
-      (spawn as any).mockReturnValue(mockProcess);
+      mocks.mockSpawn.mockReturnValue(mockProcess);
 
       const probePromise = client.probe('/test/video.mp4');
 
@@ -154,8 +181,11 @@ describe('FFmpegClient', () => {
         ],
       };
 
-      mockProcess.stdout.emit('data', Buffer.from(JSON.stringify(mockResult)));
-      mockProcess.emit('close', 0);
+      // Emit probe response
+      setImmediate(() => {
+        mockProcess.stdout.emit('data', Buffer.from(JSON.stringify(mockResult)));
+        mockProcess.emit('close', 0);
+      });
 
       const result = await probePromise;
       expect(result.format.duration).toBe(120.5);
@@ -164,7 +194,8 @@ describe('FFmpegClient', () => {
     });
 
     it('should reject for non-existent file', async () => {
-      (access as any).mockImplementation((path: string, mode: number, cb: Function) => {
+      // Mock file does not exist
+      mocks.mockAccess.mockImplementation((_path: string, _mode: number, cb: Function) => {
         cb(new Error('ENOENT'));
       });
 
@@ -177,15 +208,16 @@ describe('FFmpegClient', () => {
   describe('getVideoDuration', () => {
     it('should return duration from format', async () => {
       // Mock file exists
-      (access as any).mockImplementation((path: string, mode: number, cb: Function) => {
+      mocks.mockAccess.mockImplementation((_path: string, _mode: number, cb: Function) => {
         cb(null);
       });
 
       const mockProcess = new EventEmitter() as any;
       mockProcess.stdout = new EventEmitter();
       mockProcess.stderr = new EventEmitter();
+      mockProcess.kill = vi.fn();
 
-      (spawn as any).mockReturnValue(mockProcess);
+      mocks.mockSpawn.mockReturnValue(mockProcess);
 
       const durationPromise = client.getVideoDuration('/test/video.mp4');
 
@@ -200,8 +232,10 @@ describe('FFmpegClient', () => {
         streams: [],
       };
 
-      mockProcess.stdout.emit('data', Buffer.from(JSON.stringify(mockResult)));
-      mockProcess.emit('close', 0);
+      setImmediate(() => {
+        mockProcess.stdout.emit('data', Buffer.from(JSON.stringify(mockResult)));
+        mockProcess.emit('close', 0);
+      });
 
       const duration = await durationPromise;
       expect(duration).toBe(60);
@@ -211,15 +245,16 @@ describe('FFmpegClient', () => {
   describe('getAudioDuration', () => {
     it('should return duration from format', async () => {
       // Mock file exists
-      (access as any).mockImplementation((path: string, mode: number, cb: Function) => {
+      mocks.mockAccess.mockImplementation((_path: string, _mode: number, cb: Function) => {
         cb(null);
       });
 
       const mockProcess = new EventEmitter() as any;
       mockProcess.stdout = new EventEmitter();
       mockProcess.stderr = new EventEmitter();
+      mockProcess.kill = vi.fn();
 
-      (spawn as any).mockReturnValue(mockProcess);
+      mocks.mockSpawn.mockReturnValue(mockProcess);
 
       const durationPromise = client.getAudioDuration('/test/audio.mp3');
 
@@ -234,8 +269,10 @@ describe('FFmpegClient', () => {
         streams: [],
       };
 
-      mockProcess.stdout.emit('data', Buffer.from(JSON.stringify(mockResult)));
-      mockProcess.emit('close', 0);
+      setImmediate(() => {
+        mockProcess.stdout.emit('data', Buffer.from(JSON.stringify(mockResult)));
+        mockProcess.emit('close', 0);
+      });
 
       const duration = await durationPromise;
       expect(duration).toBe(30.5);
@@ -244,7 +281,7 @@ describe('FFmpegClient', () => {
 
   describe('fileExists', () => {
     it('should return true for existing file', async () => {
-      (access as any).mockImplementation((path: string, mode: number, cb: Function) => {
+      mocks.mockAccess.mockImplementation((_path: string, _mode: number, cb: Function) => {
         cb(null);
       });
 
@@ -253,7 +290,7 @@ describe('FFmpegClient', () => {
     });
 
     it('should return false for non-existing file', async () => {
-      (access as any).mockImplementation((path: string, mode: number, cb: Function) => {
+      mocks.mockAccess.mockImplementation((_path: string, _mode: number, cb: Function) => {
         cb(new Error('ENOENT'));
       });
 

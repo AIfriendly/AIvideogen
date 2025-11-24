@@ -4,6 +4,8 @@
  * Tests for the VideoAssembler class job management.
  */
 
+// @vitest-environment node
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { VideoAssembler } from '@/lib/video/assembler';
 import db from '@/lib/db/client';

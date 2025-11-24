@@ -1,32 +1,22 @@
 /**
- * Assembly Trigger API Endpoint - Epic 4, Story 4.5
+ * Assembly Trigger API Endpoint - Epic 4, Story 4.5 (Integrated with Epic 5)
  *
  * POST /api/projects/[id]/assemble - Trigger video assembly
  *
  * Validates all scenes have clip selections and triggers the assembly process.
- * Returns a job ID for tracking the assembly progress (to be fully implemented in Epic 5).
+ * Now fully integrated with Epic 5 video assembly implementation.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getProject } from '@/lib/db/queries';
 import db from '@/lib/db/client';
 import { initializeDatabase } from '@/lib/db/init';
+import { videoAssembler } from '@/lib/video/assembler';
+import { Trimmer } from '@/lib/video/trimmer';
+import type { AssemblyScene } from '@/types/assembly';
 
 // Initialize database on first import (idempotent)
 initializeDatabase();
-
-/**
- * Assembly scene data structure
- */
-interface AssemblyScene {
-  sceneId: string;
-  sceneNumber: number;
-  scriptText: string;
-  audioFilePath: string;
-  selectedClipId: string;
-  videoId: string;
-  clipDuration: number;
-}
 
 /**
  * Assembly response structure
@@ -101,7 +91,7 @@ export async function POST(
     // Note: INNER JOIN is intentional - if a suggestion is deleted after selection,
     // the scene will not appear in results, triggering the validation error below.
     // This ensures data integrity by requiring all selected clips to exist.
-    const scenes = db.prepare(`
+    const scenesData = db.prepare(`
       SELECT
         s.id as sceneId,
         s.scene_number as sceneNumber,
@@ -114,7 +104,22 @@ export async function POST(
       INNER JOIN visual_suggestions vs ON s.selected_clip_id = vs.id
       WHERE s.project_id = ?
       ORDER BY s.scene_number
-    `).all(projectId) as AssemblyScene[];
+    `).all(projectId) as any[];
+
+    // Transform to AssemblyScene format with required alias fields
+    const scenes: AssemblyScene[] = scenesData.map(scene => ({
+      sceneId: scene.sceneId,
+      sceneNumber: scene.sceneNumber,
+      scene_number: scene.sceneNumber, // Alias for backward compatibility
+      scriptText: scene.scriptText,
+      script_text: scene.scriptText, // Alias for backward compatibility
+      audioFilePath: scene.audioFilePath,
+      audio_path: scene.audioFilePath, // Alias for backward compatibility
+      video_path: '', // Will be filled during trimming
+      selectedClipId: scene.selectedClipId,
+      videoId: scene.videoId,
+      clipDuration: scene.clipDuration,
+    }));
 
     // Validate all scenes have selections
     if (scenes.length !== totalScenesResult.count) {
@@ -130,9 +135,6 @@ export async function POST(
       );
     }
 
-    // Generate unique assembly job ID
-    const assemblyJobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-
     // Update project status to 'editing' (valid current_step value)
     db.prepare(`
       UPDATE projects
@@ -140,15 +142,56 @@ export async function POST(
       WHERE id = ?
     `).run(projectId);
 
-    console.log(`[Assembly Trigger] Started job ${assemblyJobId} for project ${projectId} with ${scenes.length} scenes`);
+    // Create assembly job in database (Story 5.1)
+    const jobId = await videoAssembler.createJob(projectId, scenes.length);
 
-    // TODO: Queue assembly job for Epic 5 implementation
-    // For now, return job ID as placeholder
+    console.log(`[Assembly Trigger] Started job ${jobId} for project ${projectId} with ${scenes.length} scenes`);
 
+    // Execute assembly asynchronously to not block the response
+    // In production, this would be handled by a job queue (e.g., BullMQ, SQS)
+    (async () => {
+      try {
+        // Update job to processing
+        videoAssembler.updateJobProgress(jobId, 5, 'trimming');
+
+        // Step 1: Trim scenes to match audio duration (Story 5.2)
+        const trimmer = new Trimmer();
+        const tempDir = videoAssembler.getTempDir(jobId);
+        const trimmedPaths = await trimmer.trimScenes(
+          scenes,
+          tempDir,
+          (sceneNumber, total) => {
+            // Calculate progress: trimming is 5-35% of total progress
+            const trimProgress = 5 + ((sceneNumber / total) * 30);
+            videoAssembler.updateJobProgress(jobId, trimProgress, 'trimming', sceneNumber);
+          }
+        );
+
+        console.log(`[Assembly] Trimmed ${trimmedPaths.length} scenes for job ${jobId}`);
+
+        // Step 2: Assemble scenes (concatenate + audio overlay) (Story 5.3)
+        const finalPath = await videoAssembler.assembleScenes(
+          jobId,
+          projectId,
+          trimmedPaths,
+          scenes
+        );
+
+        // Step 3: Complete the job
+        await videoAssembler.completeJob(jobId);
+
+        console.log(`[Assembly] Completed job ${jobId} - Video saved to: ${finalPath}`);
+      } catch (error) {
+        console.error(`[Assembly] Job ${jobId} failed:`, error);
+        await videoAssembler.failJob(jobId, error.message || 'Unknown error');
+      }
+    })();
+
+    // Return immediate response with job ID for tracking
     const response: AssemblyResponse = {
-      assemblyJobId,
-      status: 'queued',
-      message: 'Video assembly started',
+      assemblyJobId: jobId,
+      status: 'processing',
+      message: 'Video assembly started - processing in background',
       sceneCount: scenes.length,
     };
 

@@ -1,9 +1,9 @@
 /**
- * Assembly Status Page - Epic 4, Story 4.5
+ * Assembly Status Page - Epic 4, Story 4.5 (Integrated with Epic 5)
  *
- * Placeholder page for video assembly status/progress.
- * Displays the job ID and a loading indicator.
- * Full implementation will be in Epic 5.
+ * Displays video assembly status and progress.
+ * Integrated with Epic 5 assembly implementation.
+ * Shows real-time progress from the assembly job.
  */
 
 import { Loader2 } from 'lucide-react';
@@ -57,15 +57,15 @@ export default async function AssemblyPage({
 
           <div className="border-t border-slate-700 pt-4 mt-4">
             <div className="flex items-center gap-2 text-sm text-slate-400">
-              <span className="inline-block w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-              <span>This feature will be fully implemented in Epic 5</span>
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span>Video assembly is now processing</span>
             </div>
           </div>
         </div>
 
-        {/* Placeholder for Epic 5 features */}
+        {/* Assembly features */}
         <div className="mt-6 text-center text-sm text-slate-500">
-          <p>Future features: Progress bar, scene-by-scene status, preview, download</p>
+          <p>Processing: Trimming scenes → Concatenating videos → Overlaying audio → Finalizing output</p>
         </div>
       </div>
     </div>
