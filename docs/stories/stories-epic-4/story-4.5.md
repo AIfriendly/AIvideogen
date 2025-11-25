@@ -747,3 +747,28 @@ N/A - Implementation completed successfully without debug issues
   - Added INNER JOIN documentation
   - Fixed singular/plural handling in ConfirmationModal
   - Simplified toast error handling
+
+### Integration Notes
+**Epic 5 Integration Completed:** 2025-11-25
+
+**Integration Summary:**
+The `/api/projects/[id]/assemble` endpoint has been fully integrated with Epic 5 video assembly pipeline (Stories 5.1-5.3):
+
+1. **YouTube Download Integration:** Added download stage to fetch videos from YouTube using yt-dlp before trimming
+2. **Video Processing Pipeline:** Successfully integrated with:
+   - VideoAssembler (Story 5.1) - Job management and orchestration
+   - Trimmer (Story 5.2) - Scene trimming to match voiceover duration
+   - Concatenator (Story 5.3) - Scene concatenation and audio overlay
+3. **Database Updates:**
+   - Added migration 009 to include 'downloading' stage in assembly_jobs CHECK constraint
+   - Updated AssemblyStage type to include downloading stage
+4. **Path Handling:**
+   - Fixed video path passing via `defaultSegmentPath` property
+   - Resolved path validation issues for security compliance
+5. **Successful Test:** Full pipeline tested end-to-end:
+   - Downloaded 4 YouTube videos (131s, 72s, 57s, 50s)
+   - Trimmed videos (with looping for short clips)
+   - Concatenated all scenes
+   - Generated 53.2MB final video at `public/videos/{projectId}/final.mp4`
+
+The assembly trigger now fully orchestrates the complete video generation process from clip selection to final video output.
