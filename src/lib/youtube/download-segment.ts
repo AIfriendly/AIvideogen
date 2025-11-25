@@ -249,7 +249,12 @@ export async function downloadDefaultSegment(
  */
 async function executeYtDlp(args: string[]): Promise<{ success: boolean; error?: string }> {
   return new Promise((resolve) => {
-    const ytDlpProcess = spawn('yt-dlp', args);
+    // Use yt-dlp.exe from project root if it exists, otherwise try system PATH
+    const ytDlpPath = process.platform === 'win32'
+      ? path.join(process.cwd(), 'yt-dlp.exe')
+      : 'yt-dlp';
+
+    const ytDlpProcess = spawn(ytDlpPath, args);
 
     let stderr = '';
 
