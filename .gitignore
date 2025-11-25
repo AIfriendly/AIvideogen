@@ -52,6 +52,7 @@ next-env.d.ts
 /data
 /venv
 /models
+/public/videos/
 
 # database files
 *.db

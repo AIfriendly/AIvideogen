@@ -157,6 +157,40 @@ async function runMigrations(): Promise<void> {
     console.log(`Migration ${migration007Name} already applied, skipping`);
   }
 
+  // Migration 008: Create assembly_jobs table (Epic 5)
+  const migration008Name = '008_assembly_jobs';
+  if (!isMigrationApplied(migration008Name)) {
+    console.log(`Applying migration: ${migration008Name}`);
+    try {
+      const { up } = await import('./migrations/008_assembly_jobs');
+      up(db);
+      markMigrationApplied(migration008Name);
+      console.log(`Migration ${migration008Name} applied successfully`);
+    } catch (error) {
+      console.error(`Failed to apply migration ${migration008Name}:`, error);
+      throw error;
+    }
+  } else {
+    console.log(`Migration ${migration008Name} already applied, skipping`);
+  }
+
+  // Migration 009: Add downloading stage to assembly_jobs
+  const migration009Name = '009_add_downloading_stage';
+  if (!isMigrationApplied(migration009Name)) {
+    console.log(`Applying migration: ${migration009Name}`);
+    try {
+      const { up } = await import('./migrations/009_add_downloading_stage');
+      up(db);
+      markMigrationApplied(migration009Name);
+      console.log(`Migration ${migration009Name} applied successfully`);
+    } catch (error) {
+      console.error(`Failed to apply migration ${migration009Name}:`, error);
+      throw error;
+    }
+  } else {
+    console.log(`Migration ${migration009Name} already applied, skipping`);
+  }
+
   console.log('All migrations completed');
 }
 

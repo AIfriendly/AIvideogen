@@ -13,6 +13,7 @@ import db from '@/lib/db/client';
 import { initializeDatabase } from '@/lib/db/init';
 import { videoAssembler } from '@/lib/video/assembler';
 import { Trimmer } from '@/lib/video/trimmer';
+import { FFmpegClient } from '@/lib/video/ffmpeg';
 import type { AssemblyScene } from '@/types/assembly';
 import { downloadWithRetry } from '@/lib/youtube/download-segment';
 import path from 'path';
@@ -170,7 +171,8 @@ export async function POST(
           videoAssembler.updateJobProgress(jobId, downloadProgress, 'downloading', scene.sceneNumber);
 
           // Download the YouTube video segment
-          const downloadPath = path.join(downloadsDir, `scene-${scene.sceneNumber}-source.mp4`);
+          // The download service expects a path starting with .cache/videos/{projectId}/
+          const downloadPath = path.join('.cache', 'videos', projectId, `scene-${scene.sceneNumber}-source.mp4`);
           const downloadResult = await downloadWithRetry({
             videoId: scene.videoId,
             segmentDuration: scene.clipDuration + 5, // Add 5s buffer for trimming
@@ -183,13 +185,17 @@ export async function POST(
           }
 
           // Add the downloaded file path to the scene object
-          scene.video_path = downloadResult.filePath || downloadPath;
-          console.log(`[Assembly] Downloaded scene ${scene.sceneNumber}: ${scene.video_path}`);
+          // The download service returns the full path
+          const fullPath = downloadResult.filePath || path.join(process.cwd(), '.cache', 'videos', downloadPath);
+          scene.video_path = fullPath;
+          scene.defaultSegmentPath = fullPath; // Trimmer expects this property
+          console.log(`[Assembly] Downloaded scene ${scene.sceneNumber}: ${fullPath}`);
         }
 
         // Step 2: Trim scenes to match audio duration (Story 5.2)
         videoAssembler.updateJobProgress(jobId, 20, 'trimming');
-        const trimmer = new Trimmer();
+        const ffmpeg = new FFmpegClient();
+        const trimmer = new Trimmer(ffmpeg);
         const trimmedPaths = await trimmer.trimScenes(
           scenes,
           tempDir,
