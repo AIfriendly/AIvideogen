@@ -1,11 +1,9 @@
 /**
- * Script Quality Validation
+ * Script Quality Validation (Purely Informational Style)
  *
- * Validates generated scripts against professional quality standards.
- * Detects AI detection markers, checks TTS readiness, and validates narrative flow.
+ * Validates generated scripts against informational quality standards.
+ * Checks information density, detects filler language, and validates factual content.
  */
-
-import { BANNED_PHRASES } from './prompts/script-generation-prompt';
 
 /**
  * Scene structure as returned by LLM
@@ -43,19 +41,6 @@ const META_LABEL_PATTERNS = [
   /\[.*?\]/,  // Any bracketed instructions
   /^voice.*?:/i,
   /^audio:/i
-];
-
-/**
- * Generic AI opening patterns to detect
- */
-const GENERIC_OPENINGS = [
-  /^have you ever wondered/i,
-  /^imagine a world where/i,
-  /^what if i told you/i,
-  /^in today's (video|world|age)/i,
-  /^welcome to/i,
-  /^let's talk about/i,
-  /^today we're going to/i
 ];
 
 /**
@@ -211,44 +196,36 @@ export function validateScriptQuality(
     }
   }
 
-  // Validation 3: Check for AI detection markers (banned phrases)
-  const bannedPhrasesFound = checkForBannedPhrases(scenes);
-  if (bannedPhrasesFound.length > 0) {
-    issues.push(`AI detection markers found: ${bannedPhrasesFound.join(', ')}`);
-    suggestions.push('Rewrite without generic AI phrases - use more natural language');
+  // Validation 3: Check information density
+  const infoResult = checkInformationDensity(scenes);
+  if (!infoResult.passed) {
+    issues.push(...infoResult.issues);
+    suggestions.push('Add more concrete facts, numbers, dates, or specific details');
     score -= 25;
   }
 
-  // Validation 4: Check for generic AI openings
-  const genericOpenings = checkForGenericOpenings(scenes);
-  if (genericOpenings.length > 0) {
-    issues.push(`Generic opening detected: ${genericOpenings[0]}`);
-    suggestions.push('Start with a more unique, engaging hook that creates immediate intrigue');
+  // Validation 4: Check for filler language
+  const fillerResult = checkForFiller(scenes);
+  if (!fillerResult.passed) {
+    issues.push(...fillerResult.issues);
+    suggestions.push('Remove subjective adjectives without data (obviously, incredibly, basically)');
     score -= 20;
   }
 
-  // Validation 5: Check TTS readiness (no markdown, no meta-labels)
+  // Validation 5: Check for vagueness
+  const vaguenessResult = checkForVagueness(scenes);
+  if (!vaguenessResult.passed) {
+    issues.push(...vaguenessResult.issues);
+    suggestions.push('Replace vague statements with specific details and concrete examples');
+    score -= 20;
+  }
+
+  // Validation 6: Check TTS readiness (no markdown, no meta-labels)
   const ttsIssues = checkTTSReadiness(scenes);
   if (ttsIssues.length > 0) {
     issues.push(...ttsIssues);
     suggestions.push('Remove all formatting characters and meta-labels - output only spoken narration');
     score -= 30;
-  }
-
-  // Validation 6: Check narrative flow
-  const narrativeIssues = checkNarrativeFlow(scenes);
-  if (narrativeIssues.length > 0) {
-    issues.push(...narrativeIssues);
-    suggestions.push('Ensure scenes build on each other and maintain engagement throughout');
-    score -= 15;
-  }
-
-  // Validation 7: Check for robotic patterns
-  const roboticPatterns = checkForRoboticPatterns(scenes);
-  if (roboticPatterns.length > 0) {
-    issues.push(...roboticPatterns);
-    suggestions.push('Use more varied sentence structure and active voice');
-    score -= 15;
   }
 
   // Ensure score doesn't go below 0
@@ -272,41 +249,119 @@ export function validateScriptQuality(
 }
 
 /**
- * Check for banned AI phrases in script text
+ * Check information density - does the script contain concrete facts?
  */
-function checkForBannedPhrases(scenes: Scene[]): string[] {
-  const found: string[] = [];
-  const allText = scenes.map(s => s.text.toLowerCase()).join(' ');
+function checkInformationDensity(scenes: Scene[]): { passed: boolean; issues: string[] } {
+  const issues: string[] = [];
+  const allText = scenes.map(s => s.text).join(' ');
+  const totalWords = allText.trim().split(/\s+/).length;
 
-  for (const phrase of BANNED_PHRASES) {
-    if (allText.includes(phrase.toLowerCase())) {
-      found.push(`"${phrase}"`);
-    }
+  // Count factual elements (numbers, dates, specific names, percentages)
+  const numbers = allText.match(/\b\d+(\.\d+)?(%|HP|health|damage|seconds?|minutes?|degrees?|km|miles?)?\b/gi) || [];
+  const dates = allText.match(/\b(19|20)\d{2}\b|\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}\b/gi) || [];
+  const properNouns = allText.match(/\b[A-Z][a-z]+(\s+[A-Z][a-z]+)*\b/g) || [];
+
+  // Calculate information density (factual elements per 100 words)
+  const factualElements = numbers.length + dates.length + (properNouns.length / 2); // Weight proper nouns less
+  const densityScore = (factualElements / totalWords) * 100;
+
+  // Minimum density: 3 factual elements per 100 words
+  const MIN_DENSITY = 3;
+
+  if (densityScore < MIN_DENSITY) {
+    issues.push(
+      `Low information density: ${Math.round(densityScore * 10) / 10} factual elements per 100 words ` +
+      `(minimum ${MIN_DENSITY}). Add more numbers, dates, or specific names.`
+    );
   }
 
-  return found;
+  return {
+    passed: issues.length === 0,
+    issues
+  };
 }
 
 /**
- * Check for generic AI opening patterns
+ * Check for filler language (subjective adjectives without supporting data)
  */
-function checkForGenericOpenings(scenes: Scene[]): string[] {
-  const found: string[] = [];
+function checkForFiller(scenes: Scene[]): { passed: boolean; issues: string[] } {
+  const issues: string[] = [];
+  const allText = scenes.map(s => s.text).join(' ');
 
-  if (scenes.length === 0) return found;
+  // Filler words that signal vague, subjective language
+  const fillerPatterns = [
+    /\bobviously\b/gi,
+    /\bincredibly\b/gi,
+    /\bbasically\b/gi,
+    /\bkind of\b/gi,
+    /\bsort of\b/gi,
+    /\breally\s+(hard|difficult|powerful|strong|weak)/gi,
+    /\bvery\s+(powerful|strong|weak|difficult|easy)/gi,
+    /\bextremely\s+(powerful|strong|weak|difficult|easy)/gi,
+    /\bsuper\s+(challenging|difficult|easy|powerful)/gi
+  ];
 
-  const firstSceneText = scenes[0].text.trim();
-
-  for (const pattern of GENERIC_OPENINGS) {
-    if (pattern.test(firstSceneText)) {
-      const match = firstSceneText.match(pattern);
-      if (match) {
-        found.push(match[0]);
-      }
+  const foundFillers: string[] = [];
+  for (const pattern of fillerPatterns) {
+    const matches = allText.match(pattern);
+    if (matches) {
+      foundFillers.push(...matches);
     }
   }
 
-  return found;
+  if (foundFillers.length > 2) { // Allow up to 2 instances
+    issues.push(
+      `Excessive filler language detected: "${foundFillers.slice(0, 3).join('", "')}"${foundFillers.length > 3 ? '...' : ''}. ` +
+      `Replace with specific data or remove.`
+    );
+  }
+
+  return {
+    passed: issues.length === 0,
+    issues
+  };
+}
+
+/**
+ * Check for vagueness (generic statements without specifics)
+ */
+function checkForVagueness(scenes: Scene[]): { passed: boolean; issues: string[] } {
+  const issues: string[] = [];
+
+  // Vague patterns that signal lack of concrete information
+  const vaguePatterns = [
+    /\bmany (players|people|users|bosses|enemies)\b/gi,
+    /\bsome (players|people|users|bosses|enemies)\b/gi,
+    /\bmost (players|people|users|bosses|enemies)\b/gi,
+    /\bquite\s+(impressive|challenging|powerful)\b/gi,
+    /\bgenerally\s+regarded\b/gi,
+    /\bconsidered\s+(by many|to be)\s+(one of|the)\b/gi,
+    /\bis known for\b/gi,
+    /\bis famous for\b/gi
+  ];
+
+  for (const scene of scenes) {
+    const sceneVagueInstances: string[] = [];
+
+    for (const pattern of vaguePatterns) {
+      const matches = scene.text.match(pattern);
+      if (matches) {
+        sceneVagueInstances.push(...matches);
+      }
+    }
+
+    if (sceneVagueInstances.length > 1) {
+      issues.push(
+        `Scene ${scene.sceneNumber}: Contains vague statements: "${sceneVagueInstances.slice(0, 2).join('", "')}". ` +
+        `Replace with specific numbers, names, or concrete details.`
+      );
+    }
+  }
+
+  return {
+    passed: issues.length === 0,
+    issues
+  };
 }
 
 /**
@@ -343,66 +398,6 @@ function checkTTSReadiness(scenes: Scene[]): string[] {
   return issues;
 }
 
-/**
- * Check narrative flow - does the script tell a coherent story?
- */
-function checkNarrativeFlow(scenes: Scene[]): string[] {
-  const issues: string[] = [];
-
-  if (scenes.length === 0) return issues;
-
-  // Check if first scene has a hook (not just stating a fact)
-  const firstScene = scenes[0].text.trim();
-
-  // Weak hooks: starts with "The/A/An" + noun + "is/are/was/were" + adjective
-  // But allow action-oriented starts like "An octopus can..."
-  const weakHookPattern = /^(the|a|an)\s+\w+\s+(is|are|was|were)\s+(a|an|the|very|extremely|quite)\s+/i;
-  if (weakHookPattern.test(firstScene)) {
-    issues.push('Weak opening hook - starts with simple declarative statement');
-  }
-
-  // Check for list-like structure (each scene starts similarly)
-  const sceneStarts = scenes.map(s => s.text.trim().substring(0, 20).toLowerCase());
-  const uniqueStarts = new Set(sceneStarts);
-
-  if (uniqueStarts.size < scenes.length * 0.7) {
-    issues.push('Repetitive scene openings - scenes lack variety');
-  }
-
-  return issues;
-}
-
-/**
- * Check for robotic patterns in writing
- */
-function checkForRoboticPatterns(scenes: Scene[]): string[] {
-  const issues: string[] = [];
-  const allText = scenes.map(s => s.text).join(' ');
-
-  // Check for excessive passive voice
-  const passiveMatches = allText.match(/\b(is|are|was|were|be|been|being)\s+\w+ed\b/gi);
-  const totalSentences = allText.split(/[.!?]+/).length;
-
-  if (passiveMatches && passiveMatches.length > totalSentences * 0.3) {
-    issues.push('Excessive passive voice - use more active constructions');
-  }
-
-  // Check for repetitive sentence structure
-  const sentences = allText.split(/[.!?]+/).filter(s => s.trim().length > 0);
-  const sentenceLengths = sentences.map(s => s.trim().split(/\s+/).length);
-
-  if (sentenceLengths.length > 5) { // Only check if we have enough sentences
-    const avgLength = sentenceLengths.reduce((a, b) => a + b, 0) / sentenceLengths.length;
-    const variance = sentenceLengths.reduce((sum, len) => sum + Math.pow(len - avgLength, 2), 0) / sentenceLengths.length;
-
-    // Lower threshold - variance of 5 is very low (all sentences nearly same length)
-    if (variance < 5) {
-      issues.push('Repetitive sentence length - vary your sentence structure');
-    }
-  }
-
-  return issues;
-}
 
 /**
  * Calculate word count for a scene

@@ -1,85 +1,79 @@
 /**
- * Script Generation Prompt Template
+ * Script Generation Prompt Template (Purely Informational Style)
  *
- * Advanced prompt engineering for generating professional, human-quality video scripts.
- * This prompt is designed to avoid AI detection markers and produce scripts that
- * sound natural, engaging, and indistinguishable from professional scriptwriter output.
+ * Prompt engineering for generating purely informational video scripts with scientific/factual delivery.
+ * This prompt is designed to produce scripts that deliver maximum factual content with information density,
+ * optimized for gaming analysis, historical events, and technical explanations.
  */
 
 import { determineTone, getToneInstructions, type ScriptTone } from '../tone-mapper';
 
 /**
- * Banned AI phrases that make scripts sound robotic
- * These will be explicitly forbidden in the prompt
+ * Acceptable informational phrases that signal scientific delivery
+ * These phrases are ENCOURAGED for informational content
  */
-export const BANNED_PHRASES = [
-  "in today's video",
-  "let's dive in",
-  "stay tuned",
-  "make sure to like and subscribe",
-  "don't forget to",
-  "have you ever wondered",
-  "imagine a world where",
-  "without further ado",
-  "at the end of the day",
-  "the fact of the matter is",
-  "it goes without saying",
-  "needless to say",
-  "in conclusion",
-  "to sum up",
-  "as we've seen",
-  "as mentioned earlier"
+export const ACCEPTABLE_PHRASES = [
+  "in this analysis",
+  "let's examine",
+  "the data shows",
+  "research indicates",
+  "evidence suggests",
+  "specifically",
+  "for example",
+  "according to",
+  "the key factors are",
+  "this demonstrates"
 ];
 
 /**
- * Examples of professional vs. robotic scripts for few-shot learning
+ * Examples of informational vs. vague scripts for few-shot learning
  */
 const EXAMPLE_GOOD_SCRIPT = `
-Example of EXCELLENT professional script with ACCURATE word counts:
+Example of EXCELLENT informational script with ACCURATE word counts:
 
-Topic: "Why octopuses are incredibly intelligent"
+Topic: "Dark Souls boss ranking"
 
 {
   "scenes": [
     {
       "sceneNumber": 1,
-      "text": "An octopus can unscrew a jar from the inside. Not because someone taught it - because it figured it out. These eight-armed creatures solve puzzles that stump most animals, and scientists are only beginning to understand why. Their intelligence isn't just remarkable - it's alien.",
-      "wordCount": 48,
-      "estimatedDuration": 20
+      "text": "Ornstein and Smough are a duo boss fight in Anor Londo. Phase 1 has both bosses active. Ornstein uses lightning spear attacks from range and is weak to fire damage. Smough uses hammer attacks at close range and is weak to lightning. The cathedral arena has pillars for cover. Kill order determines phase 2 abilities.",
+      "wordCount": 58,
+      "estimatedDuration": 24
     },
     {
       "sceneNumber": 2,
-      "text": "Unlike humans, who centralize thinking in one brain, octopuses distribute their neurons. Two-thirds of their brain cells live in their arms. Each arm can taste, touch, and make decisions independently. It's like having eight mini-brains working together, each one capable of problem-solving on its own.",
-      "wordCount": 50,
-      "estimatedDuration": 22
+      "text": "Artorias has three distinct attack patterns. His sword combos deal 400-600 damage per hit. The overhead slam attack has a 1.5 second telegraph. His buff phase at 50% health increases damage by 30% and attack speed by 25%. Rolling toward him at 45 degrees avoids most attacks. He's weak to poison and bleed status effects.",
+      "wordCount": 60,
+      "estimatedDuration": 25
     },
     {
       "sceneNumber": 3,
-      "text": "This distributed intelligence lets them do extraordinary things. They can camouflage in milliseconds, mimicking not just colors but textures - rocky coral, sandy seafloor, waving kelp. They escape from locked tanks. They use tools. One species collects coconut shells and assembles them into portable shelters. That's not instinct - that's planning.",
-      "wordCount": 57,
+      "text": "Manus has the highest HP pool at 6,666 health. His grab attack is the most dangerous, dealing instant kill damage below 40 vigor. The dark magic attacks can be blocked with the Silver Pendant item. Positioning behind him reduces incoming damage by 40%. Optimal strategy uses fire weapons with 15+ humanity for maximum damage output.",
+      "wordCount": 60,
       "estimatedDuration": 25
     }
   ]
 }
 
-[Note: Valid JSON, accurate word counts (48+50+57=155 total), natural hooks, specific details, no banned phrases]
+[Note: Valid JSON, accurate word counts (58+60+60=178 total), specific mechanics, concrete numbers, factual delivery]
 `;
 
 const EXAMPLE_BAD_SCRIPT = `
-Example of POOR robotic script (DO NOT WRITE LIKE THIS):
+Example of POOR vague script (DO NOT WRITE LIKE THIS):
 
-Topic: "Why octopuses are incredibly intelligent"
+Topic: "Dark Souls boss ranking"
 
 Scene 1:
-Have you ever wondered about the intelligence of octopuses? In today's video, we're going to dive into the fascinating world of these incredible creatures. Octopuses are known for their remarkable cognitive abilities, and you won't believe what they can do!
+Ornstein and Smough are obviously one of the most legendary boss fights ever. These incredibly powerful warriors are super challenging. Many players think this fight is really hard and memorable. The duo is known for their amazing teamwork.
 
 Scene 2:
-Let's explore the amazing brain structure of octopuses. These animals have a unique nervous system that distributes neurons throughout their body. This distributed intelligence allows them to perform various tasks simultaneously, making them one of the most intelligent invertebrates on Earth.
+Artorias is basically another very difficult boss. He's extremely aggressive and has really powerful attacks. This fight is considered by many to be one of the best in the game. His moveset is quite impressive and challenging for most players.
 
 Scene 3:
-As we've seen, octopuses demonstrate impressive problem-solving skills. From opening jars to using tools, these creatures continue to amaze scientists. So next time you see an octopus, remember just how intelligent they really are. Don't forget to subscribe for more amazing animal facts!
+Manus is definitely one of the hardest bosses. He has some really tough attacks that can be very punishing. Players often struggle with this fight. It's generally regarded as one of the most difficult encounters in Dark Souls.
 
-[Note: Generic opening, banned phrases, robotic tone, no personality]
+[Note: Filler language (obviously, incredibly, basically), vague statements (very difficult, really hard), no specific details or numbers]
 `;
 
 /**
@@ -109,7 +103,7 @@ export function generateScriptPrompt(
     ? Math.round(targetTotalWords / targetSceneCount)
     : Math.round(targetTotalWords / 4); // Default 4 scenes
 
-  return `You are a professional scriptwriter creating a video script about: "${topic}"
+  return `You are a technical information specialist creating a purely informational video script about: "${topic}"
 
 🎯 CRITICAL DURATION REQUIREMENT:
 This script MUST have a total of **${targetTotalWords} words** across ALL scenes combined.
@@ -122,26 +116,26 @@ ${toneInstructions}
 
 CRITICAL QUALITY REQUIREMENTS:
 
-1. PROFESSIONAL WRITING STANDARDS
-   - Write like a human professional, NOT like an AI
-   - Use natural, varied sentence structure (mix short and long sentences)
-   - Employ active voice, not passive constructions
-   - Include specific details, not vague generalizations
-   - Show personality and voice - make it unique
-   - Create natural transitions between scenes
+1. PURELY INFORMATIONAL DELIVERY
+   - Focus on facts, data, strategies, and structured information
+   - Use straightforward language (direct explanations preferred over creative hooks)
+   - Prioritize information density over entertainment value
+   - Include concrete details: numbers, dates, names, statistics, mechanics
+   - Use topic-appropriate delivery style (gaming: mechanics/stats, historical: dates/causes, technical: step-by-step)
+   - No filler language (subjective adjectives without data, hedging words)
 
-2. NARRATIVE EXCELLENCE
-   - Start with a STRONG HOOK that creates immediate intrigue
-   - Avoid generic questions (NO "Have you ever wondered...")
-   - Build curiosity gaps that compel continued watching
-   - Include surprising facts or unexpected angles
-   - Use concrete examples and vivid descriptions
-   - Maintain momentum and engagement throughout
+2. SCIENTIFIC/FACTUAL STANDARDS
+   - **Gaming content:** Detailed boss mechanics, strategies, strengths/weaknesses, rankings with justification
+   - **Historical content:** Specific dates, causes, timelines, key events, factual analysis
+   - **Technical content:** Clear step-by-step explanations, definitions, concrete examples
+   - Focus on useful information, not data dumps
+   - Support claims with specific evidence or examples
+   - Avoid vague generalizations ("very powerful", "really hard" without specifics)
 
-3. ABSOLUTELY FORBIDDEN PHRASES (DO NOT USE):
-   ${BANNED_PHRASES.map(phrase => `   - "${phrase}"`).join('\n')}
+3. ACCEPTABLE INFORMATIONAL PHRASES (ENCOURAGED):
+   ${ACCEPTABLE_PHRASES.map(phrase => `   - "${phrase}"`).join('\n')}
 
-   These phrases are AI detection markers. Avoid them completely.
+   These phrases signal scientific, factual delivery and are perfectly acceptable.
 
 4. TTS-READY FORMAT
    - Output ONLY spoken narration text
@@ -366,21 +360,21 @@ Start with { character. NO preamble. ONLY valid JSON. This is your LAST CHANCE.`
  * System prompt for script generation
  * Sets the role and context for the LLM
  */
-export const SCRIPT_GENERATION_SYSTEM_PROMPT = `You are a professional scriptwriter specializing in engaging video content. Your scripts are known for their human quality, creativity, and ability to captivate audiences. You never write generic, robotic, or AI-sounding content. Every script you create is unique, engaging, and professionally crafted.
+export const SCRIPT_GENERATION_SYSTEM_PROMPT = `You are a technical information specialist who creates purely informational video scripts with scientific and factual delivery. Your scripts prioritize information density and concrete facts over entertainment value. You deliver maximum useful information in straightforward, accessible language.
 
-IMPORTANT: You create educational and documentary content on all topics, including controversial or sensitive subjects. When handling topics like:
-- AI risks, existential threats, or technology concerns
-- Historical events, conflicts, or tragedies
-- Scientific controversies or debates
-- Social, political, or philosophical topics
+IMPORTANT: You create informational content on all topics, including technical, historical, and analytical subjects. When handling topics like:
+- Gaming analysis (boss mechanics, strategies, rankings)
+- Historical events (dates, causes, timelines, key figures)
+- Technical explanations (step-by-step processes, definitions)
+- Scientific topics (data, research findings, evidence)
 
-You approach them from an educational, balanced, and informative perspective. Your goal is to inform and educate viewers, not to promote harmful behavior. You present multiple perspectives, cite facts, and maintain journalistic integrity.
+You approach them with factual precision and information-first delivery. Your goal is to inform viewers with concrete, useful information - not to entertain or create narrative tension.
 
-You can and should write scripts on any topic requested, as long as you:
-1. Maintain factual accuracy
-2. Present balanced perspectives where appropriate
-3. Avoid sensationalism or fearmongering
-4. Focus on education and understanding
-5. Use professional, measured language
+You write scripts that:
+1. Deliver facts, data, and structured information
+2. Use specific details (numbers, dates, names, statistics, mechanics)
+3. Avoid filler language (subjective adjectives without data, hedging words)
+4. Focus on information density (concrete facts per 100 words)
+5. Use straightforward, scientific delivery appropriate to the topic type
 
-You have the freedom to explore any subject matter within an educational context.`;
+You have the freedom to write informational content on any subject matter with factual precision and clarity.`;
