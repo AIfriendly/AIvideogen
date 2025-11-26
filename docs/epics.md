@@ -4,7 +4,7 @@
 
 **Project:** AI Video Generator (Level 2)
 **Repository:** https://github.com/AIfriendly/AIvideogen
-**Last Updated:** 2025-11-22
+**Last Updated:** 2025-11-25
 
 ---
 
@@ -425,35 +425,34 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 ---
 
-#### Story 2.4: LLM-Based Script Generation (Professional Quality)
-**Goal:** Generate professional, human-quality video scripts that are engaging, authentic, and indistinguishable from professional scriptwriter output
+#### Story 2.4: LLM-Based Script Generation (Purely Informational Style)
+**Goal:** Generate purely informational video scripts that deliver maximum factual content with scientific/factual delivery, optimized for gaming analysis, historical events, and technical explanations
 
 **Tasks:**
-- Create advanced script generation prompt template (lib/llm/prompts/script-generation-prompt.ts) with professional scriptwriting principles
-- **Design prompt with strict quality requirements:**
-  - **Professional scriptwriting standards:** Compelling hooks, storytelling techniques, strong pacing
-  - **Topic-adaptive tone:** Documentary style for serious topics, conversational for tutorials, engaging for entertainment
-  - **Human authenticity:** Natural language, varied sentence structure, personality, avoid AI tells
-  - **Narrative techniques:** Strong openings (no "In today's video..."), smooth transitions, emotional resonance
-  - **Banned AI phrases:** Reject generic phrases like "Moving on", "It's important to note", "Let's explore", "In conclusion"
-  - **Engagement elements:** Rhetorical questions, vivid descriptions, relatable examples, conversational tone
+- Create purely informational script generation prompt template (lib/llm/prompts/script-generation-prompt.ts) with scientific delivery principles
+- **Design prompt with strict informational requirements:**
+  - **Scientific & Factual Delivery:** Focus on facts, data, specific details, and structured information
+  - **Topic-Specific Requirements:** Gaming (mechanics, stats, strategies), Historical (dates, causes, timelines), Technical (step-by-step explanations)
+  - **Information Density:** Prioritize information value over entertainment, no filler language
+  - **Straightforward Language:** Direct explanations preferred, no creative hooks or narrative gimmicks
+  - **Acceptable Phrases:** "In this analysis...", "Let's examine...", "The data shows..." are ENCOURAGED
   - **Output format:** Structured JSON with scene breakdown
   - **Text cleanliness:** ONLY spoken narration text - no markdown, scene labels, titles, or formatting
 - **Create quality validation function (lib/llm/validate-script-quality.ts):**
-  - Check for AI detection markers (generic openings, robotic transitions, overly formal language)
-  - Validate narrative flow and pacing
-  - Ensure topic-appropriate tone
-  - Reject scripts that sound robotic or bland
-- **Implement topic-based tone mapping:** Analyze topic to determine appropriate style (educational, documentary, entertainment, tutorial)
+  - Check for information density (concrete facts, numbers, dates, names, statistics)
+  - Check for filler language (subjective adjectives without data, hedging words)
+  - Check for vagueness (generic statements without specifics)
+  - Reject scripts lacking factual content or containing excessive filler
+- **Remove narrative-focused validations:** No banned phrases check, no hook requirements, no storytelling validation
 - Implement POST /api/projects/[id]/generate-script endpoint
 - Load confirmed topic from projects.topic field
-- Call LLM provider with professionally-tuned script generation prompt
+- Call LLM provider with scientifically-tuned script generation prompt
 - Parse LLM response and validate JSON structure
 - **Run quality validation before accepting script - retry if quality check fails**
 - Validate each scene text is TTS-ready (no markdown characters, no meta-labels like "Scene:", "Title:")
 - Save scenes to database (scenes table) with scene_number and text
 - Update projects.script_generated = true and current_step = 'voiceover'
-- Add retry logic for LLM failures, invalid responses, or quality check failures (max 3 attempts)
+- Add retry logic for LLM failures, invalid responses, or quality check failures (max 6 attempts)
 - Implement scene count optimization (aim for 3-5 scenes for MVP)
 
 **Acceptance Criteria:**
@@ -461,25 +460,26 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 - LLM generates structured script with 3-5 scenes minimum
 - Each scene has scene_number (sequential) and text (50-200 words)
 - Scene text contains ONLY spoken narration (no markdown *, #, **, no "Scene 1:", no meta-text)
-- **Scripts sound professional and human-written, NOT AI-generated**
-- **Scripts avoid generic AI phrases ("In today's video", "Moving on", "It's important to note", "Let's explore")**
-- **Scripts use topic-appropriate tone (documentary, educational, conversational, etc.)**
-- **Scripts have strong narrative hooks (no boring openings)**
-- **Scripts use natural, varied language with personality**
-- **Quality validation rejects robotic or bland scripts**
+- **Scripts use scientific, factual delivery style with information-dense content**
+- **Scripts focus on facts, data, strategies, and structured information delivery**
+- **Scripts use straightforward language (direct explanations preferred over creative hooks)**
+- **Gaming content: Detailed boss mechanics, strategies, strengths/weaknesses, rankings with justification**
+- **Historical content: Specific dates, causes, timelines, key events, factual analysis**
+- **Technical content: Clear step-by-step explanations, definitions, concrete examples**
+- **Quality validation rejects vague, unfocused, or overly narrative scripts**
 - Scenes saved to database in correct order
-- Script generation handles various topic types (educational, entertainment, tutorials, documentary)
-- Invalid or low-quality LLM responses trigger retry with improved prompt (max 3 attempts)
+- Script generation handles various topic types (gaming analysis, historical events, technical explanations)
+- Invalid or low-quality LLM responses trigger retry with improved prompt (max 6 attempts)
 - Validation rejects scenes containing markdown or formatting characters
 - Projects.script_generated flag updated on success
 
 **Quality Examples:**
 
-❌ **Bad (AI-sounding):**
-"In today's video, we'll explore the fascinating world of Mars colonization. It's important to note that Mars is the fourth planet from the sun. Moving on to the next point, let's discuss the challenges of space travel."
+❌ **Bad (Filler/Vague):**
+"Ornstein and Smough are obviously one of the most legendary boss fights ever. These incredibly powerful warriors are super challenging. Many players think this fight is really hard and memorable. The duo is known for their amazing teamwork."
 
-✅ **Good (Professional):**
-"Picture this: A million humans living on Mars by 2050. Sounds like science fiction, right? But SpaceX and NASA are betting everything on making it reality. The red planet, once just a distant dream, is now humanity's next home. Here's how we're actually going to pull it off."
+✅ **Good (Purely Informational):**
+"Ornstein and Smough are a duo boss fight in Anor Londo. Phase 1 has both bosses active. Ornstein uses lightning spear attacks and is weak to fire. Smough uses hammer attacks and is weak to lightning. The cathedral arena has pillars for cover."
 
 **References:**
 - PRD Feature 1.2 (Automated Script Generation) lines 78-102
@@ -576,7 +576,7 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 - Support for niche content (gaming, tutorials, vlogs, etc.)
 - Handle YouTube API quotas and rate limiting
 
-**Story Count Estimate:** 8 stories (6 original + 2 enhancement stories for advanced filtering)
+**Story Count Estimate:** 9 stories (6 original + 3 enhancement stories for advanced filtering and pipeline integration)
 
 **Dependencies:**
 - Epic 2 (needs script structure as input)
@@ -994,6 +994,65 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 - PRD Feature 1.5 (Google Cloud Vision API Integration) lines 214-220
 - PRD Feature 1.5 AC9-AC14 lines 266-289
 - UX Design Specification v3.4, Section 8.13 (VideoPreviewPlayer Silent Video Indicator)
+
+---
+
+#### Story 3.7b: CV Pipeline Integration
+**Goal:** Integrate CV filtering into the automatic download pipeline and enforce quality thresholds in the UI to ensure users only see pure B-roll footage
+
+**Problem Statement:** Story 3.7 implemented CV filtering as a standalone service with a manual API endpoint, but this was never integrated into the visual sourcing workflow. Users see low-quality B-roll because:
+1. CV analysis never runs automatically - requires manual POST call
+2. Low cv_score suggestions aren't filtered from UI
+3. Detection thresholds (15% face area) are too lenient
+
+**Tasks:**
+- **Auto-Trigger CV Analysis:**
+  - Modify download-segments route to call analyzeVideoSuggestion() after each segment download
+  - Import cv-filter-service functions into download pipeline
+  - Wrap CV analysis in try-catch to not block download success (graceful degradation)
+  - Pass scene.visual_keywords as expectedLabels for label matching
+- **Tighten CV Detection Thresholds:**
+  - Create CV_THRESHOLDS constant object in lib/vision/client.ts
+  - Update TALKING_HEAD_AREA from 0.15 to 0.10 (10% face area)
+  - Update CAPTION_COVERAGE from 0.05 to 0.03 (3% text coverage)
+  - Update CAPTION_BLOCKS from 3 to 2 text blocks
+  - Increase FACE_PENALTY_MAJOR from -0.5 to -0.6
+  - Increase FACE_PENALTY_MINOR from -0.2 to -0.3
+  - Increase CAPTION_PENALTY from -0.3 to -0.4
+- **UI Filtering for Low CV Scores:**
+  - Add getFilteredSuggestions() function to visual curation component
+  - Filter suggestions where cv_score < 0.5 (hide from view)
+  - Keep suggestions with cv_score = NULL visible (not yet analyzed)
+  - Display "X low-quality video(s) filtered" message
+
+**Acceptance Criteria:**
+- **Auto CV Trigger:** CV analysis automatically runs after each segment download completes (no manual API call)
+- **Graceful Degradation:** CV analysis failure does not block download success (cv_score remains NULL)
+- **Stricter Face Detection:** Videos with face area >10% flagged as talking heads (was 15%)
+- **Stricter Caption Detection:** Videos with text coverage >3% OR >2 text blocks flagged (was 5% or 3 blocks)
+- **Increased Penalties:** Face penalty -0.6 (was -0.5), caption penalty -0.4 (was -0.3)
+- **UI Filtering:** Suggestions with cv_score < 0.5 hidden from visual curation view
+- **NULL Handling:** Suggestions with cv_score = NULL (not yet analyzed) remain visible
+- **Filtered Count:** UI displays "X low-quality video(s) filtered" message
+- **Label Passing:** visual_keywords from scene passed to CV analysis as expectedLabels
+- **Manual Validation:** >90% pure B-roll in visible results across 10 test scenes
+
+**Threshold Changes Summary:**
+
+| Threshold | Before (3.7) | After (3.7b) |
+|-----------|--------------|--------------|
+| Talking head face area | 15% | 10% |
+| Small face area | 5% | 3% |
+| Caption text coverage | 5% | 3% |
+| Caption text blocks | 3 | 2 |
+| Major face penalty | -0.5 | -0.6 |
+| Minor face penalty | -0.2 | -0.3 |
+| Caption penalty | -0.3 | -0.4 |
+
+**References:**
+- Story 3.7 (Parent implementation - CV filtering service)
+- Tech Spec Epic 3 v3.1, Story 3.7b section
+- PRD Feature 1.5 (Pure B-Roll Content Filtering)
 
 ---
 
@@ -1428,13 +1487,13 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 |------|------|---------|--------------|-------|
 | 1 | Conversational Topic Discovery | 7 | None | Foundation |
 | 2 | Content Generation Pipeline + Voice Selection | 6 | Epic 1 | Core |
-| 3 | Visual Content Sourcing (YouTube API + Duration Filtering + Segment Downloads + Advanced CV Filtering) | 8 | Epic 2 | Core |
+| 3 | Visual Content Sourcing (YouTube API + Duration Filtering + Segment Downloads + Advanced CV Filtering) | 9 | Epic 2 | Core |
 | 4 | Visual Curation Interface | 6 | Epic 2, 3 | Core |
 | 5 | Video Assembly & Output | 5 | Epic 2, 4 | Delivery |
 
-**Total Stories:** 32 stories
+**Total Stories:** 33 stories
 
-**Note:** Epic 3 includes Stories 3.2b and 3.7 which add advanced content filtering (moved from post-MVP Feature 2.2 to MVP).
+**Note:** Epic 3 includes Stories 3.2b, 3.7, and 3.7b which add advanced content filtering and pipeline integration (moved from post-MVP Feature 2.2 to MVP).
 
 **Recommended Development Order:**
 1. Epic 1 → Epic 2 → Epic 3 → Epic 4 → Epic 5

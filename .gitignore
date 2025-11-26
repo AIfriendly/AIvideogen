@@ -3,7 +3,11 @@ node_modules/
 venv/
 __pycache__/
 *.pyc
-credentials/
+
+# Credentials folder - keep folder but ignore files
+credentials/*
+!credentials/.gitkeep
+
 # Environment variables
 .env
 .env.local

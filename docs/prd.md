@@ -2,11 +2,18 @@
 
 *This document outlines the requirements for the AI Video Generator MVP. It is a living document and will be updated as the project progresses.*
 
-**Last Updated:** 2025-11-22
-**Version:** 1.4
+**Last Updated:** 2025-11-26
+**Version:** 1.5
 **Repository:** https://github.com/AIfriendly/AIvideogen
 
-**Recent Changes (v1.4 - 2025-11-22):**
+**Recent Changes (v1.5 - 2025-11-26):**
+- Enhanced Feature 1.5: Tightened face detection threshold from 15% to 10% for stricter talking head filtering
+- Enhanced Feature 1.5: Added 'queued' status to download status tracking
+- Enhanced Feature 1.5: Added CV pipeline auto-trigger requirements (FR-5.27a-e)
+- Enhanced Feature 1.5: Added UI filtering for low cv_score suggestions
+- Updated AC10 to reflect 10% face area threshold
+
+**Previous Changes (v1.4 - 2025-11-22):**
 - **MAJOR:** Moved Feature 2.2 (Advanced Content Filtering) into MVP Feature 1.5
 - Enhanced Feature 1.5: Added pure B-roll requirements (no commentary, captions, reaction content)
 - Enhanced Feature 1.5: Added Google Cloud Vision API integration (face detection, OCR, label verification)
@@ -131,11 +138,14 @@ The following measurable criteria define MVP success:
     *   **FR-2.02:** The system must generate a script that is factually relevant to the input topic.
     *   **FR-2.03:** The generated script must be segmented into an ordered list of scenes.
     *   **FR-2.04:** Each scene must contain a block of text for the voiceover.
-    *   **FR-2.05:** The system must generate scripts that sound professional, human-written, and engaging (NOT robotic or AI-generic).
-    *   **FR-2.06:** The system must adapt script tone based on topic type (documentary, educational, entertainment, tutorial).
-    *   **FR-2.07:** The system must avoid AI detection markers (generic phrases like "In today's video", "Moving on", "It's important to note").
-    *   **FR-2.08:** The system must use professional scriptwriting techniques (strong hooks, storytelling, natural language, varied sentence structure).
-    *   **FR-2.09:** The system shall validate script quality and reject robotic or bland scripts.
+    *   **FR-2.05:** The system must generate scripts that sound professional and factual (NOT robotic, vague, or filler-heavy).
+    *   **FR-2.06:** The system must adapt script tone based on topic type (gaming analysis, historical events, technical explanations).
+    *   **FR-2.07:** The system must prioritize information density and avoid filler language (subjective adjectives without data, hedging words).
+    *   **FR-2.08:** The system must use straightforward, scientific delivery techniques (factual focus, structured information, concrete details).
+    *   **FR-2.09:** The system shall validate script quality and reject vague, unfocused, or filler-heavy scripts.
+    *   **FR-2.09a:** The system must generate scripts in purely informational style by default (scientific/factual delivery).
+    *   **FR-2.09b:** Scripts must prioritize information density over entertainment value.
+    *   **FR-2.09c:** Scripts must focus on concrete facts, strategies, and structured information delivery.
     *   **FR-2.10:** The system shall pass the structured script to the visual curation and voiceover generation modules.
 
 *   **Acceptance Criteria:**
@@ -147,18 +157,18 @@ The following measurable criteria define MVP success:
         *   **Given** a script has been generated.
         *   **When** the script is passed to the next module.
         *   **Then** it must be in a structured format, such as a JSON array of objects, with each object containing at least a `scene_number` and `text` key.
-    *   **AC3: Professional Quality (Human-Like)**
+    *   **AC3: Purely Informational Quality**
         *   **Given** a generated script for any topic.
         *   **When** the script is reviewed.
-        *   **Then** it must sound like a professional scriptwriter created it, not an AI.
-        *   **And** it must NOT contain generic AI phrases ("In today's video", "Moving on", "Let's explore", "It's important to note").
-        *   **And** it must have a strong, engaging opening (no boring "welcome" intros).
-        *   **And** it must use topic-appropriate tone (conversational for tutorials, documentary-style for serious topics, etc.).
+        *   **Then** it must deliver purely informational content with factual focus.
+        *   **And** it must NOT contain filler language (subjective adjectives without data, hedging words like "obviously", "incredibly", "basically").
+        *   **And** it must focus on concrete facts, data, strategies, and structured information.
+        *   **And** it must use topic-appropriate style (gaming: mechanics/stats/strategies, historical: dates/causes/timelines, technical: step-by-step explanations).
     *   **AC4: Quality Validation**
         *   **Given** the script generation process produces output.
         *   **When** the system validates script quality.
-        *   **Then** robotic or bland scripts must be rejected and regeneration triggered (max 3 attempts).
-        *   **And** only scripts meeting professional quality standards are accepted and saved.
+        *   **Then** vague, unfocused, or filler-heavy scripts must be rejected and regeneration triggered (max 6 attempts).
+        *   **And** only scripts meeting informational quality standards (high information density, factual content) are accepted and saved.
 
 ### 1.3. Voice Selection
 
@@ -250,7 +260,7 @@ The following measurable criteria define MVP success:
     *   **Google Cloud Vision API Integration:**
         *   **FR-5.15:** The system should first analyze YouTube video thumbnails using Vision API to pre-filter candidates before downloading video segments (reduces bandwidth usage and API calls).
         *   **FR-5.16:** The system must extract 3 sample frames from downloaded video segments (at 10%, 50%, 90% duration) for detailed analysis.
-        *   **FR-5.17:** The system must use FACE_DETECTION to identify and filter videos with prominent talking heads (face bounding box area >15% of total frame area).
+        *   **FR-5.17:** The system must use FACE_DETECTION to identify and filter videos with prominent talking heads (face bounding box area >10% of total frame area).
         *   **FR-5.18:** The system must use TEXT_DETECTION (OCR) to identify and filter videos with burned-in captions or text overlays.
         *   **FR-5.19:** The system must use LABEL_DETECTION to verify video content matches scene theme (at least 1 of the top 3 expected labels must be present).
         *   **FR-5.20:** The system must implement graceful fallback to keyword-only filtering when API quota is exceeded.
@@ -260,8 +270,13 @@ The following measurable criteria define MVP success:
         *   **FR-5.23:** Downloads must use appropriate video download tooling with 720p resolution and segment range selection.
         *   **FR-5.24:** The system must strip audio from all downloaded segments.
         *   **FR-5.25:** The system must store downloaded segments in organized cache structure with project and scene identification.
-        *   **FR-5.26:** The system must track download status (pending, downloading, complete, error) in the database.
+        *   **FR-5.26:** The system must track download status (pending, queued, downloading, complete, error) in the database.
         *   **FR-5.27:** Downloaded segments must be immediately available for preview in the Visual Curation UI without requiring user-triggered downloads.
+        *   **FR-5.27a:** CV analysis must automatically trigger after each segment download completes (no manual API call required).
+        *   **FR-5.27b:** CV analysis failure must not block download success (graceful degradation - cv_score remains NULL).
+        *   **FR-5.27c:** The Visual Curation UI must hide suggestions with cv_score < 0.5 by default.
+        *   **FR-5.27d:** Suggestions with cv_score = NULL (not yet analyzed) must remain visible in the UI.
+        *   **FR-5.27e:** The UI must display a count of filtered low-quality videos (e.g., "3 low-quality videos filtered").
     *   **FR-5.28:** The system shall implement appropriate filtering (e.g., Creative Commons licensing when possible, content type, duration).
     *   **FR-5.29:** The system must handle YouTube API quotas and rate limits gracefully.
     *   **FR-5.30:** The system must support diverse content types including educational, gaming, nature, tutorials, and general footage.
@@ -305,10 +320,10 @@ The following measurable criteria define MVP success:
         *   **When** content filtering is applied.
         *   **Then** videos with titles containing "reaction", "reacts", "commentary", "review", "tier list", "vlog", or "my thoughts" must be filtered out.
     *   **AC10: Face Detection Filtering**
-        *   **Given** a downloaded video segment with a talking head (face bounding box area >15% of total frame area).
+        *   **Given** a downloaded video segment with a talking head (face bounding box area >10% of total frame area).
         *   **When** Google Cloud Vision API FACE_DETECTION analyzes the frames.
         *   **Then** the video must be filtered out as non-B-roll content.
-        *   **Note:** Face area is calculated as (bounding box width × height) / (frame width × height). Multiple faces are summed.
+        *   **Note:** Face area is calculated as (bounding box width × height) / (frame width × height). Multiple faces are summed. The 10% threshold catches "face-in-corner" gaming videos and PIP layouts.
     *   **AC11: Caption/Text Detection**
         *   **Given** a downloaded video segment with burned-in captions or text overlays.
         *   **When** Google Cloud Vision API TEXT_DETECTION analyzes the frames.

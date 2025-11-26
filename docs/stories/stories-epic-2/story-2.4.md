@@ -1,31 +1,34 @@
-# Story 2.4: LLM-Based Script Generation (Professional Quality)
+# Story 2.4: LLM-Based Script Generation (Purely Informational Style)
 
 **Epic:** Epic 2 - Content Generation Pipeline + Voice Selection
-**Status:** Ready
+**Status:** Ready for Rework (Correct-Course Approved 2025-11-26)
 **Created:** 2025-11-07
+**Updated:** 2025-11-26 (Correct-Course: Narrative → Informational)
 **Owner:** Dev Agent
 
 ## Goal
 
-Generate professional, human-quality video scripts that are engaging, authentic, and indistinguishable from professional scriptwriter output. The system will leverage advanced LLM prompting techniques to produce scripts that avoid AI detection markers while maintaining narrative excellence.
+Generate purely informational video scripts that deliver maximum factual content with scientific/factual delivery, optimized for gaming analysis, historical events, and technical explanations. The system will leverage LLM prompting techniques to produce scripts that prioritize information density over entertainment value.
 
 ## Context
 
-After confirming a topic in Epic 1 and setting up the database schema in Story 2.2, we need to generate high-quality scripts for video production. This story implements the core content generation capability using professionally-tuned LLM prompts that:
+**CORRECT-COURSE UPDATE (2025-11-26):** This story has been modified to change script generation from narrative entertainment style to purely informational scientific delivery.
 
-1. **Produce Human-Quality Scripts:** Generate scripts that sound natural and authentic, not robotic or AI-generated
-2. **Apply Professional Scriptwriting Principles:** Use narrative hooks, topic-adaptive tone, and engagement techniques
+After confirming a topic in Epic 1 and setting up the database schema in Story 2.2, we need to generate high-quality informational scripts for video production. This story implements the core content generation capability using scientifically-tuned LLM prompts that:
+
+1. **Produce Purely Informational Scripts:** Generate scripts focused on facts, data, strategies, and structured information
+2. **Apply Scientific Delivery Principles:** Straightforward language, information density, no entertainment filler
 3. **Ensure TTS Compatibility:** Output clean, spoken-word text without markdown or meta-labels
-4. **Validate Quality:** Implement quality checks to reject bland or generic AI outputs
+4. **Validate Quality:** Implement quality checks to reject vague, filler-heavy, or unfocused outputs
 5. **Handle Edge Cases:** Retry logic for LLM failures, invalid responses, or quality check failures
 
-The script generation pipeline is a critical quality gate in the video creation workflow. Poor scripts result in poor videos, so we enforce strict quality standards before accepting any LLM output.
+The script generation pipeline is a critical quality gate in the video creation workflow. Poor scripts result in poor videos, so we enforce strict informational quality standards before accepting any LLM output.
 
 ## Story
 
 As a **video creator**,
-I want **the system to generate professional-quality video scripts automatically**,
-so that **I can produce engaging videos without hiring a professional scriptwriter**.
+I want **the system to generate purely informational video scripts automatically**,
+so that **I can produce fact-focused videos (gaming analysis, historical events, technical explanations) without writing scripts manually**.
 
 ## Acceptance Criteria
 
@@ -33,18 +36,19 @@ so that **I can produce engaging videos without hiring a professional scriptwrit
 2. LLM generates structured script with 3-5 scenes minimum
 3. Each scene has `scene_number` (sequential) and `text` (50-200 words)
 4. Scene text contains ONLY spoken narration (no markdown `*`, `#`, `**`, no "Scene 1:", no meta-text)
-5. Scripts sound professional and human-written, NOT AI-generated
-6. Scripts avoid generic AI phrases (e.g., "in today's video", "let's dive in", "stay tuned")
-7. Scripts use topic-appropriate tone (educational, entertaining, dramatic, etc.)
-8. Scripts have strong narrative hooks (no boring openings like "Have you ever wondered...")
-9. Scripts use natural, varied language with personality
-10. Quality validation rejects robotic or bland scripts
-11. Scenes saved to database in correct order
-12. Script generation handles various topic types (educational, entertainment, news, etc.)
-13. Invalid or low-quality LLM responses trigger retry with improved prompt (max 3 attempts)
-14. Validation rejects scenes containing markdown or formatting characters
-15. `projects.script_generated` flag updated on success
-16. `projects.current_step` updated to `'voiceover'` on success
+5. **Scripts use scientific, factual delivery style with information-dense content**
+6. **Scripts focus on facts, data, strategies, and structured information delivery**
+7. **Scripts use straightforward language (direct explanations preferred over creative hooks)**
+8. **Gaming content: Detailed boss mechanics, strategies, strengths/weaknesses, rankings with justification**
+9. **Historical content: Specific dates, causes, timelines, key events, factual analysis**
+10. **Technical content: Clear step-by-step explanations, definitions, concrete examples**
+11. **Quality validation rejects vague, unfocused, or filler-heavy scripts**
+12. Scenes saved to database in correct order
+13. Script generation handles various topic types (gaming analysis, historical events, technical explanations)
+14. Invalid or low-quality LLM responses trigger retry with improved prompt (max 6 attempts)
+15. Validation rejects scenes containing markdown or formatting characters
+16. `projects.script_generated` flag updated on success
+17. `projects.current_step` updated to `'voiceover'` on success
 
 ## Tasks / Subtasks
 
@@ -804,3 +808,86 @@ This enhancement significantly improves the user experience by:
 
 **Status:** ✅ Complete and production-ready
 **Related Documentation:** `docs/script-review-page-implementation.md`, `docs/script-generation-error-fix.md`
+
+---
+
+### Update 2: Correct-Course - Narrative to Purely Informational Style (2025-11-26)
+
+**Context:** User testing revealed that script generation was producing narrative entertainment-style content (YouTube storytelling with hooks and engagement tactics) instead of purely informational content focused on facts, data, and strategies.
+
+**Issue:** Scripts for gaming, historical, and technical content were bland, vague, and filled with subjective language without concrete details. User described output as "AWFUL" and "cringe bland scripts."
+
+**Root Cause:** Prompt engineering optimized for narrative storytelling (hooks, banned phrases, entertainment value) rather than scientific/factual information delivery.
+
+**Solution Approved:** Replace narrative-focused prompt and validation with purely informational approach.
+
+#### Change Scope
+
+**Sprint Change Proposal:** `docs/sprint-change-proposal-2025-11-26.md`
+
+**Planning Documents Updated:**
+1. **`docs/epics.md`** - Story 2.4 title, goal, tasks, and acceptance criteria updated to reflect informational style
+2. **`docs/prd.md`** - Functional requirements FR-2.05 through FR-2.09c updated, acceptance criteria AC3-AC4 revised
+3. **`docs/stories/stories-epic-2/story-2.4.md`** (this file) - Title, goal, context, and acceptance criteria updated
+
+**Implementation Files to Modify (Dev Agent):**
+1. **`ai-video-generator/src/lib/llm/prompts/script-generation-prompt.ts`**
+   - Replace narrative prompt with scientific/factual template
+   - Update system prompt: "technical information specialist" instead of "professional scriptwriter"
+   - Update example scripts: Gaming boss analysis instead of octopus narrative
+   - Remove banned phrases, add acceptable informational phrases
+
+2. **`ai-video-generator/src/lib/llm/validate-script-quality.ts`**
+   - Remove: Banned phrases check, generic openings check, narrative flow validation, robotic patterns check
+   - Add: Information density check, filler language detection, vagueness detection
+   - New helper functions: `checkInformationDensity()`, `checkForFiller()`, `checkForVagueness()`
+
+#### Key Requirements (Informational Style)
+
+**Script Characteristics:**
+- **Information vs Data:** Focus on useful information, not overwhelming data dumps
+- **Straightforward:** Direct explanations preferred, no creative hooks
+- **Factual:** Concrete facts, strategies, mechanics, dates, events
+- **Topic-Specific:**
+  - Gaming: Boss mechanics, strategies, weaknesses, rankings with justification
+  - Historical: Dates, causes, timelines, key events
+  - Technical: Step-by-step explanations, definitions, examples
+
+**Quality Validation:**
+- Reject vague language ("very powerful", "many bosses" without specifics)
+- Reject filler language ("obviously", "incredibly", "basically", "kind of")
+- Enforce information density (factual elements per 100 words)
+- Accept straightforward openings ("In this analysis...", "Let's examine...")
+
+**Example Quality:**
+
+❌ **Bad (Filler):**
+> "Ornstein and Smough are obviously one of the most legendary boss fights ever. These incredibly powerful warriors are super challenging."
+
+✅ **Good (Informational):**
+> "Ornstein and Smough are a duo boss fight in Anor Londo. Phase 1 has both bosses active. Ornstein uses lightning spear attacks and is weak to fire."
+
+#### Implementation Timeline
+
+- **Planning:** Complete (Correct-Course workflow)
+- **Implementation:** 2-3 days (Dev Agent)
+- **Testing:** Included in implementation
+- **Scope:** Epic 2, Story 2.4 only (no other stories affected)
+
+#### Status
+
+**Planning Status:** ✅ Complete - All planning documents updated
+**Implementation Status:** ⏳ Pending - Awaiting Dev Agent execution
+**Approval Status:** ✅ Approved by user (2025-11-26)
+
+**Next Steps:**
+1. User calls Dev Agent (`/bmad:bmm:agents:dev`)
+2. Dev implements Sprint Change Proposal (`docs/sprint-change-proposal-2025-11-26.md`)
+3. Dev modifies prompt templates and validation logic per approved changes
+4. Dev tests with gaming, historical, technical topics
+5. Dev marks Story 2.4 as complete (rework)
+
+**Related Documentation:**
+- `docs/sprint-change-proposal-2025-11-26.md` - Complete change proposal with all 6 approved changes
+- `docs/epics.md` - Updated Story 2.4 requirements
+- `docs/prd.md` - Updated functional requirements

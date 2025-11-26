@@ -4,12 +4,17 @@ Date: 2025-11-05
 Author: lichking
 Epic ID: 2
 Status: Draft
+**Updated:** 2025-11-26 (Correct-Course: Story 2.4 rework - Narrative → Informational)
+
+---
+
+> **CORRECT-COURSE UPDATE (2025-11-26):** This tech spec has been updated to reflect Story 2.4 rework. Script generation changed from narrative entertainment style to purely informational scientific delivery. See Sprint Change Proposal: `docs/sprint-change-proposal-2025-11-26.md`
 
 ---
 
 ## Overview
 
-Epic 2 implements the complete content generation pipeline for the AI Video Generator, encompassing voice selection, professional-quality script generation, and text-to-speech synthesis. Building on Epic 1's topic confirmation workflow, this epic transforms confirmed topics into production-ready audio-scripted content. The implementation leverages KokoroTTS for high-quality voice synthesis with 48+ voice options, flexible LLM provider support (Ollama/Llama 3.2 or Google Gemini 2.5) for intelligent script generation with professional scriptwriting standards, and a comprehensive text sanitization pipeline to ensure clean TTS output. The architecture follows a progressive enhancement pattern where users first select their preferred voice, then receive AI-generated scripts divided into scenes, and finally get MP3 voiceovers for each scene using their selected voice.
+Epic 2 implements the complete content generation pipeline for the AI Video Generator, encompassing voice selection, purely informational script generation, and text-to-speech synthesis. Building on Epic 1's topic confirmation workflow, this epic transforms confirmed topics into production-ready audio-scripted content. The implementation leverages KokoroTTS for high-quality voice synthesis with 48+ voice options, flexible LLM provider support (Ollama/Llama 3.2 or Google Gemini 2.5) for intelligent script generation with scientific/factual delivery standards, and a comprehensive text sanitization pipeline to ensure clean TTS output. The architecture follows a progressive enhancement pattern where users first select their preferred voice, then receive AI-generated informational scripts divided into scenes, and finally get MP3 voiceovers for each scene using their selected voice.
 
 **LLM Provider Options:**
 - **Primary (FOSS):** Ollama with Llama 3.2 (3B) - Local deployment, no API costs, complete privacy
@@ -17,15 +22,15 @@ Epic 2 implements the complete content generation pipeline for the AI Video Gene
 - **Configuration:** Set via .env.local `LLM_PROVIDER=ollama|gemini`
 - **Compatibility:** Both providers implement same LLMProvider interface for seamless switching
 
-This epic represents a critical transformation point in the video creation workflow, where abstract ideas become concrete, narrated content ready for visual pairing. The system emphasizes professional quality output that sounds human-written and naturally spoken, avoiding robotic or AI-generated tells that would diminish viewer engagement.
+This epic represents a critical transformation point in the video creation workflow, where abstract ideas become concrete, narrated content ready for visual pairing. The system emphasizes purely informational output that delivers factual content with scientific delivery, optimized for gaming analysis, historical events, and technical explanations.
 
 ## Objectives and Scope
 
 **In Scope:**
 - Voice selection interface with 3-5+ distinct voice options and audio preview capability
-- LLM-based script generation producing professional, human-quality scripts with scene segmentation
-- Topic-adaptive tone mapping (documentary, educational, conversational, entertainment styles)
-- Quality validation to reject robotic or bland scripts with retry logic
+- LLM-based script generation producing purely informational scripts with scene segmentation
+- Topic-adaptive delivery (gaming analysis, historical events, technical explanations)
+- Quality validation to reject vague, filler-heavy, or unfocused scripts with retry logic
 - Text-to-speech synthesis generating MP3 files for each scene using selected voice
 - Text sanitization pipeline removing markdown, formatting, and non-speakable characters before TTS
 - Database schema extensions for voice selection, scenes, and audio tracking
@@ -59,8 +64,8 @@ This epic aligns with the architecture's modular design and FOSS-compliant techn
 | **POST /api/projects/[id]/select-voice** | Save voice selection to database | project_id, voice_id | Success/failure status | Backend |
 | **POST /api/projects/[id]/generate-script** | Generate professional script via LLM | project_id, topic | Scene array with text | Backend |
 | **POST /api/projects/[id]/generate-voiceovers** | Generate TTS audio for all scenes | project_id | Audio file paths array | Backend |
-| **lib/llm/prompts/script-generation-prompt.ts** | Professional script generation prompt | Topic, tone requirements | Formatted prompt string | LLM Module |
-| **lib/llm/validate-script-quality.ts** | Validate script meets quality standards | Generated script | Pass/fail with reasons | LLM Module |
+| **lib/llm/prompts/script-generation-prompt.ts** | Purely informational script generation prompt | Topic, delivery requirements | Formatted prompt string | LLM Module |
+| **lib/llm/validate-script-quality.ts** | Validate script information density and factual content | Generated script | Pass/fail with reasons | LLM Module |
 | **lib/tts/kokoro.ts** | KokoroTTS integration wrapper | Text, voice_id | MP3 audio buffer | TTS Module |
 | **lib/tts/sanitize-text.ts** | Remove non-speakable characters | Raw scene text | Clean TTS-ready text | TTS Module |
 | **lib/tts/voice-profiles.ts** | Voice profile configuration | None | Voice metadata array | TTS Module |
@@ -373,20 +378,21 @@ scipy==1.11.1                   # Audio utilities
 - Then: All scenes use the selected voice consistently
 - And: The voice selection is saved to the database for future reference
 
-**AC3: Professional Script Generation**
+**AC3: Purely Informational Script Generation**
 - Given: Script generation is triggered for a topic
 - When: The LLM generates the script
-- Then: The script must sound professional and human-written
-- And: Must NOT contain generic AI phrases ("In today's video", "Moving on", "It's important to note")
-- And: Must have strong narrative hooks and topic-appropriate tone
+- Then: The script must deliver purely informational content with factual focus
+- And: Must NOT contain filler language (subjective adjectives without data, hedging words like "obviously", "incredibly", "basically")
+- And: Must focus on concrete facts, data, strategies, and structured information
+- And: Must use topic-appropriate style (gaming: mechanics/stats/strategies, historical: dates/causes/timelines, technical: step-by-step explanations)
 - And: Must be structured into 3-5 logical scenes minimum
 
 **AC4: Script Quality Validation**
 - Given: A script is generated by the LLM
 - When: Quality validation runs
-- Then: Robotic or bland scripts must be rejected
-- And: System retries with improved prompts (max 3 attempts)
-- And: Only scripts meeting professional quality standards proceed to TTS
+- Then: Vague, unfocused, or filler-heavy scripts must be rejected
+- And: System retries with improved prompts (max 6 attempts)
+- And: Only scripts meeting informational quality standards (high information density, factual content) proceed to TTS
 
 **AC5: Text Sanitization for TTS**
 - Given: Scene text contains markdown or formatting characters
@@ -488,6 +494,6 @@ scipy==1.11.1                   # Audio utilities
 
 **Manual Testing:**
 - Audio quality verification for each voice option
-- Script readability and narrative flow
+- Script information density and factual accuracy
 - UI responsiveness during long operations
 - Error message clarity and recovery options
