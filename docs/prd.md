@@ -147,6 +147,10 @@ The following measurable criteria define MVP success:
     *   **FR-2.09b:** Scripts must prioritize information density over entertainment value.
     *   **FR-2.09c:** Scripts must focus on concrete facts, strategies, and structured information delivery.
     *   **FR-2.10:** The system shall pass the structured script to the visual curation and voiceover generation modules.
+    *   **FR-2.11:** The system must provide 3-5 preset personas for script generation (Scientific Analyst, Blackpill Realist, Documentary Filmmaker, Educational Designer).
+    *   **FR-2.12:** Users must be able to select a persona for each project via project settings UI.
+    *   **FR-2.13:** The selected persona's system prompt must be used to generate scripts for that project.
+    *   **FR-2.14:** Personas must be stored in the `system_prompts` database table and linked to projects via `projects.system_prompt_id`.
 
 *   **Acceptance Criteria:**
     *   **AC1: Successful Script Generation**
@@ -169,6 +173,16 @@ The following measurable criteria define MVP success:
         *   **When** the system validates script quality.
         *   **Then** vague, unfocused, or filler-heavy scripts must be rejected and regeneration triggered (max 6 attempts).
         *   **And** only scripts meeting informational quality standards (high information density, factual content) are accepted and saved.
+    *   **AC5: Preset Persona Selection**
+        *   **Given** a user creates or configures a project.
+        *   **When** they access project settings.
+        *   **Then** they must be able to select from 3-5 preset personas (Scientific Analyst, Blackpill Realist, Documentary Filmmaker, Educational Designer).
+        *   **And** the selected persona is saved to `projects.system_prompt_id`.
+    *   **AC6: Persona-Based Script Generation**
+        *   **Given** a project has a selected persona.
+        *   **When** script generation is triggered.
+        *   **Then** the system must use the selected persona's system prompt for LLM script generation.
+        *   **And** the generated script must reflect the persona's tone and style (e.g., Blackpill Realist produces brutal/pessimistic analysis).
 
 ### 1.3. Voice Selection
 
@@ -486,10 +500,21 @@ The following measurable criteria define MVP success:
         *   **Per-Project Personas:** Ability to override default persona on a per-project basis (e.g., use "Educational Designer" for science videos, "Viral Strategist" for entertainment content).
     *   **Rationale:** Local Ollama deployment provides complete control over LLM behavior without external restrictions. Gemini offers cloud-based alternative with generous free tier (1,500 requests/day). System prompts ensure the assistant adapts to different creative workflows and content types.
     *   **MVP Implementation:**
-        *   Ollama (primary, FOSS) and Gemini (optional, cloud) providers implemented
-        *   Default "Creative Assistant" persona hardcoded
-        *   Provider selection via .env.local configuration
-        *   UI configuration for provider selection and custom personas added post-MVP
+        *   Ollama (primary, FOSS) and Gemini (optional, cloud) providers implemented ✅
+        *   Provider selection via .env.local configuration ✅
+        *   **Preset Personas:** 3-5 built-in personas optimized for script generation:
+            *   Scientific Analyst (neutral informational, data-driven)
+            *   Blackpill Realist (brutal/harsh truths, pessimistic analysis)
+            *   Documentary Filmmaker (balanced narrative, human stories)
+            *   Educational Designer (TED-Ed style, learning-focused)
+            *   (Additional presets as needed)
+        *   **Persona Selection UI:** Dropdown in project settings to select persona for script generation
+        *   **Per-Project Personas:** Selected persona stored in `projects.system_prompt_id` and used for script generation
+        *   Personas stored in `system_prompts` table (database infrastructure already exists)
+    *   **POST-MVP Enhancements:**
+        *   Custom persona creation UI (user-defined system prompts)
+        *   Persona editing and deletion interface
+        *   Advanced provider configuration UI (API keys, custom endpoints)
 
 ### 2.7. Topic Research & Web Search
 *   **Description:** Enhance the conversational AI agent (Epic 1) with real-time web search capability to research topics, verify current trends, and incorporate up-to-date information into brainstorming sessions. When discussing video topics, the assistant can search for recent developments, trending content, current events, and factual information to provide more relevant and timely suggestions.
