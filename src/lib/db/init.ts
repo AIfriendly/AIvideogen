@@ -191,6 +191,23 @@ async function runMigrations(): Promise<void> {
     console.log(`Migration ${migration009Name} already applied, skipping`);
   }
 
+  // Migration 010: Add 'queued' to download_status CHECK constraint (Story 3.7b)
+  const migration010Name = '010_add_queued_status';
+  if (!isMigrationApplied(migration010Name)) {
+    console.log(`Applying migration: ${migration010Name}`);
+    try {
+      const { up } = await import('./migrations/010_add_queued_status');
+      up(db);
+      markMigrationApplied(migration010Name);
+      console.log(`Migration ${migration010Name} applied successfully`);
+    } catch (error) {
+      console.error(`Failed to apply migration ${migration010Name}:`, error);
+      throw error;
+    }
+  } else {
+    console.log(`Migration ${migration010Name} already applied, skipping`);
+  }
+
   console.log('All migrations completed');
 }
 

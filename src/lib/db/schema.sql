@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS visual_suggestions (
   rank INTEGER NOT NULL,
   duration INTEGER,
   default_segment_path TEXT,
-  download_status TEXT DEFAULT 'pending' CHECK(download_status IN ('pending', 'downloading', 'complete', 'error')),
+  download_status TEXT DEFAULT 'pending' CHECK(download_status IN ('pending', 'queued', 'downloading', 'complete', 'error')),
   created_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE,
   UNIQUE(scene_id, video_id)

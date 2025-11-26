@@ -88,7 +88,7 @@ function applyTestSchema(db: Database.Database): void {
       rank INTEGER NOT NULL,
       duration INTEGER NOT NULL,
       default_segment_path TEXT,
-      download_status TEXT DEFAULT 'pending' CHECK(download_status IN ('pending', 'downloading', 'complete', 'error')),
+      download_status TEXT DEFAULT 'pending' CHECK(download_status IN ('pending', 'queued', 'downloading', 'complete', 'error')),
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE,
       UNIQUE(scene_id, video_id)
