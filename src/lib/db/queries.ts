@@ -870,6 +870,7 @@ interface VisualSuggestionRow {
   duration: number | null;
   default_segment_path: string | null;
   download_status: string;
+  cv_score: number | null; // Story 3.7b: CV quality score 0-1
   created_at: string;
 }
 
@@ -889,6 +890,7 @@ export interface VisualSuggestion {
   duration: number | null;
   defaultSegmentPath: string | null;
   downloadStatus: string;
+  cvScore: number | null; // Story 3.7b: CV quality score 0-1
   createdAt: string;
 }
 
@@ -910,6 +912,7 @@ function transformVisualSuggestion(row: VisualSuggestionRow): VisualSuggestion {
     duration: row.duration,
     defaultSegmentPath: row.default_segment_path,
     downloadStatus: row.download_status,
+    cvScore: row.cv_score, // Story 3.7b: CV quality score
     createdAt: row.created_at
   };
 }

@@ -22,6 +22,41 @@ import {
 } from './types';
 
 // ============================================================================
+// CV Thresholds Constants (Story 3.7b)
+// ============================================================================
+
+/**
+ * CV Detection and Scoring Thresholds
+ *
+ * Story 3.7b: Stricter thresholds for better B-roll filtering
+ *
+ * Detection Thresholds:
+ * - TALKING_HEAD_AREA: 10% face area (was 15%) - AC60
+ * - SMALL_FACE_AREA: 3% face area for minor penalty (was 5%)
+ * - CAPTION_COVERAGE: 3% text coverage (was 5%) - AC61
+ * - CAPTION_BLOCKS: 2 text blocks (was 3) - AC61
+ *
+ * Scoring Penalties:
+ * - FACE_PENALTY_MAJOR: -0.6 for talking heads (was -0.5) - AC62
+ * - FACE_PENALTY_MINOR: -0.3 for small faces (was -0.2) - AC62
+ * - CAPTION_PENALTY: -0.4 for captions (was -0.3) - AC63
+ * - LABEL_MATCH_BONUS: +0.3 (unchanged)
+ */
+export const CV_THRESHOLDS = {
+  // Detection thresholds
+  TALKING_HEAD_AREA: 0.10,    // 10% face area triggers major penalty (was 0.15)
+  SMALL_FACE_AREA: 0.03,      // 3% face area triggers minor penalty (was 0.05)
+  CAPTION_COVERAGE: 0.03,     // 3% text coverage (was 0.05)
+  CAPTION_BLOCKS: 2,          // 2 text blocks triggers caption detection (was 3)
+
+  // Scoring penalties
+  FACE_PENALTY_MAJOR: -0.6,   // Heavy penalty for talking heads (was -0.5)
+  FACE_PENALTY_MINOR: -0.3,   // Small penalty for small faces (was -0.2)
+  CAPTION_PENALTY: -0.4,      // Penalty for captions (was -0.3)
+  LABEL_MATCH_BONUS: 0.3,     // Bonus for matching expected labels (unchanged)
+} as const;
+
+// ============================================================================
 // QuotaTracker Class
 // ============================================================================
 
@@ -355,7 +390,7 @@ export class VisionAPIClient {
     return {
       faces,
       totalFaceArea,
-      hasTalkingHead: totalFaceArea > 0.15 // 15% threshold
+      hasTalkingHead: totalFaceArea > CV_THRESHOLDS.TALKING_HEAD_AREA // Story 3.7b: 10% threshold (was 15%)
     };
   }
 
@@ -394,7 +429,8 @@ export class VisionAPIClient {
 
     return {
       texts,
-      hasCaption: textCoverage > 0.05 || textBlocks.length > 3, // 5% coverage or >3 text blocks
+      // Story 3.7b: Stricter thresholds - 3% coverage or >2 text blocks (was 5% or >3)
+      hasCaption: textCoverage > CV_THRESHOLDS.CAPTION_COVERAGE || textBlocks.length > CV_THRESHOLDS.CAPTION_BLOCKS,
       textCoverage
     };
   }
@@ -481,30 +517,32 @@ export class VisionAPIClient {
   /**
    * Calculate CV score based on analysis results
    *
+   * Story 3.7b: Updated scoring formula with stricter penalties
+   *
    * Formula:
    * - Base score: 1.0
-   * - Talking head (face >15%): -0.5
-   * - Small faces (face 5-15%): -0.2
-   * - Captions detected: -0.3
-   * - Label match bonus: +0.3 * matchScore
+   * - Talking head (face >10%): -0.6 (was -0.5 at 15%) - AC62
+   * - Small faces (face 3-10%): -0.3 (was -0.2 at 5-15%) - AC62
+   * - Captions detected: -0.4 (was -0.3) - AC63
+   * - Label match bonus: +0.3 * matchScore (unchanged)
    */
   private calculateCVScore(result: VisionAnalysisResult): number {
     let score = 1.0;
 
-    // Penalize face area (talking heads)
+    // Penalize face area (talking heads) - Story 3.7b: Stricter penalties
     if (result.faceDetection.hasTalkingHead) {
-      score -= 0.5; // Heavy penalty for >15% face area
-    } else if (result.faceDetection.totalFaceArea > 0.05) {
-      score -= 0.2; // Small penalty for 5-15% face area
+      score += CV_THRESHOLDS.FACE_PENALTY_MAJOR; // -0.6 for >10% face area (was -0.5)
+    } else if (result.faceDetection.totalFaceArea > CV_THRESHOLDS.SMALL_FACE_AREA) {
+      score += CV_THRESHOLDS.FACE_PENALTY_MINOR; // -0.3 for 3-10% face area (was -0.2)
     }
 
-    // Penalize text/captions
+    // Penalize text/captions - Story 3.7b: Stricter penalty
     if (result.textDetection.hasCaption) {
-      score -= 0.3;
+      score += CV_THRESHOLDS.CAPTION_PENALTY; // -0.4 (was -0.3)
     }
 
     // Bonus for matching labels
-    score += result.labelDetection.matchScore * 0.3;
+    score += result.labelDetection.matchScore * CV_THRESHOLDS.LABEL_MATCH_BONUS;
 
     // Clamp to 0-1 range
     return Math.max(0, Math.min(1, score));

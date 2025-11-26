@@ -16,12 +16,16 @@
 'use client';
 
 import * as React from 'react';
-import { type VisualSuggestion } from '@/types/visual-suggestions';
+import {
+  type VisualSuggestion,
+  filterSuggestionsByCVScore,
+  getFilteredSuggestionsCount
+} from '@/types/visual-suggestions';
 import { SuggestionCard } from './SuggestionCard';
 import { EmptyClipState } from './EmptyClipState';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, EyeOff } from 'lucide-react';
 import { useCurationStore } from '@/lib/stores/curation-store';
 import { toast } from '@/hooks/use-toast';
 
@@ -101,6 +105,25 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
       >
         Retry
       </Button>
+    </div>
+  );
+}
+
+/**
+ * Filtered Suggestions Info Component
+ *
+ * Story 3.7b AC66: Displays count of filtered low-quality videos
+ * Shows a subtle indicator when videos have been hidden due to low CV scores
+ */
+function FilteredSuggestionsInfo({ filteredCount }: { filteredCount: number }) {
+  if (filteredCount === 0) return null;
+
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+      <EyeOff className="w-3 h-3" aria-hidden="true" />
+      <span>
+        {filteredCount} low-quality video{filteredCount !== 1 ? 's' : ''} filtered
+      </span>
     </div>
   );
 }
@@ -230,29 +253,50 @@ export function VisualSuggestionGallery({
       )}
 
       {/* Suggestions Grid */}
-      {!loading && !error && suggestions.length > 0 && (
-        <div>
-          {/* Header */}
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Suggested Video Clips ({suggestions.length})
-            </h3>
-          </div>
+      {!loading && !error && suggestions.length > 0 && (() => {
+        // Story 3.7b: Filter suggestions by CV score (AC64, AC65)
+        const visibleSuggestions = filterSuggestionsByCVScore(suggestions);
+        const filteredCount = getFilteredSuggestionsCount(suggestions);
 
-          {/* Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            {suggestions.map((suggestion) => (
-              <SuggestionCard
-                key={suggestion.id}
-                suggestion={suggestion}
-                isSelected={currentSelection?.suggestionId === suggestion.id}
-                onSelect={() => handleSelectClip(suggestion)}
-                onClick={() => onSuggestionClick?.(suggestion)}
-              />
-            ))}
+        return (
+          <div>
+            {/* Header with filtered count */}
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Suggested Video Clips ({visibleSuggestions.length})
+              </h3>
+              {/* Story 3.7b AC66: Show filtered count */}
+              <FilteredSuggestionsInfo filteredCount={filteredCount} />
+            </div>
+
+            {/* Grid - only show visible (filtered) suggestions */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              {visibleSuggestions.map((suggestion) => (
+                <SuggestionCard
+                  key={suggestion.id}
+                  suggestion={suggestion}
+                  isSelected={currentSelection?.suggestionId === suggestion.id}
+                  onSelect={() => handleSelectClip(suggestion)}
+                  onClick={() => onSuggestionClick?.(suggestion)}
+                />
+              ))}
+            </div>
+
+            {/* Show empty state if all suggestions were filtered */}
+            {visibleSuggestions.length === 0 && filteredCount > 0 && (
+              <div className="py-8 text-center">
+                <EyeOff className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  All {filteredCount} suggestion{filteredCount !== 1 ? 's were' : ' was'} filtered due to low quality.
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Try regenerating visuals for better results.
+                </p>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

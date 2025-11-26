@@ -19,6 +19,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import db from '../db/client';
 import { downloadWithRetry, DownloadSegmentOptions } from './download-segment';
+import { analyzeVideoSuggestion, getCVFilterStatus } from '../vision/cv-filter-service';
 
 // ============================================================================
 // Types and Interfaces
@@ -304,6 +305,10 @@ export class DownloadQueue {
           );
 
           console.log(`[DownloadQueue] Job ${job.id} completed successfully`);
+
+          // Story 3.7b: Auto-trigger CV analysis after successful download
+          // Wrapped in try-catch to ensure CV failure doesn't block download success (AC59)
+          await this.triggerCVAnalysis(job.suggestionId, job.outputPath);
         } catch (accessError) {
           console.error(`[DownloadQueue] File not found after download: ${result.filePath}`);
           await this.updateDownloadStatus(job.suggestionId, 'error');
@@ -320,6 +325,85 @@ export class DownloadQueue {
       } catch (dbError) {
         console.error(`[DownloadQueue] Failed to update error status for job ${job.id}:`, dbError);
       }
+    }
+  }
+
+  // ==========================================================================
+  // CV Analysis Integration (Story 3.7b)
+  // ==========================================================================
+
+  /**
+   * Trigger CV analysis after successful download
+   *
+   * Story 3.7b: Auto-trigger CV analysis post-download
+   * - Fetches expected labels from scene's visual_keywords
+   * - Calls analyzeVideoSuggestion with suggestion ID, segment path, and expected labels
+   * - Graceful degradation: CV failures do not block download success (AC59)
+   *
+   * @param suggestionId - ID of the visual suggestion
+   * @param segmentPath - Relative path to the downloaded segment
+   */
+  private async triggerCVAnalysis(suggestionId: string, segmentPath: string): Promise<void> {
+    try {
+      // Check if Vision API is available before attempting analysis
+      const cvStatus = getCVFilterStatus();
+      if (!cvStatus.available) {
+        console.log(`[DownloadQueue] CV analysis skipped for ${suggestionId}: ${cvStatus.reason}`);
+        return;
+      }
+
+      // Fetch expected labels from scene's visual_keywords (AC67)
+      const expectedLabels = this.getExpectedLabelsForSuggestion(suggestionId);
+
+      console.log(`[DownloadQueue] Triggering CV analysis for ${suggestionId} with ${expectedLabels.length} expected labels`);
+
+      // Run CV analysis (this updates cv_score in database)
+      const cvResult = await analyzeVideoSuggestion(suggestionId, segmentPath, expectedLabels);
+
+      if (cvResult.analyzed) {
+        console.log(`[DownloadQueue] CV analysis complete for ${suggestionId}: cv_score = ${cvResult.cvScore}`);
+      } else {
+        console.warn(`[DownloadQueue] CV analysis not completed for ${suggestionId}: ${cvResult.reason}`);
+      }
+    } catch (error) {
+      // CV analysis failure should NOT block download success (AC59)
+      console.warn(`[DownloadQueue] CV analysis failed for ${suggestionId} (non-blocking):`, error);
+      // Don't rethrow - download is still successful
+    }
+  }
+
+  /**
+   * Get expected labels for CV analysis from scene's visual_keywords
+   *
+   * @param suggestionId - ID of the visual suggestion
+   * @returns Array of expected label strings
+   */
+  private getExpectedLabelsForSuggestion(suggestionId: string): string[] {
+    try {
+      const stmt = db.prepare(`
+        SELECT s.visual_keywords
+        FROM visual_suggestions vs
+        INNER JOIN scenes s ON vs.scene_id = s.id
+        WHERE vs.id = ?
+      `);
+
+      const result = stmt.get(suggestionId) as { visual_keywords: string | null } | undefined;
+
+      if (!result?.visual_keywords) {
+        return [];
+      }
+
+      // Parse JSON array of keywords
+      try {
+        const keywords = JSON.parse(result.visual_keywords);
+        return Array.isArray(keywords) ? keywords : [];
+      } catch (parseError) {
+        console.warn(`[DownloadQueue] Failed to parse visual_keywords for ${suggestionId}`);
+        return [];
+      }
+    } catch (error) {
+      console.warn(`[DownloadQueue] Failed to fetch visual_keywords for ${suggestionId}:`, error);
+      return [];
     }
   }
 
