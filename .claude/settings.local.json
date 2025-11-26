@@ -99,7 +99,10 @@
       "Bash(git diff-tree:*)",
       "Bash(git merge:*)",
       "SlashCommand(/bmad:bmm:workflows:story-context D:\\BMAD video generator\\docs\\stories\\story-5.1.md)",
-      "Bash(git check-ignore:*)"
+      "Bash(git check-ignore:*)",
+      "Bash(ffmpeg:*)",
+      "Bash(pip install:*)",
+      "Bash(./yt-dlp.exe:*)"
     ],
     "deny": [],
     "ask": []
