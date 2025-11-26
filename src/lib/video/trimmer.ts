@@ -40,7 +40,9 @@ export class Trimmer {
     }
 
     const videoDuration = await this.ffmpeg.getVideoDuration(videoPath);
-    const audioDuration = scene.clipDuration;
+    // CRITICAL: Use audioDuration (actual voiceover length), NOT clipDuration (YouTube video duration)
+    // Videos must be trimmed to match voiceover duration for proper audio sync
+    const audioDuration = scene.audioDuration;
     const outputPath = `${outputDir}/scene-${scene.sceneNumber}-trimmed.mp4`;
 
     // Log the operation
@@ -155,8 +157,8 @@ export class Trimmer {
     return {
       outputPath,
       originalDuration: videoDuration,
-      trimmedDuration: scene.clipDuration,
-      wasLooped: videoDuration < scene.clipDuration,
+      trimmedDuration: scene.audioDuration,
+      wasLooped: videoDuration < scene.audioDuration,
     };
   }
 }

@@ -102,6 +102,7 @@ export async function POST(
         s.text as scriptText,
         s.audio_file_path as audioFilePath,
         s.selected_clip_id as selectedClipId,
+        s.duration as audioDuration,
         vs.video_id as videoId,
         vs.duration as clipDuration
       FROM scenes s
@@ -123,6 +124,8 @@ export async function POST(
       selectedClipId: scene.selectedClipId,
       videoId: scene.videoId,
       clipDuration: scene.clipDuration,
+      audioDuration: scene.audioDuration, // Actual voiceover duration for audio timing
+      duration: scene.audioDuration, // Alias for backward compatibility
     }));
 
     // Validate all scenes have selections
@@ -222,7 +225,8 @@ export async function POST(
         console.log(`[Assembly] Completed job ${jobId} - Video saved to: ${finalPath}`);
       } catch (error) {
         console.error(`[Assembly] Job ${jobId} failed:`, error);
-        await videoAssembler.failJob(jobId, error.message || 'Unknown error');
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        await videoAssembler.failJob(jobId, errorMessage);
       }
     })();
 

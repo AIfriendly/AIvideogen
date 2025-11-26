@@ -7,6 +7,11 @@
 
 import db from '../client';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function up(_db?: unknown): void {
+  migrate008AssemblyJobs();
+}
+
 export function migrate008AssemblyJobs(): void {
   console.log('[Migration 008] Creating assembly_jobs table...');
 

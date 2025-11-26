@@ -80,6 +80,7 @@ export interface AssemblyScene {
   videoId: string;
   clipDuration: number;
   duration: number; // Alias for backward compatibility
+  audioDuration: number; // Actual voiceover duration (from scenes.duration)
   defaultSegmentPath?: string;
 }
 

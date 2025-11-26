@@ -7,7 +7,9 @@
 export const VIDEO_ASSEMBLY_CONFIG = {
   // Output formats
   VIDEO_CODEC: 'libx264',
-  AUDIO_CODEC: 'aac',
+  // Note: Using libmp3lame instead of aac for better player compatibility
+  // AAC encoding has issues with some players (e.g., Kiro IDE, some browsers)
+  AUDIO_CODEC: 'libmp3lame',
   CONTAINER: 'mp4',
 
   // Quality settings

@@ -303,7 +303,9 @@ export class VideoAssembler {
         startTime: currentTime,
       });
 
-      currentTime += scene.clipDuration;
+      // Use audioDuration (actual voiceover length) NOT clipDuration (original YouTube video length)
+      // The videos are trimmed to match audio duration, so timing must use the same value
+      currentTime += scene.audioDuration;
     }
 
     console.log(`[VideoAssembler] Overlaying ${audioInputs.length} audio tracks`);
