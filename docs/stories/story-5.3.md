@@ -2,10 +2,10 @@
 
 **Epic:** 5 - Video Assembly & Output
 **Story ID:** 5.3
-**Status:** Draft (Revised - Architect Feedback Addressed)
+**Status:** Complete (Bug Fix Applied 2025-11-25)
 **Priority:** High
 **Created:** 2025-11-24
-**Revised:** 2025-11-24
+**Revised:** 2025-11-25 (Bug Fix)
 **Implements:** FR-7.03, FR-7.04, FR-7.06
 
 ---
@@ -68,6 +68,64 @@
 - **Position:** 3 of 5
 - **Merges after:** Story 5.2 (Scene Video Trimming)
 - **Merges before:** Story 5.4 (Thumbnail Generation)
+
+---
+
+## Bug Fix History
+
+### BUG-001: Audio Timing Uses Wrong Duration Field (Fixed 2025-11-25)
+
+**Symptom:** Final assembled video had no audible audio or audio was severely misaligned.
+
+**Root Cause:** The `overlayAllAudio()` method was using `scene.clipDuration` (original YouTube video duration from `visual_suggestions.duration`) instead of `scene.audioDuration` (actual voiceover duration from `scenes.duration`) for calculating audio delay times.
+
+**Impact:**
+- Scene 1 audio: Correct (started at 0s)
+- Scene 2+ audio: Delayed too far because YouTube clips are longer than trimmed duration
+- Example: If YouTube clip was 76s but voiceover was 40s, scene 2 audio started at 76s instead of 40s
+- Result: Most audio delayed past end of video, appearing as silence
+
+**Fix Applied:**
+1. Added `audioDuration` field to `AssemblyScene` interface (`src/types/assembly.ts`)
+2. Updated assembly route to include `s.duration as audioDuration` in SQL query (`route.ts`)
+3. Changed `assembler.ts:308` from `scene.clipDuration` to `scene.audioDuration`
+
+**Files Changed:**
+- `src/types/assembly.ts` - Added `audioDuration` field
+- `src/app/api/projects/[id]/assemble/route.ts` - Added audioDuration to query and mapping
+- `src/lib/video/assembler.ts` - Fixed timing calculation
+
+**Prevention:** Updated this story's code examples and added prominent warnings about using `audioDuration` for timing.
+
+### BUG-002: AAC Audio Codec Playback Issue (Fixed 2025-11-25)
+
+**Symptom:** Final assembled video appeared to have no audio when played in certain players (Kiro IDE, some browsers), even though FFmpeg reported audio was present with valid volume levels.
+
+**Root Cause:** FFmpeg's AAC encoder (`-c:a aac`) produces audio that some players don't decode correctly. The audio stream existed and had valid volume (-24dB mean), but players couldn't play it.
+
+**Diagnosis Steps:**
+1. FFprobe showed audio stream existed with valid properties
+2. `volumedetect` filter showed -24dB mean volume (not silent)
+3. Source MP3 files played correctly
+4. Test video with `-c:a copy` (MP3 passthrough) had working audio
+5. Test video with `-c:a aac` (AAC re-encode) had no audible audio
+
+**Fix Applied:**
+Changed `VIDEO_ASSEMBLY_CONFIG.AUDIO_CODEC` in `constants.ts` from:
+```typescript
+AUDIO_CODEC: 'aac',  // Playback issues in some players
+```
+To:
+```typescript
+AUDIO_CODEC: 'libmp3lame',  // Better compatibility
+```
+
+**Files Changed:**
+- `src/lib/video/constants.ts` - Line 12
+
+**Prevention:** Added comment explaining why MP3 codec is used instead of AAC for player compatibility.
+
+**Note:** This may be specific to the FFmpeg build/version on the development machine. AAC should theoretically work, but MP3 provides better cross-player compatibility.
 
 ---
 
@@ -222,6 +280,9 @@ export class Concatenator {
   /**
    * Overlay multiple audio files sequentially onto concatenated video
    * Each audio starts at the corresponding scene's start time
+   *
+   * CRITICAL: Use audioDuration (voiceover length) NOT clipDuration (YouTube video length)
+   * Videos are trimmed to match audioDuration, so timing must use the same value.
    */
   async overlayAllAudio(
     concatenatedVideoPath: string,
@@ -229,6 +290,7 @@ export class Concatenator {
     outputPath: string
   ): Promise<string> {
     // Calculate cumulative start times for each scene
+    // IMPORTANT: Use audioDuration, NOT clipDuration!
     let currentTime = 0;
     const audioInputs: Array<{ path: string; startTime: number }> = [];
 
@@ -237,8 +299,9 @@ export class Concatenator {
         path: scene.audioFilePath,
         startTime: currentTime,
       });
-      currentTime += scene.clipDuration;
-    }
+      // Use audioDuration (actual voiceover length) for timing calculation
+      // NOT clipDuration (original YouTube video duration)
+      currentTime += scene.audioDuration;
 
     await this.ffmpeg.muxAudioVideo(
       concatenatedVideoPath,
@@ -687,8 +750,19 @@ The key to perfect synchronization is:
 2. **Concatenation (this story):** Videos join without gaps
 3. **Audio Overlay:** Each audio starts at cumulative time offset:
    - Scene 1 audio starts at 0s
-   - Scene 2 audio starts at Scene 1 duration
-   - Scene 3 audio starts at Scene 1 + Scene 2 duration
+   - Scene 2 audio starts at Scene 1 **audioDuration**
+   - Scene 3 audio starts at Scene 1 + Scene 2 **audioDuration**
+
+> **⚠️ CRITICAL BUG PREVENTION:**
+>
+> Always use `scene.audioDuration` (voiceover length from `scenes.duration`) for timing calculations.
+>
+> **NEVER** use `scene.clipDuration` (YouTube video length from `visual_suggestions.duration`).
+>
+> The videos are trimmed to match `audioDuration`, so audio timing must use the same value.
+> Using `clipDuration` causes audio to be delayed past video boundaries, resulting in silence.
+>
+> See BUG-001 in Bug Fix History for details.
 
 ### FFmpeg Concat Demuxer Approach
 

@@ -3,8 +3,37 @@
 **Date:** 2025-11-24
 **Author:** master
 **Epic ID:** 5
-**Status:** Parallel-Ready
+**Status:** Complete (Bug Fixes Applied 2025-11-25)
 **Stories:** 5
+**Revised:** 2025-11-25
+
+---
+
+## Bug Fix Summary (2025-11-25)
+
+Three critical bugs were discovered and fixed during integration testing:
+
+### BUG-001: Audio Timing Uses Wrong Duration Field (Story 5.3)
+- **Root Cause:** `assembler.ts` used `clipDuration` instead of `audioDuration` for audio delay calculation
+- **Impact:** Audio tracks delayed past video boundaries, resulting in silent video
+- **Fix:** Changed to use `scene.audioDuration` for timing
+
+### BUG-002: Trimmer Uses Wrong Duration Field (Story 5.2)
+- **Root Cause:** `trimmer.ts` used `clipDuration` instead of `audioDuration` for video trimming
+- **Impact:** Videos trimmed to wrong length, causing duration mismatch
+- **Fix:** Changed to use `scene.audioDuration` for trimming
+
+### BUG-003: AAC Audio Codec Playback Issue (Story 5.3)
+- **Root Cause:** FFmpeg's AAC encoder produces audio incompatible with some players
+- **Impact:** Video appeared silent in Kiro IDE and some browsers
+- **Fix:** Changed `AUDIO_CODEC` from `'aac'` to `'libmp3lame'` in constants.ts
+
+**Files Modified:**
+- `src/lib/video/assembler.ts` - Audio timing fix
+- `src/lib/video/trimmer.ts` - Trimming duration fix
+- `src/lib/video/constants.ts` - Audio codec fix
+- `src/types/assembly.ts` - Added `audioDuration` field
+- `src/app/api/projects/[id]/assemble/route.ts` - Added audioDuration to query
 
 ---
 
@@ -90,12 +119,37 @@ export interface AssemblyJob {
 }
 
 export interface AssemblyScene {
-  scene_number: number;
-  video_path: string;        // Path to selected clip segment
-  audio_path: string;        // Path to voiceover MP3
-  duration: number;          // Voiceover duration in seconds
-  script_text: string;       // For reference
+  sceneId: string;           // Scene database ID
+  sceneNumber: number;       // Scene order (1-based)
+  scene_number: number;      // Alias for backward compatibility
+  video_path: string;        // Path to downloaded/trimmed video segment
+  audio_path: string;        // Path to voiceover MP3 (alias: audioFilePath)
+  audioFilePath: string;     // Path to voiceover MP3
+  script_text: string;       // Scene script text (alias: scriptText)
+  scriptText: string;        // Scene script text
+  selectedClipId: string;    // Selected visual_suggestion ID
+  videoId: string;           // YouTube video ID for download
+  clipDuration: number;      // Original YouTube clip duration (for download buffer)
+  audioDuration: number;     // **CRITICAL**: Actual voiceover duration - used for audio timing
+  duration: number;          // Alias for audioDuration (backward compatibility)
+  defaultSegmentPath?: string; // Path for trimmer input
 }
+
+// IMPORTANT: Audio Timing Implementation Note
+// -------------------------------------------------
+// When overlaying audio tracks in Story 5.3, the timing calculation MUST use
+// `audioDuration` (the actual voiceover length from scenes.duration), NOT
+// `clipDuration` (the original YouTube video duration from visual_suggestions.duration).
+//
+// The videos are trimmed to match voiceover duration, so audio delays must
+// accumulate based on audioDuration:
+//   Scene 1 audio starts at: 0
+//   Scene 2 audio starts at: scene1.audioDuration
+//   Scene 3 audio starts at: scene1.audioDuration + scene2.audioDuration
+//   etc.
+//
+// Using clipDuration would cause audio to be delayed past the trimmed video
+// boundaries, resulting in silent or misaligned audio.
 
 export interface AssemblyRequest {
   project_id: string;
@@ -498,6 +552,14 @@ api_contracts:
   consumes:
     - endpoint: "Internal: VideoAssembler.concatenateScenes()"
       provider_story: "5.1"
+
+implementation_notes:
+  audio_timing_critical: |
+    CRITICAL: When calculating audio delay times for muxAudioVideo(), MUST use
+    scene.audioDuration (voiceover length from scenes.duration), NOT scene.clipDuration
+    (YouTube video duration). Videos are trimmed to audioDuration, so timing must match:
+      currentTime += scene.audioDuration;  // CORRECT
+      currentTime += scene.clipDuration;   // WRONG - causes audio sync issues
 
 naming_conventions:
   file_prefix: "concat-"
@@ -943,7 +1005,10 @@ Each agent should verify before committing:
 **Story 5.3:**
 - AC1: Given 3 trimmed scenes (5s, 7s, 8s), final video is 20s
 - AC2: Scenes appear in correct order
-- AC3: Voiceover audio syncs with corresponding scene
+- AC3: Voiceover audio syncs with corresponding scene (audio timing uses audioDuration, not clipDuration)
+- AC3.1: Scene 1 audio starts at 0s
+- AC3.2: Scene N audio starts at sum of previous scenes' audioDuration values
+- AC3.3: Total audio duration matches total video duration (no silent gaps at end)
 - AC4: Final format: H.264 video, AAC audio, MP4 container
 
 **Story 5.4:**

@@ -1,0 +1,272 @@
+<story-context id="story-3.7b" v="1.0">
+  <metadata>
+    <epicId>3</epicId>
+    <storyId>3.7b</storyId>
+    <title>CV Pipeline Integration</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-25</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/stories-epic-3/story-3.7b.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>creator generating video content</asA>
+    <iWant>the CV filtering to automatically run after each video segment downloads and hide low-quality results from my view</iWant>
+    <soThat>I only see pure B-roll footage without having to manually trigger analysis or sift through garbage results</soThat>
+    <tasks>
+      <task id="1" name="Modify Download Segments Route for Auto CV Trigger" acs="AC58,AC59,AC67">
+        <subtask>1.1 Import analyzeVideoSuggestion from @/lib/vision</subtask>
+        <subtask>1.2 Import getCVFilterStatus to check Vision API availability</subtask>
+        <subtask>1.3 After successful segment download, check if Vision API is available</subtask>
+        <subtask>1.4 Fetch scene data to get visual_keywords for expected labels</subtask>
+        <subtask>1.5 Call analyzeVideoSuggestion(suggestionId, segmentPath, expectedLabels)</subtask>
+        <subtask>1.6 Wrap CV analysis in try-catch to not block download success (AC59)</subtask>
+        <subtask>1.7 Log CV analysis results (success or failure)</subtask>
+        <subtask>1.8 Write integration test for auto CV trigger</subtask>
+      </task>
+      <task id="2" name="Tighten CV Detection Thresholds" acs="AC60,AC61">
+        <subtask>2.1 Create CV_THRESHOLDS constant object in lib/vision/client.ts</subtask>
+        <subtask>2.2 Update TALKING_HEAD_AREA from 0.15 to 0.10 (AC60)</subtask>
+        <subtask>2.3 Update SMALL_FACE_AREA from 0.05 to 0.03</subtask>
+        <subtask>2.4 Update CAPTION_COVERAGE from 0.05 to 0.03 (AC61)</subtask>
+        <subtask>2.5 Update CAPTION_BLOCKS from 3 to 2 (AC61)</subtask>
+        <subtask>2.6 Write unit tests for new threshold values</subtask>
+      </task>
+      <task id="3" name="Update CV Score Calculation" acs="AC62,AC63">
+        <subtask>3.1 Update FACE_PENALTY_MAJOR from -0.5 to -0.6 (AC62)</subtask>
+        <subtask>3.2 Update FACE_PENALTY_MINOR from -0.2 to -0.3 (AC62)</subtask>
+        <subtask>3.3 Update CAPTION_PENALTY from -0.3 to -0.4 (AC63)</subtask>
+        <subtask>3.4 Refactor calculateCVScore() to use CV_THRESHOLDS constants</subtask>
+        <subtask>3.5 Update face detection logic with new thresholds</subtask>
+        <subtask>3.6 Update caption detection logic with new thresholds</subtask>
+        <subtask>3.7 Write unit tests for updated penalty values</subtask>
+      </task>
+      <task id="4" name="Add UI Filtering for Low CV Scores" acs="AC64,AC65,AC66">
+        <subtask>4.1 Identify visual curation component that displays suggestions</subtask>
+        <subtask>4.2 Create getFilteredSuggestions() function with cv_score >= 0.5 filter (AC64)</subtask>
+        <subtask>4.3 Handle NULL cv_score - show these suggestions (AC65)</subtask>
+        <subtask>4.4 Create FilteredSuggestionsInfo component for count display (AC66)</subtask>
+        <subtask>4.5 Integrate filtering and info display into visual curation UI</subtask>
+        <subtask>4.6 Write component tests for UI filtering behavior</subtask>
+      </task>
+      <task id="5" name="Manual Validation" acs="AC68">
+        <subtask>5.1 Process 10 test scenes covering different content types</subtask>
+        <subtask>5.2 Verify CV analysis runs automatically after downloads</subtask>
+        <subtask>5.3 Verify low cv_score suggestions are hidden in UI</subtask>
+        <subtask>5.4 Verify >90% of visible results are pure B-roll</subtask>
+        <subtask>5.5 Document results in Dev Agent Record</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <ac id="58" name="Auto-Trigger CV Analysis">
+      CV analysis must automatically trigger after each segment download completes (no manual API call required)
+    </ac>
+    <ac id="59" name="CV Failure Graceful Degradation">
+      CV analysis failure must not block download success (cv_score remains NULL, error logged)
+    </ac>
+    <ac id="60" name="Stricter Face Detection Threshold">
+      Videos with face area >10% must be flagged as talking heads (was 15%)
+    </ac>
+    <ac id="61" name="Stricter Caption Detection Threshold">
+      Videos with text coverage >3% OR >2 text blocks must be flagged as having captions (was 5% or 3 blocks)
+    </ac>
+    <ac id="62" name="Increased Face Penalty">
+      Major face violation (>10%) applies -0.6 penalty (was -0.5), minor (3-10%) applies -0.3 (was -0.2)
+    </ac>
+    <ac id="63" name="Increased Caption Penalty">
+      Caption detection applies -0.4 penalty (was -0.3)
+    </ac>
+    <ac id="64" name="UI Hides Low CV Scores">
+      Suggestions with cv_score less than 0.5 must be hidden from visual curation view
+    </ac>
+    <ac id="65" name="NULL CV Scores Remain Visible">
+      Suggestions with cv_score = NULL (not yet analyzed) must remain visible
+    </ac>
+    <ac id="66" name="Filtered Count Display">
+      UI must display "X low-quality video(s) filtered" message
+    </ac>
+    <ac id="67" name="Expected Labels Passed to CV Analysis">
+      visual_keywords from scene must be passed as expectedLabels for label matching
+    </ac>
+    <ac id="68" name="Improved B-Roll Quality Validation">
+      Manual validation of 10 test scenes must show >90% pure B-roll in visible results
+    </ac>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/tech-spec-epic-3.md</path>
+        <title>Epic 3 Technical Specification</title>
+        <section>Story 3.7b - CV Pipeline Integration</section>
+        <snippet>Auto-trigger CV analysis after segment download, stricter thresholds (10% face, 3% text), UI filtering for cv_score less than 0.5</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <title>System Architecture</title>
+        <section>Implementation Patterns, Error Handling</section>
+        <snippet>Error isolation pattern - CV failures should never block download workflow. Graceful degradation for API quota exceeded.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/stories-epic-3/story-3.7.md</path>
+        <title>Story 3.7 - Computer Vision Content Filtering</title>
+        <section>Full story - parent implementation</section>
+        <snippet>Established Vision API client, frame extraction, CV score calculation. Manual endpoint only - not integrated into pipeline.</snippet>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <title>Product Requirements Document</title>
+        <section>Feature 1.5 - AI-Powered Visual Sourcing</section>
+        <snippet>B-roll quality requirements - pure footage without talking heads, commentary, or burned-in captions</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Definitions</title>
+        <section>Epic 3 - Visual Content Sourcing</section>
+        <snippet>YouTube API integration, content filtering, CV-based quality scoring</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>ai-video-generator/src/app/api/projects/[id]/download-segments/route.ts</path>
+        <kind>API Route</kind>
+        <symbol>POST handler</symbol>
+        <lines>203-353</lines>
+        <reason>Primary modification target - add auto CV trigger after segment download completes. Currently queues jobs without CV analysis.</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/lib/vision/client.ts</path>
+        <kind>Service</kind>
+        <symbol>VisionAPIClient, calculateCVScore</symbol>
+        <lines>491-511</lines>
+        <reason>Threshold and penalty updates. Current values: 0.15 face, 0.05 text, -0.5/-0.3 penalties. Change to: 0.10 face, 0.03 text, -0.6/-0.4 penalties.</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/lib/vision/client.ts</path>
+        <kind>Service</kind>
+        <symbol>processFaceDetection, processTextDetection</symbol>
+        <lines>327-399</lines>
+        <reason>Detection threshold logic - hasTalkingHead uses 0.15, hasCaption uses 0.05/3 blocks. Update thresholds.</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/lib/vision/cv-filter-service.ts</path>
+        <kind>Service</kind>
+        <symbol>analyzeVideoSuggestion, getCVFilterStatus</symbol>
+        <lines>96-150</lines>
+        <reason>Core function to call for auto CV analysis. Already handles graceful degradation. Import into download-segments route.</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/app/projects/[id]/visual-curation/VisualCurationClient.tsx</path>
+        <kind>Component</kind>
+        <symbol>VisualCurationClient</symbol>
+        <lines>1-100</lines>
+        <reason>UI filtering target - add getFilteredSuggestions() and FilteredSuggestionsInfo component</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/components/features/curation/SceneCard.tsx</path>
+        <kind>Component</kind>
+        <symbol>SceneCard</symbol>
+        <reason>May need modification to display cv_score or filtered indicators per suggestion</reason>
+      </file>
+      <file>
+        <path>ai-video-generator/src/lib/youtube/download-queue.ts</path>
+        <kind>Service</kind>
+        <symbol>DownloadJob, downloadQueue</symbol>
+        <reason>Job completion callback location - alternative integration point for auto CV trigger</reason>
+      </file>
+    </code>
+
+    <dependencies>
+      <npm>
+        <package name="@google-cloud/vision" version="^4.3.3">Google Cloud Vision API client for face/text/label detection</package>
+        <package name="better-sqlite3" version="^12.4.1">Database for cv_score storage</package>
+        <package name="next" version="16.0.1">Framework - API routes</package>
+        <package name="react" version="19.2.0">UI components</package>
+        <package name="vitest" version="^1.6.1">Testing framework</package>
+        <package name="@testing-library/react" version="^14.3.1">Component testing</package>
+      </npm>
+      <external>
+        <tool name="ffmpeg">Frame extraction from video segments (required by lib/vision/frame-extractor.ts)</tool>
+        <api name="Google Cloud Vision API">Face detection, OCR, label detection - requires GOOGLE_APPLICATION_CREDENTIALS</api>
+      </external>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="error-handling">
+      CV analysis failure must NEVER block download workflow. Wrap all CV calls in try-catch with console.warn logging. Download marked successful regardless of CV outcome.
+    </constraint>
+    <constraint type="architecture">
+      Follow existing two-tier filtering architecture: Tier 1 (keyword) runs at search time, Tier 2 (Vision API) runs post-download. This story integrates Tier 2 into automatic pipeline.
+    </constraint>
+    <constraint type="quota">
+      Vision API has 1000 units/month free tier. Each frame analysis uses 3 units (face + text + label). QuotaTracker already implemented in client.ts. Graceful fallback when exceeded.
+    </constraint>
+    <constraint type="testing">
+      Use Vitest for unit/integration tests. Component tests with @testing-library/react. Follow existing test patterns in tests/unit/ and tests/api/ directories.
+    </constraint>
+    <constraint type="performance">
+      CV analysis should complete in less than 5 seconds per suggestion (3 frames x Vision API call). If slower, don't block download completion - run async.
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>analyzeVideoSuggestion</name>
+      <kind>function</kind>
+      <signature>async function analyzeVideoSuggestion(suggestionId: string, segmentPath: string, expectedLabels: string[]): Promise&lt;CVFilterResult&gt;</signature>
+      <path>ai-video-generator/src/lib/vision/cv-filter-service.ts</path>
+    </interface>
+    <interface>
+      <name>getCVFilterStatus</name>
+      <kind>function</kind>
+      <signature>function getCVFilterStatus(): CVFilterStatus</signature>
+      <path>ai-video-generator/src/lib/vision/cv-filter-service.ts</path>
+    </interface>
+    <interface>
+      <name>visionClient.isAvailable</name>
+      <kind>method</kind>
+      <signature>isAvailable(): boolean</signature>
+      <path>ai-video-generator/src/lib/vision/client.ts</path>
+    </interface>
+    <interface>
+      <name>CVFilterResult</name>
+      <kind>type</kind>
+      <signature>{ suggestionId: string; cvScore: number | null; analyzed: boolean; reason?: string; faceDetected?: boolean; textDetected?: boolean; labelMatchScore?: number }</signature>
+      <path>ai-video-generator/src/lib/vision/cv-filter-service.ts</path>
+    </interface>
+    <interface>
+      <name>visual_suggestions.cv_score</name>
+      <kind>database column</kind>
+      <signature>cv_score REAL (nullable, 0-1 range)</signature>
+      <path>ai-video-generator/src/lib/db/schema.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Use Vitest with @testing-library/react for component tests. Unit tests in tests/unit/, API tests in tests/api/, integration tests in tests/integration/. Mock Vision API calls to avoid quota usage. Use existing mock patterns from tests/__mocks__/.
+    </standards>
+    <locations>
+      <location>tests/unit/vision/*.test.ts</location>
+      <location>tests/api/download-segments.test.ts</location>
+      <location>tests/integration/cv-filtering.test.ts</location>
+      <location>tests/components/visual-curation/*.test.tsx</location>
+    </locations>
+    <ideas>
+      <idea ac="58">Integration test: Mock downloadQueue completion, verify analyzeVideoSuggestion called with correct params</idea>
+      <idea ac="59">Unit test: Mock Vision API to throw error, verify download still marked successful, cv_score stays NULL</idea>
+      <idea ac="60">Unit test: processFaceDetection with 12% face area returns hasTalkingHead=true (was false at 15%)</idea>
+      <idea ac="61">Unit test: processTextDetection with 4% text coverage returns hasCaption=true (was false at 5%)</idea>
+      <idea ac="62">Unit test: calculateCVScore with talking head returns 0.4 (base 1.0 - 0.6 penalty)</idea>
+      <idea ac="63">Unit test: calculateCVScore with captions returns 0.6 (base 1.0 - 0.4 penalty)</idea>
+      <idea ac="64">Component test: Render suggestions with cv_score 0.3, verify not visible</idea>
+      <idea ac="65">Component test: Render suggestions with cv_score NULL, verify visible</idea>
+      <idea ac="66">Component test: Render with 3 filtered suggestions, verify "3 low-quality videos filtered" displayed</idea>
+      <idea ac="67">Integration test: Verify scene.visual_keywords passed to analyzeVideoSuggestion as expectedLabels</idea>
+    </ideas>
+  </tests>
+</story-context>

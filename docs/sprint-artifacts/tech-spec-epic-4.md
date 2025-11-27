@@ -51,7 +51,11 @@ The interface is built on Next.js 15.5 with shadcn/ui components (per UX specifi
 **Integration Points:**
 - **Epic 2 Integration:** Reads `scenes.text`, `scenes.audio_file_path`, `scenes.duration` for display
 - **Epic 3 Integration:** Consumes `visual_suggestions` data (videoId, title, thumbnail, duration, download status, segment paths)
-- **Epic 5 Integration:** Passes complete scene data with `selected_clip_id` to assembly endpoint
+- **Epic 5 Integration (UPDATED 2025-11-25):** Full pipeline integration via `/api/projects/[id]/assemble` endpoint
+  - Orchestrates VideoAssembler (Story 5.1), Trimmer (Story 5.2), and Concatenator (Story 5.3)
+  - Implements YouTube download stage before video processing
+  - Returns `assemblyJobId` for async job tracking
+  - Final output: `public/videos/{projectId}/final.mp4`
 
 **Constraints from Architecture:**
 - Desktop-first responsive design (1920px primary, 768px tablet minimum)
@@ -224,33 +228,27 @@ interface AssemblyRequest {
    - **Error 400:** Invalid sceneId or suggestionId
    - **Error 409:** Suggestion does not belong to specified scene
 
-4. **POST /api/projects/[id]/assemble** (Story 4.5)
-   - **Purpose:** Trigger Epic 5 video assembly process
-   - **Request:**
+4. **POST /api/projects/[id]/assemble** (Story 4.5 - UPDATED INTEGRATION 2025-11-25)
+   - **Purpose:** Trigger Epic 5 video assembly process with full pipeline orchestration
+   - **Implementation Details:**
+     - Validates all scenes have clip selections (INNER JOIN scenes + visual_suggestions)
+     - Creates async assembly job via VideoAssembler (Epic 5 Story 5.1)
+     - Downloads YouTube videos using yt-dlp with retry logic (added download stage)
+     - Trims videos to match audio duration via Trimmer (Epic 5 Story 5.2)
+     - Concatenates scenes and overlays audio via Concatenator (Epic 5 Story 5.3)
+   - **Request:** No body required (pulls data from database)
+   - **Response 200:**
      ```json
      {
-       "scenes": [
-         {
-           "sceneId": "scene-1",
-           "sceneNumber": 1,
-           "scriptText": "...",
-           "audioFilePath": ".cache/audio/abc123/scene-1.mp3",
-           "selectedClipId": "sugg-1",
-           "videoId": "dQw4w9WgXcQ",
-           "clipDuration": 45
-         }
-       ]
-     }
-     ```
-   - **Response 202:**
-     ```json
-     {
-       "assemblyJobId": "job-xyz",
-       "status": "queued",
-       "message": "Video assembly started"
+       "assemblyJobId": "d5557468-f23c-4040-baa4-28f76c2e92ff",
+       "status": "processing",
+       "message": "Video assembly started - processing in background",
+       "sceneCount": 4
      }
      ```
    - **Error 400:** Incomplete scene selections
+   - **Database:** Migration 009 adds 'downloading' stage to assembly_jobs
+   - **Output:** Final video at `public/videos/{projectId}/final.mp4`
 
 ### Workflows and Sequencing
 
@@ -749,3 +747,74 @@ IF user accesses /visual-curation with wrong current_step:
 - Manual test: Complete selection workflow in <2 minutes
 - Manual test: Verify responsive layout on 1920px and 768px viewports
 - Manual test: Keyboard navigation (Tab, Space, Esc) works for all interactions
+
+---
+
+## Integration Notes (Added 2025-11-25)
+
+### Epic 5 Integration Completed
+
+The `/api/projects/[id]/assemble` endpoint (Story 4.5) has been fully integrated with the Epic 5 video assembly pipeline. This integration bridges the Visual Curation Interface (Epic 4) with the Video Assembly Pipeline (Epic 5), enabling end-to-end video generation from clip selection to final output.
+
+**Key Integration Changes:**
+
+1. **Assembly Endpoint Enhancement:**
+   - Endpoint no longer creates placeholder jobs
+   - Now orchestrates full Epic 5 pipeline (Stories 5.1, 5.2, 5.3)
+   - Implements async job processing with progress tracking
+
+2. **YouTube Download Stage:**
+   - Added download stage before video trimming
+   - Uses yt-dlp with retry logic and error classification
+   - Security-hardened path validation prevents traversal attacks
+   - Downloads to `.cache/videos/{projectId}/scene-{sceneNumber}-source.mp4`
+
+3. **Data Contract Updates:**
+   - AssemblyScene interface includes `defaultSegmentPath` for Trimmer compatibility
+   - Added backward-compatible aliases for field names
+   - INNER JOIN ensures data integrity (scenes + visual_suggestions)
+
+4. **Database Migration:**
+   - Migration 009: Added 'downloading' to assembly_jobs stages
+   - Updated AssemblyStage TypeScript type
+   - Maintains backward compatibility with existing jobs
+
+5. **Error Handling:**
+   - Retryable vs permanent error classification
+   - Exponential backoff (1s, 2s, 4s) for network failures
+   - Proper cleanup of temp directories on failure
+
+**Integration Testing Requirements:**
+
+```typescript
+// Full pipeline integration test
+it('should complete assembly from clip selection to final video', async () => {
+  // Setup project with selected clips
+  const projectId = await setupProjectWithSelections();
+
+  // Trigger assembly
+  const response = await fetch(`/api/projects/${projectId}/assemble`, {
+    method: 'POST'
+  });
+  const { assemblyJobId } = await response.json();
+
+  // Wait for completion
+  await waitForJobCompletion(assemblyJobId);
+
+  // Verify final output
+  const videoPath = `public/videos/${projectId}/final.mp4`;
+  expect(fs.existsSync(videoPath)).toBe(true);
+});
+```
+
+**Verified Output:**
+- Successfully assembled 4-scene video (53.2MB)
+- Downloaded scenes: 131s, 72s, 57s, 50s
+- Trimming with looping for short clips
+- Final output: `public/videos/{projectId}/final.mp4`
+
+**Future Considerations:**
+- Parallel download optimization for multiple scenes
+- Stream processing for large videos
+- CDN integration for final video distribution
+- Analytics for clip selection patterns

@@ -58,9 +58,11 @@ function checkFFmpeg() {
   log('Checking FFmpeg installation...', 'info');
   try {
     const version = execSync(`${config.ffmpegPath} -version`, { encoding: 'utf8' });
-    const versionMatch = version.match(/ffmpeg version (\d+\.\d+)/);
-    if (versionMatch) {
-      log(`✓ FFmpeg ${versionMatch[1]} found`, 'success');
+    // Match various ffmpeg version formats (including git builds)
+    const versionMatch = version.match(/ffmpeg version (\d+\.\d+|[\w\-\.]+)/);
+    if (versionMatch || version.includes('ffmpeg version')) {
+      const versionStr = versionMatch ? versionMatch[1] : 'detected';
+      log(`✓ FFmpeg ${versionStr} found`, 'success');
       return true;
     }
   } catch (error) {
@@ -97,11 +99,10 @@ function generateTestVideo(spec) {
   log(`Generating test video: ${spec.name} (${spec.duration}s, ${spec.resolution}, ${spec.fps}fps)...`, 'info');
 
   try {
-    // Generate test video with color bars and timecode
+    // Generate test video with color bars
     // Color bars pattern helps with visual quality assessment
+    // Note: Simplified without drawtext to avoid fontconfig issues on Windows
     const cmd = `${config.ffmpegPath} -f lavfi -i testsrc=duration=${spec.duration}:size=${spec.resolution}:rate=${spec.fps} ` +
-                `-vf "drawtext=text='${spec.name}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=50:box=1:boxcolor=black@0.5:boxborderw=10," +
-                `drawtext=text='%{pts\\:hms}':fontsize=36:fontcolor=yellow:x=(w-text_w)/2:y=(h-100):box=1:boxcolor=black@0.5:boxborderw=5" ` +
                 `-c:v libx264 -preset medium -crf 23 -pix_fmt yuv420p -y "${outputPath}"`;
 
     execSync(cmd, { stdio: 'pipe' });

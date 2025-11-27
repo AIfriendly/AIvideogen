@@ -1,12 +1,15 @@
 # Epic Technical Specification: Visual Content Sourcing (YouTube API)
 
-Date: 2025-11-22 (Updated)
+Date: 2025-11-26 (Updated)
 Author: master
 Epic ID: 3
 Status: Production Ready
-Version: 3.0
+Version: 3.3
 
 **Version History:**
+- v3.3 (2025-11-26): Bug fix - added migration 011 for visual_keywords column in scenes table (required for CV label matching)
+- v3.2 (2025-11-26): Story 3.7b implementation complete - added trigger-downloads.ts, migration 010 for 'queued' status, Tasks 1-6 verified
+- v3.1 (2025-11-25): Added Story 3.7b (CV Pipeline Integration) - auto-trigger CV analysis after segment download, stricter thresholds, UI filtering
 - v3.0 (2025-11-22): Added Stories 3.2b (Enhanced Query Generation) and 3.7 (Computer Vision Content Filtering)
 - v2.0 (2025-11-16): Added Stories 3.4 (Duration Filtering) and 3.6 (Default Segment Downloads)
 - v1.0 (2025-11-13): Initial specification for Stories 3.1-3.5
@@ -50,17 +53,21 @@ This epic transforms the manual process of searching for video clips into an aut
 
 ## System Architecture Alignment
 
-This epic integrates with the existing architecture by extending the API layer with YouTube integration capabilities, adding video download infrastructure using yt-dlp, **adding Google Cloud Vision API for content validation**, leveraging the LLM provider abstraction from Epic 1, and building upon the database schema from Epic 2. Key architectural components:
+This epic integrates with the existing architecture by extending the API layer with YouTube integration capabilities, adding video download infrastructure using yt-dlp, **adding Google Cloud Vision API for content validation**, **automatic CV pipeline integration for quality enforcement (Story 3.7b)**, leveraging the LLM provider abstraction from Epic 1, and building upon the database schema from Epic 2. Key architectural components:
 
 - **lib/youtube/**: New module for YouTube API integration including client, analysis, and filtering with duration support
 - **lib/youtube/entity-extractor.ts**: Entity extraction for specific subjects (Story 3.2b)
 - **lib/youtube/query-optimizer.ts**: Platform-optimized query generation with negative terms (Story 3.2b)
+- **lib/youtube/trigger-downloads.ts**: Auto-trigger segment downloads after visual generation (Story 3.7b)
+- **lib/youtube/download-queue.ts**: Concurrent download queue with max 3 parallel downloads and CV analysis integration (Story 3.7b)
 - **lib/vision/**: New module for Google Cloud Vision API integration (Story 3.7)
 - **lib/vision/client.ts**: VisionAPIClient with quota management
 - **lib/vision/analyze-content.ts**: Face detection, OCR, and label verification
 - **lib/vision/frame-extractor.ts**: FFmpeg-based frame extraction from video segments
 - **lib/video/**: New module for yt-dlp video download service (Story 3.6)
-- **Database Extensions**: visual_suggestions table with foreign keys to scenes, duration tracking, download status, and cv_score
+- **Database Extensions**: visual_suggestions table with foreign keys to scenes, duration tracking, download status ('pending', 'queued', 'downloading', 'complete', 'error'), and cv_score; scenes table extended with visual_keywords column
+- **lib/db/migrations/010_add_queued_status.ts**: Migration to add 'queued' status to download_status CHECK constraint (Story 3.7b)
+- **lib/db/migrations/011_add_visual_keywords.ts**: Migration to add visual_keywords column to scenes table for CV label matching (Story 3.7b bug fix)
 - **API Endpoints**: /api/projects/[id]/generate-visuals, /api/projects/[id]/visual-suggestions, /api/projects/[id]/download-default-segments, and /api/projects/[id]/cv-filter
 - **LLM Integration**: Reuses provider abstraction for scene analysis prompts and expected label generation
 - **File Storage**: .cache/videos/{projectId}/ for downloaded video segments (audio stripped)
@@ -773,6 +780,153 @@ export function VideoPreviewPlayer({ videoPath }: Props) {
 }
 ```
 
+### CV Pipeline Integration (Story 3.7b)
+
+**Goal:** Integrate CV filtering into the download pipeline automatically and enforce quality thresholds in the UI to ensure users only see pure B-roll footage.
+
+**Problem Statement:** Story 3.7 implemented CV filtering as a standalone service with a manual API endpoint (`POST /api/projects/[id]/cv-analysis`), but this was never integrated into the visual sourcing workflow. Users see low-quality B-roll because:
+1. CV analysis is never automatically triggered
+2. Low cv_score suggestions are not filtered from the UI
+3. Detection thresholds may be too lenient
+
+**Components:**
+- `app/api/projects/[id]/download-segments/route.ts` - Auto-trigger CV analysis post-download
+- `lib/vision/client.ts` - Tightened detection thresholds
+- Visual curation UI components - Filter low cv_score from display
+
+**Implementation: Auto-Trigger CV Analysis**
+```typescript
+// app/api/projects/[id]/download-segments/route.ts - MODIFIED
+import { analyzeVideoSuggestion } from '@/lib/vision';
+
+// After successful segment download:
+async function handleSegmentDownload(suggestion: VisualSuggestion, segmentPath: string) {
+  // ... existing download logic ...
+
+  // NEW: Auto-trigger CV analysis after download completes
+  if (segmentPath && visionClient.isAvailable()) {
+    try {
+      // Get expected labels from scene analysis
+      const scene = getSceneById(suggestion.scene_id);
+      const expectedLabels = scene.visual_keywords
+        ? JSON.parse(scene.visual_keywords)
+        : [];
+
+      // Run CV analysis
+      const cvResult = await analyzeVideoSuggestion(
+        suggestion.id,
+        segmentPath,
+        expectedLabels
+      );
+
+      console.log(`[Download] CV analysis complete for ${suggestion.id}: cv_score = ${cvResult.cvScore}`);
+    } catch (error) {
+      // CV analysis failure should not block download success
+      console.warn(`[Download] CV analysis failed for ${suggestion.id}:`, error);
+    }
+  }
+
+  return { success: true, segmentPath };
+}
+```
+
+**Implementation: Stricter CV Thresholds**
+```typescript
+// lib/vision/client.ts - MODIFIED thresholds
+
+// OLD thresholds (Story 3.7):
+// - Talking head: face area > 15%
+// - Caption: text coverage > 5% OR > 3 text blocks
+// - Face penalty: -0.5
+// - Caption penalty: -0.3
+
+// NEW thresholds (Story 3.7b):
+const CV_THRESHOLDS = {
+  TALKING_HEAD_AREA: 0.10,      // 10% face area (was 15%)
+  SMALL_FACE_AREA: 0.03,        // 3% triggers small penalty (was 5%)
+  CAPTION_COVERAGE: 0.03,       // 3% text coverage (was 5%)
+  CAPTION_BLOCKS: 2,            // 2 text blocks (was 3)
+
+  FACE_PENALTY_MAJOR: -0.6,     // Was -0.5
+  FACE_PENALTY_MINOR: -0.3,     // Was -0.2
+  CAPTION_PENALTY: -0.4,        // Was -0.3
+  LABEL_MATCH_BONUS: 0.3,       // Unchanged
+};
+
+// Updated score calculation
+calculateCVScore(result: VisionAnalysisResult): number {
+  let score = 1.0;
+
+  // Stricter face detection
+  if (result.faceDetection.totalFaceArea > CV_THRESHOLDS.TALKING_HEAD_AREA) {
+    score += CV_THRESHOLDS.FACE_PENALTY_MAJOR; // -0.6 for talking heads
+  } else if (result.faceDetection.totalFaceArea > CV_THRESHOLDS.SMALL_FACE_AREA) {
+    score += CV_THRESHOLDS.FACE_PENALTY_MINOR; // -0.3 for small faces
+  }
+
+  // Stricter caption detection
+  if (result.textDetection.textCoverage > CV_THRESHOLDS.CAPTION_COVERAGE ||
+      result.textDetection.texts.length > CV_THRESHOLDS.CAPTION_BLOCKS) {
+    score += CV_THRESHOLDS.CAPTION_PENALTY; // -0.4 for captions
+  }
+
+  // Label match bonus (unchanged)
+  score += result.labelDetection.matchScore * CV_THRESHOLDS.LABEL_MATCH_BONUS;
+
+  return Math.max(0, Math.min(1, score));
+}
+```
+
+**Implementation: UI Filtering**
+```typescript
+// Visual curation component - filter low cv_score suggestions
+
+const CV_SCORE_THRESHOLD = 0.5; // Minimum score to display
+
+function getFilteredSuggestions(suggestions: VisualSuggestion[]): VisualSuggestion[] {
+  return suggestions.filter(s => {
+    // Show if not yet analyzed (cv_score is null)
+    if (s.cv_score === null || s.cv_score === undefined) {
+      return true;
+    }
+    // Hide if cv_score below threshold
+    return s.cv_score >= CV_SCORE_THRESHOLD;
+  });
+}
+
+// Optional: Show filtered count to user
+function FilteredSuggestionsInfo({ total, filtered }: { total: number; filtered: number }) {
+  const hidden = total - filtered;
+  if (hidden === 0) return null;
+
+  return (
+    <div className="text-sm text-muted-foreground">
+      {hidden} low-quality video{hidden !== 1 ? 's' : ''} filtered
+    </div>
+  );
+}
+```
+
+**Workflow Integration:**
+```
+BEFORE (Story 3.7 - Broken):
+Download Segment → Save Path → [CV Analysis never called] → Show all to user
+
+AFTER (Story 3.7b - Fixed):
+Download Segment → Save Path → AUTO CV Analysis → Update cv_score → Filter low scores in UI
+```
+
+**Key Changes Summary:**
+
+| Component | Before (3.7) | After (3.7b) |
+|-----------|--------------|--------------|
+| CV trigger | Manual API call only | Auto after each download |
+| Face threshold | 15% | 10% |
+| Caption threshold | 5% or 3 blocks | 3% or 2 blocks |
+| Face penalty | -0.5 | -0.6 |
+| Caption penalty | -0.3 | -0.4 |
+| UI filtering | None | Hide cv_score < 0.5 |
+
 ### Workflows and Sequencing
 
 **Visual Sourcing Workflow (Stories 3.1-3.5):**
@@ -966,6 +1120,19 @@ export function VideoPreviewPlayer({ videoPath }: Props) {
 56. **No volume slider or unmute option in VideoPreviewPlayer**
 57. **Keyboard shortcuts M, Up/Down arrows do not trigger any action (removed)**
 
+**Story 3.7b (CV Pipeline Integration):**
+58. **CV analysis automatically triggers after each segment download completes (no manual API call required)**
+59. **CV analysis failure does not block download success (graceful degradation)**
+60. **Face detection threshold lowered to 10% face area (was 15%) for stricter talking head detection**
+61. **Caption detection threshold lowered to 3% text coverage OR 2 text blocks (was 5% or 3 blocks)**
+62. **Face penalty increased to -0.6 (was -0.5) for major violations, -0.3 (was -0.2) for minor**
+63. **Caption penalty increased to -0.4 (was -0.3)**
+64. **Visual curation UI hides suggestions with cv_score < 0.5 by default**
+65. **Suggestions with cv_score = NULL (not yet analyzed) remain visible**
+66. **UI displays count of filtered low-quality videos (e.g., "3 low-quality videos filtered")**
+67. **Expected labels passed from scene.visual_keywords to CV analysis for label matching**
+68. **Manual validation shows improved B-roll quality with stricter thresholds (>90% pure B-roll)**
+
 ## Traceability Mapping
 
 | Acceptance Criteria | Spec Section | Component/API | Test Idea |
@@ -1027,6 +1194,17 @@ export function VideoPreviewPlayer({ videoPath }: Props) {
 | AC55: Mute Tooltip | VideoPreviewPlayer | title attribute | Accessibility test |
 | AC56: Volume Control Removal | VideoPreviewPlayer | React component | Verify no volume slider |
 | AC57: Keyboard Shortcuts | VideoPreviewPlayer | Event handlers | Test M/Up/Down disabled |
+| AC58: Auto CV Trigger | download-segments/route.ts | analyzeVideoSuggestion() | Integration test post-download |
+| AC59: CV Failure Graceful | download-segments/route.ts | Error handling | Test CV failure doesn't block |
+| AC60: Stricter Face Threshold | VisionAPIClient | CV_THRESHOLDS | Unit test 10% threshold |
+| AC61: Stricter Caption Threshold | VisionAPIClient | CV_THRESHOLDS | Unit test 3%/2 blocks |
+| AC62: Increased Face Penalty | calculateCVScore() | Score formula | Unit test -0.6/-0.3 penalties |
+| AC63: Increased Caption Penalty | calculateCVScore() | Score formula | Unit test -0.4 penalty |
+| AC64: UI Hides Low Scores | Visual curation UI | getFilteredSuggestions() | Component test cv_score < 0.5 |
+| AC65: NULL Scores Visible | Visual curation UI | getFilteredSuggestions() | Component test null handling |
+| AC66: Filtered Count Display | Visual curation UI | FilteredSuggestionsInfo | Component test UI display |
+| AC67: Expected Labels Passed | download-segments/route.ts | scene.visual_keywords | Integration test label passing |
+| AC68: Improved B-Roll Quality | Story 3.7b | Manual validation | 10 scene samples >90% pure B-roll |
 
 ## Risks, Assumptions, Open Questions
 
@@ -1129,6 +1307,12 @@ export function VideoPreviewPlayer({ videoPath }: Props) {
 26. FFmpeg missing: Actionable error message displayed (Story 3.7)
 27. Silent video indicator: 🔇 icon displayed in VideoPreviewPlayer (Story 3.7)
 28. Volume control removal: No volume slider or mute button (Story 3.7)
+29. Auto CV trigger: CV analysis runs automatically after segment download (Story 3.7b)
+30. CV failure graceful: CV analysis failure doesn't block download success (Story 3.7b)
+31. Stricter thresholds: 10% face area, 3% text coverage detect more talking heads/captions (Story 3.7b)
+32. UI filtering: Suggestions with cv_score < 0.5 hidden from visual curation (Story 3.7b)
+33. NULL handling: Unanalyzed suggestions (cv_score NULL) remain visible (Story 3.7b)
+34. Filtered count: UI shows "X low-quality videos filtered" message (Story 3.7b)
 
 **Coverage Focus:**
 - Error handling paths (API failures, quota, network, download failures, storage errors, Vision API errors)

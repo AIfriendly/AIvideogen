@@ -2,9 +2,42 @@
 
 **Epic:** 5 - Video Assembly & Output
 **Story ID:** 5.2
-**Status:** Done
+**Status:** Done (Bug Fix Applied 2025-11-25)
 **Priority:** High
 **Created:** 2025-11-24
+**Revised:** 2025-11-25 (Bug Fix)
+
+---
+
+## Bug Fix History
+
+### BUG-002: Trimmer Uses Wrong Duration Field (Fixed 2025-11-25)
+
+**Symptom:** Videos were trimmed to the wrong duration, causing audio/video duration mismatch in final output.
+
+**Root Cause:** The `trimmer.ts` was using `scene.clipDuration` (original YouTube video duration from `visual_suggestions.duration`) instead of `scene.audioDuration` (actual voiceover duration from `scenes.duration`) for trimming.
+
+**Impact:**
+- Videos were trimmed to 45s, 76s, 69s, etc. (YouTube clip lengths) instead of ~40-50s (voiceover lengths)
+- Final concatenated video was much longer than total audio
+- Combined with the audio timing bug (BUG-001 in Story 5.3), resulted in silent video
+
+**Fix Applied:**
+Changed `trimmer.ts:43` from:
+```typescript
+const audioDuration = scene.clipDuration;  // WRONG
+```
+To:
+```typescript
+const audioDuration = scene.audioDuration;  // CORRECT
+```
+
+**Files Changed:**
+- `src/lib/video/trimmer.ts` - Lines 43, 160, 161
+
+**Prevention:** Added CRITICAL comment in code explaining to use `audioDuration` for trimming, not `clipDuration`.
+
+**Related:** This bug was discovered alongside BUG-001 (audio timing) in Story 5.3. Both bugs used the wrong duration field.
 
 ---
 

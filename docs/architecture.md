@@ -5,8 +5,8 @@
 **Type:** Level 2 Greenfield Software Project
 **Author:** Winston (BMAD Architect Agent)
 **Date:** 2025-11-12
-**Version:** 1.5
-**Last Updated:** 2025-11-22 (Added Stories 3.2b and 3.7 - Enhanced Query Generation and Computer Vision Content Filtering with Google Cloud Vision API integration, audio stripping, and cv_score database extension)
+**Version:** 1.9
+**Last Updated:** 2025-11-26 (Story 3.7b Bug Fix - migration 011 adds visual_keywords column to scenes)
 
 ---
 
@@ -37,7 +37,8 @@ The primary technology stack is FOSS (Free and Open-Source Software) compliant p
 15. [Development Environment](#development-environment)
 16. [Deployment Architecture](#deployment-architecture)
 17. [Cloud Migration Path](#cloud-migration-path)
-18. [Architecture Decision Records](#architecture-decision-records)
+18. [Cross-Epic Integration Architecture](#cross-epic-integration-architecture)
+19. [Architecture Decision Records](#architecture-decision-records)
 
 ---
 
@@ -244,7 +245,9 @@ ai-video-generator/
 │   │   ├── filter-results.ts  # Content filtering & ranking
 │   │   ├── filter-config.ts   # Filtering preferences config
 │   │   ├── entity-extractor.ts # Entity extraction for specific subjects (Story 3.2b)
-│   │   └── query-optimizer.ts  # Platform-optimized query generation (Story 3.2b)
+│   │   ├── query-optimizer.ts  # Platform-optimized query generation (Story 3.2b)
+│   │   ├── trigger-downloads.ts # Auto-trigger segment downloads after visual gen (Story 3.7b)
+│   │   └── download-queue.ts   # Concurrent download queue with CV analysis integration
 │   │
 │   ├── vision/                # Google Cloud Vision API (Epic 3 Story 3.7)
 │   │   ├── client.ts          # VisionAPIClient class
@@ -259,7 +262,19 @@ ai-video-generator/
 │   ├── db/                    # Database utilities
 │   │   ├── client.ts          # SQLite connection
 │   │   ├── schema.sql         # Database schema
-│   │   └── queries.ts         # Reusable queries
+│   │   ├── init.ts            # Database initialization and migrations runner
+│   │   ├── queries.ts         # Reusable queries
+│   │   └── migrations/        # Database migrations
+│   │       ├── 002_content_generation_schema.ts
+│   │       ├── 003_visual_suggestions_schema.ts
+│   │       ├── 004_add_current_step_constraint.ts
+│   │       ├── 005_fix_current_step_constraint.ts
+│   │       ├── 006_add_selected_clip_id.ts
+│   │       ├── 007_add_cv_score.ts
+│   │       ├── 008_assembly_jobs.ts
+│   │       ├── 009_add_downloading_stage.ts
+│   │       ├── 010_add_queued_status.ts  # Story 3.7b: Add 'queued' to download_status CHECK
+│   │       └── 011_add_visual_keywords.ts # Story 3.7b: Add visual_keywords to scenes for CV label matching
 │   │
 │   └── utils/                 # General utilities
 │       ├── file-manager.ts    # File operations
@@ -500,6 +515,48 @@ When LLM is unavailable, keyword extraction provides:
 - No provider-specific logic in scene analysis code
 - Follows same patterns as Epic 1 chat implementation
 
+**Visual Keywords Storage & CV Integration (Story 3.7b):**
+
+The `keywords` array from SceneAnalysis is stored in the `scenes.visual_keywords` column for later use by CV analysis. This enables label verification during Story 3.7b auto-triggered CV analysis.
+
+```typescript
+// During Story 3.2 scene analysis (lib/youtube/analyze-scene.ts)
+const analysis = await analyzeSceneForVisuals(scene.text);
+
+// Store keywords for CV label matching (used by Story 3.7b)
+db.prepare(`
+  UPDATE scenes
+  SET visual_keywords = ?
+  WHERE id = ?
+`).run(JSON.stringify(analysis.keywords), scene.id);
+
+// Later, during Story 3.7b CV analysis (after download)
+const scene = await getSceneById(sceneId);
+const expectedLabels = JSON.parse(scene.visual_keywords || '[]');
+
+// Pass to CV analysis for label verification
+await analyzeVideoSuggestion(suggestionId, segmentPath, expectedLabels);
+```
+
+**Data Flow: Visual Keywords → CV Analysis:**
+```
+Story 3.2: analyzeSceneForVisuals()
+    ↓
+SceneAnalysis.keywords: ["lion", "savanna", "wildlife", "sunset"]
+    ↓
+Store in scenes.visual_keywords (JSON)
+    ↓
+Story 3.6: Download segment completes
+    ↓
+Story 3.7b: Fetch scene.visual_keywords
+    ↓
+Pass as expectedLabels to analyzeVideoSuggestion()
+    ↓
+CV verifies Vision API labels match expected keywords
+    ↓
+cv_score reflects label match quality
+```
+
 #### Story 3.3: YouTube Video Search & Result Retrieval
 **Backend:**
 - `app/api/projects/[id]/generate-visuals/route.ts` - Main endpoint
@@ -699,6 +756,58 @@ Custom segments:   .cache/videos/{projectId}/scene-{sceneNumber}-custom-{startTi
 - Retry logic: 3 attempts with exponential backoff (2s, 4s, 8s)
 - Permanent failures (restricted videos) → Mark error, skip retry
 - User can manually retry failed downloads in Epic 4 UI
+
+**Auto-Trigger CV Analysis (Story 3.7b Integration):**
+
+After each successful segment download, CV analysis automatically triggers to evaluate B-roll quality. This integration ensures users only see high-quality suggestions in the Visual Curation UI.
+
+```typescript
+// app/api/projects/[id]/download-segments/route.ts
+import { analyzeVideoSuggestion, getCVFilterStatus } from '@/lib/vision';
+
+// After successful segment download:
+async function handleSuccessfulDownload(
+  suggestionId: string,
+  segmentPath: string,
+  sceneId: string
+) {
+  // Update download status first (download is successful regardless of CV)
+  await updateSuggestionStatus(suggestionId, 'complete', segmentPath);
+
+  // Auto-trigger CV analysis (non-blocking, graceful degradation)
+  try {
+    const cvStatus = await getCVFilterStatus();
+    if (cvStatus.available) {
+      // Fetch scene's visual_keywords for expected labels
+      const scene = await getSceneById(sceneId);
+      const expectedLabels = scene.visual_keywords || [];
+
+      // Run CV analysis - updates cv_score in database
+      await analyzeVideoSuggestion(suggestionId, segmentPath, expectedLabels);
+      console.log(`CV analysis complete for suggestion ${suggestionId}`);
+    }
+  } catch (error) {
+    // CV failure should NEVER block download success (AC59)
+    console.warn(`CV analysis failed for ${suggestionId}:`, error);
+    // cv_score remains NULL - suggestion still visible to user
+  }
+}
+```
+
+**Error Isolation Pattern:**
+- Download marked successful BEFORE CV analysis runs
+- CV analysis wrapped in try-catch with warning log only
+- If CV fails, cv_score remains NULL (suggestion stays visible)
+- User can still see and use videos that weren't CV-analyzed
+
+**Data Flow:**
+```
+Download Complete → Update download_status = 'complete'
+                 → Fetch scene.visual_keywords
+                 → Call analyzeVideoSuggestion(id, path, keywords)
+                 → Update cv_score in visual_suggestions table
+                 → [If CV fails: log warning, cv_score stays NULL]
+```
 
 #### Story 3.2b: Enhanced Search Query Generation
 
@@ -918,24 +1027,52 @@ export class VisionAPIClient {
     analyses: FrameAnalysis[],
     expectedLabels: string[]
   ): number {
-    // Higher score = better B-roll quality
-    let score = 100;
+    // Higher score = better B-roll quality (normalized 0.0-1.0)
+    let score = 1.0;
 
-    // Penalize for faces (talking heads)
+    // Penalize for faces (talking heads) - Story 3.7b thresholds
     const avgFaceArea = this.average(analyses.map(a => a.faceArea));
-    if (avgFaceArea > 0.15) score -= 50; // >15% = major penalty
-    else if (avgFaceArea > 0.05) score -= 20; // >5% = minor penalty
+    if (avgFaceArea > CV_THRESHOLDS.TALKING_HEAD_AREA) {
+      score -= CV_THRESHOLDS.FACE_PENALTY_MAJOR; // >10% = major penalty (-0.6)
+    } else if (avgFaceArea > CV_THRESHOLDS.SMALL_FACE_AREA) {
+      score -= CV_THRESHOLDS.FACE_PENALTY_MINOR; // 3-10% = minor penalty (-0.3)
+    }
 
-    // Penalize for text overlays (captions)
-    if (analyses.some(a => a.hasText)) score -= 30;
+    // Penalize for text overlays (captions) - Story 3.7b thresholds
+    const hasCaption = analyses.some(a =>
+      a.textCoverage > CV_THRESHOLDS.CAPTION_COVERAGE ||
+      a.textBlockCount > CV_THRESHOLDS.CAPTION_BLOCKS
+    );
+    if (hasCaption) {
+      score -= CV_THRESHOLDS.CAPTION_PENALTY; // -0.4
+    }
 
     // Reward for label matches
     const matchCount = this.countLabelMatches(analyses, expectedLabels);
-    score += matchCount * 10; // +10 per matching label
+    score += matchCount * 0.1; // +0.1 per matching label
 
-    return Math.max(0, Math.min(100, score));
+    return Math.max(0, Math.min(1.0, score));
   }
 }
+
+// CV_THRESHOLDS constant (Story 3.7b values)
+const CV_THRESHOLDS = {
+  // Face detection thresholds
+  TALKING_HEAD_AREA: 0.10,    // 10% of frame (was 15% in Story 3.7)
+  SMALL_FACE_AREA: 0.03,      // 3% of frame (was 5% in Story 3.7)
+
+  // Caption detection thresholds
+  CAPTION_COVERAGE: 0.03,     // 3% text coverage (was 5% in Story 3.7)
+  CAPTION_BLOCKS: 2,          // 2 text blocks (was 3 in Story 3.7)
+
+  // Penalty values (normalized 0-1 scale)
+  FACE_PENALTY_MAJOR: 0.6,    // -0.6 for talking heads (was -0.5)
+  FACE_PENALTY_MINOR: 0.3,    // -0.3 for small faces (was -0.2)
+  CAPTION_PENALTY: 0.4,       // -0.4 for captions (was -0.3)
+
+  // UI filtering threshold
+  MIN_DISPLAY_SCORE: 0.5,     // Hide suggestions below 0.5
+};
 ```
 
 **Quota Management:**
@@ -973,7 +1110,7 @@ export class QuotaTracker {
 // lib/vision/analyze-content.ts
 function filterByFaceDetection(
   analysis: ThumbnailAnalysis | VideoAnalysis,
-  threshold: number = 0.15 // 15% of frame area
+  threshold: number = CV_THRESHOLDS.TALKING_HEAD_AREA // 10% of frame area (Story 3.7b)
 ): FilterResult {
   if (analysis.avgFaceArea > threshold) {
     return {
@@ -1379,11 +1516,11 @@ export async function GET(
     SELECT id, scene_number FROM scenes WHERE project_id = ? ORDER BY scene_number
   `).all(params.id);
 
-  // Get suggestions for each scene
+  // Get suggestions for each scene (includes cv_score for filtering)
   const scenesSuggestions = scenes.map(scene => {
     const suggestions = db.prepare(`
       SELECT id, video_id, title, thumbnail_url, channel_title,
-             embed_url, rank, duration, default_segment_path, download_status
+             embed_url, rank, duration, default_segment_path, download_status, cv_score
       FROM visual_suggestions
       WHERE scene_id = ?
       ORDER BY rank ASC
@@ -1399,6 +1536,113 @@ export async function GET(
   return Response.json({ success: true, data: scenesSuggestions });
 }
 ```
+
+**CV Score UI Filtering (Story 3.7b):**
+
+The Visual Curation UI filters suggestions based on cv_score to hide low-quality B-roll:
+
+```typescript
+// lib/utils/cv-filter.ts
+import { CV_THRESHOLDS } from '@/lib/vision/client';
+
+interface FilteredSuggestions {
+  visible: VisualSuggestion[];
+  hiddenCount: number;
+}
+
+/**
+ * Filter suggestions for UI display based on cv_score
+ * - cv_score >= 0.5: Show (acceptable B-roll)
+ * - cv_score < 0.5: Hide (low quality - faces, captions)
+ * - cv_score === null: Show (not yet analyzed)
+ */
+export function filterSuggestionsByQuality(
+  suggestions: VisualSuggestion[]
+): FilteredSuggestions {
+  const visible: VisualSuggestion[] = [];
+  let hiddenCount = 0;
+
+  for (const suggestion of suggestions) {
+    // NULL cv_score = not analyzed yet, show to user (AC65)
+    if (suggestion.cv_score === null) {
+      visible.push(suggestion);
+      continue;
+    }
+
+    // cv_score >= 0.5 = acceptable quality, show (AC64)
+    if (suggestion.cv_score >= CV_THRESHOLDS.MIN_DISPLAY_SCORE) {
+      visible.push(suggestion);
+    } else {
+      // cv_score < 0.5 = low quality, hide (AC64)
+      hiddenCount++;
+    }
+  }
+
+  return { visible, hiddenCount };
+}
+
+// components/features/curation/FilteredSuggestionsInfo.tsx
+interface FilteredSuggestionsInfoProps {
+  hiddenCount: number;
+}
+
+/**
+ * Display count of filtered low-quality videos (AC66)
+ */
+export function FilteredSuggestionsInfo({ hiddenCount }: FilteredSuggestionsInfoProps) {
+  if (hiddenCount === 0) return null;
+
+  return (
+    <div className="filtered-info">
+      <span className="filtered-icon">🔍</span>
+      <span className="filtered-text">
+        {hiddenCount} low-quality video{hiddenCount > 1 ? 's' : ''} filtered
+      </span>
+    </div>
+  );
+}
+```
+
+**Integration with VisualSuggestionGallery:**
+```typescript
+// components/features/curation/VisualSuggestionGallery.tsx
+export function VisualSuggestionGallery({ sceneId, suggestions }: Props) {
+  // Apply CV score filtering (Story 3.7b)
+  const { visible, hiddenCount } = filterSuggestionsByQuality(suggestions);
+
+  return (
+    <div className="suggestion-gallery">
+      {/* Filtered count indicator (AC66) */}
+      <FilteredSuggestionsInfo hiddenCount={hiddenCount} />
+
+      {/* Grid of visible suggestions only */}
+      <div className="suggestions-grid">
+        {visible.length > 0 ? (
+          visible.map(suggestion => (
+            <ClipSelectionCard
+              key={suggestion.id}
+              suggestion={suggestion}
+              onSelect={handleSelect}
+            />
+          ))
+        ) : (
+          <EmptyClipState />
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+**CV Score Interpretation:**
+
+| Score Range | Quality | UI Behavior |
+|-------------|---------|-------------|
+| 0.8 - 1.0 | Excellent B-roll | ✅ Shown (priority) |
+| 0.5 - 0.8 | Acceptable B-roll | ✅ Shown |
+| 0.0 - 0.5 | Low quality (faces/captions) | ❌ Hidden |
+| NULL | Not yet analyzed | ✅ Shown |
+
 
 **UX Specifications:**
 - **Grid Layout:** 3 columns on desktop (1920px), 2 on tablet (768px), 1 on mobile
@@ -3582,6 +3826,7 @@ CREATE TABLE scenes (
   text TEXT NOT NULL, -- Narration text for voiceover
   audio_file_path TEXT, -- Generated voiceover MP3 (Epic 2)
   duration INTEGER, -- Audio duration in seconds (Epic 2)
+  visual_keywords TEXT, -- JSON array of keywords for CV label matching (Epic 3 Story 3.2, used by 3.7b)
   selected_clip_id TEXT, -- Selected visual suggestion (Epic 4 Story 4.4)
   created_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
@@ -3604,7 +3849,7 @@ CREATE TABLE visual_suggestions (
   duration INTEGER, -- Video duration in seconds (Epic 3 Story 3.4)
   default_segment_path TEXT, -- Path to downloaded default segment (Epic 3 Story 3.6)
   download_status TEXT DEFAULT 'pending', -- pending, downloading, complete, error (Epic 3 Story 3.6)
-  cv_score REAL, -- Computer vision quality score 0-100 (Epic 3 Story 3.7)
+  cv_score REAL, -- Computer vision quality score 0.0-1.0 (Epic 3 Story 3.7/3.7b)
   created_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
 );
@@ -5382,6 +5627,263 @@ OUTPUT_DIR=./.cache/output
 
 ---
 
+## Cross-Epic Integration Architecture
+
+### Overview
+
+The cross-epic integration architecture establishes clear boundaries and contracts between modular epics while enabling seamless data flow for complex multi-stage workflows. The primary integration point is between Epic 4 (Visual Curation Interface) and Epic 5 (Video Assembly Pipeline).
+
+### Epic 4 to Epic 5 Integration
+
+#### Integration Point: Assembly Trigger
+
+**Story 4.5 (Assembly Trigger) → Epic 5 (Video Assembly Pipeline)**
+
+The `/api/projects/[id]/assemble` endpoint serves as the orchestration point that bridges user-facing curation (Epic 4) with backend video processing (Epic 5).
+
+```typescript
+// Integration Flow
+Epic 4 (Visual Curation)
+    → POST /api/projects/[id]/assemble
+    → Epic 5 (Video Assembly Pipeline)
+        → Story 5.1 (VideoAssembler - Job Management)
+        → Story 5.2 (Trimmer - Scene Preparation)
+        → Story 5.3 (Concatenator - Final Assembly)
+```
+
+#### Data Contract: AssemblyScene Interface
+
+The AssemblyScene interface defines the data contract between Epic 4 and Epic 5:
+
+```typescript
+interface AssemblyScene {
+  // Core identifiers
+  sceneId: string;
+  sceneNumber: number;
+
+  // Content data
+  scriptText: string;
+  audioFilePath: string;
+
+  // Video selection from Epic 4
+  selectedClipId: string;
+  videoId: string;
+  clipDuration: number;
+
+  // Path fields populated during processing
+  defaultSegmentPath?: string;  // Downloaded YouTube video
+  video_path: string;           // Alias for compatibility
+
+  // Legacy aliases for backward compatibility
+  scene_number: number;         // Alias for sceneNumber
+  script_text?: string;         // Alias for scriptText
+  audio_path: string;           // Alias for audioFilePath
+  duration: number;             // Alias for clipDuration
+}
+```
+
+### Async Job Processing Pattern
+
+The integration implements an asynchronous job processing pattern with progress tracking:
+
+#### Job Lifecycle
+
+```typescript
+type AssemblyJobStatus = 'pending' | 'processing' | 'complete' | 'error';
+
+type AssemblyStage =
+  | 'initializing'
+  | 'downloading'    // Added for YouTube downloads
+  | 'trimming'
+  | 'concatenating'
+  | 'audio_overlay'
+  | 'thumbnail'
+  | 'finalizing';
+```
+
+#### Progress Tracking
+
+```typescript
+// Job progress update flow
+assembleVideo(projectId) {
+  const jobId = videoAssembler.createJob(projectId, sceneCount);
+
+  // Async execution with progress updates
+  (async () => {
+    videoAssembler.updateJobProgress(jobId, 5, 'downloading');
+    // Download YouTube videos...
+
+    videoAssembler.updateJobProgress(jobId, 20, 'trimming');
+    // Trim scenes to audio duration...
+
+    videoAssembler.updateJobProgress(jobId, 50, 'concatenating');
+    // Concatenate scenes...
+
+    videoAssembler.updateJobProgress(jobId, 80, 'audio_overlay');
+    // Overlay audio tracks...
+
+    videoAssembler.completeJob(jobId);
+  })();
+
+  return { jobId, status: 'processing' };
+}
+```
+
+### YouTube Download Integration
+
+A critical integration point added during implementation is the YouTube download stage, which wasn't originally in Epic 5:
+
+```typescript
+// Download stage integration
+const downloadPath = path.join('.cache', 'videos', projectId, `scene-${sceneNumber}-source.mp4`);
+
+const downloadResult = await downloadWithRetry({
+  videoId: scene.videoId,
+  segmentDuration: scene.clipDuration + 5,  // Buffer for trimming
+  outputPath: downloadPath,
+  maxHeight: 720
+});
+
+// Path validation for security
+function sanitizeOutputPath(outputPath: string, projectId: string): string {
+  const basePath = path.resolve('.cache', 'videos', projectId);
+  const resolvedPath = path.resolve(outputPath);
+
+  if (!resolvedPath.startsWith(basePath)) {
+    throw new Error('Path traversal detected');
+  }
+
+  return resolvedPath;
+}
+```
+
+### Database Migration Strategy
+
+Cross-epic integrations may require database schema updates:
+
+```sql
+-- Migration 009: Add downloading stage
+ALTER TABLE assembly_jobs
+  MODIFY COLUMN current_stage
+  CHECK(current_stage IN (
+    'initializing', 'downloading', 'trimming',
+    'concatenating', 'audio_overlay', 'thumbnail', 'finalizing'
+  ));
+```
+
+### Error Handling & Recovery
+
+The integration implements a cascading error handling pattern:
+
+```typescript
+// Error classification
+interface DownloadError {
+  error: string;
+  retryable: boolean;  // Network errors vs permanent failures
+}
+
+// Retry strategy with exponential backoff
+const retryOptions = {
+  maxRetries: 3,
+  baseDelay: 1000,  // 1s, 2s, 4s
+  maxDelay: 8000
+};
+
+// Error propagation
+try {
+  const result = await downloadWithRetry(options, retryOptions);
+  if (!result.success) {
+    await videoAssembler.failJob(jobId, result.error);
+  }
+} catch (error) {
+  await videoAssembler.failJob(jobId, 'Unknown error');
+}
+```
+
+### Integration Testing Requirements
+
+Cross-epic integration requires specialized testing strategies:
+
+#### Integration Test Boundaries
+
+```typescript
+describe('Epic 4-5 Integration', () => {
+  it('should complete full pipeline from clip selection to video output', async () => {
+    // 1. Setup: Create project with scenes and selections
+    const projectId = await createProject();
+    await generateScenes(projectId);
+    await selectClips(projectId);
+
+    // 2. Trigger assembly
+    const response = await fetch(`/api/projects/${projectId}/assemble`, {
+      method: 'POST'
+    });
+    const { jobId } = await response.json();
+
+    // 3. Wait for completion
+    await waitForJobCompletion(jobId);
+
+    // 4. Verify output
+    const outputPath = `public/videos/${projectId}/final.mp4`;
+    expect(fs.existsSync(outputPath)).toBe(true);
+
+    // 5. Verify video properties
+    const metadata = await getVideoMetadata(outputPath);
+    expect(metadata.duration).toBeCloseTo(expectedDuration, 1);
+  });
+});
+```
+
+#### Test Data Requirements
+
+```typescript
+// Integration tests require:
+- YouTube video IDs that are stable and available
+- Pre-generated audio files matching expected durations
+- Database migrations applied before test runs
+- FFmpeg and yt-dlp available in test environment
+```
+
+### Performance Considerations
+
+#### Pipeline Optimization
+
+- **Parallel Downloads**: Download multiple YouTube videos concurrently
+- **Stream Processing**: Process videos as streams when possible
+- **Temp File Management**: Clean up intermediate files after each stage
+- **Progress Granularity**: Balance update frequency with database writes
+
+#### Resource Management
+
+```typescript
+// Temp directory management
+const tempDir = videoAssembler.getTempDir(jobId);
+try {
+  // Process videos...
+} finally {
+  await videoAssembler.cleanupTempDir(tempDir);
+}
+```
+
+### Future Integration Points
+
+#### Planned Integrations
+
+1. **Epic 6 → Epic 5**: Post-processing effects integration
+2. **Epic 4 → Analytics**: Clip selection telemetry
+3. **Epic 5 → CDN**: Final video distribution
+4. **Epic 2 → Epic 5**: Direct audio file handoff optimization
+
+#### Integration Principles
+
+- **Loose Coupling**: Epics communicate via well-defined APIs
+- **Data Contracts**: Interfaces versioned and backward compatible
+- **Async by Default**: Long-running operations use job queue pattern
+- **Error Recovery**: All integrations support retry and rollback
+- **Observability**: Integration points emit structured logs and metrics
+
+---
+
 ## Architecture Decision Records
 
 ### ADR-001: Next.js 15.5 as Primary Framework
@@ -5577,6 +6079,49 @@ Implement configurable system prompts stored in database with:
 
 ---
 
+### ADR-008: Story 3.7b CV Pipeline Integration Patterns
+
+**Status:** Accepted
+**Date:** 2025-11-25
+
+**Context:**
+Story 3.7 implemented CV filtering as a manual API endpoint, but users were seeing low-quality B-roll because CV analysis never ran automatically. Story 3.7b addresses this gap by integrating CV analysis into the download pipeline and filtering results in the UI.
+
+**Decision:**
+Implement automatic CV pipeline integration with:
+1. **Auto-trigger CV analysis** after each segment download (non-blocking)
+2. **Stricter thresholds** (10% face area vs 15%, tighter caption detection)
+3. **UI filtering** of low cv_score suggestions (< 0.5 hidden)
+4. **Visual keywords flow** from scene analysis to CV label verification
+
+**Consequences:**
+- ✅ CV analysis runs automatically (no manual API calls needed)
+- ✅ Low-quality suggestions hidden from user
+- ✅ Graceful degradation if CV fails (download still succeeds)
+- ✅ Better B-roll quality (stricter thresholds catch more talking heads)
+- ✅ NULL cv_score suggestions remain visible (backwards compatible)
+- ⚠️ Increased API usage (CV runs for every downloaded segment)
+- ⚠️ Requires visual_keywords storage in scenes table
+
+**Threshold Changes:**
+
+| Parameter | Story 3.7 | Story 3.7b | Rationale |
+|-----------|-----------|------------|-----------|
+| Talking head face area | 15% | 10% | Catch face-in-corner gaming videos |
+| Small face area | 5% | 3% | More sensitive detection |
+| Caption text coverage | 5% | 3% | Catch smaller captions |
+| Caption text blocks | 3 | 2 | Catch subtitle-style text |
+| Major face penalty | -0.5 | -0.6 | Stronger talking head rejection |
+| Minor face penalty | -0.2 | -0.3 | More penalty for small faces |
+| Caption penalty | -0.3 | -0.4 | Stronger caption rejection |
+
+**Implementation Pattern:**
+- Error isolation: CV failure never blocks download success
+- Non-blocking: Download status updated before CV runs
+- Backwards compatible: NULL cv_score treated as "show"
+
+---
+
 ## Conclusion
 
 This architecture provides a solid foundation for the AI Video Generator MVP with clear paths for future enhancement. All decisions prioritize FOSS compliance, local-first privacy, and developer experience while maintaining the flexibility to scale to cloud multi-tenant deployment when needed.
@@ -5592,5 +6137,5 @@ The modular design with abstraction layers (LLM provider, state management, API 
 ---
 
 **Document Status:** Complete and Ready for Implementation
-**Architecture Validated:** 2025-11-01
-**Ready for Phase 4:** Pending solutioning-gate-check
+**Architecture Validated:** 2025-11-25
+**Ready for Phase 4:** Yes (Story 3.7b patterns added)
