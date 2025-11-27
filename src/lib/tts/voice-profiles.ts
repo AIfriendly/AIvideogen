@@ -121,7 +121,8 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     accent: 'american',
     tone: 'gentle',
     previewUrl: '/audio/previews/charlotte.mp3',
-    modelId: 'af_charlotte',
+    modelId: 'af_sky',
+    mvpVoice: true,
   },
 
   {
@@ -131,7 +132,8 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     accent: 'american',
     tone: 'sophisticated',
     previewUrl: '/audio/previews/grace.mp3',
-    modelId: 'af_grace',
+    modelId: 'af_jessica',
+    mvpVoice: true,
   },
 
   {
@@ -161,7 +163,8 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     accent: 'american',
     tone: 'authoritative',
     previewUrl: '/audio/previews/sophia.mp3',
-    modelId: 'af_sophia',
+    modelId: 'af_nova',
+    mvpVoice: true,
   },
 
   {
@@ -205,7 +208,8 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     accent: 'american',
     tone: 'authoritative',
     previewUrl: '/audio/previews/david.mp3',
-    modelId: 'am_david',
+    modelId: 'am_eric',
+    mvpVoice: true,
   },
 
   {
@@ -215,7 +219,8 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     accent: 'american',
     tone: 'friendly',
     previewUrl: '/audio/previews/ethan.mp3',
-    modelId: 'am_ethan',
+    modelId: 'am_fenrir',
+    mvpVoice: true,
   },
 
   {
@@ -235,7 +240,8 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     accent: 'american',
     tone: 'enthusiastic',
     previewUrl: '/audio/previews/liam.mp3',
-    modelId: 'am_liam',
+    modelId: 'am_puck',
+    mvpVoice: true,
   },
 
   {
@@ -265,7 +271,8 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     accent: 'american',
     tone: 'warm',
     previewUrl: '/audio/previews/samuel.mp3',
-    modelId: 'am_samuel',
+    modelId: 'am_echo',
+    mvpVoice: true,
   },
 
   // ========================================
@@ -299,7 +306,8 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     accent: 'british',
     tone: 'articulate',
     previewUrl: '/audio/previews/freya.mp3',
-    modelId: 'bf_freya',
+    modelId: 'bf_isabella',
+    mvpVoice: true,
   },
 
   {
@@ -329,7 +337,8 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     accent: 'british',
     tone: 'professional',
     previewUrl: '/audio/previews/lucy.mp3',
-    modelId: 'bf_lucy',
+    modelId: 'bf_alice',
+    mvpVoice: true,
   },
 
   {
@@ -354,6 +363,7 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     tone: 'distinguished',
     previewUrl: '/audio/previews/george.mp3',
     modelId: 'bm_george',
+    mvpVoice: true,
   },
 
   {
@@ -403,7 +413,8 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     accent: 'british',
     tone: 'articulate',
     previewUrl: '/audio/previews/william.mp3',
-    modelId: 'bm_william',
+    modelId: 'bm_daniel',
+    mvpVoice: true,
   },
 
   {
@@ -422,12 +433,13 @@ export const VOICE_PROFILES: VoiceProfile[] = [
 
   {
     id: 'matilda',
-    name: 'Matilda - Australian Female',
+    name: 'Matilda - American Female',
     gender: 'female',
-    accent: 'australian',
+    accent: 'american',
     tone: 'friendly',
     previewUrl: '/audio/previews/matilda.mp3',
-    modelId: 'au_matilda',
+    modelId: 'af_nicole',
+    mvpVoice: true,
   },
 
   {
@@ -462,12 +474,13 @@ export const VOICE_PROFILES: VoiceProfile[] = [
 
   {
     id: 'lucas',
-    name: 'Lucas - Australian Male',
+    name: 'Lucas - American Male',
     gender: 'male',
-    accent: 'australian',
+    accent: 'american',
     tone: 'friendly',
     previewUrl: '/audio/previews/lucas.mp3',
-    modelId: 'au_lucas',
+    modelId: 'am_liam',
+    mvpVoice: true,
   },
 
   {
@@ -486,12 +499,13 @@ export const VOICE_PROFILES: VoiceProfile[] = [
 
   {
     id: 'aria',
-    name: 'Aria - Neutral Female',
+    name: 'Aria - American Female',
     gender: 'female',
-    accent: 'neutral',
+    accent: 'american',
     tone: 'clear',
     previewUrl: '/audio/previews/aria.mp3',
-    modelId: 'neutral_aria',
+    modelId: 'af_kore',
+    mvpVoice: true,
   },
 
   {
@@ -516,12 +530,13 @@ export const VOICE_PROFILES: VoiceProfile[] = [
 
   {
     id: 'kai',
-    name: 'Kai - Neutral Male',
+    name: 'Kai - American Male',
     gender: 'male',
-    accent: 'neutral',
+    accent: 'american',
     tone: 'clear',
     previewUrl: '/audio/previews/kai.mp3',
-    modelId: 'neutral_kai',
+    modelId: 'am_onyx',
+    mvpVoice: true,
   },
 
   {
