@@ -416,7 +416,7 @@ export class FFmpegClient {
    * Creates visually appealing text with shadow for legibility
    * Scales and pads image to target dimensions (1920x1080 by default)
    *
-   * Note: On Windows without Fontconfig, text overlay may fail.
+   * On Windows, uses explicit font file path to avoid Fontconfig dependency.
    * Falls back to just scaling the image if drawtext fails.
    */
   async addTextOverlay(
@@ -437,6 +437,13 @@ export class FFmpegClient {
     // Max 80px, scales down for longer titles
     const fontSize = Math.min(80, Math.floor(1600 / Math.max(title.length, 10)));
 
+    // On Windows, use explicit font file path to avoid Fontconfig dependency
+    // FFmpeg on Windows needs the path with forward slashes and escaped colons
+    const isWindows = process.platform === 'win32';
+    const fontFile = isWindows
+      ? 'fontfile=C\\\\:/Windows/Fonts/arial.ttf:'
+      : '';
+
     // Build filter_complex for scaling, padding, and text overlay
     const filterComplex = [
       // Scale to fit within target dimensions while maintaining aspect ratio
@@ -444,9 +451,9 @@ export class FFmpegClient {
       // Pad to exact target dimensions (centers the scaled image)
       `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`,
       // Add text shadow (offset 3px right, 3px down) for readability
-      `drawtext=text='${escapedTitle}':fontsize=${fontSize}:fontcolor=black:x=(w-text_w)/2+3:y=h-120+3`,
+      `drawtext=${fontFile}text='${escapedTitle}':fontsize=${fontSize}:fontcolor=black:x=(w-text_w)/2+3:y=h-120+3`,
       // Add main white text on top of shadow
-      `drawtext=text='${escapedTitle}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=h-120`,
+      `drawtext=${fontFile}text='${escapedTitle}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=h-120`,
     ].join(',');
 
     const args = [
@@ -460,8 +467,7 @@ export class FFmpegClient {
     try {
       await this.execute(args);
     } catch (error) {
-      // Fallback: if text overlay fails (e.g., Fontconfig issue on Windows),
-      // just scale and pad the image without text
+      // Fallback: if text overlay fails, just scale and pad the image without text
       console.warn('[FFmpegClient] Text overlay failed, falling back to scaled image only:', error);
 
       const fallbackFilter = [
