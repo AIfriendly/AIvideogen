@@ -33,7 +33,6 @@ import { YouTubeAPIClient } from '@/lib/youtube/client';
 import { analyzeSceneForVisuals } from '@/lib/youtube/analyze-scene';
 import { YouTubeError, YouTubeErrorCode } from '@/lib/youtube/types';
 import { filterAndRankResults } from '@/lib/youtube/filter-results';
-import { triggerSegmentDownloads } from '@/lib/youtube/trigger-downloads';
 
 // Initialize database on first import (idempotent)
 await initializeDatabase();
@@ -192,12 +191,9 @@ export async function POST(
         updateProjectVisualsGenerated(projectId, true);
         console.log(`[Visual Generation] Updated project ${projectId} visuals_generated = true`);
 
-        // Story 3.7b: Auto-trigger segment downloads for CV analysis
-        // This runs asynchronously so it doesn't block the response
-        triggerSegmentDownloads(projectId).catch((err) => {
-          console.error(`[Visual Generation] Failed to trigger segment downloads for CV analysis:`, err);
-        });
-        console.log(`[Visual Generation] Triggered segment downloads for CV analysis`);
+        // NOTE: Downloads are now triggered manually from Visual Curation UI
+        // User selects which videos they want, then clicks "Download Selected"
+        // See POST /api/projects/[id]/download-selected endpoint
       } catch (error: any) {
         console.error('[Visual Generation] Failed to update project visuals_generated flag:', error);
         errors.push(`Failed to update project flag: ${error.message}`);

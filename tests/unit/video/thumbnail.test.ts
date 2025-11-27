@@ -1,236 +1,487 @@
 /**
  * ThumbnailGenerator Unit Tests - Story 5.4
  *
+ * Test Quality Score: Target 85/100 (Grade A)
+ *
  * Tests thumbnail generation functionality including:
+ * - ThumbnailGenerator class methods
  * - Best frame selection logic
  * - Font size calculation
  * - Interface validation
+ * - Error handling
+ *
+ * NOTE: Some tests use mocked FFmpeg to avoid filesystem dependencies.
+ *       For full integration testing with real FFmpeg, see:
+ *       tests/integration/video/thumbnail.integration.test.ts
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import path from 'path';
 
-describe('ThumbnailGenerator', () => {
-  describe('selectBestFrameIndex logic', () => {
-    // This tests the frame selection algorithm in isolation
+// Mock fs module BEFORE importing ThumbnailGenerator
+vi.mock('fs', async () => {
+  const actual = await vi.importActual<typeof import('fs')>('fs');
+  return {
+    ...actual,
+    default: actual,
+    existsSync: vi.fn(() => true), // Default: return true for all paths
+    mkdirSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    unlinkSync: vi.fn(),
+  };
+});
 
-    const selectBestFrameIndex = (frames: string[]): number => {
-      return Math.floor(frames.length / 2);
-    };
+import { ThumbnailGenerator, ThumbnailOptions, ThumbnailResult } from '@/lib/video/thumbnail';
+import { FFmpegClient } from '@/lib/video/ffmpeg';
+import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs';
 
-    it('should return middle index for odd number of frames', () => {
-      const frames = ['frame1.jpg', 'frame2.jpg', 'frame3.jpg'];
-      const index = selectBestFrameIndex(frames);
-      expect(index).toBe(1); // Middle frame
+// ============================================================================
+// PHASE 1: Core ThumbnailGenerator Class Tests (NEW)
+// ============================================================================
+
+describe('5.4-UNIT-026: ThumbnailGenerator.generate() [P0]', () => {
+  let generator: ThumbnailGenerator;
+  let mockFFmpeg: any;
+  let tempDir: string;
+
+  beforeEach(() => {
+    // Reset fs mocks to default (return true for all existence checks)
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(mkdirSync).mockReturnValue(undefined as any);
+    vi.mocked(writeFileSync).mockReturnValue(undefined);
+    vi.mocked(unlinkSync).mockReturnValue(undefined);
+
+    tempDir = path.join(process.cwd(), 'temp', 'test-thumbnails');
+
+    // Mock FFmpeg client
+    mockFFmpeg = {
+      getVideoDuration: vi.fn().mockResolvedValue(60), // 60 second video
+      extractFrame: vi.fn().mockResolvedValue(undefined),
+      addTextOverlay: vi.fn().mockResolvedValue(undefined),
+    } as unknown as FFmpegClient;
+
+    generator = new ThumbnailGenerator(mockFFmpeg);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('[P0] AC1+AC3: should generate thumbnail with 1920x1080 dimensions (16:9 aspect ratio)', async () => {
+    const outputPath = path.join(tempDir, 'test-thumbnail-ac1.jpg');
+
+    // Ensure output path appears to exist after generation
+    vi.mocked(existsSync).mockImplementation((path: any) => {
+      if (typeof path === 'string') {
+        return path.includes('video.mp4') || path.includes('thumbnail') || path === outputPath;
+      }
+      return true;
     });
 
-    it('should return floor of middle for even number of frames', () => {
-      const frames = ['frame1.jpg', 'frame2.jpg', 'frame3.jpg', 'frame4.jpg'];
-      const index = selectBestFrameIndex(frames);
-      expect(index).toBe(2);
+    const result = await generator.generate({
+      videoPath: '/test/video.mp4',
+      title: 'Test Video',
+      outputPath,
     });
 
-    it('should return 0 for single frame', () => {
-      const frames = ['frame1.jpg'];
-      const index = selectBestFrameIndex(frames);
-      expect(index).toBe(0);
+    // Verify dimensions are 1920x1080 (16:9)
+    expect(result.width).toBe(1920);
+    expect(result.height).toBe(1080);
+    expect(result.width / result.height).toBeCloseTo(16 / 9, 2);
+  });
+
+  it('[P0] AC4: should extract frames at 10%, 50%, 90% of video duration', async () => {
+    const outputPath = path.join(tempDir, 'test-thumbnail-ac4.jpg');
+
+    // Ensure paths exist
+    vi.mocked(existsSync).mockReturnValue(true);
+
+    await generator.generate({
+      videoPath: '/test/video.mp4',
+      title: 'Test Video',
+      outputPath,
     });
 
-    it('should return 0 for two frames', () => {
-      const frames = ['frame1.jpg', 'frame2.jpg'];
-      const index = selectBestFrameIndex(frames);
-      expect(index).toBe(1); // floor(2/2) = 1
+    // Verify frames extracted at correct timestamps
+    expect(mockFFmpeg.extractFrame).toHaveBeenCalledTimes(3);
+    expect(mockFFmpeg.extractFrame).toHaveBeenNthCalledWith(
+      1,
+      '/test/video.mp4',
+      6, // 10% of 60s
+      expect.stringContaining('frame-0.jpg')
+    );
+    expect(mockFFmpeg.extractFrame).toHaveBeenNthCalledWith(
+      2,
+      '/test/video.mp4',
+      30, // 50% of 60s
+      expect.stringContaining('frame-1.jpg')
+    );
+    expect(mockFFmpeg.extractFrame).toHaveBeenNthCalledWith(
+      3,
+      '/test/video.mp4',
+      54, // 90% of 60s
+      expect.stringContaining('frame-2.jpg')
+    );
+  });
+
+  it('[P0] AC2: should add title text overlay to middle frame', async () => {
+    const outputPath = path.join(tempDir, 'test-thumbnail-ac2.jpg');
+
+    // Ensure paths exist
+    vi.mocked(existsSync).mockReturnValue(true);
+
+    await generator.generate({
+      videoPath: '/test/video.mp4',
+      title: 'My Video Title',
+      outputPath,
+    });
+
+    // Verify text overlay applied to middle frame
+    expect(mockFFmpeg.addTextOverlay).toHaveBeenCalledWith(
+      expect.stringContaining('frame-1.jpg'), // Middle frame
+      'My Video Title',
+      outputPath,
+      1920,
+      1080
+    );
+  });
+
+  it('[P0] should return result with thumbnail path and metadata', async () => {
+    const outputPath = path.join(tempDir, 'test-thumbnail-result.jpg');
+
+    // Ensure paths exist
+    vi.mocked(existsSync).mockReturnValue(true);
+
+    const result = await generator.generate({
+      videoPath: '/test/video.mp4',
+      title: 'Test Video',
+      outputPath,
+    });
+
+    expect(result).toEqual({
+      thumbnailPath: outputPath,
+      width: 1920,
+      height: 1080,
+      sourceTimestamp: 30, // Middle frame (50% of 60s)
     });
   });
 
-  describe('frame timestamp calculation', () => {
-    // Tests the timestamp calculation for frame extraction
+  it('[P1] should use custom dimensions when provided', async () => {
+    const outputPath = path.join(tempDir, 'test-thumbnail-custom.jpg');
 
-    const calculateTimestamps = (duration: number): number[] => {
-      return [
-        duration * 0.1, // 10%
-        duration * 0.5, // 50%
-        duration * 0.9, // 90%
-      ];
-    };
+    // Ensure paths exist
+    vi.mocked(existsSync).mockReturnValue(true);
 
-    it('should calculate correct timestamps for 60 second video', () => {
-      const timestamps = calculateTimestamps(60);
-      expect(timestamps).toEqual([6, 30, 54]);
+    const result = await generator.generate({
+      videoPath: '/test/video.mp4',
+      title: 'Test Video',
+      outputPath,
+      width: 1280,
+      height: 720,
     });
 
-    it('should calculate correct timestamps for 100 second video', () => {
-      const timestamps = calculateTimestamps(100);
-      expect(timestamps).toEqual([10, 50, 90]);
-    });
-
-    it('should calculate correct timestamps for short video', () => {
-      const timestamps = calculateTimestamps(10);
-      expect(timestamps).toEqual([1, 5, 9]);
-    });
-  });
-
-  describe('ThumbnailOptions interface', () => {
-    // Tests that the interface is correctly typed
-
-    interface ThumbnailOptions {
-      videoPath: string;
-      title: string;
-      outputPath: string;
-      width?: number;
-      height?: number;
-    }
-
-    it('should accept required fields only', () => {
-      const options: ThumbnailOptions = {
-        videoPath: '/path/to/video.mp4',
-        title: 'Test Video',
-        outputPath: '/output/thumbnail.jpg',
-      };
-      expect(options.videoPath).toBe('/path/to/video.mp4');
-      expect(options.title).toBe('Test Video');
-      expect(options.outputPath).toBe('/output/thumbnail.jpg');
-      expect(options.width).toBeUndefined();
-      expect(options.height).toBeUndefined();
-    });
-
-    it('should accept optional dimensions', () => {
-      const options: ThumbnailOptions = {
-        videoPath: '/path/to/video.mp4',
-        title: 'Test Video',
-        outputPath: '/output/thumbnail.jpg',
-        width: 1280,
-        height: 720,
-      };
-      expect(options.width).toBe(1280);
-      expect(options.height).toBe(720);
-    });
-  });
-
-  describe('ThumbnailResult interface', () => {
-    interface ThumbnailResult {
-      thumbnailPath: string;
-      width: number;
-      height: number;
-      sourceTimestamp: number;
-    }
-
-    it('should include all required fields', () => {
-      const result: ThumbnailResult = {
-        thumbnailPath: '/output/thumbnail.jpg',
-        width: 1920,
-        height: 1080,
-        sourceTimestamp: 30.5,
-      };
-      expect(result.thumbnailPath).toBe('/output/thumbnail.jpg');
-      expect(result.width).toBe(1920);
-      expect(result.height).toBe(1080);
-      expect(result.sourceTimestamp).toBe(30.5);
-    });
+    expect(result.width).toBe(1280);
+    expect(result.height).toBe(720);
+    expect(mockFFmpeg.addTextOverlay).toHaveBeenCalledWith(
+      expect.any(String),
+      'Test Video',
+      outputPath,
+      1280,
+      720
+    );
   });
 });
 
-describe('FFmpegClient thumbnail methods', () => {
-  describe('addTextOverlay font size calculation', () => {
-    // Font size formula: min(80, floor(1600 / max(title.length, 10)))
+describe('5.4-UNIT-027: ThumbnailGenerator Error Handling [P0]', () => {
+  it('[P0] should throw error if video file does not exist', async () => {
+    // Mock existsSync to return false for this specific test
+    vi.mocked(existsSync).mockReturnValue(false);
 
-    const calculateFontSize = (title: string): number => {
-      return Math.min(80, Math.floor(1600 / Math.max(title.length, 10)));
-    };
+    const generator = new ThumbnailGenerator();
 
-    it('should return max font size for short titles', () => {
-      expect(calculateFontSize('Short')).toBe(80); // 1600/10 = 160, min(80,160) = 80
-    });
-
-    it('should return max font size for 10 character title', () => {
-      expect(calculateFontSize('TenCharsAB')).toBe(80); // 1600/10 = 160
-    });
-
-    it('should scale down for 20 character title', () => {
-      expect(calculateFontSize('A'.repeat(20))).toBe(80); // 1600/20 = 80
-    });
-
-    it('should scale down for 40 character title', () => {
-      expect(calculateFontSize('A'.repeat(40))).toBe(40); // 1600/40 = 40
-    });
-
-    it('should scale down for 80 character title', () => {
-      expect(calculateFontSize('A'.repeat(80))).toBe(20); // 1600/80 = 20
-    });
-
-    it('should scale down for 160 character title', () => {
-      expect(calculateFontSize('A'.repeat(160))).toBe(10); // 1600/160 = 10
-    });
+    await expect(
+      generator.generate({
+        videoPath: '/nonexistent/video.mp4',
+        title: 'Test',
+        outputPath: '/output/thumbnail.jpg',
+      })
+    ).rejects.toThrow('Video file not found');
   });
 
-  describe('text escaping for FFmpeg', () => {
-    // FFmpeg drawtext filter requires escaping: \, :, '
-
-    const escapeForFFmpeg = (title: string): string => {
-      return title
-        .replace(/\\/g, '\\\\\\\\') // Escape backslashes
-        .replace(/:/g, '\\:') // Escape colons
-        .replace(/'/g, "'\\''"); // Escape single quotes
-    };
-
-    it('should escape colons', () => {
-      const escaped = escapeForFFmpeg('Video: Title');
-      expect(escaped).toBe('Video\\: Title');
+  it('[P0] should throw error if thumbnail output is not created', async () => {
+    // Mock existsSync to return true for video, but false for final thumbnail check
+    let callCount = 0;
+    vi.mocked(existsSync).mockImplementation((path: any) => {
+      callCount++;
+      // First call (video check): return true
+      // Last call (thumbnail verification): return false
+      if (callCount === 1) return true; // Video exists
+      return false; // Thumbnail not created
     });
 
-    it('should escape single quotes', () => {
-      const escaped = escapeForFFmpeg("It's a Video");
-      expect(escaped).toBe("It'\\''s a Video");
-    });
+    const mockFFmpeg = {
+      getVideoDuration: vi.fn().mockResolvedValue(60),
+      extractFrame: vi.fn().mockResolvedValue(undefined),
+      addTextOverlay: vi.fn().mockResolvedValue(undefined), // Doesn't create file
+    } as unknown as FFmpegClient;
 
-    it('should escape backslashes', () => {
-      const escaped = escapeForFFmpeg('Path\\File');
-      expect(escaped).toBe('Path\\\\\\\\File');
-    });
+    const generator = new ThumbnailGenerator(mockFFmpeg);
 
-    it('should handle multiple special characters', () => {
-      const escaped = escapeForFFmpeg("Video: The 'Special' Edition\\2025");
-      expect(escaped).toContain('\\:'); // Colon escaped
-      expect(escaped).toContain("'\\''"); // Quote escaped
-      expect(escaped).toContain('\\\\\\\\'); // Backslash escaped
-    });
-
-    it('should not modify plain text', () => {
-      const escaped = escapeForFFmpeg('Simple Video Title');
-      expect(escaped).toBe('Simple Video Title');
-    });
+    await expect(
+      generator.generate({
+        videoPath: '/test/video.mp4',
+        title: 'Test',
+        outputPath: '/nonexistent/dir/thumbnail.jpg',
+      })
+    ).rejects.toThrow('Thumbnail generation failed');
   });
 
-  describe('extractFrame command parameters', () => {
-    // The extractFrame method should use input seeking (-ss before -i)
+  it('[P1] should handle FFmpeg errors gracefully', async () => {
+    // Mock existsSync to return true for video
+    vi.mocked(existsSync).mockReturnValue(true);
 
-    it('should document input seeking format', () => {
-      // FFmpeg command: ffmpeg -ss TIMESTAMP -i VIDEO -vframes 1 -q:v 2 OUTPUT
-      // Input seeking (-ss before -i) is faster for large videos
-      const expectedArgsOrder = ['-ss', 'TIMESTAMP', '-i', 'VIDEO', '-vframes', '1', '-q:v', '2', '-y', 'OUTPUT'];
-      expect(expectedArgsOrder[0]).toBe('-ss'); // -ss comes first
-      expect(expectedArgsOrder[2]).toBe('-i'); // -i comes after -ss
-    });
-  });
+    const mockFFmpeg = {
+      getVideoDuration: vi.fn().mockRejectedValue(new Error('FFmpeg error')),
+    } as unknown as FFmpegClient;
 
-  describe('thumbnail dimensions', () => {
-    const THUMBNAIL_WIDTH = 1920;
-    const THUMBNAIL_HEIGHT = 1080;
+    const generator = new ThumbnailGenerator(mockFFmpeg);
 
-    it('should use 16:9 aspect ratio', () => {
-      const ratio = THUMBNAIL_WIDTH / THUMBNAIL_HEIGHT;
-      expect(ratio).toBeCloseTo(16 / 9, 2);
-    });
-
-    it('should use YouTube recommended dimensions', () => {
-      // YouTube recommends 1920x1080 for thumbnails
-      expect(THUMBNAIL_WIDTH).toBe(1920);
-      expect(THUMBNAIL_HEIGHT).toBe(1080);
-    });
+    await expect(
+      generator.generate({
+        videoPath: '/test/video.mp4',
+        title: 'Test',
+        outputPath: '/output/thumbnail.jpg',
+      })
+    ).rejects.toThrow('FFmpeg error');
   });
 });
 
-describe('Video constants', () => {
-  it('should define thumbnail configuration', () => {
+describe('5.4-UNIT-028: ThumbnailGenerator.selectBestFrameIndex [P1]', () => {
+  let generator: ThumbnailGenerator;
+
+  beforeEach(() => {
+    generator = new ThumbnailGenerator();
+  });
+
+  it('[P1] should return middle index for odd number of frames', () => {
+    const frames = ['frame1.jpg', 'frame2.jpg', 'frame3.jpg'];
+    const index = generator.selectBestFrameIndex(frames);
+    expect(index).toBe(1); // Middle frame
+  });
+
+  it('[P1] should return floor of middle for even number of frames', () => {
+    const frames = ['frame1.jpg', 'frame2.jpg', 'frame3.jpg', 'frame4.jpg'];
+    const index = generator.selectBestFrameIndex(frames);
+    expect(index).toBe(2);
+  });
+
+  it('[P1] should return 0 for single frame', () => {
+    const frames = ['frame1.jpg'];
+    const index = generator.selectBestFrameIndex(frames);
+    expect(index).toBe(0);
+  });
+
+  it('[P1] should return floor(length/2) for two frames', () => {
+    const frames = ['frame1.jpg', 'frame2.jpg'];
+    const index = generator.selectBestFrameIndex(frames);
+    expect(index).toBe(1); // floor(2/2) = 1
+  });
+});
+
+describe('5.4-UNIT-029: ThumbnailGenerator.selectBestFrame [P1]', () => {
+  let generator: ThumbnailGenerator;
+
+  beforeEach(() => {
+    generator = new ThumbnailGenerator();
+  });
+
+  it('[P1] should return middle frame path', () => {
+    const frames = ['frame1.jpg', 'frame2.jpg', 'frame3.jpg'];
+    const bestFrame = generator.selectBestFrame(frames);
+    expect(bestFrame).toBe('frame2.jpg');
+  });
+
+  it('[P1] should return correct frame for even count', () => {
+    const frames = ['frame1.jpg', 'frame2.jpg', 'frame3.jpg', 'frame4.jpg'];
+    const bestFrame = generator.selectBestFrame(frames);
+    expect(bestFrame).toBe('frame3.jpg'); // index 2
+  });
+});
+
+// ============================================================================
+// PHASE 1: Refactored Logic Tests (Existing tests with IDs and priorities)
+// ============================================================================
+
+describe('5.4-UNIT-001: Frame timestamp calculation logic [P1]', () => {
+  // Tests the timestamp calculation for frame extraction
+  const calculateTimestamps = (duration: number): number[] => {
+    return [
+      duration * 0.1, // 10%
+      duration * 0.5, // 50%
+      duration * 0.9, // 90%
+    ];
+  };
+
+  it('[P1] should calculate correct timestamps for 60 second video', () => {
+    const timestamps = calculateTimestamps(60);
+    expect(timestamps).toEqual([6, 30, 54]);
+  });
+
+  it('[P1] should calculate correct timestamps for 100 second video', () => {
+    const timestamps = calculateTimestamps(100);
+    expect(timestamps).toEqual([10, 50, 90]);
+  });
+
+  it('[P1] should calculate correct timestamps for short video', () => {
+    const timestamps = calculateTimestamps(10);
+    expect(timestamps).toEqual([1, 5, 9]);
+  });
+});
+
+describe('5.4-UNIT-002: ThumbnailOptions Interface [P2]', () => {
+  // Tests that the interface is correctly typed (using imported interface)
+
+  it('[P2] should accept required fields only', () => {
+    const options: ThumbnailOptions = {
+      videoPath: '/path/to/video.mp4',
+      title: 'Test Video',
+      outputPath: '/output/thumbnail.jpg',
+    };
+    expect(options.videoPath).toBe('/path/to/video.mp4');
+    expect(options.title).toBe('Test Video');
+    expect(options.outputPath).toBe('/output/thumbnail.jpg');
+    expect(options.width).toBeUndefined();
+    expect(options.height).toBeUndefined();
+  });
+
+  it('[P2] should accept optional dimensions', () => {
+    const options: ThumbnailOptions = {
+      videoPath: '/path/to/video.mp4',
+      title: 'Test Video',
+      outputPath: '/output/thumbnail.jpg',
+      width: 1280,
+      height: 720,
+    };
+    expect(options.width).toBe(1280);
+    expect(options.height).toBe(720);
+  });
+});
+
+describe('5.4-UNIT-003: ThumbnailResult Interface [P2]', () => {
+  // Tests that the interface is correctly typed (using imported interface)
+
+  it('[P2] should include all required fields', () => {
+    const result: ThumbnailResult = {
+      thumbnailPath: '/output/thumbnail.jpg',
+      width: 1920,
+      height: 1080,
+      sourceTimestamp: 30.5,
+    };
+    expect(result.thumbnailPath).toBe('/output/thumbnail.jpg');
+    expect(result.width).toBe(1920);
+    expect(result.height).toBe(1080);
+    expect(result.sourceTimestamp).toBe(30.5);
+  });
+});
+
+describe('5.4-UNIT-004: Font size calculation logic [P1]', () => {
+  // Font size formula: min(80, floor(1600 / max(title.length, 10)))
+  const calculateFontSize = (title: string): number => {
+    return Math.min(80, Math.floor(1600 / Math.max(title.length, 10)));
+  };
+
+  it('[P1] should return max font size for short titles', () => {
+    expect(calculateFontSize('Short')).toBe(80); // 1600/10 = 160, min(80,160) = 80
+  });
+
+  it('[P1] should return max font size for 10 character title', () => {
+    expect(calculateFontSize('TenCharsAB')).toBe(80); // 1600/10 = 160
+  });
+
+  it('[P1] should scale down for 20 character title', () => {
+    expect(calculateFontSize('A'.repeat(20))).toBe(80); // 1600/20 = 80
+  });
+
+  it('[P1] should scale down for 40 character title', () => {
+    expect(calculateFontSize('A'.repeat(40))).toBe(40); // 1600/40 = 40
+  });
+
+  it('[P1] should scale down for 80 character title', () => {
+    expect(calculateFontSize('A'.repeat(80))).toBe(20); // 1600/80 = 20
+  });
+
+  it('[P1] should scale down for 160 character title', () => {
+    expect(calculateFontSize('A'.repeat(160))).toBe(10); // 1600/160 = 10
+  });
+});
+
+describe('5.4-UNIT-005: Text escaping for FFmpeg [P1]', () => {
+  // FFmpeg drawtext filter requires escaping: \, :, '
+  const escapeForFFmpeg = (title: string): string => {
+    return title
+      .replace(/\\/g, '\\\\\\\\') // Escape backslashes
+      .replace(/:/g, '\\:') // Escape colons
+      .replace(/'/g, "'\\''"); // Escape single quotes
+  };
+
+  it('[P1] should escape colons', () => {
+    const escaped = escapeForFFmpeg('Video: Title');
+    expect(escaped).toBe('Video\\: Title');
+  });
+
+  it('[P1] should escape single quotes', () => {
+    const escaped = escapeForFFmpeg("It's a Video");
+    expect(escaped).toBe("It'\\''s a Video");
+  });
+
+  it('[P1] should escape backslashes', () => {
+    const escaped = escapeForFFmpeg('Path\\File');
+    expect(escaped).toBe('Path\\\\\\\\File');
+  });
+
+  it('[P1] should handle multiple special characters', () => {
+    const escaped = escapeForFFmpeg("Video: The 'Special' Edition\\2025");
+    expect(escaped).toContain('\\:'); // Colon escaped
+    expect(escaped).toContain("'\\''"); // Quote escaped
+    expect(escaped).toContain('\\\\\\\\'); // Backslash escaped
+  });
+
+  it('[P1] should not modify plain text', () => {
+    const escaped = escapeForFFmpeg('Simple Video Title');
+    expect(escaped).toBe('Simple Video Title');
+  });
+});
+
+describe('5.4-UNIT-006: FFmpeg extractFrame command parameters [P2]', () => {
+  // The extractFrame method should use input seeking (-ss before -i)
+
+  it('[P2] should document input seeking format', () => {
+    // FFmpeg command: ffmpeg -ss TIMESTAMP -i VIDEO -vframes 1 -q:v 2 OUTPUT
+    // Input seeking (-ss before -i) is faster for large videos
+    const expectedArgsOrder = ['-ss', 'TIMESTAMP', '-i', 'VIDEO', '-vframes', '1', '-q:v', '2', '-y', 'OUTPUT'];
+    expect(expectedArgsOrder[0]).toBe('-ss'); // -ss comes first
+    expect(expectedArgsOrder[2]).toBe('-i'); // -i comes after -ss
+  });
+});
+
+describe('5.4-UNIT-007: Thumbnail dimensions validation [P1]', () => {
+  const THUMBNAIL_WIDTH = 1920;
+  const THUMBNAIL_HEIGHT = 1080;
+
+  it('[P1] should use 16:9 aspect ratio', () => {
+    const ratio = THUMBNAIL_WIDTH / THUMBNAIL_HEIGHT;
+    expect(ratio).toBeCloseTo(16 / 9, 2);
+  });
+
+  it('[P1] should use YouTube recommended dimensions', () => {
+    // YouTube recommends 1920x1080 for thumbnails
+    expect(THUMBNAIL_WIDTH).toBe(1920);
+    expect(THUMBNAIL_HEIGHT).toBe(1080);
+  });
+});
+
+describe('5.4-UNIT-008: Video constants validation [P2]', () => {
+  it('[P2] should define thumbnail configuration', () => {
     // These values should match src/lib/video/constants.ts
     const expectedConfig = {
       THUMBNAIL_WIDTH: 1920,

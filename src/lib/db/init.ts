@@ -208,6 +208,23 @@ async function runMigrations(): Promise<void> {
     console.log(`Migration ${migration010Name} already applied, skipping`);
   }
 
+  // Migration 011: Add visual_keywords column to scenes table (Story 3.7b)
+  const migration011Name = '011_add_visual_keywords';
+  if (!isMigrationApplied(migration011Name)) {
+    console.log(`Applying migration: ${migration011Name}`);
+    try {
+      const { up } = await import('./migrations/011_add_visual_keywords');
+      up(db);
+      markMigrationApplied(migration011Name);
+      console.log(`Migration ${migration011Name} applied successfully`);
+    } catch (error) {
+      console.error(`Failed to apply migration ${migration011Name}:`, error);
+      throw error;
+    }
+  } else {
+    console.log(`Migration ${migration011Name} already applied, skipping`);
+  }
+
   console.log('All migrations completed');
 }
 

@@ -1,13 +1,16 @@
 /**
  * Download Segments Orchestration Endpoint
  *
- * Orchestrates batch download of default video segments for all visual suggestions
- * in a project. Includes yt-dlp health check and proactive disk space validation.
+ * Orchestrates batch download of video segments for visual suggestions.
+ * Supports both selective download (specific suggestion IDs) and full download.
+ * Includes yt-dlp health check and proactive disk space validation.
  *
  * Story 3.6: Default Segment Download Service
+ * Updated: Support selective downloads - only download user-selected clips
  *
  * POST /api/projects/[id]/download-segments
- * Request: { projectId: string }
+ * Request: { suggestionIds?: string[] } - Optional array of specific suggestion IDs to download
+ *          If not provided, downloads all pending suggestions (legacy behavior)
  * Response: { success, totalJobs, queued, alreadyDownloaded, message, error }
  */
 
@@ -153,6 +156,40 @@ function loadPendingSuggestions(projectId: string): PendingSuggestion[] {
 }
 
 /**
+ * Load specific visual suggestions by IDs
+ * Used for selective download of user-chosen clips
+ */
+function loadSuggestionsByIds(projectId: string, suggestionIds: string[]): PendingSuggestion[] {
+  if (suggestionIds.length === 0) return [];
+
+  try {
+    // Build placeholders for the IN clause
+    const placeholders = suggestionIds.map(() => '?').join(',');
+    const stmt = db.prepare(`
+      SELECT
+        vs.id,
+        vs.scene_id,
+        vs.video_id,
+        vs.duration,
+        s.scene_number
+      FROM visual_suggestions vs
+      INNER JOIN scenes s ON vs.scene_id = s.id
+      WHERE s.project_id = ?
+        AND vs.id IN (${placeholders})
+        AND vs.download_status IN ('pending', 'error')
+      ORDER BY s.scene_number ASC, vs.rank ASC
+    `);
+
+    return stmt.all(projectId, ...suggestionIds) as PendingSuggestion[];
+  } catch (error) {
+    console.error('[Download Segments] Failed to load suggestions by IDs:', error);
+    throw new Error(
+      `Failed to load suggestions: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
  * Count already downloaded suggestions
  */
 function countDownloadedSuggestions(projectId: string): number {
@@ -199,6 +236,10 @@ function getSceneDuration(sceneId: string): number {
 /**
  * POST /api/projects/[id]/download-segments
  * Orchestrate batch download of video segments
+ *
+ * Request body (optional):
+ * - suggestionIds: string[] - Specific suggestion IDs to download
+ *   If not provided, downloads all pending suggestions (legacy behavior)
  */
 export async function POST(
   request: NextRequest,
@@ -207,6 +248,18 @@ export async function POST(
   const { id: projectId } = await params;
 
   try {
+    // Parse request body for selective download
+    let suggestionIds: string[] | undefined;
+    try {
+      const body = await request.json();
+      if (body.suggestionIds && Array.isArray(body.suggestionIds)) {
+        suggestionIds = body.suggestionIds;
+        console.log(`[Download Segments] Selective download requested for ${body.suggestionIds.length} suggestions`);
+      }
+    } catch {
+      // No body or invalid JSON - use default behavior (download all)
+    }
+
     // Validate project ID
     if (!validateProjectId(projectId)) {
       return NextResponse.json(
@@ -238,8 +291,10 @@ export async function POST(
       );
     }
 
-    // Load pending suggestions
-    const pendingSuggestions = loadPendingSuggestions(projectId);
+    // Load suggestions - either specific IDs or all pending
+    const pendingSuggestions = suggestionIds
+      ? loadSuggestionsByIds(projectId, suggestionIds)
+      : loadPendingSuggestions(projectId);
     const alreadyDownloaded = countDownloadedSuggestions(projectId);
 
     if (pendingSuggestions.length === 0) {

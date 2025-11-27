@@ -34,7 +34,7 @@ import {
   DialogContent,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CheckCircle, ArrowLeft, RefreshCw, AlertTriangle, Loader2 } from 'lucide-react';
+import { CheckCircle, ArrowLeft, RefreshCw, AlertTriangle, Loader2, Download } from 'lucide-react';
 import { useCurationStore, type ClipSelection } from '@/lib/stores/curation-store';
 import { toast } from '@/hooks/use-toast';
 
@@ -178,6 +178,9 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
   const [pendingNavigation, setPendingNavigation] = React.useState<string | null>(null);
   const [isRegenerating, setIsRegenerating] = React.useState(false);
 
+  // Download selected clips state
+  const [isDownloading, setIsDownloading] = React.useState(false);
+
   // Get curation store state and actions
   const {
     selections,
@@ -312,6 +315,56 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
       setIsRegenerating(false);
     }
   }, [project.id]);
+
+  // Handle download selected clips
+  const handleDownloadSelected = React.useCallback(async () => {
+    if (selectionCount === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No Clips Selected',
+        description: 'Please select at least one clip before downloading.',
+      });
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      // Get selected suggestion IDs from the store
+      const suggestionIds = Array.from(selections.values()).map((s) => s.suggestionId);
+
+      const response = await fetch(`/api/projects/${project.id}/download-segments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suggestionIds }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to start downloads');
+      }
+
+      const data = await response.json();
+
+      toast({
+        title: 'Downloads Started',
+        description: `Downloading ${data.queued} selected clip${data.queued !== 1 ? 's' : ''}. This may take a moment.`,
+      });
+
+      // Refresh scene data after a delay to show updated download status
+      setTimeout(() => {
+        fetchScenes();
+      }, 3000);
+    } catch (error) {
+      console.error('Download selected clips failed:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Download Failed',
+        description: error instanceof Error ? error.message : 'Failed to download clips',
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [project.id, selectionCount, selections]);
 
   // Story 4.6: Handle navigation confirmation from modal
   const handleConfirmLeave = React.useCallback(() => {
@@ -476,19 +529,35 @@ export function VisualCurationClient({ project }: VisualCurationClientProps) {
                 Back to Script Preview
               </Button>
 
-              <Button
-                variant="outline"
-                onClick={handleRegenerateVisuals}
-                disabled={isRegenerating}
-                className="flex items-center gap-2"
-              >
-                {isRegenerating ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-4 h-4" />
-                )}
-                Regenerate Visuals
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadSelected}
+                  disabled={isDownloading || selectionCount === 0}
+                  className="flex items-center gap-2"
+                >
+                  {isDownloading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                  Download Selected ({selectionCount})
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={handleRegenerateVisuals}
+                  disabled={isRegenerating}
+                  className="flex items-center gap-2"
+                >
+                  {isRegenerating ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                  Regenerate Visuals
+                </Button>
+              </div>
             </div>
           )}
 

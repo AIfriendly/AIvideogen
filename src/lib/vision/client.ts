@@ -18,7 +18,8 @@ import {
   VisionErrorCode,
   VisionAPIError,
   QuotaUsage,
-  FrameDimensions
+  FrameDimensions,
+  TextOverlaySeverity
 } from './types';
 
 // ============================================================================
@@ -29,30 +30,51 @@ import {
  * CV Detection and Scoring Thresholds
  *
  * Story 3.7b: Stricter thresholds for better B-roll filtering
+ * Updated: Tiered text overlay detection to eliminate videos with text
  *
  * Detection Thresholds:
  * - TALKING_HEAD_AREA: 10% face area (was 15%) - AC60
  * - SMALL_FACE_AREA: 3% face area for minor penalty (was 5%)
- * - CAPTION_COVERAGE: 3% text coverage (was 5%) - AC61
- * - CAPTION_BLOCKS: 2 text blocks (was 3) - AC61
+ * - CAPTION_COVERAGE_HEAVY: 5% text coverage for heavy penalty
+ * - CAPTION_COVERAGE_MODERATE: 2% text coverage for moderate penalty
+ * - CAPTION_BLOCKS_HEAVY: 4+ text blocks for heavy penalty
+ * - CAPTION_BLOCKS_MODERATE: 2+ text blocks for moderate penalty
  *
  * Scoring Penalties:
  * - FACE_PENALTY_MAJOR: -0.6 for talking heads (was -0.5) - AC62
  * - FACE_PENALTY_MINOR: -0.3 for small faces (was -0.2) - AC62
- * - CAPTION_PENALTY: -0.4 for captions (was -0.3) - AC63
+ * - CAPTION_PENALTY_HEAVY: -0.6 for heavy text (watermarks, subscribe buttons)
+ * - CAPTION_PENALTY_MODERATE: -0.5 for moderate text (titles, channel names)
+ * - CAPTION_PENALTY_LIGHT: -0.3 for any text detected
  * - LABEL_MATCH_BONUS: +0.3 (unchanged)
  */
 export const CV_THRESHOLDS = {
   // Detection thresholds
   TALKING_HEAD_AREA: 0.10,    // 10% face area triggers major penalty (was 0.15)
   SMALL_FACE_AREA: 0.03,      // 3% face area triggers minor penalty (was 0.05)
-  CAPTION_COVERAGE: 0.03,     // 3% text coverage (was 0.05)
-  CAPTION_BLOCKS: 2,          // 2 text blocks triggers caption detection (was 3)
+
+  // Tiered text detection thresholds
+  CAPTION_COVERAGE_HEAVY: 0.05,    // 5% text coverage = heavy overlay
+  CAPTION_COVERAGE_MODERATE: 0.02, // 2% text coverage = moderate overlay
+  CAPTION_BLOCKS_HEAVY: 4,         // 4+ text blocks = heavy overlay (watermarks, titles)
+  CAPTION_BLOCKS_MODERATE: 2,      // 2+ text blocks = moderate overlay
+
+  // Legacy threshold (for backwards compatibility)
+  CAPTION_COVERAGE: 0.02,     // Used for hasCaption boolean
+  CAPTION_BLOCKS: 2,          // Used for hasCaption boolean
 
   // Scoring penalties
   FACE_PENALTY_MAJOR: -0.6,   // Heavy penalty for talking heads (was -0.5)
   FACE_PENALTY_MINOR: -0.3,   // Small penalty for small faces (was -0.2)
-  CAPTION_PENALTY: -0.4,      // Penalty for captions (was -0.3)
+
+  // Tiered text penalties - more aggressive to filter out overlays
+  CAPTION_PENALTY_HEAVY: -0.6,    // Heavy text overlay (watermarks, subscribe buttons)
+  CAPTION_PENALTY_MODERATE: -0.5, // Moderate text (titles, channel names)
+  CAPTION_PENALTY_LIGHT: -0.3,    // Any text detected (minor text)
+
+  // Legacy penalty (for backwards compatibility)
+  CAPTION_PENALTY: -0.4,      // Deprecated, use tiered penalties
+
   LABEL_MATCH_BONUS: 0.3,     // Bonus for matching expected labels (unchanged)
 } as const;
 
@@ -181,7 +203,9 @@ export class VisionAPIClient {
   private isConfigured: boolean = false;
 
   constructor() {
-    this.quotaTracker = new QuotaTracker(1000);
+    // 10,000 units/month - allows ~3,300 video analyses
+    // Adjust based on your Google Cloud billing/credits
+    this.quotaTracker = new QuotaTracker(10000);
     this.initializeClient();
   }
 
@@ -396,6 +420,12 @@ export class VisionAPIClient {
 
   /**
    * Process text detection results
+   *
+   * Tiered severity detection for text overlays:
+   * - heavy: >5% coverage OR 4+ text blocks (watermarks, subscribe buttons, titles)
+   * - moderate: >2% coverage OR 2+ text blocks (channel names, minor overlays)
+   * - light: any text detected (single words, small labels)
+   * - none: no text detected
    */
   private processTextDetection(
     annotations: any[],
@@ -426,13 +456,50 @@ export class VisionAPIClient {
     });
 
     const textCoverage = totalArea > 0 ? textArea / totalArea : 0;
+    const textBlockCount = textBlocks.length;
+
+    // Calculate severity based on tiered thresholds
+    const severity = this.calculateTextSeverity(textCoverage, textBlockCount);
 
     return {
       texts,
-      // Story 3.7b: Stricter thresholds - 3% coverage or >2 text blocks (was 5% or >3)
-      hasCaption: textCoverage > CV_THRESHOLDS.CAPTION_COVERAGE || textBlocks.length > CV_THRESHOLDS.CAPTION_BLOCKS,
-      textCoverage
+      // hasCaption is true for any detected text (backwards compatibility)
+      hasCaption: textCoverage > CV_THRESHOLDS.CAPTION_COVERAGE || textBlockCount > CV_THRESHOLDS.CAPTION_BLOCKS,
+      textCoverage,
+      textBlockCount,
+      severity
     };
+  }
+
+  /**
+   * Calculate text overlay severity for tiered penalty scoring
+   *
+   * Thresholds:
+   * - heavy: >5% coverage OR 4+ text blocks
+   * - moderate: >2% coverage OR 2+ text blocks
+   * - light: any text detected (1+ blocks)
+   * - none: no text
+   */
+  private calculateTextSeverity(textCoverage: number, textBlockCount: number): TextOverlaySeverity {
+    // Heavy: watermarks, subscribe buttons, full titles
+    if (textCoverage > CV_THRESHOLDS.CAPTION_COVERAGE_HEAVY ||
+        textBlockCount >= CV_THRESHOLDS.CAPTION_BLOCKS_HEAVY) {
+      return 'heavy';
+    }
+
+    // Moderate: channel names, partial overlays
+    if (textCoverage > CV_THRESHOLDS.CAPTION_COVERAGE_MODERATE ||
+        textBlockCount >= CV_THRESHOLDS.CAPTION_BLOCKS_MODERATE) {
+      return 'moderate';
+    }
+
+    // Light: any text detected
+    if (textBlockCount > 0) {
+      return 'light';
+    }
+
+    // No text
+    return 'none';
   }
 
   /**
@@ -490,11 +557,14 @@ export class VisionAPIClient {
       hasTalkingHead: faceResults.some(r => r.hasTalkingHead)
     };
 
-    // Worst case for text detection
+    // Worst case for text detection - use worst severity across all frames
+    const worstSeverity = this.getWorstTextSeverity(textResults.map(r => r.severity));
     const textDetection: TextDetectionResult = {
       texts: textResults.flatMap(r => r.texts),
       hasCaption: textResults.some(r => r.hasCaption),
-      textCoverage: Math.max(...textResults.map(r => r.textCoverage))
+      textCoverage: Math.max(...textResults.map(r => r.textCoverage)),
+      textBlockCount: Math.max(...textResults.map(r => r.textBlockCount)),
+      severity: worstSeverity
     };
 
     // Best case for label detection
@@ -515,16 +585,44 @@ export class VisionAPIClient {
   }
 
   /**
+   * Get the worst (most severe) text overlay severity from an array
+   */
+  private getWorstTextSeverity(severities: TextOverlaySeverity[]): TextOverlaySeverity {
+    const severityOrder: TextOverlaySeverity[] = ['none', 'light', 'moderate', 'heavy'];
+    let worstIndex = 0;
+
+    for (const severity of severities) {
+      const index = severityOrder.indexOf(severity);
+      if (index > worstIndex) {
+        worstIndex = index;
+      }
+    }
+
+    return severityOrder[worstIndex];
+  }
+
+  /**
    * Calculate CV score based on analysis results
    *
-   * Story 3.7b: Updated scoring formula with stricter penalties
+   * Story 3.7b: Updated scoring formula with tiered text penalties
    *
    * Formula:
    * - Base score: 1.0
    * - Talking head (face >10%): -0.6 (was -0.5 at 15%) - AC62
    * - Small faces (face 3-10%): -0.3 (was -0.2 at 5-15%) - AC62
-   * - Captions detected: -0.4 (was -0.3) - AC63
+   * - Text overlay penalties (tiered):
+   *   - Heavy (watermarks, subscribe): -0.6
+   *   - Moderate (titles, channel names): -0.5
+   *   - Light (any text): -0.3
    * - Label match bonus: +0.3 * matchScore (unchanged)
+   *
+   * Example scores with text overlays:
+   * - No text, no face, good labels: 1.0 + 0.3 = 1.0 (clamped)
+   * - Heavy text, no face, good labels: 1.0 - 0.6 + 0.3 = 0.7 (FAIL if threshold 0.8)
+   * - Moderate text, no face, good labels: 1.0 - 0.5 + 0.3 = 0.8
+   * - Light text, no face, good labels: 1.0 - 0.3 + 0.3 = 1.0
+   * - Heavy text, no face, no labels: 1.0 - 0.6 = 0.4 (FAIL)
+   * - Moderate text, no face, no labels: 1.0 - 0.5 = 0.5 (BORDERLINE)
    */
   private calculateCVScore(result: VisionAnalysisResult): number {
     let score = 1.0;
@@ -536,9 +634,18 @@ export class VisionAPIClient {
       score += CV_THRESHOLDS.FACE_PENALTY_MINOR; // -0.3 for 3-10% face area (was -0.2)
     }
 
-    // Penalize text/captions - Story 3.7b: Stricter penalty
-    if (result.textDetection.hasCaption) {
-      score += CV_THRESHOLDS.CAPTION_PENALTY; // -0.4 (was -0.3)
+    // Penalize text/captions - Tiered penalties based on severity
+    switch (result.textDetection.severity) {
+      case 'heavy':
+        score += CV_THRESHOLDS.CAPTION_PENALTY_HEAVY; // -0.6 for watermarks, subscribe buttons
+        break;
+      case 'moderate':
+        score += CV_THRESHOLDS.CAPTION_PENALTY_MODERATE; // -0.5 for titles, channel names
+        break;
+      case 'light':
+        score += CV_THRESHOLDS.CAPTION_PENALTY_LIGHT; // -0.3 for minor text
+        break;
+      // 'none' - no penalty
     }
 
     // Bonus for matching labels

@@ -5,7 +5,7 @@
  * Uses FFmpeg for frame extraction and text rendering.
  */
 
-import { existsSync, mkdirSync, unlinkSync } from 'fs';
+import * as fs from 'fs';
 import path from 'path';
 import { FFmpegClient } from './ffmpeg';
 import { VIDEO_ASSEMBLY_CONFIG } from './constants';
@@ -48,14 +48,14 @@ export class ThumbnailGenerator {
     } = options;
 
     // Validate video exists
-    if (!existsSync(videoPath)) {
+    if (!fs.existsSync(videoPath)) {
       throw new Error(`Video file not found: ${videoPath}`);
     }
 
     // Ensure output directory exists
     const outputDir = path.dirname(outputPath);
-    if (!existsSync(outputDir)) {
-      mkdirSync(outputDir, { recursive: true });
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
     }
 
     // Get video duration for frame selection
@@ -70,8 +70,8 @@ export class ThumbnailGenerator {
 
     // Create temp directory for frames
     const tempDir = path.join(process.cwd(), VIDEO_ASSEMBLY_CONFIG.TEMP_DIR, 'thumbnails');
-    if (!existsSync(tempDir)) {
-      mkdirSync(tempDir, { recursive: true });
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
     }
 
     // Generate unique prefix for this operation
@@ -95,7 +95,7 @@ export class ThumbnailGenerator {
       await this.ffmpeg.addTextOverlay(bestFrame, title, outputPath, width, height);
 
       // Verify output was created
-      if (!existsSync(outputPath)) {
+      if (!fs.existsSync(outputPath)) {
         throw new Error(`Thumbnail generation failed: output not created at ${outputPath}`);
       }
 
@@ -138,8 +138,8 @@ export class ThumbnailGenerator {
   private cleanupTempFrames(framePaths: string[]): void {
     for (const framePath of framePaths) {
       try {
-        if (existsSync(framePath)) {
-          unlinkSync(framePath);
+        if (fs.existsSync(framePath)) {
+          fs.unlinkSync(framePath);
         }
       } catch (error) {
         console.warn(`[ThumbnailGenerator] Failed to cleanup temp frame: ${framePath}`, error);

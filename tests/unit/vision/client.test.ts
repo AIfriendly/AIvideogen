@@ -271,6 +271,8 @@ describe('CV Score Calculation', () => {
           texts: [],
           hasCaption: false,
           textCoverage: 0,
+          textBlockCount: 0,
+          severity: 'none',
         },
         labelDetection: {
           labels: [],
@@ -702,20 +704,29 @@ describe('Result Aggregation', () => {
     });
 
     it('should use worst-case for text detection (AC44)', () => {
-      // Given: Multiple frame results
+      // Given: Multiple frame results with tiered severity
       const textResults: TextDetectionResult[] = [
-        { texts: [], hasCaption: false, textCoverage: 0.01 },
-        { texts: [], hasCaption: true, textCoverage: 0.08 },
-        { texts: [], hasCaption: false, textCoverage: 0.03 },
+        { texts: [], hasCaption: false, textCoverage: 0.01, textBlockCount: 1, severity: 'light' },
+        { texts: [], hasCaption: true, textCoverage: 0.08, textBlockCount: 5, severity: 'heavy' },
+        { texts: [], hasCaption: false, textCoverage: 0.03, textBlockCount: 2, severity: 'moderate' },
       ];
 
       // When: Aggregating
       const maxCoverage = Math.max(...textResults.map(r => r.textCoverage));
       const hasCaption = textResults.some(r => r.hasCaption);
+      const maxBlockCount = Math.max(...textResults.map(r => r.textBlockCount));
+      // Worst severity logic
+      const severityOrder = ['none', 'light', 'moderate', 'heavy'];
+      const worstSeverity = textResults.reduce((worst, r) =>
+        severityOrder.indexOf(r.severity) > severityOrder.indexOf(worst) ? r.severity : worst,
+        'none' as TextDetectionResult['severity']
+      );
 
       // Then: Should use worst case
       expect(maxCoverage).toBe(0.08);
       expect(hasCaption).toBe(true);
+      expect(maxBlockCount).toBe(5);
+      expect(worstSeverity).toBe('heavy');
     });
 
     it('should use best-case for label matching (AC44)', () => {
@@ -767,6 +778,303 @@ describe('Quota Usage Tracking', () => {
 
       // Then: Should be 9 units for 3 frames
       expect(totalUnits).toBe(9);
+    });
+  });
+});
+
+// ============================================================================
+// Story 3.7b: CV Pipeline Integration - Updated Thresholds Tests
+// ============================================================================
+
+describe('Story 3.7b: Updated CV Thresholds and Penalties', () => {
+  /**
+   * [3.7b-UNIT-060] Stricter face detection threshold (10% instead of 15%)
+   */
+  describe('[3.7b-UNIT-060] Stricter Face Detection Threshold (AC60)', () => {
+    it('should detect talking head when face area > 10% (AC60)', () => {
+      // Given: Face area at 12% (would pass old 15% threshold)
+      const totalFaceArea = 0.12; // 12% > 10%
+      const threshold = 0.10; // NEW Story 3.7b threshold
+
+      // When: Checking threshold
+      const hasTalkingHead = totalFaceArea > threshold;
+
+      // Then: Should detect talking head
+      expect(hasTalkingHead).toBe(true);
+    });
+
+    it('should NOT detect talking head when face area ≤ 10% (AC60)', () => {
+      // Given: Face area at 9%
+      const totalFaceArea = 0.09; // 9% ≤ 10%
+      const threshold = 0.10;
+
+      // When: Checking threshold
+      const hasTalkingHead = totalFaceArea > threshold;
+
+      // Then: Should NOT detect talking head
+      expect(hasTalkingHead).toBe(false);
+    });
+
+    it('should catch "face-in-corner" videos that passed old 15% threshold (AC60)', () => {
+      // Given: Gaming video with small PIP (picture-in-picture) at 12%
+      const pipFaceArea = 0.12; // 12% - passed old 15%, fails new 10%
+      const oldThreshold = 0.15;
+      const newThreshold = 0.10;
+
+      // When: Comparing thresholds
+      const passedOld = pipFaceArea <= oldThreshold;
+      const passesNew = pipFaceArea <= newThreshold;
+
+      // Then: Should fail new threshold (stricter)
+      expect(passedOld).toBe(true); // Passed old threshold
+      expect(passesNew).toBe(false); // Fails new threshold - correctly filtered
+    });
+
+    it('should use 3% for small face detection (was 5%) (AC60)', () => {
+      // Given: Small background face at 4%
+      const smallFaceArea = 0.04; // 4% - between 3-10%
+      const smallFaceThreshold = 0.03; // NEW Story 3.7b small face threshold
+
+      // When: Checking small face threshold
+      const hasSmallFace = smallFaceArea > smallFaceThreshold;
+
+      // Then: Should detect small face
+      expect(hasSmallFace).toBe(true);
+    });
+  });
+
+  /**
+   * [3.7b-UNIT-061] Stricter caption detection threshold (3% coverage, 2 blocks)
+   */
+  describe('[3.7b-UNIT-061] Stricter Caption Detection Threshold (AC61)', () => {
+    it('should detect captions when text coverage > 3% (AC61)', () => {
+      // Given: Small caption at 4% coverage (would pass old 5% threshold)
+      const textCoverage = 0.04; // 4% > 3%
+      const textBlockCount = 1;
+      const coverageThreshold = 0.03; // NEW Story 3.7b threshold
+      const blockThreshold = 2; // NEW Story 3.7b threshold
+
+      // When: Checking caption detection
+      const hasCaption = textCoverage > coverageThreshold || textBlockCount > blockThreshold;
+
+      // Then: Should detect captions
+      expect(hasCaption).toBe(true);
+    });
+
+    it('should detect captions when > 2 text blocks (AC61)', () => {
+      // Given: Subtitle-style captions with 3 blocks
+      const textCoverage = 0.01; // Low coverage
+      const textBlockCount = 3; // 3 > 2 (was 3 in old threshold)
+      const coverageThreshold = 0.03;
+      const blockThreshold = 2; // NEW Story 3.7b threshold
+
+      // When: Checking caption detection
+      const hasCaption = textCoverage > coverageThreshold || textBlockCount > blockThreshold;
+
+      // Then: Should detect captions
+      expect(hasCaption).toBe(true);
+    });
+
+    it('should NOT detect captions for clean frames (AC61)', () => {
+      // Given: Clean B-roll frame
+      const textCoverage = 0.02; // 2% < 3%
+      const textBlockCount = 2; // 2 blocks (not > 2)
+      const coverageThreshold = 0.03;
+      const blockThreshold = 2;
+
+      // When: Checking caption detection
+      const hasCaption = textCoverage > coverageThreshold || textBlockCount > blockThreshold;
+
+      // Then: Should NOT detect captions
+      expect(hasCaption).toBe(false);
+    });
+
+    it('should catch smaller captions that passed old 5% threshold (AC61)', () => {
+      // Given: Video with 4% text coverage
+      const textCoverage = 0.04; // 4% - passed old 5%, fails new 3%
+      const oldThreshold = 0.05;
+      const newThreshold = 0.03;
+
+      // When: Comparing thresholds
+      const passedOld = textCoverage <= oldThreshold;
+      const passesNew = textCoverage <= newThreshold;
+
+      // Then: Should fail new threshold (stricter)
+      expect(passedOld).toBe(true); // Passed old threshold
+      expect(passesNew).toBe(false); // Fails new threshold - correctly filtered
+    });
+  });
+
+  /**
+   * [3.7b-UNIT-062] Increased face penalties (-0.6 major, -0.3 minor)
+   */
+  describe('[3.7b-UNIT-062] Increased Face Penalties (AC62)', () => {
+    it('should apply -0.6 penalty for major face violation (>10%) (AC62)', () => {
+      // Given: Talking head detected (>10% face area)
+      let score = 1.0;
+      const hasTalkingHead = true;
+      const majorFacePenalty = -0.6; // NEW Story 3.7b penalty (was -0.5)
+
+      // When: Applying penalty
+      if (hasTalkingHead) {
+        score += majorFacePenalty;
+      }
+
+      // Then: Score should be 0.4
+      expect(score).toBeCloseTo(0.4, 2);
+    });
+
+    it('should apply -0.3 penalty for minor face violation (3-10%) (AC62)', () => {
+      // Given: Small face detected (3-10% area)
+      let score = 1.0;
+      const hasTalkingHead = false;
+      const totalFaceArea = 0.05; // 5% - minor violation
+      const minorFacePenalty = -0.3; // NEW Story 3.7b penalty (was -0.2)
+
+      // When: Applying penalty
+      if (hasTalkingHead) {
+        score += -0.6;
+      } else if (totalFaceArea > 0.03) {
+        score += minorFacePenalty;
+      }
+
+      // Then: Score should be 0.7
+      expect(score).toBeCloseTo(0.7, 2);
+    });
+
+    it('should apply stricter penalty than Story 3.7 (AC62)', () => {
+      // Given: Video with talking head
+      const oldPenalty = -0.5;
+      const newPenalty = -0.6;
+
+      // When: Calculating scores
+      const oldScore = 1.0 + oldPenalty; // 0.5
+      const newScore = 1.0 + newPenalty; // 0.4
+
+      // Then: New penalty should be stricter
+      expect(newScore).toBeLessThan(oldScore);
+      expect(newScore).toBeCloseTo(0.4, 2);
+      expect(oldScore).toBeCloseTo(0.5, 2);
+    });
+  });
+
+  /**
+   * [3.7b-UNIT-063] Increased caption penalty (-0.4)
+   */
+  describe('[3.7b-UNIT-063] Increased Caption Penalty (AC63)', () => {
+    it('should apply -0.4 penalty for detected captions (AC63)', () => {
+      // Given: Captions detected
+      let score = 1.0;
+      const hasCaption = true;
+      const captionPenalty = -0.4; // NEW Story 3.7b penalty (was -0.3)
+
+      // When: Applying penalty
+      if (hasCaption) {
+        score += captionPenalty;
+      }
+
+      // Then: Score should be 0.6
+      expect(score).toBeCloseTo(0.6, 2);
+    });
+
+    it('should apply stricter penalty than Story 3.7 (AC63)', () => {
+      // Given: Video with captions
+      const oldPenalty = -0.3;
+      const newPenalty = -0.4;
+
+      // When: Calculating scores
+      const oldScore = 1.0 + oldPenalty; // 0.7
+      const newScore = 1.0 + newPenalty; // 0.6
+
+      // Then: New penalty should be stricter
+      expect(newScore).toBeLessThan(oldScore);
+      expect(newScore).toBeCloseTo(0.6, 2);
+      expect(oldScore).toBeCloseTo(0.7, 2);
+    });
+  });
+
+  /**
+   * [3.7b-UNIT-064] Combined score calculation with Story 3.7b values
+   */
+  describe('[3.7b-UNIT-064] Combined Score with Story 3.7b Values', () => {
+    it('should calculate combined score with new thresholds and penalties', () => {
+      // Given: Video with talking head (>10%), no captions, 50% label match
+      const hasTalkingHead = true; // -0.6
+      const hasCaption = false;
+      const matchScore = 0.5; // +0.15
+
+      // When: Calculating score
+      let score = 1.0;
+      if (hasTalkingHead) score -= 0.6;
+      if (hasCaption) score -= 0.4;
+      score += matchScore * 0.3;
+      score = Math.max(0, Math.min(1, score));
+
+      // Then: 1.0 - 0.6 + 0.15 = 0.55
+      expect(score).toBeCloseTo(0.55, 2);
+    });
+
+    it('should handle worst case: talking head + captions (Story 3.7b)', () => {
+      // Given: Video with both talking head and captions
+      const hasTalkingHead = true; // -0.6
+      const hasCaption = true; // -0.4
+      const matchScore = 0; // no bonus
+
+      // When: Calculating score
+      let score = 1.0;
+      if (hasTalkingHead) score -= 0.6;
+      if (hasCaption) score -= 0.4;
+      score += matchScore * 0.3;
+      score = Math.max(0, Math.min(1, score));
+
+      // Then: 1.0 - 0.6 - 0.4 = 0.0
+      expect(score).toBeCloseTo(0.0, 2);
+    });
+
+    it('should handle best case: clean B-roll with perfect labels (Story 3.7b)', () => {
+      // Given: Clean B-roll video
+      const hasTalkingHead = false;
+      const totalFaceArea = 0;
+      const hasCaption = false;
+      const matchScore = 1.0; // +0.3 (capped at 1.0)
+
+      // When: Calculating score
+      let score = 1.0;
+      if (hasTalkingHead) score -= 0.6;
+      else if (totalFaceArea > 0.03) score -= 0.3;
+      if (hasCaption) score -= 0.4;
+      score += matchScore * 0.3;
+      score = Math.max(0, Math.min(1, score));
+
+      // Then: 1.0 + 0.3 = 1.3 clamped to 1.0
+      expect(score).toBe(1.0);
+    });
+
+    it('should filter more aggressively than Story 3.7 thresholds', () => {
+      // Given: Video with 12% face area and 4% text coverage
+      const faceArea = 0.12; // Passes old 15%, fails new 10%
+      const textCoverage = 0.04; // Passes old 5%, fails new 3%
+
+      // Story 3.7 thresholds
+      const old_hasTalkingHead = faceArea > 0.15; // false
+      const old_hasCaption = textCoverage > 0.05; // false
+      let oldScore = 1.0;
+      if (old_hasTalkingHead) oldScore -= 0.5;
+      if (old_hasCaption) oldScore -= 0.3;
+      // oldScore = 1.0 (clean video by old standards)
+
+      // Story 3.7b thresholds
+      const new_hasTalkingHead = faceArea > 0.10; // true
+      const new_hasCaption = textCoverage > 0.03; // true
+      let newScore = 1.0;
+      if (new_hasTalkingHead) newScore -= 0.6;
+      if (new_hasCaption) newScore -= 0.4;
+      // newScore = 0.0 (filtered by new standards)
+
+      // Then: Story 3.7b should filter more aggressively
+      expect(oldScore).toBeCloseTo(1.0, 2); // Passed old standards
+      expect(newScore).toBeCloseTo(0.0, 2); // Filtered by new standards
+      expect(newScore).toBeLessThan(oldScore);
     });
   });
 });

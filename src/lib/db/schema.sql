@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS scenes (
   sanitized_text TEXT,             -- Cleaned text for TTS input
   audio_file_path TEXT,            -- Path to generated MP3 file
   duration REAL,                   -- Duration in seconds
+  visual_keywords TEXT,            -- JSON array of keywords for CV label matching (Story 3.7b)
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,

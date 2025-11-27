@@ -69,6 +69,7 @@ function applyTestSchema(db: Database.Database): void {
       scene_number INTEGER NOT NULL,
       text TEXT NOT NULL,
       duration INTEGER, -- Voiceover duration in seconds
+      visual_keywords TEXT, -- JSON array of keywords for CV label matching (Story 3.7b)
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       UNIQUE(project_id, scene_number)

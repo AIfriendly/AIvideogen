@@ -49,12 +49,22 @@ export interface FaceDetectionResult {
 }
 
 /**
+ * Text overlay severity level
+ * Used for tiered penalty scoring
+ */
+export type TextOverlaySeverity = 'none' | 'light' | 'moderate' | 'heavy';
+
+/**
  * Text detection result
  */
 export interface TextDetectionResult {
   texts: TextAnnotation[];
   hasCaption: boolean;
   textCoverage: number;
+  /** Number of text blocks detected */
+  textBlockCount: number;
+  /** Severity of text overlay for tiered penalty scoring */
+  severity: TextOverlaySeverity;
 }
 
 /**
