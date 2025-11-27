@@ -16,7 +16,7 @@
 'use client';
 
 import * as React from 'react';
-import Plyr from 'plyr';
+import type PlyrType from 'plyr';
 import { type VisualSuggestion } from '@/types/visual-suggestions';
 import { X, AlertCircle, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -110,6 +110,7 @@ class VideoPreviewErrorBoundary extends React.Component<
 
 /**
  * Local Video Player using Plyr
+ * Plyr is dynamically imported to avoid SSR issues (document is not defined)
  */
 function LocalVideoPlayer({
   videoUrl,
@@ -121,48 +122,60 @@ function LocalVideoPlayer({
   onError: () => void;
 }) {
   const videoRef = React.useRef<HTMLVideoElement>(null);
-  const plyrRef = React.useRef<Plyr | null>(null);
+  const plyrRef = React.useRef<PlyrType | null>(null);
 
   React.useEffect(() => {
     if (!videoRef.current) return;
 
-    // Initialize Plyr
-    // Story 3.7: Remove 'mute' and 'volume' controls - audio is stripped from all segments
-    try {
-      plyrRef.current = new Plyr(videoRef.current, {
-        controls: ['play', 'progress', 'current-time', 'fullscreen'],
-        keyboard: { focused: false, global: false }, // We handle keyboard shortcuts manually
-        clickToPlay: true,
-        hideControls: true,
-        resetOnEnd: false,
-        tooltips: { controls: false, seek: true },
-      });
+    let mounted = true;
 
-      // Auto-play on load - check if 'on' method exists (might be mocked in tests)
-      if (plyrRef.current && typeof plyrRef.current.on === 'function') {
-        plyrRef.current.on('ready', () => {
-          const playPromise = plyrRef.current?.play();
+    // Dynamically import Plyr to avoid SSR issues
+    import('plyr').then((PlyrModule) => {
+      if (!mounted || !videoRef.current) return;
+
+      const Plyr = PlyrModule.default;
+
+      // Initialize Plyr
+      // Story 3.7: Remove 'mute' and 'volume' controls - audio is stripped from all segments
+      try {
+        plyrRef.current = new Plyr(videoRef.current, {
+          controls: ['play', 'progress', 'current-time', 'fullscreen'],
+          keyboard: { focused: false, global: false }, // We handle keyboard shortcuts manually
+          clickToPlay: true,
+          hideControls: true,
+          resetOnEnd: false,
+          tooltips: { controls: false, seek: true },
+        });
+
+        // Auto-play on load - check if 'on' method exists (might be mocked in tests)
+        if (plyrRef.current && typeof plyrRef.current.on === 'function') {
+          plyrRef.current.on('ready', () => {
+            const playPromise = plyrRef.current?.play();
+            if (playPromise && typeof playPromise.catch === 'function') {
+              playPromise.catch((err) => {
+                console.warn('[VideoPreviewPlayer] Auto-play prevented:', err);
+              });
+            }
+          });
+        } else if (plyrRef.current && typeof plyrRef.current.play === 'function') {
+          // Direct play for mocked Plyr in tests
+          const playPromise = plyrRef.current.play();
           if (playPromise && typeof playPromise.catch === 'function') {
             playPromise.catch((err) => {
               console.warn('[VideoPreviewPlayer] Auto-play prevented:', err);
             });
           }
-        });
-      } else if (plyrRef.current && typeof plyrRef.current.play === 'function') {
-        // Direct play for mocked Plyr in tests
-        const playPromise = plyrRef.current.play();
-        if (playPromise && typeof playPromise.catch === 'function') {
-          playPromise.catch((err) => {
-            console.warn('[VideoPreviewPlayer] Auto-play prevented:', err);
-          });
         }
+      } catch (error) {
+        console.warn('[VideoPreviewPlayer] Failed to initialize Plyr:', error);
       }
-    } catch (error) {
-      console.warn('[VideoPreviewPlayer] Failed to initialize Plyr:', error);
-    }
+    }).catch((error) => {
+      console.warn('[VideoPreviewPlayer] Failed to load Plyr:', error);
+    });
 
     // Cleanup
     return () => {
+      mounted = false;
       if (plyrRef.current && typeof plyrRef.current.destroy === 'function') {
         plyrRef.current.destroy();
       }
