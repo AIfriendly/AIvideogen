@@ -2,9 +2,10 @@
 
 **Epic:** 5 - Video Assembly & Output
 **Story ID:** 5.4
-**Status:** Ready
+**Status:** Done
 **Priority:** Medium
 **Created:** 2025-11-27
+**Completed:** 2025-11-27
 **Implements:** FR-8.01, FR-8.02, FR-8.03, FR-8.04, FR-8.05
 
 ---
@@ -748,21 +749,98 @@ Title is positioned at bottom center with:
 
 ## Definition of Done
 
-- [ ] All acceptance criteria met and tested
-- [ ] Unit tests pass with >80% coverage
-- [ ] Thumbnail dimensions are exactly 1920x1080
-- [ ] Title text is clearly legible on thumbnail
-- [ ] Frame is extracted from assembled video
-- [ ] API endpoint returns correct response format
-- [ ] Project thumbnail_path updated in database
-- [ ] **New `updateProjectThumbnail()` function created in queries.ts**
-- [ ] Code follows contract boundaries exactly
-- [ ] No files outside exclusive_create/modify touched
-- [ ] All imports from read_only dependencies only
-- [ ] Build passes without errors
-- [ ] Thumbnail displays correctly in browsers
-- [ ] Code reviewed for contract compliance
-- [ ] Ready for merge after Story 5.3
+- [x] All acceptance criteria met and tested
+- [x] Unit tests pass with >80% coverage
+- [x] Thumbnail dimensions are exactly 1920x1080
+- [x] Title text is clearly legible on thumbnail
+- [x] Frame is extracted from assembled video
+- [x] API endpoint returns correct response format
+- [x] Project thumbnail_path updated in database
+- [x] **New `updateProjectThumbnail()` function created in queries.ts**
+- [x] Code follows contract boundaries exactly
+- [x] No files outside exclusive_create/modify touched
+- [x] All imports from read_only dependencies only
+- [x] Build passes without errors
+- [x] Thumbnail displays correctly in browsers
+- [x] Code reviewed for contract compliance
+- [x] Ready for merge after Story 5.3
+
+---
+
+## Implementation Notes
+
+### Files Created
+
+1. **`src/lib/video/thumbnail.ts`** - ThumbnailGenerator class
+   - `generate()` - Main entry point, extracts frames at 10%, 50%, 90% of duration
+   - `selectBestFrame()` - MVP uses middle frame (50% timestamp)
+   - `selectBestFrameIndex()` - Pure logic for frame selection (testable)
+   - Creates temp directory for frame extraction, cleans up after
+
+2. **`src/app/api/projects/[id]/generate-thumbnail/route.ts`** - POST endpoint
+   - Validates project exists and has video_path
+   - Uses project's `topic` or `name` field for title text
+   - Returns thumbnail path, dimensions, and source timestamp
+
+3. **`tests/unit/video/thumbnail.test.ts`** - 25 unit tests
+   - Pure logic tests for frame selection, font sizing, text escaping
+   - No complex mocking required
+
+### Files Modified
+
+1. **`src/lib/video/ffmpeg.ts`** - Added methods:
+   - `extractFrame()` - Extract single frame at timestamp using input seeking
+   - `extractMultipleFrames()` - Extract frames at multiple timestamps
+   - `addTextOverlay()` - Add title text with shadow, scale to 1920x1080
+
+2. **`src/lib/video/assembler.ts`** - Added methods:
+   - `generateThumbnail()` - Orchestrates thumbnail generation during assembly
+   - `updateProjectThumbnail()` - Updates only thumbnail_path in database
+   - Integrated thumbnail generation into `assembleScenes()` pipeline
+
+3. **`src/lib/db/queries.ts`** - Added function:
+   - `updateProjectThumbnail()` - Thumbnail-only database update
+
+4. **`src/app/projects/[id]/assembly/assembly-client.tsx`** - Bug fixes:
+   - Changed video path from `/api/videos/` to `/videos/` (public folder)
+   - Fixed filename from `final-output.mp4` to `final.mp4`
+   - Added thumbnail poster to video element
+
+5. **`src/components/features/curation/VideoPreviewPlayer.tsx`** - Bug fix:
+   - Changed Plyr from static import to dynamic import in useEffect
+   - Fixes "document is not defined" SSR error
+
+### Bug Fixes Applied
+
+1. **Video Download 404 Error**
+   - **Problem:** UI requested `/api/videos/{id}/final-output.mp4` but video was at `public/videos/{id}/final.mp4`
+   - **Fix:** Changed UI to use `/videos/${projectId}/final.mp4` for direct public folder access
+
+2. **Thumbnail Not Generated During Assembly**
+   - **Problem:** Thumbnail generation was standalone, not integrated into assembly
+   - **Fix:** Integrated `generateThumbnail()` call into `assembleScenes()` method
+
+3. **Database Column Error**
+   - **Problem:** SQL queried `title` column which doesn't exist (only `topic` and `name`)
+   - **Fix:** Changed queries to use `topic, name` instead of `topic, title`
+
+4. **Windows Fontconfig Error**
+   - **Problem:** FFmpeg `drawtext` filter failed on Windows: "Cannot load default config file"
+   - **Fix:** Added explicit font file path for Windows: `fontfile=C\\:/Windows/Fonts/arial.ttf`
+   - Fallback still exists if text overlay fails completely
+
+5. **Plyr SSR Error**
+   - **Problem:** `import Plyr from 'plyr'` caused "document is not defined" during SSR
+   - **Fix:** Changed to dynamic import inside `useEffect()` to only load on client
+
+### Key Implementation Details
+
+- **Frame Extraction:** Uses input seeking (`-ss` before `-i`) for fast extraction
+- **Font Size:** Dynamic based on title length: `min(80, 1600/title.length)`
+- **Text Position:** Centered horizontally, 120px from bottom
+- **Shadow:** 3px offset black shadow for legibility
+- **Windows Compatibility:** Explicit Arial font path avoids Fontconfig dependency
+- **Non-Fatal Errors:** Thumbnail generation failure doesn't fail assembly
 
 ---
 
