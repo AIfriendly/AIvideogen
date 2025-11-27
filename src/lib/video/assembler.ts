@@ -12,6 +12,7 @@ import path from 'path';
 import db from '@/lib/db/client';
 import { FFmpegClient } from './ffmpeg';
 import { Concatenator } from './concatenator';
+import { ThumbnailGenerator } from './thumbnail';
 import { VIDEO_ASSEMBLY_CONFIG, ASSEMBLY_JOB_STATUS } from './constants';
 import type { AssemblyJob, AssemblyJobStatus, AssemblyStage, AssemblyScene } from '@/types/assembly';
 
@@ -317,6 +318,67 @@ export class VideoAssembler {
     }
 
     return finalPath;
+  }
+
+  // ========================================
+  // Story 5.4: Thumbnail Generation
+  // ========================================
+
+  /**
+   * Generate thumbnail for completed video
+   * Extracts a frame from the video and adds title text overlay
+   */
+  async generateThumbnail(
+    jobId: string,
+    videoPath: string,
+    title: string,
+    projectId: string
+  ): Promise<string> {
+    const generator = new ThumbnailGenerator(this.ffmpeg);
+
+    // Update progress to thumbnail stage
+    this.updateJobProgress(jobId, 75, 'thumbnail');
+
+    const outputDir = path.join(process.cwd(), VIDEO_ASSEMBLY_CONFIG.OUTPUT_DIR, projectId);
+    const thumbnailPath = path.join(outputDir, 'thumbnail.jpg');
+
+    // Ensure output directory exists
+    if (!existsSync(outputDir)) {
+      mkdirSync(outputDir, { recursive: true });
+    }
+
+    const result = await generator.generate({
+      videoPath,
+      title,
+      outputPath: thumbnailPath,
+    });
+
+    // Update project with thumbnail path only
+    this.updateProjectThumbnail(projectId, result.thumbnailPath);
+
+    // Update progress
+    this.updateJobProgress(jobId, 85, 'thumbnail');
+
+    console.log(
+      `[VideoAssembler] Thumbnail generated: ${result.thumbnailPath}, ` +
+      `dimensions: ${result.width}x${result.height}, ` +
+      `source timestamp: ${result.sourceTimestamp.toFixed(2)}s`
+    );
+
+    return result.thumbnailPath;
+  }
+
+  /**
+   * Update project with thumbnail path only
+   * Used when generating thumbnail without modifying video data
+   */
+  updateProjectThumbnail(projectId: string, thumbnailPath: string): void {
+    const stmt = db.prepare(`
+      UPDATE projects
+      SET thumbnail_path = ?
+      WHERE id = ?
+    `);
+    stmt.run(thumbnailPath, projectId);
   }
 }
 

@@ -1348,3 +1348,28 @@ export function updateProjectVideo(
     );
   }
 }
+
+/**
+ * Update project thumbnail path only - Story 5.4
+ * Use when updating thumbnail without modifying video data
+ * @param projectId Project ID
+ * @param thumbnailPath Path to thumbnail image
+ */
+export function updateProjectThumbnail(
+  projectId: string,
+  thumbnailPath: string
+): void {
+  try {
+    const stmt = db.prepare(`
+      UPDATE projects
+      SET thumbnail_path = ?
+      WHERE id = ?
+    `);
+    stmt.run(thumbnailPath, projectId);
+  } catch (error) {
+    console.error('Error updating project thumbnail:', error);
+    throw new Error(
+      `Failed to update project thumbnail: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}

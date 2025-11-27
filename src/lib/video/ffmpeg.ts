@@ -366,6 +366,97 @@ export class FFmpegClient {
     await this.execute(args);
   }
 
+  // ========================================
+  // Story 5.4: Thumbnail Methods
+  // ========================================
+
+  /**
+   * Extract a single frame from video at specified timestamp
+   * Uses input seeking (-ss before -i) for faster seeking in large videos
+   */
+  async extractFrame(
+    videoPath: string,
+    timestamp: number,
+    outputPath: string
+  ): Promise<void> {
+    const args = [
+      '-ss', timestamp.toFixed(3),
+      '-i', videoPath,
+      '-vframes', '1',
+      '-q:v', '2', // High quality JPEG
+      '-y',
+      outputPath,
+    ];
+
+    await this.execute(args);
+  }
+
+  /**
+   * Extract multiple frames at specified timestamps
+   * Returns array of output paths in same order as timestamps
+   */
+  async extractMultipleFrames(
+    videoPath: string,
+    timestamps: number[],
+    outputDir: string
+  ): Promise<string[]> {
+    const outputPaths: string[] = [];
+
+    for (let i = 0; i < timestamps.length; i++) {
+      const outputPath = path.join(outputDir, `frame-${i}.jpg`);
+      await this.extractFrame(videoPath, timestamps[i], outputPath);
+      outputPaths.push(outputPath);
+    }
+
+    return outputPaths;
+  }
+
+  /**
+   * Add text overlay to an image
+   * Creates visually appealing text with shadow for legibility
+   * Scales and pads image to target dimensions (1920x1080 by default)
+   */
+  async addTextOverlay(
+    inputPath: string,
+    title: string,
+    outputPath: string,
+    width: number = VIDEO_ASSEMBLY_CONFIG.THUMBNAIL_WIDTH,
+    height: number = VIDEO_ASSEMBLY_CONFIG.THUMBNAIL_HEIGHT
+  ): Promise<void> {
+    // Escape special characters in title for FFmpeg drawtext filter
+    // FFmpeg requires escaping: backslash, colon, single quote
+    const escapedTitle = title
+      .replace(/\\/g, '\\\\\\\\') // Escape backslashes
+      .replace(/:/g, '\\:') // Escape colons
+      .replace(/'/g, "'\\''"); // Escape single quotes
+
+    // Calculate font size based on title length to prevent overflow
+    // Max 80px, scales down for longer titles
+    const fontSize = Math.min(80, Math.floor(1600 / Math.max(title.length, 10)));
+
+    // Build filter_complex for scaling, padding, and text overlay
+    const filterComplex = [
+      // Scale to fit within target dimensions while maintaining aspect ratio
+      `scale=${width}:${height}:force_original_aspect_ratio=decrease`,
+      // Pad to exact target dimensions (centers the scaled image)
+      `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`,
+      // Add text shadow (offset 3px right, 3px down) for readability
+      `drawtext=text='${escapedTitle}':fontsize=${fontSize}:fontcolor=black:x=(w-text_w)/2+3:y=h-120+3`,
+      // Add main white text on top of shadow
+      `drawtext=text='${escapedTitle}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=h-120`,
+    ].join(',');
+
+    const args = [
+      '-i', inputPath,
+      '-vf', filterComplex,
+      '-q:v', String(VIDEO_ASSEMBLY_CONFIG.THUMBNAIL_QUALITY),
+      '-y',
+      outputPath,
+    ];
+
+    await this.execute(args);
+  }
+
   /**
    * Execute FFmpeg command
    */
