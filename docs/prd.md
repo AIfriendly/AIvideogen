@@ -2,11 +2,32 @@
 
 *This document outlines the requirements for the AI Video Generator MVP. It is a living document and will be updated as the project progresses.*
 
-**Last Updated:** 2025-11-26
-**Version:** 1.5
+**Last Updated:** 2025-11-27
+**Version:** 1.8
 **Repository:** https://github.com/AIfriendly/AIvideogen
 
-**Recent Changes (v1.5 - 2025-11-26):**
+**Project Type:** Web Application
+**Domain:** Content Creation
+**Complexity:** Level 2 (BMad Method)
+
+**Recent Changes (v1.8 - 2025-11-27):**
+- **MAJOR:** Moved Feature 2.6 (LLM Configuration & Script Personas) to Feature 1.9 (Epic 1 - MVP)
+- **Enhanced Blackpill Realist Persona:** Added specific use cases (AI dystopia, western collapse, lookism/dating inequality, blackpill economics)
+- **Enhanced Blackpill Realist Persona:** Detailed delivery style (brutal honesty, nihilistic framing, elimination of false hope, focus on systemic failures)
+- Added functional requirements FR-1.9.01 through FR-1.9.08 for persona system
+- Added acceptance criteria AC1-AC4 including specific Blackpill Realist script generation test
+- Renumbered Future Enhancements: 2.6 → Local Computer Vision, 2.7 → Topic Research
+
+**Previous Changes (v1.7 - 2025-11-27):**
+- Added Future Enhancement 2.7: Local Computer Vision (MediaPipe + Tesseract.js) as FOSS alternative to Google Cloud Vision API
+- Detailed hardware requirements, performance comparison, and implementation approach
+
+**Previous Changes (v1.6 - 2025-11-26):**
+- **MAJOR:** Added Executive Summary with product vision, target users, and key value proposition
+- Articulated "FOSS-first, cloud-enhanced" product differentiator
+- Added Project Classification (Type: Web Application, Domain: Content Creation, Complexity: Level 2)
+
+**Previous Changes (v1.5 - 2025-11-26):**
 - Enhanced Feature 1.5: Tightened face detection threshold from 15% to 10% for stricter talking head filtering
 - Enhanced Feature 1.5: Added 'queued' status to download status tracking
 - Enhanced Feature 1.5: Added CV pipeline auto-trigger requirements (FR-5.27a-e)
@@ -27,11 +48,21 @@
 - Added database schema extensions for video duration tracking and segment management
 
 **Previous Changes (v1.2 - 2025-11-01):**
-- Expanded Feature 2.6: LLM Configuration to include System Prompts & Persona Configuration
+- Expanded Feature 1.9 (formerly 2.6): LLM Configuration to include System Prompts & Persona Configuration
 - Added preset personas (Creative Assistant, Viral Strategist, Educational Designer, Documentary Filmmaker)
 - Added custom persona creation and per-project persona overrides
 - Specified MVP implementation: default Creative Assistant persona hardcoded, UI configuration post-MVP
 - Previous updates (v1.1): Added Voice Selection as Feature 1.3, specified YouTube Data API v3
+
+---
+
+## Executive Summary
+
+**Product Vision:** The AI Video Generator transforms video content creation from a multi-hour, multi-tool process into a streamlined 20-minute workflow. Content creators currently face a complex pipeline requiring scriptwriting skills, voiceover recording equipment, hours of B-roll footage searching, and professional video editing software. This system eliminates those barriers by providing an end-to-end AI-powered solution that takes a simple topic idea and produces a complete, share-ready video with professional narration, relevant visuals, and an eye-catching thumbnail.
+
+**Target Users:** This product serves content creators across YouTube, educational platforms, and social media who need to produce high-quality informational videos efficiently. Our primary users include gaming analysts creating strategy guides, educators producing tutorial content, historical content creators, and technical explainers. These creators value production speed and quality but lack the time, budget, or technical skills for traditional video production workflows. The system is designed for solo creators who need to maintain consistent content output without hiring scriptwriters, voice actors, or video editors.
+
+**Key Value Proposition:** The AI Video Generator delivers complete video production automation with a unique local-first, privacy-focused architecture. Unlike cloud-dependent solutions, our system runs primarily on the creator's own hardware using free and open-source (FOSS) technologies—Ollama for local LLM script generation, open-source TTS for voiceover, and YouTube's free API for visual sourcing. Creators who want enhanced quality can optionally leverage cloud services (Google Gemini, Google Cloud Vision API) with generous free tiers, maintaining a hybrid local+cloud approach with zero mandatory subscription costs. This "FOSS-first, cloud-enhanced" philosophy ensures creators maintain privacy, avoid vendor lock-in, and control their entire production pipeline while optionally accessing cutting-edge AI capabilities when needed.
 
 ---
 
@@ -147,10 +178,7 @@ The following measurable criteria define MVP success:
     *   **FR-2.09b:** Scripts must prioritize information density over entertainment value.
     *   **FR-2.09c:** Scripts must focus on concrete facts, strategies, and structured information delivery.
     *   **FR-2.10:** The system shall pass the structured script to the visual curation and voiceover generation modules.
-    *   **FR-2.11:** The system must provide 3-5 preset personas for script generation (Scientific Analyst, Blackpill Realist, Documentary Filmmaker, Educational Designer).
-    *   **FR-2.12:** Users must be able to select a persona for each project via project settings UI.
-    *   **FR-2.13:** The selected persona's system prompt must be used to generate scripts for that project.
-    *   **FR-2.14:** Personas must be stored in the `system_prompts` database table and linked to projects via `projects.system_prompt_id`.
+    *   **FR-2.11:** The system must support script persona configuration as defined in Feature 1.9 (LLM Configuration & Script Personas).
 
 *   **Acceptance Criteria:**
     *   **AC1: Successful Script Generation**
@@ -446,6 +474,84 @@ The following measurable criteria define MVP success:
         *   **When** the image is viewed.
         *   **Then** it must contain the text "The Secrets of Ancient Rome" and a background image relevant to the topic (e.g., the Colosseum, a Roman statue).
 
+### 1.9. LLM Configuration & Script Personas
+
+*   **Description:** Provide comprehensive control over LLM behavior and configuration:
+    *   **LLM Provider Configuration:** UI options to select from supported providers, enter API keys, or specify custom endpoints:
+        *   **Local Providers (FOSS):**
+            *   **Ollama** (Primary, FOSS-compliant) - Local deployment with Llama 3.2 or other open models
+        *   **Cloud Providers (Optional):**
+            *   **Google Gemini** (FREE tier available) - Gemini 2.5 Flash/Pro with 1,500 requests/day free
+            *   **OpenAI** (Post-MVP) - GPT models with API key
+            *   **Anthropic** (Post-MVP) - Claude models with API key
+            *   **Custom Endpoints** (Post-MVP) - Support for self-hosted or alternative APIs
+        *   **Implementation Notes:**
+            *   Provider abstraction layer (lib/llm/provider.ts) supports multiple backends
+            *   Configuration via .env.local: LLM_PROVIDER=ollama|gemini
+            *   Ollama remains primary per NFR 1 (FOSS requirement)
+            *   Gemini optional for users who prefer cloud-based free tier
+    *   **System Prompt/Persona Configuration:** Allow users to customize the script generation tone, style, and delivery through configurable personas:
+        *   **Preset Personas:** Built-in personas optimized for different content types and ideological frameworks:
+            *   **Scientific Analyst** (neutral informational, data-driven, factual delivery)
+            *   **Blackpill Realist** (brutal/harsh truths, nihilistic, pessimistic analysis)
+                *   **Use Cases:** AI dystopia scenarios, western civilization decline, lookism and dating disadvantages for short/ugly men, blackpill economics (coming economic collapse, mass unemployment, resource scarcity), technological determinism, inevitable societal failures
+                *   **Delivery Style:** Unflinching brutality, no sugar-coating or optimistic spin, emphasis on harsh realities and systemic failures, stark language ("collapse", "dystopia", "doomed", "irreversible"), focus on power imbalances and biological/economic determinism
+                *   **Tone Characteristics:** Nihilistic framing, elimination of false hope and platitudes, direct confrontation with uncomfortable truths, fatalistic outlook on human agency
+            *   **Documentary Filmmaker** (balanced narrative, human stories, investigative journalism)
+            *   **Educational Designer** (TED-Ed style, learning-focused, accessible explanations)
+        *   **Custom Personas (Post-MVP):** UI for creating and saving custom system prompts with full control over tone, restrictions, and delivery style.
+        *   **Per-Project Personas:** Ability to select persona on a per-project basis via project settings (e.g., use "Scientific Analyst" for gaming analysis, "Blackpill Realist" for societal critique content).
+    *   **Rationale:** Local Ollama deployment provides complete control over LLM behavior without content restrictions or censorship. Gemini offers cloud-based alternative with generous free tier (1,500 requests/day). Script personas ensure the system adapts to different ideological frameworks and content types without imposing editorial bias.
+    *   **MVP Implementation:**
+        *   Ollama (primary, FOSS) and Gemini (optional, cloud) providers implemented ✅
+        *   Provider selection via .env.local configuration ✅
+        *   **Preset Personas:** 3-5 built-in personas optimized for script generation:
+            *   Scientific Analyst (neutral informational, data-driven) ✅
+            *   Blackpill Realist (brutal/harsh truths, nihilistic analysis) - **Enhanced with dystopian, lookism, economic collapse use cases**
+            *   Documentary Filmmaker (balanced narrative, human stories)
+            *   Educational Designer (TED-Ed style, learning-focused)
+        *   **Persona Selection UI:** Dropdown in project settings to select persona for script generation
+        *   **Per-Project Personas:** Selected persona stored in `projects.system_prompt_id` and used for script generation
+        *   Personas stored in `system_prompts` table (database infrastructure already exists)
+    *   **POST-MVP Enhancements:**
+        *   Custom persona creation UI (user-defined system prompts with full editorial control)
+        *   Persona editing and deletion interface
+        *   Advanced provider configuration UI (API keys, custom endpoints)
+        *   Additional preset personas (Optimistic Futurist, Libertarian Analyst, Marxist Critic, etc.)
+
+*   **User Stories:**
+    1.  **As a creator,** I want to select different script personas for different content types, **so that** my videos match the appropriate ideological framework and delivery style.
+    2.  **As a blackpill content creator,** I want scripts that deliver harsh truths about societal collapse, lookism, and economic dystopia without sugar-coating, **so that** my content authentically represents the blackpill worldview.
+    3.  **As a creator,** I want to configure my LLM provider (local Ollama or cloud Gemini), **so that** I have control over privacy, cost, and content restrictions.
+
+*   **Functional Requirements:**
+    *   **FR-1.9.01:** The system shall provide a persona selection interface in project settings.
+    *   **FR-1.9.02:** The system must store 3-5 preset personas in the `system_prompts` database table.
+    *   **FR-1.9.03:** Each persona must include: name, description, system_prompt (LLM instructions), and tone characteristics.
+    *   **FR-1.9.04:** The Blackpill Realist persona must support content types: AI dystopia, western collapse, lookism/dating inequality, economic collapse, technological determinism.
+    *   **FR-1.9.05:** The Blackpill Realist persona must deliver scripts with: brutal honesty, nihilistic framing, elimination of false hope, focus on systemic failures and power imbalances.
+    *   **FR-1.9.06:** Selected persona must be linked to project via `projects.system_prompt_id` foreign key.
+    *   **FR-1.9.07:** Script generation must use the selected persona's system prompt when generating content.
+    *   **FR-1.9.08:** The system must support both local (Ollama) and cloud (Gemini) LLM providers via configuration.
+
+*   **Acceptance Criteria:**
+    *   **AC1: Persona Selection**
+        *   **Given** a user creates or edits a project.
+        *   **When** they navigate to project settings.
+        *   **Then** they must see a dropdown with all available personas (Scientific Analyst, Blackpill Realist, Documentary Filmmaker, Educational Designer).
+    *   **AC2: Blackpill Realist Script Generation**
+        *   **Given** a user selects "Blackpill Realist" persona and generates a script about "AI will cause mass unemployment".
+        *   **When** the script is generated.
+        *   **Then** it must use brutal, nihilistic framing with no optimistic spin, emphasize inevitable collapse and systemic failure, and avoid platitudes about retraining or economic resilience.
+    *   **AC3: Persona Persistence**
+        *   **Given** a user selects "Blackpill Realist" for Project A and "Scientific Analyst" for Project B.
+        *   **When** scripts are generated for both projects.
+        *   **Then** Project A scripts must use blackpill tone and Project B scripts must use neutral scientific tone.
+    *   **AC4: LLM Provider Configuration**
+        *   **Given** the system is configured with `LLM_PROVIDER=ollama` or `LLM_PROVIDER=gemini`.
+        *   **When** script generation is triggered.
+        *   **Then** the system must use the configured provider without errors.
+
 ---
 
 ## 2. Future Enhancements
@@ -475,46 +581,44 @@ The following measurable criteria define MVP success:
 ### 2.5. Editable Script & Voiceover Regeneration
 *   **Description:** In the Visual Curation UI, allow users to edit the AI-generated script text for any scene and trigger a re-generation of the voiceover for that specific scene. Additionally, allow users to switch voices per scene or for the entire project after initial generation.
 
-### 2.6. LLM Configuration & System Prompts
-*   **Description:** Provide comprehensive control over LLM behavior and configuration:
-    *   **LLM Provider Configuration:** UI options to select from supported providers, enter API keys, or specify custom endpoints:
-        *   **Local Providers (FOSS):**
-            *   **Ollama** (Primary, FOSS-compliant) - Local deployment with Llama 3.2 or other open models
-        *   **Cloud Providers (Optional):**
-            *   **Google Gemini** (FREE tier available) - Gemini 2.5 Flash/Pro with 1,500 requests/day free
-            *   **OpenAI** (Post-MVP) - GPT models with API key
-            *   **Anthropic** (Post-MVP) - Claude models with API key
-            *   **Custom Endpoints** (Post-MVP) - Support for self-hosted or alternative APIs
-        *   **Implementation Notes:**
-            *   Provider abstraction layer (lib/llm/provider.ts) supports multiple backends
-            *   Configuration via .env.local: LLM_PROVIDER=ollama|gemini
-            *   Ollama remains primary per NFR 1 (FOSS requirement)
-            *   Gemini optional for users who prefer cloud-based free tier
-    *   **System Prompt/Persona Configuration:** Allow users to customize the AI assistant's personality, tone, and behavior through configurable system prompts:
-        *   **Preset Personas:** Built-in personas optimized for different video types:
-            *   Creative Assistant (unrestricted, general brainstorming)
-            *   Viral Content Strategist (focus on engagement and shareability)
-            *   Educational Content Designer (TED-Ed style, learning-focused)
-            *   Documentary Filmmaker (human stories, narrative arcs)
-        *   **Custom Personas:** UI for creating and saving custom system prompts with full control over the assistant's behavior, restrictions, and goals.
-        *   **Per-Project Personas:** Ability to override default persona on a per-project basis (e.g., use "Educational Designer" for science videos, "Viral Strategist" for entertainment content).
-    *   **Rationale:** Local Ollama deployment provides complete control over LLM behavior without external restrictions. Gemini offers cloud-based alternative with generous free tier (1,500 requests/day). System prompts ensure the assistant adapts to different creative workflows and content types.
-    *   **MVP Implementation:**
-        *   Ollama (primary, FOSS) and Gemini (optional, cloud) providers implemented ✅
-        *   Provider selection via .env.local configuration ✅
-        *   **Preset Personas:** 3-5 built-in personas optimized for script generation:
-            *   Scientific Analyst (neutral informational, data-driven)
-            *   Blackpill Realist (brutal/harsh truths, pessimistic analysis)
-            *   Documentary Filmmaker (balanced narrative, human stories)
-            *   Educational Designer (TED-Ed style, learning-focused)
-            *   (Additional presets as needed)
-        *   **Persona Selection UI:** Dropdown in project settings to select persona for script generation
-        *   **Per-Project Personas:** Selected persona stored in `projects.system_prompt_id` and used for script generation
-        *   Personas stored in `system_prompts` table (database infrastructure already exists)
-    *   **POST-MVP Enhancements:**
-        *   Custom persona creation UI (user-defined system prompts)
-        *   Persona editing and deletion interface
-        *   Advanced provider configuration UI (API keys, custom endpoints)
+### 2.6. Local Computer Vision (MediaPipe + Tesseract.js)
+*   **Description:** Implement a fully local, free alternative to Google Cloud Vision API for B-roll content filtering. This enhancement replaces cloud-based CV analysis with on-device processing using MediaPipe for face detection and Tesseract.js for OCR/text detection, enabling unlimited video analysis with zero API costs.
+*   **Rationale:** Aligns with the "FOSS-first, cloud-enhanced" philosophy by providing a completely free, offline-capable CV solution. Users with adequate hardware can process unlimited videos without API quotas or costs, while those preferring cloud accuracy can continue using Google Vision API.
+*   **Technical Components:**
+    *   **MediaPipe Face Detection:**
+        *   Google's open-source, production-ready face detection
+        *   Runs locally using TensorFlow.js or native bindings
+        *   GPU-accelerated (WebGL/CUDA) for fast processing
+        *   ~20-50ms per frame on modern hardware
+        *   Replaces Google Vision FACE_DETECTION
+    *   **Tesseract.js (OCR):**
+        *   Open-source OCR engine (JavaScript port of Tesseract)
+        *   Detects burned-in captions, watermarks, text overlays
+        *   ~100-300ms per frame
+        *   Replaces Google Vision TEXT_DETECTION
+    *   **Label Detection Alternative:**
+        *   Option A: TensorFlow.js with MobileNet/ImageNet models for scene classification
+        *   Option B: Skip label verification (rely on keyword matching)
+        *   Option C: Use CLIP model for semantic image-text matching
+*   **Hardware Requirements:**
+    *   Minimum: 8GB RAM, integrated GPU
+    *   Recommended: 16GB+ RAM, 4GB+ VRAM (dedicated GPU)
+    *   Optimal: 32GB RAM, 8GB+ VRAM (enables batch processing)
+*   **Implementation Approach:**
+    *   Create `lib/vision/local-cv-client.ts` as drop-in replacement for Vision API client
+    *   Configuration option: `CV_PROVIDER=local|google` in environment
+    *   Hybrid mode: Use local CV by default, fallback to Google Vision for edge cases
+    *   Same interface (`analyzeVideoFrames`, `calculateCVScore`) for seamless switching
+*   **Performance Comparison:**
+    | Metric | Google Vision | Local (MediaPipe + Tesseract) |
+    |--------|---------------|-------------------------------|
+    | Cost | ~€0.01-0.02/video | **Free** |
+    | Speed | ~500ms/video | ~1-2s/video |
+    | Accuracy | 95%+ | 85-90% |
+    | Offline | No | **Yes** |
+    | Quota | 1,000 units/month free | **Unlimited** |
+*   **User Value:** Creators can analyze unlimited B-roll footage with zero cloud costs. The slight accuracy trade-off (85-90% vs 95%+) is acceptable for filtering obvious faces/text overlays, which is the primary use case.
+*   **FOSS Compliance:** All components (MediaPipe, Tesseract.js, TensorFlow.js) are open-source and free to use commercially.
 
 ### 2.7. Topic Research & Web Search
 *   **Description:** Enhance the conversational AI agent (Epic 1) with real-time web search capability to research topics, verify current trends, and incorporate up-to-date information into brainstorming sessions. When discussing video topics, the assistant can search for recent developments, trending content, current events, and factual information to provide more relevant and timely suggestions.
