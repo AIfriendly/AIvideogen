@@ -222,7 +222,10 @@ The following measurable criteria define MVP success:
 
 *   **Functional Requirements:**
     *   **FR-3.01:** The system shall present a voice selection interface after topic confirmation and before script generation.
-    *   **FR-3.02:** The system must provide at least 3-5 distinct voice options with different characteristics (gender, accent, tone).
+    *   **FR-3.02:** The system must provide at least 20 distinct voice options with diverse characteristics (gender, accent, tone).
+        *   Gender diversity: 10 female, 10 male voices
+        *   Accent diversity: 15 American, 5 British
+        *   Tone diversity: Warm, professional, authoritative, friendly, calm, energetic, articulate, gentle, enthusiastic, sophisticated, clear, and more
     *   **FR-3.03:** Each voice option must have a short audio preview sample that users can play.
     *   **FR-3.04:** The system must allow users to select exactly one voice for their video project.
     *   **FR-3.05:** The selected voice must be used consistently for all scene voiceovers in that project.
@@ -477,19 +480,6 @@ The following measurable criteria define MVP success:
 ### 1.9. LLM Configuration & Script Personas
 
 *   **Description:** Provide comprehensive control over LLM behavior and configuration:
-    *   **LLM Provider Configuration:** UI options to select from supported providers, enter API keys, or specify custom endpoints:
-        *   **Local Providers (FOSS):**
-            *   **Ollama** (Primary, FOSS-compliant) - Local deployment with Llama 3.2 or other open models
-        *   **Cloud Providers (Optional):**
-            *   **Google Gemini** (FREE tier available) - Gemini 2.5 Flash/Pro with 1,500 requests/day free
-            *   **OpenAI** (Post-MVP) - GPT models with API key
-            *   **Anthropic** (Post-MVP) - Claude models with API key
-            *   **Custom Endpoints** (Post-MVP) - Support for self-hosted or alternative APIs
-        *   **Implementation Notes:**
-            *   Provider abstraction layer (lib/llm/provider.ts) supports multiple backends
-            *   Configuration via .env.local: LLM_PROVIDER=ollama|gemini
-            *   Ollama remains primary per NFR 1 (FOSS requirement)
-            *   Gemini optional for users who prefer cloud-based free tier
     *   **System Prompt/Persona Configuration:** Allow users to customize the script generation tone, style, and delivery through configurable personas:
         *   **Preset Personas:** Built-in personas optimized for different content types and ideological frameworks:
             *   **Scientific Analyst** (neutral informational, data-driven, factual delivery)
@@ -659,7 +649,7 @@ The following measurable criteria define MVP success:
 - User authentication if multi-user support added
 - Encrypted storage for API keys
 - Audit logging for API usage
-- Content moderation for generated scripts
+ 
 
 ---
 
@@ -684,7 +674,7 @@ The following items are explicitly excluded from the MVP:
 - Database migrations for schema changes
 
 ### Content
-- Content moderation or filtering for inappropriate topics
+- 
 - Copyright verification for selected clips
 - Monetization or licensing compliance
 

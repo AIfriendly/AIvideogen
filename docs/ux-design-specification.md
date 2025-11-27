@@ -999,7 +999,8 @@ graph LR
 **User Value:** Creators can personalize their videos by selecting a voice that matches their content's tone and target audience. Preview samples ensure confident selection.
 
 **Key Features:**
-- Display 3-5 voice options with metadata (name, gender, accent, tone)
+- Display 20 voice options with metadata (name, gender, accent, tone)
+- Voice cards displayed in 3-column grid with vertical scroll for overflow
 - Audio preview playback for each voice
 - Single voice selection per project
 - Voice selection persists and applies to all scene voiceovers
@@ -1016,12 +1017,12 @@ graph LR
 ├─────────────────────────────────────┤
 │                                     │
 │  ┌───────┐ ┌───────┐ ┌───────┐    │
-│  │ Voice │ │ Voice │ │ Voice │    │  <- Voice cards (3-col grid)
-│  │   1   │ │   2   │ │   3   │    │
+│  │ Voice │ │ Voice │ │ Voice │    │  <- Voice cards (3-col grid, scrollable)
+│  │   1   │ │   2   │ │   3   │    │  <- 20 total voices, ~7 rows
 │  │ ▶ Play│ │ ▶ Play│ │ ▶ Play│    │  <- Preview buttons
 │  └───────┘ └───────┘ └───────┘    │
 │                                     │
-│  ┌───────┐ ┌───────┐              │
+│  ┌───────┐ ┌───────┐ ┌───────┐    │
 │  │ Voice │ │ Voice │              │
 │  │   4   │ │   5   │              │
 │  │ ▶ Play│ │ ▶ Play│              │
@@ -1044,7 +1045,9 @@ graph LR
 **Voice Card Grid:**
 - **Display:** CSS Grid
 - **Columns:** 3 (desktop 1024px+), 2 (tablet 768px+), 1 (mobile)
-- **Gap:** 16px (md)
+- **Gap:** 24px (1.5rem between cards)
+- **Rows:** 7 rows (20 voices ÷ 3 columns = ~7 rows)
+- **Vertical Scroll:** Container has max-height with overflow-y auto
 - **Margin Bottom:** 32px (lg)
 
 **Voice Card:**
@@ -3449,9 +3452,10 @@ graph TD
 
 **Step 4: Voice Selection**
 - System navigates to Voice Selection UI (Section 6.5)
-- User sees 5 voice options displayed as cards
+- User sees 20 voice options displayed as cards in scrollable 3-column grid
 - Each card shows: Voice name, gender, accent, tone, preview button
-- User clicks "Preview" on Voice 2 → Audio sample plays (10 seconds)
+- User scrolls through available voices
+- User clicks "Preview" on Voice 2 (Emma) → Audio sample plays (10 seconds)
 - User decides Voice 2 fits the friendly, approachable tone desired
 - User clicks Voice 2 card to select → Card highlights with indigo border + checkmark
 - "Continue to Script Generation" button enables
@@ -3534,16 +3538,20 @@ graph TD
 - System navigates to Voice Selection UI (Section 6.5)
 - Page loads with title: "Select Your Voice"
 - Subtitle: "Choose a narrator for your video"
-- 5 voice option cards displayed in 3-column grid
+- 20 voice option cards displayed in scrollable 3-column grid (~7 rows)
 - "Continue" button disabled (gray) at bottom
 
 **Step 2: Exploring Voice Options**
-- User sees Voice 1 card: "Professional Alex | Male | American | Professional"
-- User sees Voice 2 card: "Friendly Sarah | Female | British | Friendly"
-- User sees Voice 3 card: "Energetic Marcus | Male | Neutral | Energetic"
-- User sees Voice 4 card: "Calm Emma | Female | American | Professional"
-- User sees Voice 5 card: "Dynamic Jordan | Male | British | Energetic"
+- User sees 20 voice cards in scrollable grid, including:
+  - Sarah - American Female, Warm
+  - James - American Male, Professional
+  - Emma - American Female, Energetic
+  - Michael - American Male, Calm
+  - Olivia - British Female, Friendly
+  - (15 additional voices available by scrolling: Sophia, Grace, Lucy, Freya, Charlotte, Matilda, Aria, David, William, Samuel, George, Lucas, Kai, Ethan, Liam)
+  - Accent mix: 15 American (7 female, 8 male), 5 British (3 female, 2 male)
 - All cards have gradient avatar icons and "Preview" buttons
+- User scrolls through grid to view all options
 
 **Step 3: Previewing Voices**
 - User clicks "Preview" button on Voice 1 (Professional Alex)

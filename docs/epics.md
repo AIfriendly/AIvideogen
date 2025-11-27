@@ -357,7 +357,10 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 **Acceptance Criteria:**
 - TTS engine successfully installed and accessible via API
-- At least 3-5 distinct voice profiles defined with metadata (name, gender, accent, tone)
+- 20 distinct voice profiles defined with metadata (name, gender, accent, tone)
+  - Gender diversity: 10 female, 10 male voices
+  - Accent diversity: 15 American, 5 British
+  - Tone diversity: 12+ unique tone characteristics
 - Preview audio samples generated and stored for each voice profile
 - TTSProvider interface defined with generateAudio() method
 - Audio files stored in organized directory structure (e.g., /public/audio/previews/, /public/audio/scenes/)
