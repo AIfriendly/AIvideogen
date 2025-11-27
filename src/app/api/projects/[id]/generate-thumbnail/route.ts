@@ -17,7 +17,7 @@ interface ProjectRow {
   id: string;
   video_path: string | null;
   topic: string | null;
-  title: string | null;
+  name: string | null;
 }
 
 export async function POST(
@@ -27,9 +27,9 @@ export async function POST(
   try {
     const { id: projectId } = await params;
 
-    // Get project to verify it exists and get video path and title
+    // Get project to verify it exists and get video path and topic
     const projectStmt = db.prepare(`
-      SELECT id, video_path, topic, title
+      SELECT id, video_path, topic, name
       FROM projects
       WHERE id = ?
     `);
@@ -57,8 +57,8 @@ export async function POST(
       );
     }
 
-    // Use topic or title as the thumbnail text
-    const title = project.topic || project.title || 'Untitled Video';
+    // Use topic or name as the thumbnail text
+    const title = project.topic || project.name || 'Untitled Video';
 
     // Generate thumbnail
     const ffmpeg = new FFmpegClient();

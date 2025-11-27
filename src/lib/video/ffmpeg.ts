@@ -415,6 +415,9 @@ export class FFmpegClient {
    * Add text overlay to an image
    * Creates visually appealing text with shadow for legibility
    * Scales and pads image to target dimensions (1920x1080 by default)
+   *
+   * Note: On Windows without Fontconfig, text overlay may fail.
+   * Falls back to just scaling the image if drawtext fails.
    */
   async addTextOverlay(
     inputPath: string,
@@ -454,7 +457,28 @@ export class FFmpegClient {
       outputPath,
     ];
 
-    await this.execute(args);
+    try {
+      await this.execute(args);
+    } catch (error) {
+      // Fallback: if text overlay fails (e.g., Fontconfig issue on Windows),
+      // just scale and pad the image without text
+      console.warn('[FFmpegClient] Text overlay failed, falling back to scaled image only:', error);
+
+      const fallbackFilter = [
+        `scale=${width}:${height}:force_original_aspect_ratio=decrease`,
+        `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`,
+      ].join(',');
+
+      const fallbackArgs = [
+        '-i', inputPath,
+        '-vf', fallbackFilter,
+        '-q:v', String(VIDEO_ASSEMBLY_CONFIG.THUMBNAIL_QUALITY),
+        '-y',
+        outputPath,
+      ];
+
+      await this.execute(fallbackArgs);
+    }
   }
 
   /**

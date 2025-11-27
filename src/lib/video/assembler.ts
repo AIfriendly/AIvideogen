@@ -265,13 +265,28 @@ export class VideoAssembler {
       outputDir
     );
 
-    // Step 3: Finalize and update records
+    // Step 3: Generate thumbnail
+    // Get project topic/name for thumbnail text
+    const projectStmt = db.prepare('SELECT topic, name FROM projects WHERE id = ?');
+    const project = projectStmt.get(projectId) as { topic: string | null; name: string | null } | undefined;
+    const thumbnailTitle = project?.topic || project?.name || 'Video';
+
+    let thumbnailPath: string | null = null;
+    try {
+      thumbnailPath = await this.generateThumbnail(jobId, finalPath, thumbnailTitle, projectId);
+      console.log(`[VideoAssembler] Thumbnail generated: ${thumbnailPath}`);
+    } catch (error) {
+      // Thumbnail generation failure should not fail the whole assembly
+      console.error('[VideoAssembler] Thumbnail generation failed (non-fatal):', error);
+    }
+
+    // Step 4: Finalize and update records
     this.updateJobProgress(jobId, 95, 'finalizing');
     const finalDuration = await this.ffmpeg.getVideoDuration(finalPath);
     const fileSize = statSync(finalPath).size;
 
-    // Update project with video info (thumbnail handled by Story 5.4)
-    this.updateProjectVideo(projectId, finalPath, null, finalDuration, fileSize);
+    // Update project with video info
+    this.updateProjectVideo(projectId, finalPath, thumbnailPath, finalDuration, fileSize);
 
     return finalPath;
   }
