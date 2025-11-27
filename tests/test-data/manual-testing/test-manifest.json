@@ -1,0 +1,140 @@
+{
+  "generatedAt": "2025-11-24T21:14:48.873Z",
+  "testDataDir": "D:\\BMAD video generator\\tests\\test-data\\manual-testing",
+  "videos": [
+    {
+      "name": "scene-1-short-5s.mp4",
+      "path": "D:\\BMAD video generator\\tests\\test-data\\manual-testing\\videos\\scene-1-short-5s.mp4",
+      "expectedDuration": 5,
+      "resolution": "1280x720",
+      "fps": 30
+    },
+    {
+      "name": "scene-2-medium-7s.mp4",
+      "path": "D:\\BMAD video generator\\tests\\test-data\\manual-testing\\videos\\scene-2-medium-7s.mp4",
+      "expectedDuration": 7,
+      "resolution": "1280x720",
+      "fps": 30
+    },
+    {
+      "name": "scene-3-long-8s.mp4",
+      "path": "D:\\BMAD video generator\\tests\\test-data\\manual-testing\\videos\\scene-3-long-8s.mp4",
+      "expectedDuration": 8,
+      "resolution": "1280x720",
+      "fps": 30
+    },
+    {
+      "name": "scene-4-exact-10s.mp4",
+      "path": "D:\\BMAD video generator\\tests\\test-data\\manual-testing\\videos\\scene-4-exact-10s.mp4",
+      "expectedDuration": 10,
+      "resolution": "1280x720",
+      "fps": 30
+    },
+    {
+      "name": "scene-5-longer-30s.mp4",
+      "path": "D:\\BMAD video generator\\tests\\test-data\\manual-testing\\videos\\scene-5-longer-30s.mp4",
+      "expectedDuration": 30,
+      "resolution": "1280x720",
+      "fps": 30
+    },
+    {
+      "name": "hq-test-video.mp4",
+      "path": "D:\\BMAD video generator\\tests\\test-data\\manual-testing\\videos\\hq-test-video.mp4",
+      "expectedDuration": 15,
+      "resolution": "1920x1080",
+      "fps": 60
+    }
+  ],
+  "audios": [
+    {
+      "name": "voiceover-1-5s.mp3",
+      "path": "D:\\BMAD video generator\\tests\\test-data\\manual-testing\\audio\\voiceover-1-5s.mp3",
+      "expectedDuration": 5,
+      "sampleRate": 44100
+    },
+    {
+      "name": "voiceover-2-7s.mp3",
+      "path": "D:\\BMAD video generator\\tests\\test-data\\manual-testing\\audio\\voiceover-2-7s.mp3",
+      "expectedDuration": 7,
+      "sampleRate": 44100
+    },
+    {
+      "name": "voiceover-3-8s.mp3",
+      "path": "D:\\BMAD video generator\\tests\\test-data\\manual-testing\\audio\\voiceover-3-8s.mp3",
+      "expectedDuration": 8,
+      "sampleRate": 44100
+    },
+    {
+      "name": "voiceover-exact-8.5s.mp3",
+      "path": "D:\\BMAD video generator\\tests\\test-data\\manual-testing\\audio\\voiceover-exact-8.5s.mp3",
+      "expectedDuration": 8.5,
+      "sampleRate": 44100
+    },
+    {
+      "name": "voiceover-long-15s.mp3",
+      "path": "D:\\BMAD video generator\\tests\\test-data\\manual-testing\\audio\\voiceover-long-15s.mp3",
+      "expectedDuration": 15,
+      "sampleRate": 44100
+    }
+  ],
+  "testScenarios": [
+    {
+      "name": "Basic 3-scene assembly",
+      "description": "Test basic concatenation and audio overlay with 3 scenes",
+      "scenes": [
+        {
+          "video": "scene-1-short-5s.mp4",
+          "audio": "voiceover-1-5s.mp3",
+          "expectedDuration": 5
+        },
+        {
+          "video": "scene-2-medium-7s.mp4",
+          "audio": "voiceover-2-7s.mp3",
+          "expectedDuration": 7
+        },
+        {
+          "video": "scene-3-long-8s.mp4",
+          "audio": "voiceover-3-8s.mp3",
+          "expectedDuration": 8
+        }
+      ],
+      "expectedTotalDuration": 20
+    },
+    {
+      "name": "Trimming test - long video to short audio",
+      "description": "Test Story 5.2 trimming with 30s video trimmed to 10s",
+      "scenes": [
+        {
+          "video": "scene-5-longer-30s.mp4",
+          "audio": "voiceover-1-5s.mp3",
+          "expectedDuration": 5
+        }
+      ],
+      "expectedTotalDuration": 5
+    },
+    {
+      "name": "High quality test",
+      "description": "Test quality preservation with 1080p 60fps video",
+      "scenes": [
+        {
+          "video": "hq-test-video.mp4",
+          "audio": "voiceover-long-15s.mp3",
+          "expectedDuration": 15
+        }
+      ],
+      "expectedTotalDuration": 15
+    },
+    {
+      "name": "Exact duration test",
+      "description": "Test metadata accuracy with exact 10.0s video and 8.5s audio",
+      "scenes": [
+        {
+          "video": "scene-4-exact-10s.mp4",
+          "audio": "voiceover-exact-8.5s.mp3",
+          "expectedDuration": 8.5
+        }
+      ],
+      "expectedTotalDuration": 8.5
+    }
+  ]
+}
