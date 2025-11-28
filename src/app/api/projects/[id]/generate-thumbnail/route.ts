@@ -7,11 +7,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { existsSync } from 'fs';
+import path from 'path';
 import db from '@/lib/db/client';
 import { FFmpegClient } from '@/lib/video/ffmpeg';
 import { ThumbnailGenerator } from '@/lib/video/thumbnail';
 import { VIDEO_ASSEMBLY_CONFIG } from '@/lib/video/constants';
 import { updateProjectThumbnail } from '@/lib/db/queries';
+import { getPublicPath, toWebPath } from '@/lib/utils/paths';
 
 interface ProjectRow {
   id: string;
@@ -49,8 +51,14 @@ export async function POST(
       );
     }
 
+    // Resolve video path - could be relative (public/...) or absolute
+    let videoFilePath = project.video_path;
+    if (!path.isAbsolute(videoFilePath)) {
+      videoFilePath = path.join(process.cwd(), videoFilePath);
+    }
+
     // Verify video file exists
-    if (!existsSync(project.video_path)) {
+    if (!existsSync(videoFilePath)) {
       return NextResponse.json(
         { error: 'Video file not found on disk', code: 'FILE_NOT_FOUND' },
         { status: 400 }
@@ -67,22 +75,25 @@ export async function POST(
     const outputPath = `${VIDEO_ASSEMBLY_CONFIG.OUTPUT_DIR}/${projectId}/thumbnail.jpg`;
 
     console.log(`[generate-thumbnail] Generating thumbnail for project ${projectId}`);
-    console.log(`[generate-thumbnail] Video path: ${project.video_path}`);
+    console.log(`[generate-thumbnail] Video path: ${videoFilePath}`);
     console.log(`[generate-thumbnail] Title: ${title}`);
 
     const result = await generator.generate({
-      videoPath: project.video_path,
+      videoPath: videoFilePath,
       title,
       outputPath,
     });
 
-    // Update project with thumbnail path only
-    updateProjectThumbnail(projectId, result.thumbnailPath);
+    // Update project with relative thumbnail path for database portability
+    const relativeThumbnailPath = getPublicPath(result.thumbnailPath);
+    updateProjectThumbnail(projectId, relativeThumbnailPath);
 
     console.log(`[generate-thumbnail] Thumbnail created: ${result.thumbnailPath}`);
+    console.log(`[generate-thumbnail] Stored path: ${relativeThumbnailPath}`);
 
+    // Return web-servable path for frontend
     return NextResponse.json({
-      thumbnail_path: result.thumbnailPath,
+      thumbnail_path: toWebPath(result.thumbnailPath),
       width: result.width,
       height: result.height,
       source_timestamp: result.sourceTimestamp,

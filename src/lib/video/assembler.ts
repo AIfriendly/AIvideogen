@@ -14,6 +14,7 @@ import { FFmpegClient } from './ffmpeg';
 import { Concatenator } from './concatenator';
 import { ThumbnailGenerator } from './thumbnail';
 import { VIDEO_ASSEMBLY_CONFIG, ASSEMBLY_JOB_STATUS } from './constants';
+import { getPublicPath } from '@/lib/utils/paths';
 import type { AssemblyJob, AssemblyJobStatus, AssemblyStage, AssemblyScene } from '@/types/assembly';
 
 /**
@@ -286,7 +287,10 @@ export class VideoAssembler {
     const fileSize = statSync(finalPath).size;
 
     // Update project with video info
-    this.updateProjectVideo(projectId, finalPath, thumbnailPath, finalDuration, fileSize);
+    // Store relative paths (public/...) in database for portability
+    const relativeVideoPath = getPublicPath(finalPath);
+    const relativeThumbnailPath = thumbnailPath ? getPublicPath(thumbnailPath) : null;
+    this.updateProjectVideo(projectId, relativeVideoPath, relativeThumbnailPath, finalDuration, fileSize);
 
     return finalPath;
   }
@@ -369,7 +373,9 @@ export class VideoAssembler {
     });
 
     // Update project with thumbnail path only
-    this.updateProjectThumbnail(projectId, result.thumbnailPath);
+    // Store relative path (public/...) in database for portability
+    const relativeThumbnailPath = getPublicPath(result.thumbnailPath);
+    this.updateProjectThumbnail(projectId, relativeThumbnailPath);
 
     // Update progress
     this.updateJobProgress(jobId, 85, 'thumbnail');
