@@ -117,7 +117,7 @@ export function PersonaSelector({ projectId, onSelect, initialPersonaId }: Perso
       <div className="text-center">
         <h2 className="text-2xl font-bold">Choose Your AI Persona</h2>
         <p className="text-muted-foreground mt-2">
-          Select a persona to shape your AI assistant's personality and delivery style
+          Select a persona to shape your AI assistant&apos;s personality and delivery style
         </p>
       </div>
 
