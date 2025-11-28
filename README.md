@@ -28,7 +28,8 @@ The AI Video Generator is a desktop-first web application built with Next.js 15 
 - **KokoroTTS** - High-quality text-to-speech (82M model, Apache 2.0)
 - **yt-dlp** - YouTube video downloading
 - **FFmpeg 7.1.2+** - Video processing and assembly
-- **Gemini 2.5 Free** Free tier API
+- **Gemini 2.5 Free** - Free tier API
+
 ### State & Data
 - **Zustand 5.0.8** - Lightweight client state management
 - **SQLite (better-sqlite3)** - Embedded database for conversation history and projects
@@ -55,14 +56,14 @@ See [Architecture Documentation](../docs/architecture.md) for complete technical
 
 ### Installation
 
-1. **Install Node.js** - https://nodejs.org
-2. **Install Python** - https://python.org
-3. **Install UV** - https://github.com/astral-sh/uv
-4. **Install Ollama** - https://ollama.com
+1. **Install Node.js** - <https://nodejs.org>
+2. **Install Python** - <https://python.org>
+3. **Install UV** - <https://github.com/astral-sh/uv>
+4. **Install Ollama** - <https://ollama.com>
    ```bash
    ollama pull llama3.2:3b-instruct-q8_0
    ```
-5. **Install FFmpeg** - https://ffmpeg.org/download.html
+5. **Install FFmpeg** - <https://ffmpeg.org/download.html>
 
 ## Setup
 
@@ -106,7 +107,7 @@ This project follows the **BMAD Method** (BMad Architecture & Development):
 - **Phase 3**: Architecture & Solutioning ✅
 - **Phase 4**: Implementation (Current Phase)
 
-See [Workflow Status](../docs/bmm-workflow-status.md) for current progress.
+See [Workflow Status](../docs/workflow-status.md) for current progress.
 
 ## Configuration
 
@@ -125,20 +126,17 @@ Post-MVP: Support for OpenAI, Anthropic, custom endpoints
 
 ## License
 
-[Specify License]
-
-## Contributing
-
-[Contribution guidelines]
+MIT License - See LICENSE file for details.
 
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/AIfriendly/AIvideogen/issues
-- Architecture Documentation: [../docs/architecture.md](../docs/architecture.md)
+- GitHub Issues: <https://github.com/AIfriendly/AIvideogen/issues>
+- [Architecture Documentation](../docs/architecture.md)
+- [Setup Guide](../docs/setup-guide.md)
 
 ---
 
-**Status**: Phase 4 - Implementation Ready
+**Status**: Phase 4 - Implementation
 **Version**: 0.1.0 (MVP)
-**Last Updated**: 2025-11-01
+**Last Updated**: 2025-11-28

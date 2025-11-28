@@ -99,17 +99,23 @@ export async function GET(
     // Videos stored in public/videos/{projectId}/final.mp4
     // Serve via /videos/{projectId}/final.mp4
     let videoPath = project.video_path;
-    if (videoPath.startsWith('public/')) {
-      videoPath = videoPath.replace('public/', '/');
-    } else if (!videoPath.startsWith('/')) {
-      videoPath = '/' + videoPath;
+    if (videoPath) {
+      // Handle absolute paths (Windows or Unix)
+      const publicIndex = videoPath.indexOf('public');
+      if (publicIndex !== -1) {
+        videoPath = videoPath.substring(publicIndex).replace(/\\/g, '/').replace('public/', '/');
+      } else if (!videoPath.startsWith('/')) {
+        videoPath = '/' + videoPath;
+      }
     }
 
     // Transform thumbnail_path similarly
     let thumbnailPath = project.thumbnail_path;
     if (thumbnailPath) {
-      if (thumbnailPath.startsWith('public/')) {
-        thumbnailPath = thumbnailPath.replace('public/', '/');
+      // Handle absolute paths (Windows or Unix)
+      const publicIndex = thumbnailPath.indexOf('public');
+      if (publicIndex !== -1) {
+        thumbnailPath = thumbnailPath.substring(publicIndex).replace(/\\/g, '/').replace('public/', '/');
       } else if (!thumbnailPath.startsWith('/')) {
         thumbnailPath = '/' + thumbnailPath;
       }
