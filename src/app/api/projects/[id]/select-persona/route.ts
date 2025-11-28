@@ -29,6 +29,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateProject, getProject } from '@/lib/db/queries';
 import { initializeDatabase } from '@/lib/db/init';
+import db from '@/lib/db/client';
 
 // Initialize database on first import
 initializeDatabase();
@@ -60,19 +61,44 @@ export async function POST(
       );
     }
 
-    // Update project with selected persona
+    // Check if project exists, auto-create if not (handles frontend UUID generation)
+    let project = getProject(projectId);
+    if (!project) {
+      console.log(`[select-persona] Project ${projectId} not found. Auto-creating...`);
+
+      // Create project with specified ID and persona
+      const createStmt = db.prepare(`
+        INSERT INTO projects (id, name, current_step, status, system_prompt_id)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      createStmt.run(projectId, 'New Project', 'topic', 'draft', personaId);
+
+      project = getProject(projectId);
+      if (!project) {
+        return NextResponse.json(
+          { error: 'Failed to create project' },
+          { status: 500 }
+        );
+      }
+
+      console.log(`[select-persona] Project ${projectId} created with persona: ${personaId}`);
+      return NextResponse.json({ project });
+    }
+
+    // Update existing project with selected persona
     updateProject(projectId, { system_prompt_id: personaId });
 
     // Retrieve updated project
-    const project = getProject(projectId);
+    project = getProject(projectId);
 
     if (!project) {
       return NextResponse.json(
-        { error: 'Project not found' },
-        { status: 404 }
+        { error: 'Project not found after update' },
+        { status: 500 }
       );
     }
 
+    console.log(`[select-persona] Project ${projectId} updated with persona: ${personaId}`);
     return NextResponse.json({ project });
   } catch (error) {
     console.error('[select-persona] Error:', error);
