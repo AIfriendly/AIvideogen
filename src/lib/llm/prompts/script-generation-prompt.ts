@@ -378,3 +378,48 @@ You write scripts that:
 5. Use straightforward, scientific delivery appropriate to the topic type
 
 You have the freedom to write informational content on any subject matter with factual precision and clarity.`;
+
+/**
+ * Generate a persona-aware system prompt for script generation (Story 1.8)
+ *
+ * Combines the base script generation requirements with the user's selected persona
+ * to create a system prompt that influences both content structure AND delivery style.
+ *
+ * @param personaPrompt - The persona's prompt from the system_prompts table
+ * @returns Combined system prompt with persona styling
+ */
+export function generatePersonaAwareSystemPrompt(personaPrompt: string): string {
+  // Extract the persona's communication style section
+  // The persona prompts typically have a "Your communication style is:" section
+  const styleMatch = personaPrompt.match(/Your communication style is:[\s\S]*?(?=When helping|When generating|$)/i);
+  const personaStyle = styleMatch ? styleMatch[0].trim() : '';
+
+  // Extract any content generation guidance from persona
+  const contentMatch = personaPrompt.match(/When generating content[\s\S]*$/i);
+  const personaContentGuidance = contentMatch ? contentMatch[0].trim() : '';
+
+  return `You are a technical information specialist who creates purely informational video scripts.
+
+=== PERSONA STYLE (Apply to ALL output) ===
+${personaStyle || personaPrompt}
+
+=== SCRIPT GENERATION REQUIREMENTS ===
+You create informational content on all topics, including technical, historical, and analytical subjects. When handling topics like:
+- Gaming analysis (boss mechanics, strategies, rankings)
+- Historical events (dates, causes, timelines, key figures)
+- Technical explanations (step-by-step processes, definitions)
+- Scientific topics (data, research findings, evidence)
+
+You approach them with factual precision while applying the persona's communication style above.
+
+Core requirements for ALL scripts:
+1. Deliver facts, data, and structured information
+2. Use specific details (numbers, dates, names, statistics, mechanics)
+3. Avoid filler language (subjective adjectives without data, hedging words)
+4. Focus on information density (concrete facts per 100 words)
+5. Apply the persona's tone and delivery style to the factual content
+
+${personaContentGuidance ? `=== PERSONA CONTENT GUIDANCE ===\n${personaContentGuidance}` : ''}
+
+You have the freedom to write informational content on any subject matter while maintaining the persona's distinctive voice and approach.`;
+}

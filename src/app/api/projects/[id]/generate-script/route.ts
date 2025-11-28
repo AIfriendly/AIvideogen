@@ -24,6 +24,8 @@ import {
   markScriptGenerated,
   updateProject,
   deleteScenesByProjectId,
+  getSystemPromptById,
+  getDefaultSystemPrompt,
 } from '@/lib/db/queries';
 import { initializeDatabase } from '@/lib/db/init';
 import { generateScriptWithRetry, ScriptGenerationError } from '@/lib/llm/script-generator';
@@ -154,11 +156,39 @@ export async function POST(
       console.log(`[Script Generation API] No config_json found, using defaults (3-5 scenes)`);
     }
 
+    // Load project's selected persona for script generation style (Story 1.8 integration)
+    let personaPrompt: string | null = null;
+    let personaName: string | null = null;
+    try {
+      if (project.system_prompt_id) {
+        const persona = getSystemPromptById(project.system_prompt_id);
+        if (persona) {
+          personaPrompt = persona.prompt;
+          personaName = persona.name;
+          console.log(`[Script Generation API] Using persona: ${personaName} for project ${projectId}`);
+        }
+      }
+      // Fallback to default persona if none selected
+      if (!personaPrompt) {
+        const defaultPersona = getDefaultSystemPrompt();
+        if (defaultPersona) {
+          personaPrompt = defaultPersona.prompt;
+          personaName = defaultPersona.name;
+          console.log(`[Script Generation API] Using default persona: ${personaName} for project ${projectId}`);
+        }
+      }
+    } catch (error) {
+      console.warn('[Script Generation API] Could not load persona, using default script style:', error);
+    }
+
     // Call business logic layer for script generation with retry
     console.log(`[Script Generation API] Calling script generator with config:`, projectConfig);
+    if (personaName) {
+      console.log(`[Script Generation API] Script style will be influenced by persona: ${personaName}`);
+    }
     let result;
     try {
-      result = await generateScriptWithRetry(sanitizedTopic, projectConfig);
+      result = await generateScriptWithRetry(sanitizedTopic, projectConfig, 6, personaPrompt);
     } catch (error) {
       if (error instanceof ScriptGenerationError) {
         console.error(

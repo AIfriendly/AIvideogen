@@ -10,7 +10,8 @@ import type { Message } from './provider';
 import {
   generateScriptPrompt,
   generateEnhancedPrompt,
-  SCRIPT_GENERATION_SYSTEM_PROMPT
+  SCRIPT_GENERATION_SYSTEM_PROMPT,
+  generatePersonaAwareSystemPrompt
 } from './prompts/script-generation-prompt';
 import { validateScriptQuality, type Scene, type ValidationResult } from './validate-script-quality';
 import { jsonrepair } from 'jsonrepair';
@@ -130,7 +131,8 @@ function parseScriptResponse(response: string): Scene[] {
  *
  * @param topic - The video topic to generate a script for
  * @param projectConfig - Optional configuration for scene count, duration, etc.
- * @param maxAttempts - Maximum number of attempts (default: 3)
+ * @param maxAttempts - Maximum number of attempts (default: 6)
+ * @param personaPrompt - Optional persona prompt to influence script style (Story 1.8)
  * @returns ScriptGenerationResult with scenes and attempt count
  * @throws ScriptGenerationError if all attempts fail
  *
@@ -149,7 +151,8 @@ function parseScriptResponse(response: string): Scene[] {
 export async function generateScriptWithRetry(
   topic: string,
   projectConfig?: any,
-  maxAttempts: number = 6
+  maxAttempts: number = 6,
+  personaPrompt?: string | null
 ): Promise<ScriptGenerationResult> {
   const provider = createLLMProvider();
   let lastValidationResult: ValidationResult | null = null;
@@ -190,14 +193,19 @@ export async function generateScriptWithRetry(
                   `${optimizedConfig?.sceneCount || 'N/A'} scenes, ` +
                   `${Math.round((optimizedConfig?.estimatedWords || 0) / (optimizedConfig?.sceneCount || 1))} words/scene`);
 
-      // Call LLM
+      // Call LLM with persona-aware system prompt (Story 1.8 integration)
       const messages: Message[] = [
         { role: 'user', content: prompt }
       ];
 
-      console.log(`[Script Generation] Calling LLM provider...`);
+      // Generate system prompt - use persona if provided, otherwise use default
+      const systemPrompt = personaPrompt
+        ? generatePersonaAwareSystemPrompt(personaPrompt)
+        : SCRIPT_GENERATION_SYSTEM_PROMPT;
+
+      console.log(`[Script Generation] Calling LLM provider${personaPrompt ? ' (with persona)' : ''}...`);
       const startTime = Date.now();
-      const response = await provider.chat(messages, SCRIPT_GENERATION_SYSTEM_PROMPT);
+      const response = await provider.chat(messages, systemPrompt);
       const llmDuration = ((Date.now() - startTime) / 1000).toFixed(1);
       console.log(`[DEBUG] LLM response received in ${llmDuration}s, length: ${response.length} chars`);
 
