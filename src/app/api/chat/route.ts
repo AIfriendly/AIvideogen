@@ -43,6 +43,7 @@ import db from '@/lib/db/client';
 import { initializeDatabase } from '@/lib/db/init';
 import { createLLMProvider } from '@/lib/llm/factory';
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/llm/prompts/default-system-prompt';
+import { getProject, getSystemPromptById, getDefaultSystemPrompt } from '@/lib/db/queries';
 import { generateProjectName } from '@/lib/utils/generate-project-name';
 import { extractTopicFromConversation } from '@/lib/conversation/topic-extraction';
 import { Message } from '@/types/api';
@@ -253,7 +254,33 @@ export async function POST(request: NextRequest) {
     }
 
     // ==========================================
-    // STEP 4: Get LLM Response
+    // STEP 4: Get Project's Persona System Prompt (Story 1.8)
+    // ==========================================
+
+    let systemPrompt = DEFAULT_SYSTEM_PROMPT;
+    try {
+      const projectData = getProject(projectId);
+      if (projectData?.system_prompt_id) {
+        // Use project's selected persona
+        const persona = getSystemPromptById(projectData.system_prompt_id);
+        if (persona) {
+          systemPrompt = persona.prompt;
+          console.log(`[Chat API] Using persona: ${persona.name} for project ${projectId}`);
+        }
+      } else {
+        // Fallback to default persona if none selected
+        const defaultPersona = getDefaultSystemPrompt();
+        if (defaultPersona) {
+          systemPrompt = defaultPersona.prompt;
+          console.log(`[Chat API] Using default persona: ${defaultPersona.name} for project ${projectId}`);
+        }
+      }
+    } catch (error) {
+      console.warn('[Chat API] Could not load project persona, using hardcoded default:', error);
+    }
+
+    // ==========================================
+    // STEP 5: Get LLM Response
     // ==========================================
 
     let aiResponse: string;
@@ -263,11 +290,11 @@ export async function POST(request: NextRequest) {
       const llmProvider = createLLMProvider();
 
       // Construct message array:
-      // 1. System prompt (first)
+      // 1. System prompt (first) - from project's persona or default
       // 2. Conversation history (context)
       // 3. Current user message (last)
       const messages = [
-        { role: 'system' as const, content: DEFAULT_SYSTEM_PROMPT },
+        { role: 'system' as const, content: systemPrompt },
         ...conversationHistory,
         { role: 'user' as const, content: message }
       ];
@@ -289,7 +316,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ==========================================
-    // STEP 5: Persist Messages in Transaction
+    // STEP 6: Persist Messages in Transaction
     // ==========================================
 
     // Generate UUIDs for both messages
@@ -342,7 +369,7 @@ export async function POST(request: NextRequest) {
       db.prepare('COMMIT').run();
 
       // ==========================================
-      // STEP 6: Topic Detection (Story 1.7)
+      // STEP 7: Topic Detection (Story 1.7)
       // ==========================================
 
       // Load full conversation history with new messages for topic detection
@@ -365,7 +392,7 @@ export async function POST(request: NextRequest) {
       const extractedTopic = extractTopicFromConversation(conversationMessages);
 
       // ==========================================
-      // STEP 7: Return Success Response
+      // STEP 8: Return Success Response
       // ==========================================
 
       const responseData: ChatSuccessResponse['data'] = {

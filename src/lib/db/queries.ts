@@ -83,6 +83,45 @@ export function getSystemPrompts(): SystemPrompt[] {
 }
 
 /**
+ * Retrieve all preset system prompts for UI display (Story 1.8)
+ * Returns only essential fields needed for PersonaSelector component
+ * @returns Array of preset system prompts ordered by default first, then by name
+ */
+export function getPresetSystemPrompts(): Pick<SystemPrompt, 'id' | 'name' | 'description' | 'is_default'>[] {
+  try {
+    const stmt = db.prepare(`
+      SELECT id, name, description, is_default
+      FROM system_prompts
+      WHERE is_preset = 1
+      ORDER BY is_default DESC, name ASC
+    `);
+    return stmt.all() as Pick<SystemPrompt, 'id' | 'name' | 'description' | 'is_default'>[];
+  } catch (error) {
+    console.error('Error fetching preset system prompts:', error);
+    throw new Error(
+      `Failed to fetch preset system prompts: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Retrieve a system prompt by ID (Story 1.8)
+ * @param id System prompt ID
+ * @returns System prompt or null if not found
+ */
+export function getSystemPromptById(id: string): SystemPrompt | null {
+  try {
+    const stmt = db.prepare('SELECT * FROM system_prompts WHERE id = ?');
+    return (stmt.get(id) as SystemPrompt) || null;
+  } catch (error) {
+    console.error('Error fetching system prompt by ID:', error);
+    throw new Error(
+      `Failed to fetch system prompt: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
  * Retrieve the default system prompt
  * @returns Default system prompt or null if not found
  */

@@ -225,6 +225,23 @@ async function runMigrations(): Promise<void> {
     console.log(`Migration ${migration011Name} already applied, skipping`);
   }
 
+  // Migration 012: Seed preset personas (Story 1.8)
+  const migration012Name = '012_seed_preset_personas';
+  if (!isMigrationApplied(migration012Name)) {
+    console.log(`Applying migration: ${migration012Name}`);
+    try {
+      const { up } = await import('./migrations/012_seed_preset_personas');
+      up(db);
+      markMigrationApplied(migration012Name);
+      console.log(`Migration ${migration012Name} applied successfully`);
+    } catch (error) {
+      console.error(`Failed to apply migration ${migration012Name}:`, error);
+      throw error;
+    }
+  } else {
+    console.log(`Migration ${migration012Name} already applied, skipping`);
+  }
+
   console.log('All migrations completed');
 }
 
