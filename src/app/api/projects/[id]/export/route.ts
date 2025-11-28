@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db/client';
 import { stat } from 'fs/promises';
 import path from 'path';
+import { toWebPath } from '@/lib/utils/paths';
 
 interface ProjectRow {
   id: string;
@@ -95,31 +96,10 @@ export async function GET(
     // Determine title from topic or name
     const title = project.topic || project.name || 'Untitled Video';
 
-    // Transform video_path for client consumption
-    // Videos stored in public/videos/{projectId}/final.mp4
-    // Serve via /videos/{projectId}/final.mp4
-    let videoPath = project.video_path;
-    if (videoPath) {
-      // Handle absolute paths (Windows or Unix)
-      const publicIndex = videoPath.indexOf('public');
-      if (publicIndex !== -1) {
-        videoPath = videoPath.substring(publicIndex).replace(/\\/g, '/').replace('public/', '/');
-      } else if (!videoPath.startsWith('/')) {
-        videoPath = '/' + videoPath;
-      }
-    }
-
-    // Transform thumbnail_path similarly
-    let thumbnailPath = project.thumbnail_path;
-    if (thumbnailPath) {
-      // Handle absolute paths (Windows or Unix)
-      const publicIndex = thumbnailPath.indexOf('public');
-      if (publicIndex !== -1) {
-        thumbnailPath = thumbnailPath.substring(publicIndex).replace(/\\/g, '/').replace('public/', '/');
-      } else if (!thumbnailPath.startsWith('/')) {
-        thumbnailPath = '/' + thumbnailPath;
-      }
-    }
+    // Transform paths for client consumption using utility
+    // Handles Windows absolute paths, backslashes, and extracts web-servable portion
+    const videoPath = toWebPath(project.video_path);
+    const thumbnailPath = project.thumbnail_path ? toWebPath(project.thumbnail_path) : null;
 
     return NextResponse.json({
       video_path: videoPath,
