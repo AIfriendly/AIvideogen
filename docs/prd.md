@@ -4,7 +4,7 @@
 
 **Last Updated:** 2025-11-27
 **Version:** 1.8
-**Repository:** https://github.com/AIfriendly/AIvideogen
+**Repository:** <https://github.com/AIfriendly/AIvideogen>
 
 **Project Type:** Web Application
 **Domain:** Content Creation
@@ -674,7 +674,6 @@ The following items are explicitly excluded from the MVP:
 - Database migrations for schema changes
 
 ### Content
-- 
 - Copyright verification for selected clips
 - Monetization or licensing compliance
 

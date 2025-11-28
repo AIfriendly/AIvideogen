@@ -2,7 +2,7 @@
 
 **Epic:** 5 - Video Assembly & Output
 **Story ID:** 5.5
-**Status:** Ready
+**Status:** done
 **Priority:** High
 **Created:** 2025-11-28
 **Implements:** FR-7.06, FR-8.05
@@ -842,22 +842,37 @@ export function AssemblyProgress({ status }: AssemblyProgressProps) {
 
 ## Definition of Done
 
-- [ ] All acceptance criteria met and tested
-- [ ] Export page displays video player with controls
-- [ ] Thumbnail preview displays correctly
-- [ ] Video download works with sanitized filename
-- [ ] Thumbnail download works with sanitized filename
-- [ ] Metadata displays: duration, size, resolution, topic, scenes
-- [ ] "Create New Video" navigates to home
-- [ ] "Back to Curation" navigates correctly
-- [ ] Loading state shows assembly progress
-- [ ] Error state shows with retry option
-- [ ] API endpoint returns correct data
-- [ ] Project current_step updated to 'complete'
-- [ ] Code follows contract boundaries exactly
-- [ ] No files outside exclusive_create/modify touched
-- [ ] Build passes without errors
-- [ ] Unit tests pass
+- [x] All acceptance criteria met and tested
+- [x] Export page displays video player with controls
+- [x] Thumbnail preview displays correctly
+- [x] Video download works with sanitized filename
+- [x] Thumbnail download works with sanitized filename
+- [x] Metadata displays: duration, size, resolution, topic, scenes
+- [x] "Create New Video" navigates to home
+- [x] "Back to Curation" navigates correctly
+- [x] Loading state shows assembly progress
+- [x] Error state shows with retry option
+- [x] API endpoint returns correct data
+- [x] Project current_step updated to 'complete'
+- [x] Code follows contract boundaries exactly
+- [x] No files outside exclusive_create/modify touched
+- [x] Build passes without errors
+- [x] Unit tests pass (53 tests passing)
+
+---
+
+## Post-Completion Notes
+
+### Bug Fix: Absolute Path Handling (2025-11-28)
+
+**Issue:** Thumbnail and video paths were stored as absolute Windows paths in the database (e.g., `D:\BMAD video generator\ai-video-generator\public\videos\xxx\thumbnail.jpg`), but the export API expected relative paths starting with `public/`.
+
+**Fix:** Updated path transformation logic in `src/app/api/projects/[id]/export/route.ts` to:
+1. Find the `public` segment in any path (absolute or relative)
+2. Extract the web-servable portion from that point
+3. Handle Windows backslashes by converting to forward slashes
+
+**Result:** Thumbnails now display correctly on the Export page.
 
 ---
 

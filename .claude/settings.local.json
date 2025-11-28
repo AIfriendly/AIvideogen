@@ -3,7 +3,20 @@
     "allow": [
       "Bash(\".venv\\Scripts\\python.exe\" -c \"\nfrom kokoro_tts import convert_text_to_audio\nimport sys\n\ntext = ''Welcome to the BMAD AI video generator. This is a sample of the voice you have selected.''\nvoice = ''af_nova''\noutput = ''ai-video-generator/.cache/audio/previews/sophia.mp3''\n\nprint(f''Generating {output}...'')\nwith open(''temp_preview.txt'', ''w'', encoding=''utf-8'') as f:\n    f.write(text)\n    \nconvert_text_to_audio(''temp_preview.txt'', output, voice=voice, format=''mp3'')\nprint(f''✓ Generated {output}'')\n\")",
       "Bash(xcopy:*)",
-      "Bash(git clean:*)"
+      "Bash(git clean:*)",
+      "Bash(dir \"D:\\BMAD video generator\\src\\app\\projects\\[id]\")",
+      "Bash(npm run build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Implement Export UI & Download Workflow (Story 5.5)\n\nAdds the Export page displaying completed videos with download options:\n- Export page route at /projects/[id]/export\n- Video player with native HTML5 controls\n- Thumbnail preview with download button\n- Video download with sanitized filename\n- Metadata display (duration, size, resolution, topic, scenes)\n- Assembly progress indicator while processing\n- Navigation to create new video or back to curation\n- Export API endpoint returning video metadata\n\nComponents created:\n- ExportClient: Main export page client component\n- VideoDownload: Primary video download button\n- ThumbnailPreview: Thumbnail display with download\n- ExportSummary: Video metadata display\n- AssemblyProgress: Progress indicator for assembly\n\nAPI:\n- GET /api/projects/[id]/export - Returns export metadata\n\nImplements: FR-7.06, FR-8.05\nCompletes: Epic 5 - Video Assembly & Output\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push)",
+      "Bash(git commit:*)",
+      "Bash(dir /s /b \"D:\\BMAD video generator\\ai-video-generator\\tests\")",
+      "Bash(findstr:*)",
+      "Bash(npm test:*)",
+      "Bash(sqlite3:*)",
+      "Bash(node -e:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(dir /b \"D:\\BMAD video generator\\ai-video-generator\\*.md\")"
     ],
     "deny": [],
     "ask": []
