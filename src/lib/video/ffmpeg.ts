@@ -434,8 +434,8 @@ export class FFmpegClient {
       .replace(/'/g, "'\\''"); // Escape single quotes
 
     // Calculate font size based on title length to prevent overflow
-    // Max 80px, scales down for longer titles
-    const fontSize = Math.min(80, Math.floor(1600 / Math.max(title.length, 10)));
+    // Max 120px, scales down for longer titles (increased for better visibility)
+    const fontSize = Math.min(120, Math.floor(2400 / Math.max(title.length, 10)));
 
     // On Windows, use explicit font file path to avoid Fontconfig dependency
     // FFmpeg on Windows needs the path with forward slashes and escaped colons
@@ -450,10 +450,10 @@ export class FFmpegClient {
       `scale=${width}:${height}:force_original_aspect_ratio=decrease`,
       // Pad to exact target dimensions (centers the scaled image)
       `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`,
-      // Add text shadow (offset 3px right, 3px down) for readability
-      `drawtext=${fontFile}text='${escapedTitle}':fontsize=${fontSize}:fontcolor=black:x=(w-text_w)/2+3:y=h-120+3`,
-      // Add main white text on top of shadow
-      `drawtext=${fontFile}text='${escapedTitle}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=h-120`,
+      // Add text shadow (offset 3px right, 3px down) for readability - centered vertically
+      `drawtext=${fontFile}text='${escapedTitle}':fontsize=${fontSize}:fontcolor=black:x=(w-text_w)/2+3:y=(h-text_h)/2+3`,
+      // Add main white text on top of shadow - centered vertically
+      `drawtext=${fontFile}text='${escapedTitle}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2`,
     ].join(',');
 
     const args = [

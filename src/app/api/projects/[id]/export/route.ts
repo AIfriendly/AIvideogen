@@ -86,10 +86,10 @@ export async function GET(
       }
     }
 
-    // Update current_step to 'complete' on first view
-    if (project.current_step !== 'complete') {
+    // Update current_step to 'export' on first view (final step in workflow)
+    if (project.current_step !== 'export') {
       db.prepare(`
-        UPDATE projects SET current_step = 'complete' WHERE id = ?
+        UPDATE projects SET current_step = 'export' WHERE id = ?
       `).run(projectId);
     }
 
