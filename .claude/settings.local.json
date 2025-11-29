@@ -16,7 +16,20 @@
       "Bash(sqlite3:*)",
       "Bash(node -e:*)",
       "WebFetch(domain:github.com)",
-      "Bash(dir /b \"D:\\BMAD video generator\\ai-video-generator\\*.md\")"
+      "Bash(dir /b \"D:\\BMAD video generator\\ai-video-generator\\*.md\")",
+      "Bash(del \"D:\\BMAD video generator\\ai-video-generator\\src\\lib\\llm\\prompts\\preset-personas.ts\")",
+      "Bash(del \"D:\\BMAD video generator\\ai-video-generator\\src\\lib\\db\\migrations\\012_seed_preset_personas.ts\")",
+      "Bash(cmd /c del \"D:\\BMAD video generator\\ai-video-generator\\src\\lib\\llm\\prompts\\preset-personas.ts\")",
+      "Bash(cmd /c del \"D:\\BMAD video generator\\ai-video-generator\\src\\lib\\db\\migrations\\012_seed_preset_personas.ts\")",
+      "Bash(del /f \"D:\\BMAD video generator\\ai-video-generator\\src\\lib\\llm\\prompts\\preset-personas.ts\")",
+      "Bash(del /f \"D:\\BMAD video generator\\ai-video-generator\\src\\lib\\db\\migrations\\012_seed_preset_personas.ts\")",
+      "Bash(cmd /c \"del /f \"\"D:\\BMAD video generator\\ai-video-generator\\src\\lib\\llm\\prompts\\preset-personas.ts\"\"\")",
+      "Bash(cmd /c \"del /f \"\"D:\\BMAD video generator\\ai-video-generator\\src\\lib\\db\\migrations\\012_seed_preset_personas.ts\"\"\")",
+      "Bash(npx eslint:*)",
+      "Bash(dir /s /b \"D:\\BMAD video generator\\ai-video-generator\\tests\\*.ts\")",
+      "Bash(curl:*)",
+      "Bash(dir:*)",
+      "Bash(npx tsx:*)"
     ],
     "deny": [],
     "ask": []

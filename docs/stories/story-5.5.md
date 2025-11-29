@@ -48,7 +48,7 @@
 - **Tables I create:** None
 - **Columns I add:** None
 - **Tables I read:** `assembly_jobs`, `projects`, `scenes`
-- **Tables I update:** `projects` (current_step to 'complete')
+- **Tables I update:** `projects` (current_step to 'export')
 
 ### Interface Dependencies
 
@@ -149,7 +149,7 @@ The export page serves as the satisfying conclusion to the video creation workfl
 ### AC10: Project Step Update
 **Given** export page is viewed for the first time
 **When** page loads successfully
-**Then** project's current_step is updated to 'complete'
+**Then** project's current_step is updated to 'export' (final workflow step)
 
 ### AC11: Loading State
 **Given** assembly is still in progress
@@ -427,9 +427,9 @@ export async function GET(
       }
     }
 
-    // Update current_step to 'complete' on first view
+    // Update current_step to 'export' on first view (final workflow step)
     db.prepare(`
-      UPDATE projects SET current_step = 'complete' WHERE id = ? AND current_step != 'complete'
+      UPDATE projects SET current_step = 'export' WHERE id = ? AND current_step != 'export'
     `).run(projectId);
 
     const title = project.topic || project.name || 'Untitled Video';
@@ -695,7 +695,7 @@ export function AssemblyProgress({ status }: AssemblyProgressProps) {
 2.1. Create `src/app/api/projects/[id]/export/route.ts`
 2.2. Query project for video_path, thumbnail_path, duration, file_size
 2.3. Query scenes count
-2.4. Update current_step to 'complete' on first view
+2.4. Update current_step to 'export' on first view (final workflow step)
 2.5. Return sanitized response with video/thumbnail paths
 2.6. Handle 404 for missing project/video
 
@@ -853,7 +853,7 @@ export function AssemblyProgress({ status }: AssemblyProgressProps) {
 - [x] Loading state shows assembly progress
 - [x] Error state shows with retry option
 - [x] API endpoint returns correct data
-- [x] Project current_step updated to 'complete'
+- [x] Project current_step updated to 'export' (final workflow step)
 - [x] Code follows contract boundaries exactly
 - [x] No files outside exclusive_create/modify touched
 - [x] Build passes without errors
@@ -873,6 +873,39 @@ export function AssemblyProgress({ status }: AssemblyProgressProps) {
 3. Handle Windows backslashes by converting to forward slashes
 
 **Result:** Thumbnails now display correctly on the Export page.
+
+---
+
+### Bug Fix: CHECK Constraint Violation on current_step (2025-11-29)
+
+**Issue:** Export API was trying to set `current_step = 'complete'` when a user views the export page, but the database schema has a CHECK constraint that only allows these values: `topic`, `voice`, `script-generation`, `voiceover`, `visual-sourcing`, `visual-curation`, `editing`, `export`.
+
+**Error Message:**
+```
+CHECK constraint failed: current_step IN ('topic', 'voice', 'script-generation', 'voiceover', 'visual-sourcing', 'visual-curation', 'editing', 'export')
+```
+
+**Root Cause:** The export API comment and code stated "Update current_step to 'complete'" but `'complete'` was never added to the allowed values in the database schema.
+
+**Fix:** Changed `current_step = 'complete'` to `current_step = 'export'` in `src/app/api/projects/[id]/export/route.ts:91-93`. The `'export'` step is the final step in the workflow and already exists in the schema.
+
+**Files Modified:**
+- `src/app/api/projects/[id]/export/route.ts` - Line 89-93
+
+**Code Change:**
+```typescript
+// Before:
+if (project.current_step !== 'complete') {
+  db.prepare(`UPDATE projects SET current_step = 'complete' WHERE id = ?`).run(projectId);
+}
+
+// After:
+if (project.current_step !== 'export') {
+  db.prepare(`UPDATE projects SET current_step = 'export' WHERE id = ?`).run(projectId);
+}
+```
+
+**Result:** Export page and Assembly page now load correctly without database constraint errors.
 
 ---
 

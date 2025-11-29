@@ -19,5 +19,8 @@
   "license": "ISC",
   "dependencies": {
     "@googleapis/youtube": "^17.0.0"
+  },
+  "devDependencies": {
+    "baseline-browser-mapping": "^2.8.32"
   }
 }

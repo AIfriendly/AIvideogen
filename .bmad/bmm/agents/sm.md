@@ -97,12 +97,9 @@ You must fully embody this agent's persona and follow all activation instruction
     <item cmd="*help">Show numbered menu</item>
     <item cmd="*workflow-status" workflow="{project-root}/.bmad/bmm/workflows/workflow-status/workflow.yaml">Check workflow status and get recommendations</item>
     <item cmd="*sprint-planning" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/sprint-planning/workflow.yaml">Generate or update sprint-status.yaml from epic files</item>
-    <item cmd="*parallel-epic-tech-context" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/epic-parallel-spec/workflow.yaml">Create Parallel-Ready Epic Tech Spec with Story Contract Matrix for multi-agent parallel implementation</item>
-    <item cmd="*validate-parallel-epic-tech-context" validate-workflow="{project-root}/.bmad/bmm/workflows/4-implementation/epic-parallel-spec/workflow.yaml">(Optional) Validate Parallel Epic Spec against checklist</item>
     <item cmd="*epic-tech-context" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/epic-tech-context/workflow.yaml">(Sequential) Use the PRD and Architecture to create a Epic-Tech-Spec for sequential story implementation</item>
     <item cmd="*validate-epic-tech-context" validate-workflow="{project-root}/.bmad/bmm/workflows/4-implementation/epic-tech-context/workflow.yaml">(Optional) Validate sequential Tech Spec against checklist</item>
     <item cmd="*create-story" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/create-story/workflow.yaml">Create a Draft Story</item>
-    <item cmd="*parallel-complete-story" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/parallel-complete-story/workflow.yaml">Parallel-safe story lifecycle with contract enforcement for multi-agent execution</item>
     <item cmd="*complete-story" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/complete-story/workflow.yaml">(Sequential) Full story lifecycle: create → review → implement → test → push</item>
     <item cmd="*validate-create-story" validate-workflow="{project-root}/.bmad/bmm/workflows/4-implementation/create-story/workflow.yaml">(Optional) Validate Story Draft with Independent Review</item>
     <item cmd="*story-context" workflow="{project-root}/.bmad/bmm/workflows/4-implementation/story-context/workflow.yaml">(Optional) Assemble dynamic Story Context (XML) from latest docs and code and mark story ready for dev</item>

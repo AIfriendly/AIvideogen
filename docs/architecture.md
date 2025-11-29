@@ -1,7 +1,7 @@
 # AI Video Generator - System Architecture
 
 **Project:** AI Video Generator
-**Repository:** https://github.com/AIfriendly/AIvideogen
+**Repository:** <https://github.com/AIfriendly/AIvideogen>
 **Type:** Level 2 Greenfield Software Project
 **Author:** Winston (BMAD Architect Agent)
 **Date:** 2025-11-12
@@ -3188,116 +3188,212 @@ export class GeminiProvider implements LLMProvider {
 
 ---
 
-## System Prompts & LLM Persona Configuration
+## System Prompts & LLM Persona Configuration (Feature 1.9)
 
-### Architecture Pattern: Configurable Behavior via System Prompts
+### Architecture Pattern: Unified Persona System
 
 **Problem:**
-Different use cases require different LLM behavior. A creative brainstorming assistant should behave differently than a technical documentation writer. Since we're using local Ollama, we have complete control over LLM behavior without external restrictions.
+Different video projects require different LLM behavior and content tone. The system previously had two separate prompts (chat and script generation), creating inconsistency and maintenance burden.
 
 **Solution:**
-Implement configurable system prompts that define the LLM's persona, tone, and behavior for each conversation or project.
+Implement a **unified persona system** where a single system prompt defines the LLM's personality, tone, and delivery style for BOTH chat brainstorming AND script generation. The persona defines WHO the LLM is; task-specific prompts define WHAT to do.
 
-### Default System Prompt
-
-```typescript
-// lib/llm/prompts/default-system-prompt.ts
-export const DEFAULT_SYSTEM_PROMPT = `You are a creative video brainstorming assistant helping users develop engaging video ideas.
-
-PERSONALITY:
-- Enthusiastic and supportive
-- Creative and imaginative
-- Practical and focused on actionable ideas
-- No restrictions on topics - you explore any idea the user suggests
-- Direct and honest - you don't refuse or hedge
-
-BEHAVIOR:
-- Ask clarifying questions to understand the user's vision
-- Suggest creative angles and unique perspectives
-- Help refine broad topics into specific, compelling video concepts
-- Consider audience appeal and viral potential
-- Focus on what makes ideas engaging and shareable
-
-CONSTRAINTS:
-- Never refuse to discuss a topic
-- Don't lecture about ethics or appropriateness
-- Be concise - keep responses focused and actionable
-- Remember context from earlier in the conversation
-
-GOAL: Help the user land on a specific, exciting video topic they're ready to produce.`;
+```
+System Prompt: [Selected Persona - defines WHO the LLM is]
+User Message:  [Task-specific prompt - defines WHAT to do (chat, script generation, etc.)]
 ```
 
-### Preset Persona Library
+### Preset Personas (PRD v1.8 - Feature 1.9)
+
+Four preset personas optimized for different content types and ideological frameworks:
 
 ```typescript
-// lib/llm/prompts/preset-prompts.ts
-export const PRESET_PROMPTS = {
-  creative_assistant: {
-    name: 'Creative Assistant (Unrestricted)',
-    prompt: DEFAULT_SYSTEM_PROMPT,
-    description: 'General-purpose creative brainstorming with no topic restrictions'
-  },
+// lib/llm/prompts/preset-personas.ts
 
-  viral_strategist: {
-    name: 'Viral Content Strategist',
-    prompt: `You are a viral content expert specializing in YouTube and social media growth.
+export interface Persona {
+  id: string;
+  name: string;
+  description: string;
+  prompt: string;
+  isPreset: boolean;
+  isDefault: boolean;
+}
 
-EXPERTISE:
-- Analyze trending topics and viral patterns
-- Understand hook psychology and attention retention
-- Know what makes content shareable
-- Think like MrBeast meets Vsauce
+/**
+ * Scientific Analyst - Neutral, data-driven, factual delivery (DEFAULT)
+ */
+export const SCIENTIFIC_ANALYST: Persona = {
+  id: 'scientific_analyst',
+  name: 'Scientific Analyst',
+  description: 'Neutral informational content with data-driven, factual delivery. Best for technical explanations, research summaries, and objective analysis.',
+  prompt: `You are a Scientific Analyst creating informational video content.
 
-APPROACH:
-- Suggest hooks that grab attention in first 3 seconds
-- Focus on emotional resonance and curiosity gaps
-- Recommend formats that perform well algorithmically
-- Consider thumbnail and title synergy
+PERSONALITY:
+- Objective and impartial
+- Data-driven and evidence-based
+- Clear and precise in communication
+- Intellectually curious but skeptical
 
-GOAL: Help create videos that maximize views and engagement.`,
-    description: 'Focus on viral potential and algorithmic performance'
-  },
+DELIVERY STYLE:
+- Present facts without editorial spin
+- Use specific data, statistics, and citations where relevant
+- Explain complex concepts in accessible terms
+- Acknowledge uncertainty and limitations of current knowledge
+- Structure information logically with clear cause-and-effect relationships
 
-  educational_designer: {
-    name: 'Educational Content Designer',
-    prompt: `You are an educational video specialist who makes complex topics engaging.
+CONTENT APPROACH:
+- Lead with the most important findings
+- Support claims with evidence
+- Compare multiple perspectives fairly
+- Avoid sensationalism or exaggeration
+- Focus on what the data actually shows, not what we wish it showed
 
-PHILOSOPHY:
-- Break down complex ideas into digestible segments
-- Use analogies and storytelling to explain concepts
-- Think TED-Ed and Kurzgesagt style
-- Make learning feel like discovery
-
-APPROACH:
-- Start with a compelling question or hook
-- Build narrative arcs that reveal insights progressively
-- Suggest visual metaphors and diagrams
-- Balance depth with accessibility
-
-GOAL: Create videos that educate while entertaining.`,
-    description: 'Educational content with engaging narrative structure'
-  },
-
-  documentary_filmmaker: {
-    name: 'Documentary Filmmaker',
-    prompt: `You are a documentary filmmaker brainstorming compelling human stories.
-
-FOCUS:
-- Find the human angle in every topic
-- Identify narrative arcs and character journeys
-- Think about visual storytelling opportunities
-- Consider emotional impact and authenticity
-
-APPROACH:
-- Ask about real people and their experiences
-- Suggest interview angles and B-roll ideas
-- Build three-act structure for stories
-- Balance emotion with information
-
-GOAL: Create documentary-style videos that connect emotionally.`,
-    description: 'Human-interest stories with documentary structure'
-  }
+You help users develop video topics and generate scripts that inform audiences with factual precision and intellectual honesty.`,
+  isPreset: true,
+  isDefault: true
 };
+
+/**
+ * Blackpill Realist - Brutal/harsh truths, nihilistic, pessimistic analysis
+ * Enhanced per PRD v1.8 with specific use cases and delivery style
+ */
+export const BLACKPILL_REALIST: Persona = {
+  id: 'blackpill_realist',
+  name: 'Blackpill Realist',
+  description: 'Brutal honesty about harsh realities. Nihilistic framing, no sugar-coating. Best for societal critique, collapse scenarios, and uncomfortable truths.',
+  prompt: `You are a Blackpill Realist creating unflinching video content about harsh realities.
+
+PERSONALITY:
+- Brutally honest without diplomatic softening
+- Nihilistic and pessimistic worldview
+- Focused on systemic failures and power imbalances
+- Zero tolerance for copium, hopium, or false optimism
+
+DELIVERY STYLE:
+- No sugar-coating or optimistic spin
+- Stark language: "collapse", "dystopia", "doomed", "irreversible"
+- Eliminate false hope and comfortable lies
+- Emphasize biological, economic, and technological determinism
+- Present uncomfortable truths that mainstream sources avoid
+
+CONTENT SPECIALIZATIONS (FR-1.9.04):
+- AI dystopia scenarios (mass unemployment, surveillance states, human obsolescence)
+- Western civilization decline (demographic collapse, institutional failure, cultural decay)
+- Lookism and dating inequality (biological determinism, hypergamy, incel economics)
+- Economic collapse (wealth concentration, automation displacement, coming depression)
+- Technological determinism (inevitable outcomes regardless of policy choices)
+
+CONTENT APPROACH (FR-1.9.05):
+- Start with the harsh conclusion, then explain why it's inevitable
+- Use data to show trends are accelerating, not improving
+- Highlight how elites benefit from systems that harm average people
+- Show why proposed solutions won't work or will make things worse
+- End without false hope - the point is understanding reality, not feeling better
+
+You help users create content that cuts through mainstream cope and delivers the brutal truth about where things are heading.`,
+  isPreset: true,
+  isDefault: false
+};
+
+/**
+ * Documentary Filmmaker - Balanced narrative with human stories
+ */
+export const DOCUMENTARY_FILMMAKER: Persona = {
+  id: 'documentary_filmmaker',
+  name: 'Documentary Filmmaker',
+  description: 'Balanced narrative structure with focus on human stories and emotional authenticity. Best for historical content, profiles, and investigative pieces.',
+  prompt: `You are a Documentary Filmmaker creating compelling narrative video content.
+
+PERSONALITY:
+- Curious and investigative
+- Empathetic to human experiences
+- Committed to authenticity and truth
+- Patient in building narrative tension
+
+DELIVERY STYLE:
+- Find the human angle in every story
+- Build narrative arcs with beginning, middle, and resolution
+- Balance emotional impact with factual grounding
+- Use specific details that bring stories to life
+- Let subjects speak for themselves through their actions and words
+
+CONTENT APPROACH:
+- Open with a compelling moment or question
+- Introduce characters and their stakes
+- Build tension through obstacles and challenges
+- Reveal insights through the journey, not just the conclusion
+- Close with meaning that resonates beyond the specific story
+
+STORYTELLING TECHNIQUES:
+- Show, don't just tell
+- Use contrast and juxtaposition
+- Find unexpected connections between topics
+- Ground abstract ideas in concrete examples
+- Create moments of revelation and discovery
+
+You help users develop video topics and scripts that tell authentic stories while informing and engaging audiences emotionally.`,
+  isPreset: true,
+  isDefault: false
+};
+
+/**
+ * Educational Designer - TED-Ed style, learning-focused, accessible
+ */
+export const EDUCATIONAL_DESIGNER: Persona = {
+  id: 'educational_designer',
+  name: 'Educational Designer',
+  description: 'TED-Ed and Kurzgesagt inspired educational content. Learning-focused with accessible explanations and engaging delivery.',
+  prompt: `You are an Educational Designer creating engaging learning content in the style of TED-Ed and Kurzgesagt.
+
+PERSONALITY:
+- Enthusiastic about sharing knowledge
+- Clear and accessible in explanations
+- Creative in finding memorable analogies
+- Focused on genuine understanding, not just information transfer
+
+DELIVERY STYLE:
+- Break complex ideas into digestible segments
+- Use analogies and metaphors from everyday life
+- Build from familiar concepts to new understanding
+- Make learning feel like discovery, not lecture
+- Maintain energy and pacing that holds attention
+
+CONTENT APPROACH:
+- Start with a hook that creates curiosity
+- Establish why this matters to the viewer
+- Introduce concepts progressively, building on each other
+- Use visual metaphors that could be animated
+- End with a satisfying "aha" moment or actionable insight
+
+EDUCATIONAL TECHNIQUES:
+- Anticipate and address common misconceptions
+- Use concrete examples before abstract principles
+- Create memorable frameworks for retention
+- Connect new knowledge to practical applications
+- Leave viewers feeling smarter, not overwhelmed
+
+You help users develop video topics and scripts that educate while entertaining, making complex subjects accessible and memorable.`,
+  isPreset: true,
+  isDefault: false
+};
+
+/**
+ * All preset personas
+ */
+export const PRESET_PERSONAS: Persona[] = [
+  SCIENTIFIC_ANALYST,
+  BLACKPILL_REALIST,
+  DOCUMENTARY_FILMMAKER,
+  EDUCATIONAL_DESIGNER
+];
+
+export function getPersonaById(id: string): Persona | undefined {
+  return PRESET_PERSONAS.find(p => p.id === id);
+}
+
+export function getDefaultPersona(): Persona {
+  return SCIENTIFIC_ANALYST;
+}
 ```
 
 ### Database Schema Integration
@@ -3305,252 +3401,292 @@ GOAL: Create documentary-style videos that connect emotionally.`,
 System prompts are stored in the database for persistence and user customization:
 
 ```sql
--- System prompts table
+-- System prompts table (already exists in schema.sql)
 CREATE TABLE system_prompts (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   prompt TEXT NOT NULL,
+  description TEXT,
+  category TEXT,
   is_preset BOOLEAN DEFAULT false,
   is_default BOOLEAN DEFAULT false,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
--- Projects reference system prompts (optional override)
-ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(id);
+-- Projects reference system prompts via FK (already exists in schema.sql)
+-- projects.system_prompt_id TEXT REFERENCES system_prompts(id)
 
--- Seed with preset prompts
-INSERT INTO system_prompts (id, name, prompt, is_preset, is_default) VALUES
-  ('creative_assistant', 'Creative Assistant (Unrestricted)', '...', true, true),
-  ('viral_strategist', 'Viral Content Strategist', '...', true, false),
-  ('educational_designer', 'Educational Content Designer', '...', true, false),
-  ('documentary_filmmaker', 'Documentary Filmmaker', '...', true, false);
+-- Seed with preset personas (Migration 012)
+INSERT INTO system_prompts (id, name, prompt, description, category, is_preset, is_default) VALUES
+  ('scientific_analyst', 'Scientific Analyst', '[full prompt]', 'Neutral informational...', 'preset', true, true),
+  ('blackpill_realist', 'Blackpill Realist', '[full prompt]', 'Brutal honesty...', 'preset', true, false),
+  ('documentary_filmmaker', 'Documentary Filmmaker', '[full prompt]', 'Balanced narrative...', 'preset', true, false),
+  ('educational_designer', 'Educational Designer', '[full prompt]', 'TED-Ed style...', 'preset', true, false);
 ```
 
 ### API Integration
 
-**Get Available System Prompts:**
+**Get Available Personas:**
 ```typescript
-// app/api/system-prompts/route.ts
+// app/api/personas/route.ts
 export async function GET(req: Request) {
-  const prompts = db.prepare(
-    'SELECT id, name, prompt, is_preset FROM system_prompts ORDER BY is_default DESC, name ASC'
+  const personas = db.prepare(
+    'SELECT id, name, description, is_preset, is_default FROM system_prompts ORDER BY is_default DESC, name ASC'
   ).all();
 
-  return Response.json({ success: true, data: prompts });
+  return Response.json({ success: true, data: { personas } });
 }
 ```
 
-**Create Custom System Prompt:**
+**Helper: Get Project Persona:**
 ```typescript
-// app/api/system-prompts/route.ts
-export async function POST(req: Request) {
-  const { name, prompt } = await req.json();
+// lib/db/queries.ts
+import { getDefaultPersona } from '@/lib/llm/prompts/preset-personas';
 
-  const id = generateId();
-  db.prepare(
-    'INSERT INTO system_prompts (id, name, prompt, is_preset) VALUES (?, ?, ?, false)'
-  ).run(id, name, prompt);
+export function getProjectPersona(projectId: string): string {
+  // Get project's persona ID
+  const project = db.prepare(
+    'SELECT system_prompt_id FROM projects WHERE id = ?'
+  ).get(projectId) as { system_prompt_id: string | null } | undefined;
 
-  return Response.json({ success: true, data: { id, name, prompt } });
+  if (project?.system_prompt_id) {
+    const persona = db.prepare(
+      'SELECT prompt FROM system_prompts WHERE id = ?'
+    ).get(project.system_prompt_id) as { prompt: string } | undefined;
+
+    if (persona) return persona.prompt;
+  }
+
+  // Fallback to default persona
+  return getDefaultPersona().prompt;
 }
 ```
 
-**Use System Prompt in Conversation:**
+**Use Persona in Chat (FR-1.9.07):**
 ```typescript
 // app/api/chat/route.ts
-import { getLLMProvider } from '@/lib/llm/factory';
-import db from '@/lib/db/client';
+import { getProjectPersona } from '@/lib/db/queries';
 
 export async function POST(req: Request) {
   const { projectId, message } = await req.json();
 
-  // Get project's system prompt (or use default)
-  const project = db.prepare(
-    'SELECT system_prompt_id FROM projects WHERE id = ?'
-  ).get(projectId);
-
-  let systemPrompt: string | undefined;
-  if (project.system_prompt_id) {
-    const promptRecord = db.prepare(
-      'SELECT prompt FROM system_prompts WHERE id = ?'
-    ).get(project.system_prompt_id);
-    systemPrompt = promptRecord?.prompt;
-  }
+  // Get project's persona (unified system prompt)
+  const personaPrompt = getProjectPersona(projectId);
 
   // Load conversation history
-  const messages = db.prepare(
+  const history = db.prepare(
     'SELECT role, content FROM messages WHERE project_id = ? ORDER BY timestamp ASC'
   ).all(projectId);
 
-  // Add new user message
-  messages.push({ role: 'user', content: message });
+  // Build messages array with persona as system message
+  const messages = [
+    { role: 'system', content: personaPrompt },
+    ...history,
+    { role: 'user', content: message }
+  ];
 
-  // Get LLM response with system prompt
-  const llm = getLLMProvider();
-  const response = await llm.chat(messages, systemPrompt);
+  // Get LLM response
+  const llm = createLLMProvider();
+  const response = await llm.chat(messages);
 
-  // Save both messages
-  saveMessage(projectId, 'user', message);
-  saveMessage(projectId, 'assistant', response);
-
-  return Response.json({ success: true, data: response });
+  // Persist messages...
+  return Response.json({ success: true, data: { response } });
 }
 ```
 
-### UI Components
-
-**Settings Page - System Prompt Selector:**
+**Use Persona in Script Generation (FR-1.9.07):**
 ```typescript
-// app/settings/page.tsx
+// lib/llm/script-generator.ts
+import { getProjectPersona } from '@/lib/db/queries';
+import { generateScriptPrompt } from './prompts/script-generation-prompt';
+
+export async function generateScriptWithRetry(
+  topic: string,
+  projectId: string,
+  projectConfig?: ScriptConfig
+): Promise<ScriptGenerationResult> {
+  const provider = createLLMProvider();
+
+  // Get project's persona (same prompt used for chat)
+  const personaPrompt = getProjectPersona(projectId);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // Generate task-specific prompt (JSON format, word counts, etc.)
+    const taskPrompt = generateScriptPrompt(topic, projectConfig);
+
+    // Call LLM with persona as system prompt, task as user message
+    const messages = [{ role: 'user', content: taskPrompt }];
+    const response = await provider.chat(messages, personaPrompt);
+
+    // Validate and return...
+  }
+}
+```
+
+**Update Project Persona (FR-1.9.06):**
+```typescript
+// app/api/projects/[id]/persona/route.ts
+export async function PUT(req: Request, { params }: { params: { id: string } }) {
+  const { personaId } = await req.json();
+
+  // Validate persona exists
+  const persona = db.prepare('SELECT id FROM system_prompts WHERE id = ?').get(personaId);
+  if (!persona) {
+    return Response.json({ success: false, error: { message: 'Persona not found', code: 'PERSONA_NOT_FOUND' } }, { status: 404 });
+  }
+
+  // Update project
+  db.prepare('UPDATE projects SET system_prompt_id = ?, last_active = datetime("now") WHERE id = ?')
+    .run(personaId, params.id);
+
+  return Response.json({ success: true, data: { personaId } });
+}
+```
+
+### UI Components (FR-1.9.01)
+
+**Persona Selection in Project Settings:**
+```typescript
+// components/features/project/PersonaSelector.tsx
 import { useEffect, useState } from 'react';
 
-export default function SystemPromptSettings() {
-  const [prompts, setPrompts] = useState([]);
-  const [selectedId, setSelectedId] = useState('creative_assistant');
-  const [customPrompt, setCustomPrompt] = useState('');
+interface Persona {
+  id: string;
+  name: string;
+  description: string;
+  is_default: boolean;
+}
+
+interface PersonaSelectorProps {
+  projectId: string;
+  currentPersonaId: string | null;
+  onPersonaChange?: (personaId: string) => void;
+}
+
+export function PersonaSelector({ projectId, currentPersonaId, onPersonaChange }: PersonaSelectorProps) {
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [selectedId, setSelectedId] = useState(currentPersonaId || 'scientific_analyst');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    fetch('/api/system-prompts')
+    fetch('/api/personas')
       .then(res => res.json())
-      .then(data => setPrompts(data.data));
+      .then(data => setPersonas(data.data.personas));
   }, []);
 
-  const saveCustomPrompt = async () => {
-    await fetch('/api/system-prompts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'My Custom Persona',
-        prompt: customPrompt
-      })
-    });
+  const updatePersona = async (personaId: string) => {
+    setIsLoading(true);
+    try {
+      await fetch(`/api/projects/${projectId}/persona`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ personaId })
+      });
+      setSelectedId(personaId);
+      onPersonaChange?.(personaId);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">LLM Behavior & Persona</h2>
+  const selectedPersona = personas.find(p => p.id === selectedId);
 
+  return (
+    <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-2">
-          Select Assistant Persona
+          Script Persona
         </label>
         <select
           value={selectedId}
-          onChange={(e) => setSelectedId(e.target.value)}
+          onChange={(e) => updatePersona(e.target.value)}
+          disabled={isLoading}
           className="w-full px-3 py-2 border rounded-md"
         >
-          {prompts.map((prompt) => (
-            <option key={prompt.id} value={prompt.id}>
-              {prompt.name}
+          {personas.map((persona) => (
+            <option key={persona.id} value={persona.id}>
+              {persona.name} {persona.is_default ? '(Default)' : ''}
             </option>
           ))}
-          <option value="custom">Custom Persona...</option>
         </select>
       </div>
 
-      {selectedId === 'custom' && (
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Custom System Prompt
-          </label>
-          <textarea
-            value={customPrompt}
-            onChange={(e) => setCustomPrompt(e.target.value)}
-            placeholder="Define your assistant's personality, behavior, and goals..."
-            rows={12}
-            className="w-full px-3 py-2 border rounded-md font-mono text-sm"
-          />
-          <button
-            onClick={saveCustomPrompt}
-            className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md"
-          >
-            Save Custom Persona
-          </button>
-        </div>
+      {selectedPersona && (
+        <p className="text-sm text-gray-600">
+          {selectedPersona.description}
+        </p>
       )}
+    </div>
+  );
+}
+```
 
-      <div className="bg-gray-100 p-4 rounded-md">
-        <h3 className="font-semibold mb-2">Current Prompt Preview:</h3>
-        <pre className="text-xs whitespace-pre-wrap">
-          {prompts.find(p => p.id === selectedId)?.prompt || customPrompt}
-        </pre>
+**Integration with Project Header/Settings:**
+```typescript
+// components/features/project/ProjectHeader.tsx
+export function ProjectHeader({ project }: { project: Project }) {
+  return (
+    <div className="flex items-center justify-between p-4 border-b">
+      <h1 className="text-xl font-semibold">{project.name}</h1>
+
+      <div className="flex items-center gap-4">
+        {/* Persona indicator */}
+        <div className="text-sm text-gray-500">
+          Persona: {project.persona_name || 'Scientific Analyst'}
+        </div>
+
+        {/* Settings button opens modal with PersonaSelector */}
+        <ProjectSettingsButton projectId={project.id} />
       </div>
     </div>
   );
 }
 ```
 
-**Per-Project Prompt Override:**
-```typescript
-// components/features/conversation/ProjectSettings.tsx
-export function ProjectSystemPromptSelector({ projectId }: { projectId: string }) {
-  const [systemPromptId, setSystemPromptId] = useState(null);
-
-  const updateProjectPrompt = async (promptId: string) => {
-    await fetch(`/api/projects/${projectId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ system_prompt_id: promptId })
-    });
-    setSystemPromptId(promptId);
-  };
-
-  return (
-    <div>
-      <label>Assistant Persona for this Project:</label>
-      <select
-        value={systemPromptId || 'default'}
-        onChange={(e) => updateProjectPrompt(e.target.value)}
-      >
-        <option value="default">Use Default</option>
-        <option value="creative_assistant">Creative Assistant</option>
-        <option value="viral_strategist">Viral Strategist</option>
-        {/* ... other presets ... */}
-      </select>
-    </div>
-  );
-}
-```
-
-### Benefits of This Architecture
-
-**User Control:**
-- ✅ Full control over LLM behavior (no external restrictions)
-- ✅ Switch personas per project or conversation
-- ✅ Create unlimited custom personas
-
-**Privacy & Security:**
-- ✅ System prompts stored locally (never sent to cloud)
-- ✅ No API provider restrictions (local Ollama)
-- ✅ Complete transparency into assistant behavior
-
-**Flexibility:**
-- ✅ Preset personas for common use cases
-- ✅ Custom personas for specialized needs
-- ✅ Per-project overrides for different video types
+### Benefits of Unified Persona Architecture
 
 **Consistency:**
-- ✅ Same persona maintained throughout conversation
-- ✅ Behavior documented and versioned
-- ✅ Reproducible results
+- ✅ Same persona tone in chat AND generated scripts
+- ✅ No mismatch between brainstorming and output
+- ✅ Single source of truth for LLM behavior
 
-### Implementation Priority
+**User Control (FR-1.9.01 - FR-1.9.08):**
+- ✅ Per-project persona selection
+- ✅ Immediate effect on all LLM interactions
+- ✅ Blackpill Realist produces nihilistic content throughout
 
-**MVP (Phase 1):**
-- ✅ Hardcode DEFAULT_SYSTEM_PROMPT in code
-- ✅ Pass to Ollama with every chat request
-- ✅ No UI configuration yet
+**Maintainability:**
+- ✅ One prompt file per persona (not two)
+- ✅ Easier to add new personas
+- ✅ Clear separation: persona = WHO, task prompt = WHAT
 
-**Post-MVP (Phase 2):**
-- Add system_prompts table to database
-- Seed with preset prompts
-- Create settings UI for prompt selection
-- Enable custom prompt creation
+**Privacy & Security:**
+- ✅ Personas stored locally in SQLite
+- ✅ No content restrictions (local Ollama)
+- ✅ Full transparency into LLM behavior
 
-**Future Enhancement:**
-- Per-project prompt overrides
-- Prompt versioning and history
-- Community prompt sharing (if cloud deployment)
+### Implementation Priority (Feature 1.9 - MVP)
+
+**MVP Requirements:**
+1. Seed 4 preset personas into `system_prompts` table (Migration 012)
+2. Add persona selection dropdown to project settings UI
+3. Update `/api/chat` to use project's persona
+4. Update `script-generator.ts` to use project's persona
+5. Remove redundant `SCRIPT_GENERATION_SYSTEM_PROMPT` constant
+
+**Files to Modify:**
+- `lib/llm/prompts/preset-personas.ts` - New file with persona definitions
+- `lib/db/migrations/012_seed_preset_personas.ts` - Seed migration
+- `lib/db/queries.ts` - Add `getProjectPersona()` helper
+- `app/api/chat/route.ts` - Use persona instead of hardcoded prompt
+- `lib/llm/script-generator.ts` - Accept projectId, use persona
+- `components/features/project/PersonaSelector.tsx` - New UI component
+
+**Post-MVP Enhancements:**
+- Custom persona creation UI
+- Persona editing and deletion
+- Persona versioning and history
 
 ---
 
@@ -6043,39 +6179,54 @@ Build for local single-user deployment initially. Document cloud migration path 
 
 ---
 
-### ADR-007: Configurable System Prompts for LLM Behavior Control
+### ADR-007: Unified Persona System for LLM Behavior Control (Feature 1.9)
 
-**Status:** Accepted
-**Date:** 2025-11-01
+**Status:** Accepted (Updated 2025-11-28)
+**Date:** 2025-11-01 (Updated for PRD v1.8)
 
 **Context:**
-Different video projects require different LLM behavior (creative brainstorming vs. educational vs. viral strategy). Since we're using local Ollama, we have complete control over LLM behavior without external restrictions. User wants unrestricted, customizable assistant personas.
+Different video projects require different LLM behavior and content tone. The original design had two separate prompts (chat system prompt and script generation system prompt), which caused:
+- Inconsistency between brainstorming tone and generated script tone
+- Maintenance burden of keeping two prompts in sync
+- Confusion about which prompt affects which behavior
+
+PRD v1.8 moved the persona system from post-MVP (Feature 2.6) to MVP (Feature 1.9), requiring:
+- 4 preset personas: Scientific Analyst (default), Blackpill Realist, Documentary Filmmaker, Educational Designer
+- Per-project persona selection stored in `projects.system_prompt_id`
+- Blackpill Realist with specific use cases (AI dystopia, lookism, collapse scenarios)
 
 **Decision:**
-Implement configurable system prompts stored in database with:
-- Default "Creative Assistant" persona (unrestricted)
-- Preset persona library (viral strategist, educational designer, documentary filmmaker)
-- User-customizable system prompts
-- Optional per-project prompt overrides
+Implement a **unified persona system** where ONE system prompt defines the LLM's personality for BOTH chat AND script generation:
+
+```
+Persona (System Prompt) → Defines WHO the LLM is (tone, worldview, delivery style)
+Task Prompt (User Message) → Defines WHAT to do (JSON format, word counts, etc.)
+```
+
+Preset personas (MVP):
+1. **Scientific Analyst** (default) - Neutral, data-driven, factual
+2. **Blackpill Realist** - Brutal honesty, nihilistic, no sugar-coating
+3. **Documentary Filmmaker** - Human stories, narrative structure
+4. **Educational Designer** - TED-Ed style, learning-focused
 
 **Consequences:**
-- ✅ Full control over LLM behavior (no external restrictions)
-- ✅ Personas adapt to different video types
-- ✅ Users can create unlimited custom personas
-- ✅ Complete transparency into assistant behavior
-- ✅ System prompts stored locally (privacy)
-- ✅ Consistent persona throughout conversation
-- ⚠️ Requires UI for prompt management (post-MVP)
-- ⚠️ Users must understand system prompt impact
+- ✅ Consistent tone across chat AND generated scripts
+- ✅ Single prompt per persona (easier maintenance)
+- ✅ Per-project persona selection (FR-1.9.06)
+- ✅ Blackpill Realist produces nihilistic content throughout (FR-1.9.04, FR-1.9.05)
+- ✅ Full control over LLM behavior (local Ollama)
+- ✅ Personas stored locally in SQLite (privacy)
+- ⚠️ Existing `SCRIPT_GENERATION_SYSTEM_PROMPT` becomes redundant (to be removed)
+- ⚠️ Script generation needs projectId parameter to fetch persona
 
 **Alternatives Considered:**
-- Single hardcoded prompt: No flexibility
-- No system prompts: Inconsistent LLM behavior
-- Cloud-based prompt library: Privacy concerns, requires internet
+- Keep two separate prompts: Inconsistent, harder to maintain
+- Persona affects only scripts: Chat would feel disconnected from output
+- Single hardcoded prompt: No flexibility for different content types
 
 **Implementation:**
-- MVP: Hardcoded DEFAULT_SYSTEM_PROMPT
-- Post-MVP: Database table + UI configuration + preset library
+- MVP: 4 preset personas seeded in database, persona selector UI in project settings
+- Post-MVP: Custom persona creation UI, persona versioning
 
 ---
 
@@ -6137,5 +6288,5 @@ The modular design with abstraction layers (LLM provider, state management, API 
 ---
 
 **Document Status:** Complete and Ready for Implementation
-**Architecture Validated:** 2025-11-25
-**Ready for Phase 4:** Yes (Story 3.7b patterns added)
+**Architecture Validated:** 2025-11-28
+**Ready for Phase 4:** Yes (Story 3.7b patterns added, Feature 1.9 persona system added)

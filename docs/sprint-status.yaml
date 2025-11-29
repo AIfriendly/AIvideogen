@@ -45,6 +45,7 @@ development_status:
   1-5-frontend-chat-components: done
   1-6-project-management-ui: done
   1-7-topic-confirmation-workflow: done
+  1-8-persona-system-selector-ui: done
   epic-1-retrospective: optional
 
   # Epic 2: Content Generation Pipeline
@@ -86,5 +87,5 @@ development_status:
   5-2-scene-video-trimming: done
   5-3-video-concatenation-audio-overlay: done
   5-4-automated-thumbnail-generation: done
-  5-5-export-ui-download-workflow: backlog
-  epic-5-retrospective: optional
+  5-5-export-ui-download-workflow: done
+  epic-5-retrospective: completed

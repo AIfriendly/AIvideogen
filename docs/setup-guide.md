@@ -640,7 +640,7 @@ After successful setup:
 ## Support
 
 For issues not covered here:
-1. Check GitHub Issues: https://github.com/AIfriendly/AIvideogen/issues
+1. Check GitHub Issues: <https://github.com/AIfriendly/AIvideogen/issues>
 2. Review architecture docs: `docs/architecture.md`
 3. Review technical specs: `docs/tech-spec-epic-*.md`
 

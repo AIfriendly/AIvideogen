@@ -3,7 +3,7 @@
 *This document organizes the PRD features into logical development epics for the AI Video Generator MVP.*
 
 **Project:** AI Video Generator (Level 2)
-**Repository:** https://github.com/AIfriendly/AIvideogen
+**Repository:** <https://github.com/AIfriendly/AIvideogen>
 **Last Updated:** 2025-11-25
 
 ---
@@ -14,11 +14,11 @@
 
 **Features Included:**
 - 1.1. Conversational AI Agent
-- 2.6. LLM Configuration & System Prompts (MVP: Ollama + Gemini providers, Default persona; Post-MVP: UI configuration)
+- 1.9. LLM Configuration & Script Personas (MVP: Ollama + Gemini providers, 4 preset personas with selector UI)
 
 **User Value:** Creators can explore ideas naturally and receive AI guidance to refine their video topics before production begins. The AI assistant adapts its personality and behavior to match different content creation workflows. Users can choose between local Ollama (FOSS) or cloud-based Gemini (free tier) providers.
 
-**Story Count Estimate:** 7 stories (MVP: Stories 1.1-1.7), +3 stories (Post-MVP UI)
+**Story Count Estimate:** 8 stories (MVP: Stories 1.1-1.8)
 
 **Dependencies:** None (foundational epic)
 
@@ -26,27 +26,33 @@
 - Users can have multi-turn conversations about video ideas
 - Agent maintains context across conversation
 - Agent behavior follows configured system prompt/persona
+- Users can select from 4 preset personas (Scientific Analyst, Blackpill Realist, Documentary Filmmaker, Educational Designer)
 - Users can trigger video creation with explicit command
 - Topic confirmation workflow works correctly
-- (Post-MVP) Users can select or create custom personas via UI
 
 ### System Prompt/Persona Configuration (Epic 1)
 
-**MVP Implementation:**
+**MVP Implementation (Feature 1.9):**
 
-**Default Persona:**
-- Hardcoded "Creative Assistant" system prompt in codebase
-- Unrestricted, enthusiastic brainstorming assistant
-- No topic restrictions or hedging behavior
-- Focused on actionable, creative video ideas
-- Maintains conversation context automatically
+**Unified Persona System:**
+The persona defines the LLM's personality, tone, and delivery style for BOTH chat brainstorming AND script generation. This unified approach ensures consistent behavior throughout the content creation workflow.
+
+- **Persona = WHO:** Defines tone, worldview, delivery style
+- **Task Prompts = WHAT:** Defines output format (JSON for scripts, conversational for chat)
+
+**MVP Preset Personas:**
+1. **Scientific Analyst (Default)** - Neutral, data-driven, factual delivery. Best for technical explanations, research summaries, and objective analysis.
+2. **Blackpill Realist** - Brutal honesty about harsh realities. Nihilistic framing, no sugar-coating. Best for societal critique, collapse scenarios, and uncomfortable truths.
+3. **Documentary Filmmaker** - Balanced narrative with focus on human stories and emotional authenticity. Best for historical content, profiles, and investigative pieces.
+4. **Educational Designer** - TED-Ed/Kurzgesagt style educational content. Learning-focused with accessible explanations and engaging delivery.
 
 **Technical Implementation:**
-- System prompt prepended to all LLM chat requests
-- Stored as constant in `lib/llm/prompts/default-system-prompt.ts`
-- Passed through LLM provider abstraction layer (supports Ollama and Gemini)
-- Applied consistently across all conversations
+- Personas stored in `system_prompts` table with `is_preset = true`
+- Project-level persona selection via `projects.system_prompt_id` foreign key
+- Persona system prompt prepended to ALL LLM requests (chat AND script generation)
+- Task-specific instructions (JSON format, word counts) added as user message context
 - Provider selection via .env.local: LLM_PROVIDER=ollama|gemini
+- Persona selection UI appears after project creation, before first chat message
 
 **LLM Provider Support (MVP):**
 - **Ollama (Primary, FOSS):** Local deployment with Llama 3.2 or other open models
@@ -60,32 +66,14 @@
   - Models: gemini-2.5-flash, gemini-2.5-pro
   - Note: Gemini 1.5 models deprecated (use 2.5 or 2.0 only)
 
-**Post-MVP Enhancement:**
-
-**Preset Persona Library:**
-1. **Creative Assistant (Default)** - Unrestricted general brainstorming
-2. **Viral Content Strategist** - Focus on engagement, hooks, algorithmic performance
-3. **Educational Content Designer** - TED-Ed style, learning-focused narratives
-4. **Documentary Filmmaker** - Human stories, emotional arcs, interview angles
-
-**Custom Persona Creation:**
-- Settings UI for creating custom system prompts
-- Full control over personality, tone, constraints, goals
-- Save unlimited custom personas to database
-- Preview current prompt before saving
-
-**Per-Project Persona Override:**
-- Select different persona for each project type
-- Example: "Viral Strategist" for entertainment, "Educational Designer" for science videos
-- Persona selection stored in project metadata
-- Consistent behavior throughout project lifecycle
-
 **Database Schema:**
 ```sql
 CREATE TABLE system_prompts (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   prompt TEXT NOT NULL,
+  description TEXT,
+  category TEXT DEFAULT 'preset',
   is_preset BOOLEAN DEFAULT false,
   is_default BOOLEAN DEFAULT false,
   created_at TEXT,
@@ -95,16 +83,20 @@ CREATE TABLE system_prompts (
 ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(id);
 ```
 
-**UI Components (Post-MVP):**
-- Settings page: Select default persona, create custom prompts
-- Project settings: Override persona per project
-- Prompt preview: View active system prompt
-- Audio preview equivalence: Quick persona switching like voice selection
+**UI Components (MVP):**
+- PersonaSelector.tsx: Card-based selector with persona name, description, and selection state
+- Appears after "New Chat" before first message (or optionally in project settings)
+- Selected persona shown in chat header
+
+**Post-MVP Enhancement:**
+- Custom persona creation UI
+- Per-project persona switching mid-workflow
+- Persona import/export
 
 **Benefits:**
+- ✅ Unified behavior across chat AND script generation
+- ✅ Clear content differentiation (Scientific vs Documentary vs Blackpill)
 - ✅ Full control over AI behavior (local Ollama = no restrictions)
-- ✅ Adapt assistant to different video genres/workflows
-- ✅ Transparent behavior (users see exact system prompt)
 - ✅ Privacy-first (prompts stored locally)
 
 ---
@@ -289,6 +281,61 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 ---
 
+#### Story 1.8: Persona System & Selector UI
+**Goal:** Implement the unified persona system with 4 preset personas and selector UI for project-level persona selection
+
+**pdate script generation to use same persona system prompt (unified behavior)
+- Show selected persona indicator in chat header
+- Add persona selection step after project creation (before first message)
+
+**AcTasks:**
+- Create system_prompts table migration with schema from Feature 1.9
+- Seed 4 preset personas: Scientific Analyst (default), Blackpill Realist, Documentary Filmmaker, Educational Designer
+- Create preset persona definitions in lib/llm/prompts/preset-personas.ts
+- Add system_prompt_id column to projects table (nullable, defaults to Scientific Analyst)
+- Create PersonaSelector.tsx component with card-based UI
+- Display persona cards with name, description, and selection state
+- Implement POST /api/projects/[id]/select-persona endpoint
+- Update chat API to load persona from project.system_prompt_id
+- 
+- acceptance Criteria:**
+- system_prompts table created with 4 preset personas seeded
+- Scientific Analyst marked as is_default = true
+- PersonaSelector displays all 4 personas with name and description
+- Clicking a persona card selects it (visual highlight)
+- "Continue" or "Start Chat" button saves selection to projects.system_prompt_id
+- Chat API prepends selected persona's system prompt to all LLM requests
+- Script generation uses the SAME persona prompt (not a separate script-specific prompt)
+- Chat header shows selected persona name (e.g., "Blackpill Realist")
+- Default persona (Scientific Analyst) used if no selection made
+- Persona definitions stored as TypeScript constants for easy maintenance
+
+**Database Changes:**
+```sql
+-- New table
+CREATE TABLE system_prompts (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  description TEXT,
+  category TEXT DEFAULT 'preset',
+  is_preset BOOLEAN DEFAULT false,
+  is_default BOOLEAN DEFAULT false,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Projects table modification
+ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(id);
+```
+
+**References:**
+- PRD Feature 1.9 (LLM Configuration & Script Personas)
+- Architecture Section: System Prompts & LLM Persona Configuration
+- Epic 1 System Prompt/Persona Configuration section
+
+---
+
 ## Epic 2: Content Generation Pipeline
 
 **Goal:** Automatically generate complete video scripts with scene structure and corresponding voiceovers with user's choice of voice.
@@ -428,66 +475,67 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 ---
 
-#### Story 2.4: LLM-Based Script Generation (Purely Informational Style)
-**Goal:** Generate purely informational video scripts that deliver maximum factual content with scientific/factual delivery, optimized for gaming analysis, historical events, and technical explanations
+#### Story 2.4: LLM-Based Script Generation (Persona-Driven)
+**Goal:** Generate video scripts using the project's selected persona for consistent tone and delivery style
 
 **Tasks:**
-- Create purely informational script generation prompt template (lib/llm/prompts/script-generation-prompt.ts) with scientific delivery principles
-- **Design prompt with strict informational requirements:**
-  - **Scientific & Factual Delivery:** Focus on facts, data, specific details, and structured information
-  - **Topic-Specific Requirements:** Gaming (mechanics, stats, strategies), Historical (dates, causes, timelines), Technical (step-by-step explanations)
-  - **Information Density:** Prioritize information value over entertainment, no filler language
-  - **Straightforward Language:** Direct explanations preferred, no creative hooks or narrative gimmicks
-  - **Acceptable Phrases:** "In this analysis...", "Let's examine...", "The data shows..." are ENCOURAGED
+- Create script generation task prompt template (lib/llm/prompts/script-generation-task.ts) that defines OUTPUT FORMAT only
+- **Task prompt specifies WHAT to generate (not HOW to deliver):**
   - **Output format:** Structured JSON with scene breakdown
+  - **Scene structure:** scene_number, text (50-200 words per scene)
+  - **Scene count:** 3-5 scenes for MVP
   - **Text cleanliness:** ONLY spoken narration text - no markdown, scene labels, titles, or formatting
+- **Persona provides delivery style (loaded from project.system_prompt_id via Story 1.8):**
+  - Scientific Analyst: Data-driven, factual, objective analysis
+  - Blackpill Realist: Nihilistic, no sugar-coating, uncomfortable truths
+  - Documentary Filmmaker: Human stories, narrative arcs, emotional authenticity
+  - Educational Designer: Accessible, learning-focused, TED-Ed style
 - **Create quality validation function (lib/llm/validate-script-quality.ts):**
-  - Check for information density (concrete facts, numbers, dates, names, statistics)
-  - Check for filler language (subjective adjectives without data, hedging words)
-  - Check for vagueness (generic statements without specifics)
-  - Reject scripts lacking factual content or containing excessive filler
-- **Remove narrative-focused validations:** No banned phrases check, no hook requirements, no storytelling validation
+  - Check for appropriate length (50-200 words per scene)
+  - Validate JSON structure
+  - Ensure no markdown or formatting characters
+  - Reject empty or malformed scenes
 - Implement POST /api/projects/[id]/generate-script endpoint
 - Load confirmed topic from projects.topic field
-- Call LLM provider with scientifically-tuned script generation prompt
+- **Load project persona from projects.system_prompt_id (via getProjectPersona() helper)**
+- Call LLM with persona as system prompt + task instructions as user message
 - Parse LLM response and validate JSON structure
-- **Run quality validation before accepting script - retry if quality check fails**
-- Validate each scene text is TTS-ready (no markdown characters, no meta-labels like "Scene:", "Title:")
+- Validate each scene text is TTS-ready (no markdown characters, no meta-labels)
 - Save scenes to database (scenes table) with scene_number and text
 - Update projects.script_generated = true and current_step = 'voiceover'
-- Add retry logic for LLM failures, invalid responses, or quality check failures (max 6 attempts)
-- Implement scene count optimization (aim for 3-5 scenes for MVP)
+- Add retry logic for LLM failures or invalid responses (max 6 attempts)
 
 **Acceptance Criteria:**
 - Script generation endpoint accepts projectId as input
-- LLM generates structured script with 3-5 scenes minimum
+- **Persona loaded from project.system_prompt_id (defaults to Scientific Analyst)**
+- **LLM receives: persona prompt as system message, task prompt as user message**
+- LLM generates structured script with 3-5 scenes
 - Each scene has scene_number (sequential) and text (50-200 words)
-- Scene text contains ONLY spoken narration (no markdown *, #, **, no "Scene 1:", no meta-text)
-- **Scripts use scientific, factual delivery style with information-dense content**
-- **Scripts focus on facts, data, strategies, and structured information delivery**
-- **Scripts use straightforward language (direct explanations preferred over creative hooks)**
-- **Gaming content: Detailed boss mechanics, strategies, strengths/weaknesses, rankings with justification**
-- **Historical content: Specific dates, causes, timelines, key events, factual analysis**
-- **Technical content: Clear step-by-step explanations, definitions, concrete examples**
-- **Quality validation rejects vague, unfocused, or overly narrative scripts**
+- Scene text contains ONLY spoken narration (no markdown, no meta-text)
+- **Script delivery style matches selected persona:**
+  - Scientific Analyst: Facts, data, objective analysis
+  - Blackpill Realist: Stark language, harsh truths, no optimism
+  - Documentary Filmmaker: Story arcs, human angle, emotional beats
+  - Educational Designer: Accessible analogies, learning hooks
 - Scenes saved to database in correct order
-- Script generation handles various topic types (gaming analysis, historical events, technical explanations)
-- Invalid or low-quality LLM responses trigger retry with improved prompt (max 6 attempts)
-- Validation rejects scenes containing markdown or formatting characters
+- Invalid LLM responses trigger retry (max 6 attempts)
 - Projects.script_generated flag updated on success
 
-**Quality Examples:**
+**Example - Same Topic, Different Personas:**
 
-❌ **Bad (Filler/Vague):**
-"Ornstein and Smough are obviously one of the most legendary boss fights ever. These incredibly powerful warriors are super challenging. Many players think this fight is really hard and memorable. The duo is known for their amazing teamwork."
+**Topic:** "Why AI will replace most jobs by 2035"
 
-✅ **Good (Purely Informational):**
-"Ornstein and Smough are a duo boss fight in Anor Londo. Phase 1 has both bosses active. Ornstein uses lightning spear attacks and is weak to fire. Smough uses hammer attacks and is weak to lightning. The cathedral arena has pillars for cover."
+**Scientific Analyst:**
+"Current AI capabilities include language processing, image recognition, and autonomous decision-making. Studies from MIT and Oxford estimate 47% of US jobs face high automation risk. Industries most affected include transportation, manufacturing, and customer service..."
+
+**Blackpill Realist:**
+"Mass unemployment is coming and there's nothing you can do about it. By 2035, over half of all jobs will be automated away. This isn't speculation - it's a mathematical certainty. The elites know this and are preparing for a world where most humans are economically useless..."
 
 **References:**
 - PRD Feature 1.2 (Automated Script Generation) lines 78-102
-- PRD Feature 1.2 AC1-AC2 lines 94-102
-- Epic 1 Story 1.3 (LLM Provider pattern) lines 141-162
+- PRD Feature 1.9 (LLM Configuration & Script Personas)
+- Epic 1 Story 1.8 (Persona System)
+- Architecture Section: Unified Persona Architecture
 
 ---
 
@@ -1488,15 +1536,18 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 | Epic | Name | Stories | Dependencies | Phase |
 |------|------|---------|--------------|-------|
-| 1 | Conversational Topic Discovery | 7 | None | Foundation |
+| 1 | Conversational Topic Discovery + Persona System | 8 | None | Foundation |
 | 2 | Content Generation Pipeline + Voice Selection | 6 | Epic 1 | Core |
 | 3 | Visual Content Sourcing (YouTube API + Duration Filtering + Segment Downloads + Advanced CV Filtering) | 9 | Epic 2 | Core |
 | 4 | Visual Curation Interface | 6 | Epic 2, 3 | Core |
 | 5 | Video Assembly & Output | 5 | Epic 2, 4 | Delivery |
 
-**Total Stories:** 33 stories
+**Total Stories:** 34 stories
 
-**Note:** Epic 3 includes Stories 3.2b, 3.7, and 3.7b which add advanced content filtering and pipeline integration (moved from post-MVP Feature 2.2 to MVP).
+**Notes:**
+- Epic 1 includes Story 1.8 for the unified persona system (Feature 1.9) with 4 preset personas
+- Epic 3 includes Stories 3.2b, 3.7, and 3.7b for advanced CV content filtering
+- Story 2.4 uses the project's selected persona for script generation style
 
 **Recommended Development Order:**
 1. Epic 1 → Epic 2 → Epic 3 → Epic 4 → Epic 5
@@ -1512,9 +1563,11 @@ Based on PRD Section 2 (Future Enhancements):
 - **Epic 6:** Advanced Editing & Customization (script editing in UI, voiceover regeneration per scene, voice switching)
 - **Epic 7:** Enhanced Visual Control (manual search within UI, text overlays)
 - **Epic 8:** Stock Footage API Integration (Pexels, Pixabay as alternative/supplementary sources to YouTube)
-- **Epic 9:** LLM Configuration & Flexibility (BYOK, local LLM support, provider selection)
+- **Epic 9:** Custom Persona Creation (user-defined personas, persona import/export, advanced LLM settings)
 
-**Note:** Voice selection was originally planned for Epic 6 but has been moved into MVP Epic 2.
+**Notes:**
+- Voice selection moved from Epic 6 to MVP Epic 2
+- Preset persona system moved from Epic 9 to MVP Epic 1 (Story 1.8)
 
 ### Epic 8 Details (Post-MVP)
 

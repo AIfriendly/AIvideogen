@@ -12,8 +12,7 @@
 
 ## Story Contract (Parallel Execution)
 
-> **CRITICAL:** This story is designed for parallel execution. Follow this contract strictly to prevent conflicts with other stories.
-
+ 
 ### File Ownership
 
 **Files I Create (exclusive_create):**
@@ -836,11 +835,24 @@ Title is positioned at bottom center with:
 ### Key Implementation Details
 
 - **Frame Extraction:** Uses input seeking (`-ss` before `-i`) for fast extraction
-- **Font Size:** Dynamic based on title length: `min(80, 1600/title.length)`
-- **Text Position:** Centered horizontally, 120px from bottom
+- **Font Size:** Dynamic based on title length: `min(120, 2400/title.length)` *(updated 2025-11-29)*
+- **Text Position:** Centered both horizontally and vertically using `(h-text_h)/2` *(updated 2025-11-29)*
 - **Shadow:** 3px offset black shadow for legibility
 - **Windows Compatibility:** Explicit Arial font path avoids Fontconfig dependency
 - **Non-Fatal Errors:** Thumbnail generation failure doesn't fail assembly
+
+### Post-Completion Correction (2025-11-29)
+
+**Issue:** Thumbnail text was positioned too low (120px from bottom) and font was too small.
+
+**Fix Applied:**
+1. **Text Position:** Changed from `y=h-120` (bottom) to `y=(h-text_h)/2` (vertically centered)
+2. **Font Size:** Increased from `min(80, 1600/title.length)` to `min(120, 2400/title.length)`
+
+**Files Modified:**
+- `src/lib/video/ffmpeg.ts` - Updated `addTextOverlay()` method
+
+**Rationale:** Centered, larger text provides better visibility and a more professional thumbnail appearance consistent with AC7 (Text Legibility).
 
 ---
 

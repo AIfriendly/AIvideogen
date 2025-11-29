@@ -1,11 +1,11 @@
 # Story 2.4: LLM-Based Script Generation (Purely Informational Style)
 
 **Epic:** Epic 2 - Content Generation Pipeline + Voice Selection
-**Status:** DONE (Correct-Course Rework Complete 2025-11-26)
+**Status:** DONE (Persona Integration Complete 2025-11-29)
 **Created:** 2025-11-07
-**Updated:** 2025-11-26 (Correct-Course: Narrative → Informational - Implementation Complete)
+**Updated:** 2025-11-29 (Update 3: Persona System Integration)
 **Owner:** Dev Agent
-**Commit:** c85b6bd (ai-video-generator submodule)
+**Commits:** c85b6bd, 648d80f, bdadb2e (ai-video-generator submodule)
 
 ## Goal
 
@@ -901,3 +901,96 @@ This enhancement significantly improves the user experience by:
 - `docs/epics.md` - Updated Story 2.4 requirements
 - `docs/prd.md` - Updated functional requirements
 - GitHub Commit: c85b6bd "Correct-Course: Story 2.4 Script Generation Style Rework"
+
+---
+
+### Update 3: Persona System Integration (2025-11-29)
+
+**Context:** Story 1.8 introduced a Persona System allowing users to select AI personas (Scientific Analyst, Blackpill Realist, Documentary Filmmaker, Educational Designer) that shape the chat assistant's personality. This update integrates the Persona System into script generation so the selected persona also influences the script's delivery style.
+
+**Issue:** Script generation used a hardcoded system prompt (`SCRIPT_GENERATION_SYSTEM_PROMPT`) regardless of which persona the user selected. This created inconsistency between the chat experience and the generated scripts.
+
+**Solution Implemented:** Script generation now loads the project's selected persona and combines its communication style with informational quality requirements.
+
+#### Change Scope
+
+**Files Modified:**
+
+1. **`ai-video-generator/src/app/api/projects/[id]/generate-script/route.ts`**
+   - Import `getSystemPromptById` and `getDefaultSystemPrompt` from queries
+   - Load project's persona via `project.system_prompt_id`
+   - Fall back to default persona if none selected
+   - Pass persona prompt to `generateScriptWithRetry()`
+
+2. **`ai-video-generator/src/lib/llm/script-generator.ts`**
+   - Add `personaPrompt?: string | null` parameter to `generateScriptWithRetry()`
+   - Generate persona-aware system prompt when persona is provided
+   - Use default `SCRIPT_GENERATION_SYSTEM_PROMPT` when no persona provided
+
+3. **`ai-video-generator/src/lib/llm/prompts/script-generation-prompt.ts`**
+   - Add `generatePersonaAwareSystemPrompt(personaPrompt: string): string` function
+   - Extract persona's communication style section
+   - Extract persona's content generation guidance
+   - Combine with informational script requirements
+
+4. **`ai-video-generator/src/app/api/projects/[id]/select-persona/route.ts`** (Bug Fix)
+   - Auto-create project when persona is selected if project doesn't exist
+   - Handles case where frontend generates UUID before database entry exists
+
+#### Persona Influence on Scripts
+
+| Persona | Script Delivery Style |
+|---------|----------------------|
+| **Scientific Analyst** (default) | Neutral, data-driven, precise language, structured delivery, no filler |
+| **Blackpill Realist** | Unflinching, nihilistic framing, stark language, fatalistic outlook |
+| **Documentary Filmmaker** | Narrative-driven, human-centered, visual language, investigative depth |
+| **Educational Designer** | Learning-focused, analogies/metaphors, progressive complexity, interactive tone |
+
+#### Implementation Details
+
+**System Prompt Combination:**
+```typescript
+export function generatePersonaAwareSystemPrompt(personaPrompt: string): string {
+  // Extract persona's communication style section
+  const styleMatch = personaPrompt.match(/Your communication style is:[\s\S]*?(?=When helping|When generating|$)/i);
+  const personaStyle = styleMatch ? styleMatch[0].trim() : '';
+
+  // Extract content generation guidance
+  const contentMatch = personaPrompt.match(/When generating content[\s\S]*$/i);
+  const personaContentGuidance = contentMatch ? contentMatch[0].trim() : '';
+
+  // Combine with informational requirements
+  return `You are a technical information specialist...
+=== PERSONA STYLE (Apply to ALL output) ===
+${personaStyle || personaPrompt}
+=== SCRIPT GENERATION REQUIREMENTS ===
+...informational quality requirements...
+${personaContentGuidance ? `=== PERSONA CONTENT GUIDANCE ===\n${personaContentGuidance}` : ''}`;
+}
+```
+
+**API Route Flow:**
+1. Load project from database
+2. Check `project.system_prompt_id` for selected persona
+3. Load persona via `getSystemPromptById()`
+4. Fall back to `getDefaultSystemPrompt()` if none selected
+5. Pass `personaPrompt` to `generateScriptWithRetry(topic, config, 6, personaPrompt)`
+
+#### Status
+
+**Implementation Status:** ✅ COMPLETE - 2025-11-29
+**Build Verification:** ✅ Passed
+**Commits:**
+- `648d80f` - feat: Integrate Persona System into Script Generation (Story 2.4)
+- `bdadb2e` - fix: Auto-create project when selecting persona
+
+#### Testing Notes
+
+- Informational quality standards (information density, no filler, no vagueness) apply regardless of persona
+- Persona influences tone and delivery style, not factual accuracy
+- Falls back gracefully to default behavior if persona loading fails
+
+#### Related Documentation
+
+- Story 1.8: Persona System & Selector UI - Defines the 4 preset personas
+- `docs/tech-spec-epic-2.md` - Updated to reflect persona integration
