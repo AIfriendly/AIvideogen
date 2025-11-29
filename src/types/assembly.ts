@@ -66,6 +66,24 @@ export interface AssemblyJobResponse {
 
 /**
  * Scene data for assembly request
+ *
+ * IMPORTANT - Duration Field Clarification (Epic 5 Retrospective):
+ *
+ * This interface has TWO duration fields that are often confused:
+ *
+ * - `audioDuration`: The length of the TTS voiceover audio (seconds)
+ *   USE THIS for: trimming videos, calculating audio start times
+ *   Source: scenes.duration in database
+ *   Typical values: 5-30 seconds
+ *
+ * - `clipDuration`: The total length of the source YouTube video (seconds)
+ *   DO NOT USE for assembly calculations
+ *   Source: visual_suggestions.duration (YouTube API metadata)
+ *   Typical values: 60-600 seconds (1-10 minutes)
+ *
+ * BUG HISTORY: Using clipDuration instead of audioDuration caused:
+ * - BUG-001 (Story 5.2): Videos trimmed to wrong duration
+ * - BUG-002 (Story 5.3): Audio started at wrong times
  */
 export interface AssemblyScene {
   sceneId: string;
@@ -78,9 +96,23 @@ export interface AssemblyScene {
   video_path: string; // Alias for backward compatibility
   selectedClipId: string;
   videoId: string;
+
+  /**
+   * YouTube source video duration in seconds.
+   * DO NOT USE for assembly - use audioDuration instead.
+   * @see audioDuration
+   */
   clipDuration: number;
+
   duration: number; // Alias for backward compatibility
-  audioDuration: number; // Actual voiceover duration (from scenes.duration)
+
+  /**
+   * TTS voiceover duration in seconds.
+   * USE THIS for: trimming videos, calculating audio timing.
+   * This is what determines the actual video segment length.
+   */
+  audioDuration: number;
+
   defaultSegmentPath?: string;
 }
 
