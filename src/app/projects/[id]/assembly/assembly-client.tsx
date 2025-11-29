@@ -8,10 +8,15 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, Download, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { Loader2, Download, CheckCircle, XCircle, RefreshCw, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import type { AssemblyJobResponse, AssemblyStage } from '@/types/assembly';
+
+interface ExportData {
+  video_path: string;
+  thumbnail_path: string | null;
+}
 
 interface AssemblyClientProps {
   projectId: string;
@@ -36,6 +41,8 @@ export function AssemblyClient({ projectId, jobId }: AssemblyClientProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [exportData, setExportData] = useState<ExportData | null>(null);
+  const [thumbnailError, setThumbnailError] = useState(false);
 
   /**
    * Fetch current job status
@@ -58,6 +65,20 @@ export function AssemblyClient({ projectId, jobId }: AssemblyClientProps) {
       setJob(data);
       setError(null);
       setIsLoading(false);
+
+      // If job is complete, fetch export data for proper thumbnail path
+      if (data.status === 'complete' && !exportData) {
+        try {
+          const exportRes = await fetch(`/api/projects/${projectId}/export`);
+          if (exportRes.ok) {
+            const expData = await exportRes.json();
+            setExportData(expData);
+          }
+        } catch (expErr) {
+          console.error('[AssemblyClient] Error fetching export data:', expErr);
+          // Non-fatal - we'll fall back to default path
+        }
+      }
     } catch (err) {
       console.error('[AssemblyClient] Error fetching status:', err);
       setError('Failed to connect to server');
@@ -166,12 +187,36 @@ export function AssemblyClient({ projectId, jobId }: AssemblyClientProps) {
         {/* Video Preview */}
         <div className="mb-6 rounded-lg overflow-hidden bg-black">
           <video
-            src={`/videos/${projectId}/final.mp4`}
+            src={exportData?.video_path || `/videos/${projectId}/final.mp4`}
             controls
             className="w-full max-h-[400px]"
-            poster={`/videos/${projectId}/thumbnail.jpg`}
+            poster={!thumbnailError && exportData?.thumbnail_path ? exportData.thumbnail_path : undefined}
+            onError={(e) => {
+              // If video fails to load, log it
+              console.error('[AssemblyClient] Video failed to load');
+            }}
           />
         </div>
+
+        {/* Thumbnail Preview */}
+        {exportData?.thumbnail_path && !thumbnailError && (
+          <div className="mb-6 flex items-center gap-4">
+            <div className="relative w-32 h-20 rounded-lg overflow-hidden bg-slate-900 border border-slate-700">
+              <img
+                src={exportData.thumbnail_path}
+                alt="Video thumbnail"
+                className="w-full h-full object-cover"
+                onError={() => setThumbnailError(true)}
+              />
+            </div>
+            <div className="text-sm text-slate-400">
+              <div className="flex items-center gap-2">
+                <Image className="h-4 w-4" />
+                <span>Thumbnail generated</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Download Button */}
         <div className="flex gap-4">
