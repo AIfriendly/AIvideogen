@@ -11,5 +11,13 @@ mutagen>=1.47.0
 # Let kokoro-tts determine numpy version (requires numpy>=2.0.2)
 # scipy will be installed as a dependency of kokoro-tts
 
+# RAG Infrastructure (Epic 6 - Channel Intelligence)
+# Vector database for semantic search
+chromadb>=0.5.0
+# Local embeddings (FOSS, 384-dim vectors)
+sentence-transformers>=2.2.0
+# YouTube caption scraping
+youtube-transcript-api>=0.6.0
+
 # Note: FFmpeg must be installed separately as a system binary
 # Note: Ollama must be installed separately (already installed)

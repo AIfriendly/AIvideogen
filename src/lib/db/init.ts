@@ -10,11 +10,22 @@ import path from 'path';
 import db from './client';
 
 /**
- * Global singleton flag to ensure initialization runs only once
- * Prevents duplicate migrations on module re-imports
+ * Global singleton flag to ensure initialization runs only once.
+ * Uses globalThis to persist across module reloads in Next.js dev mode.
+ * Without this, hot reloading causes repeated initialization.
  */
-let isInitialized = false;
-let initializationPromise: Promise<void> | null = null;
+declare global {
+  // eslint-disable-next-line no-var
+  var __dbInitialized: boolean | undefined;
+  // eslint-disable-next-line no-var
+  var __dbInitPromise: Promise<void> | undefined;
+}
+
+// Use globalThis to survive module reloads in Next.js development
+const isInitialized = (): boolean => globalThis.__dbInitialized === true;
+const setInitialized = (value: boolean): void => { globalThis.__dbInitialized = value; };
+const getInitPromise = (): Promise<void> | undefined => globalThis.__dbInitPromise;
+const setInitPromise = (promise: Promise<void> | undefined): void => { globalThis.__dbInitPromise = promise; };
 
 /**
  * Migration tracking table
@@ -242,6 +253,23 @@ async function runMigrations(): Promise<void> {
     console.log(`Migration ${migration012Name} already applied, skipping`);
   }
 
+  // Migration 013: RAG Infrastructure (Story 6.1)
+  const migration013Name = '013_rag_infrastructure';
+  if (!isMigrationApplied(migration013Name)) {
+    console.log(`Applying migration: ${migration013Name}`);
+    try {
+      const { up } = await import('./migrations/013_rag_infrastructure');
+      up(db);
+      markMigrationApplied(migration013Name);
+      console.log(`Migration ${migration013Name} applied successfully`);
+    } catch (error) {
+      console.error(`Failed to apply migration ${migration013Name}:`, error);
+      throw error;
+    }
+  } else {
+    console.log(`Migration ${migration013Name} already applied, skipping`);
+  }
+
   console.log('All migrations completed');
 }
 
@@ -249,21 +277,22 @@ async function runMigrations(): Promise<void> {
  * Initialize the database schema by executing schema.sql
  * and running any pending migrations.
  * This function is idempotent - safe to call multiple times.
- * Uses singleton pattern to ensure initialization runs only once globally.
+ * Uses globalThis singleton pattern to survive Next.js module reloads.
  */
 export async function initializeDatabase(): Promise<void> {
-  // Return immediately if already initialized
-  if (isInitialized) {
+  // Return immediately if already initialized (persists across module reloads)
+  if (isInitialized()) {
     return;
   }
 
   // If initialization is in progress, wait for it to complete
-  if (initializationPromise) {
-    return initializationPromise;
+  const existingPromise = getInitPromise();
+  if (existingPromise) {
+    return existingPromise;
   }
 
-  // Start initialization and store the promise
-  initializationPromise = (async () => {
+  // Start initialization and store the promise in globalThis
+  const initPromise = (async () => {
     try {
       // Read schema.sql file - try multiple paths for different build environments
       let schema: string;
@@ -289,17 +318,18 @@ export async function initializeDatabase(): Promise<void> {
 
       console.log('Database initialization completed successfully');
 
-      // Mark as initialized
-      isInitialized = true;
+      // Mark as initialized in globalThis (survives module reloads)
+      setInitialized(true);
     } catch (error) {
       console.error('Failed to initialize database:', error);
       // Reset on error so retry is possible
-      initializationPromise = null;
+      setInitPromise(undefined);
       throw new Error(
         `Database initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   })();
 
-  return initializationPromise;
+  setInitPromise(initPromise);
+  return initPromise;
 }
