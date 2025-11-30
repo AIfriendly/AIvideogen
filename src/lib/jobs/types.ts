@@ -11,6 +11,8 @@ export type JobType =
   | 'rag_sync_news'
   | 'rag_sync_trends'
   | 'embedding_generation'
+  | 'video_assembly'
+  | 'cv_batch_analysis'
   | 'cache_cleanup';
 
 // Job status states
