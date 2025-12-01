@@ -35,3 +35,27 @@ export {
   getEmbeddingsServiceInstance,
   shutdownRAG
 } from './init';
+
+// Retrieval (Story 6.5)
+export {
+  queryRelevantContent,
+  queryMultipleCollections,
+  clearEmbeddingCache,
+  getCacheStats,
+  retrieveRAGContext,
+  getProjectRAGConfig,
+  isProjectRAGEnabled,
+  getProjectUserChannelId,
+  getProjectCompetitorChannels,
+  getProjectNiche,
+  getRAGContextStats,
+  countTokens,
+  countRAGContextTokens,
+  truncateRAGContext,
+  formatRAGContextForPrompt,
+  DEFAULT_MAX_TOKENS,
+  type SearchOptions,
+  type MetadataFilters,
+  type ContextBuilderOptions,
+  type RAGContextStats
+} from './retrieval';
