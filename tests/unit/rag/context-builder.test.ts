@@ -349,6 +349,132 @@ describe('retrieveRAGContext', () => {
     // Should return empty context on error
     expect(context.channelContent).toEqual([]);
   });
+
+  it('should skip channel content query for cold start mode', async () => {
+    // GIVEN: A project with cold_start mode (no user channel)
+    const mockConfig = {
+      mode: 'cold_start',
+      competitorChannels: ['UC456', 'UC789'],
+      niche: 'military',
+      newsEnabled: true,
+      trendsEnabled: false,
+      syncFrequency: 'daily'
+    };
+
+    const mockGet = vi.fn().mockReturnValue({
+      id: 'proj1',
+      rag_enabled: 1,
+      rag_config: JSON.stringify(mockConfig),
+      niche: 'military'
+    });
+    vi.mocked(db.prepare).mockReturnValue({ get: mockGet } as never);
+
+    // WHEN: Retrieving RAG context
+    await retrieveRAGContext('proj1', 'test query');
+
+    // THEN: Should NOT query channel_content for user's channel (cold start has no user channel)
+    const calls = vi.mocked(queryRelevantContent).mock.calls;
+    const channelContentCalls = calls.filter(
+      call => call[1] === 'channel_content' && call[2]?.filters?.channelId !== undefined
+    );
+
+    // In cold start, no user channel query (channelId filter would be undefined)
+    expect(channelContentCalls.every(call =>
+      call[2]?.filters?.channelId === undefined ||
+      ['UC456', 'UC789'].includes(call[2]?.filters?.channelId as string)
+    )).toBe(true);
+  });
+
+  it('should query competitor channels with correct filters', async () => {
+    // GIVEN: A project with competitor channels configured
+    const mockConfig = {
+      mode: 'established',
+      userChannelId: 'UC123',
+      competitorChannels: ['UC456', 'UC789'],
+      niche: 'military',
+      newsEnabled: false,
+      trendsEnabled: false,
+      syncFrequency: 'daily'
+    };
+
+    const mockGet = vi.fn().mockReturnValue({
+      id: 'proj1',
+      rag_enabled: 1,
+      rag_config: JSON.stringify(mockConfig),
+      niche: 'military'
+    });
+    vi.mocked(db.prepare).mockReturnValue({ get: mockGet } as never);
+
+    // WHEN: Retrieving RAG context
+    await retrieveRAGContext('proj1', 'test query');
+
+    // THEN: Should query channel_content for competitor channels
+    const calls = vi.mocked(queryRelevantContent).mock.calls;
+
+    // Should have queries for the user's channel content
+    expect(calls.some(call =>
+      call[1] === 'channel_content' &&
+      call[2]?.filters?.channelId === 'UC123'
+    )).toBe(true);
+  });
+
+  it('should skip news query when news is disabled', async () => {
+    // GIVEN: A project with news disabled
+    const mockConfig = {
+      mode: 'established',
+      userChannelId: 'UC123',
+      competitorChannels: [],
+      niche: 'military',
+      newsEnabled: false,
+      trendsEnabled: false,
+      syncFrequency: 'daily'
+    };
+
+    const mockGet = vi.fn().mockReturnValue({
+      id: 'proj1',
+      rag_enabled: 1,
+      rag_config: JSON.stringify(mockConfig),
+      niche: 'military'
+    });
+    vi.mocked(db.prepare).mockReturnValue({ get: mockGet } as never);
+
+    // WHEN: Retrieving RAG context
+    await retrieveRAGContext('proj1', 'test query');
+
+    // THEN: Should NOT query news_articles collection
+    const calls = vi.mocked(queryRelevantContent).mock.calls;
+    const newsArticleCalls = calls.filter(call => call[1] === 'news_articles');
+    expect(newsArticleCalls).toHaveLength(0);
+  });
+
+  it('should skip trends query when trends is disabled', async () => {
+    // GIVEN: A project with trends disabled
+    const mockConfig = {
+      mode: 'established',
+      userChannelId: 'UC123',
+      competitorChannels: [],
+      niche: 'military',
+      newsEnabled: false,
+      trendsEnabled: false,
+      syncFrequency: 'daily'
+    };
+
+    const mockGet = vi.fn().mockReturnValue({
+      id: 'proj1',
+      rag_enabled: 1,
+      rag_config: JSON.stringify(mockConfig),
+      niche: 'military'
+    });
+    vi.mocked(db.prepare).mockReturnValue({ get: mockGet } as never);
+
+    // WHEN: Retrieving RAG context
+    await retrieveRAGContext('proj1', 'test query');
+
+    // THEN: Should NOT query trending_topics collection
+    const calls = vi.mocked(queryRelevantContent).mock.calls;
+    const trendsCalls = calls.filter(call => call[1] === 'trending_topics');
+    expect(trendsCalls).toHaveLength(0);
+  });
 });
 
 describe('getRAGContextStats', () => {

@@ -413,7 +413,8 @@ export class FFmpegClient {
 
   /**
    * Add text overlay to an image
-   * Creates visually appealing text with shadow for legibility
+   * Creates visually appealing TWO-LINE text with shadow for legibility
+   * Line 1: WHITE, Line 2: GOLD (#FFD700)
    * Scales and pads image to target dimensions (1920x1080 by default)
    *
    * On Windows, uses explicit font file path to avoid Fontconfig dependency.
@@ -426,35 +427,63 @@ export class FFmpegClient {
     width: number = VIDEO_ASSEMBLY_CONFIG.THUMBNAIL_WIDTH,
     height: number = VIDEO_ASSEMBLY_CONFIG.THUMBNAIL_HEIGHT
   ): Promise<void> {
-    // Escape special characters in title for FFmpeg drawtext filter
-    // FFmpeg requires escaping: backslash, colon, single quote
-    const escapedTitle = title
-      .replace(/\\/g, '\\\\\\\\') // Escape backslashes
-      .replace(/:/g, '\\:') // Escape colons
-      .replace(/'/g, "'\\''"); // Escape single quotes
+    // Split title into two lines at word boundary
+    const { line1, line2 } = this.splitTitleIntoTwoLines(title);
 
-    // Calculate font size based on title length to prevent overflow
-    // Max 120px, scales down for longer titles (increased for better visibility)
-    const fontSize = Math.min(120, Math.floor(2400 / Math.max(title.length, 10)));
+    // Escape special characters for FFmpeg
+    const escapedLine1 = this.escapeTextForFFmpeg(line1);
+    const escapedLine2 = this.escapeTextForFFmpeg(line2);
+
+    // Calculate font size - larger for two-line layout (max 150px)
+    const maxTitleLength = Math.max(line1.length, line2.length, 10);
+    const fontSize = Math.min(150, Math.floor(3000 / maxTitleLength));
+
+    // Line spacing (gap between lines)
+    const lineSpacing = Math.floor(fontSize * 0.3);
 
     // On Windows, use explicit font file path to avoid Fontconfig dependency
-    // FFmpeg on Windows needs the path with forward slashes and escaped colons
     const isWindows = process.platform === 'win32';
     const fontFile = isWindows
       ? 'fontfile=C\\\\:/Windows/Fonts/arial.ttf:'
       : '';
 
-    // Build filter_complex for scaling, padding, and text overlay
-    const filterComplex = [
+    // Build filter parts for scaling, padding, and text overlay
+    const filterParts = [
       // Scale to fit within target dimensions while maintaining aspect ratio
       `scale=${width}:${height}:force_original_aspect_ratio=decrease`,
       // Pad to exact target dimensions (centers the scaled image)
       `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:black`,
-      // Add text shadow (offset 3px right, 3px down) for readability - centered vertically
-      `drawtext=${fontFile}text='${escapedTitle}':fontsize=${fontSize}:fontcolor=black:x=(w-text_w)/2+3:y=(h-text_h)/2+3`,
-      // Add main white text on top of shadow - centered vertically
-      `drawtext=${fontFile}text='${escapedTitle}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2`,
-    ].join(',');
+    ];
+
+    if (line2) {
+      // Two lines: position as group centered vertically
+      // Line 1 shadow (WHITE text)
+      filterParts.push(
+        `drawtext=${fontFile}text='${escapedLine1}':fontsize=${fontSize}:fontcolor=black:x=(w-text_w)/2+3:y=(h/2)-(${fontSize}+${lineSpacing}/2)+3`
+      );
+      // Line 1 main (WHITE)
+      filterParts.push(
+        `drawtext=${fontFile}text='${escapedLine1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=(h/2)-(${fontSize}+${lineSpacing}/2)`
+      );
+      // Line 2 shadow (GOLD text)
+      filterParts.push(
+        `drawtext=${fontFile}text='${escapedLine2}':fontsize=${fontSize}:fontcolor=black:x=(w-text_w)/2+3:y=(h/2)+(${lineSpacing}/2)+3`
+      );
+      // Line 2 main (GOLD #FFD700)
+      filterParts.push(
+        `drawtext=${fontFile}text='${escapedLine2}':fontsize=${fontSize}:fontcolor=#FFD700:x=(w-text_w)/2:y=(h/2)+(${lineSpacing}/2)`
+      );
+    } else {
+      // Single word: just one line, white, centered
+      filterParts.push(
+        `drawtext=${fontFile}text='${escapedLine1}':fontsize=${fontSize}:fontcolor=black:x=(w-text_w)/2+3:y=(h-text_h)/2+3`
+      );
+      filterParts.push(
+        `drawtext=${fontFile}text='${escapedLine1}':fontsize=${fontSize}:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2`
+      );
+    }
+
+    const filterComplex = filterParts.join(',');
 
     const args = [
       '-i', inputPath,
@@ -485,6 +514,35 @@ export class FFmpegClient {
 
       await this.execute(fallbackArgs);
     }
+  }
+
+  /**
+   * Split title into two lines at word boundary
+   * Used for two-line thumbnail text layout
+   */
+  private splitTitleIntoTwoLines(title: string): { line1: string; line2: string } {
+    const words = title.trim().split(/\s+/);
+
+    if (words.length <= 1) {
+      return { line1: title.trim(), line2: '' };
+    }
+
+    const midpoint = Math.ceil(words.length / 2);
+    return {
+      line1: words.slice(0, midpoint).join(' '),
+      line2: words.slice(midpoint).join(' '),
+    };
+  }
+
+  /**
+   * Escape text for FFmpeg drawtext filter
+   * FFmpeg requires escaping: backslash, colon, single quote
+   */
+  private escapeTextForFFmpeg(text: string): string {
+    return text
+      .replace(/\\/g, '\\\\\\\\') // Escape backslashes
+      .replace(/:/g, '\\:') // Escape colons
+      .replace(/'/g, "'\\''"); // Escape single quotes
   }
 
   /**

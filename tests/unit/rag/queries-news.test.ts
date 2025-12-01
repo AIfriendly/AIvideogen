@@ -7,15 +7,48 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Mock the database client
-vi.mock('@/lib/db/client', () => ({
-  getDb: vi.fn(() => ({
-    prepare: vi.fn(() => ({
+vi.mock('@/lib/db/client', () => {
+  const mockPrepare = vi.fn((sql: string) => {
+    // Match getNewsSyncStats queries
+    if (sql.includes('COUNT') && sql.includes('news_sources') && sql.includes('enabled')) {
+      return {
+        get: vi.fn(() => ({ total: 7, enabled: 5 })),
+        all: vi.fn(() => [])
+      };
+    }
+    if (sql.includes('COUNT') && sql.includes('news_articles') && sql.includes('embedded')) {
+      return {
+        get: vi.fn(() => ({ total: 100, embedded: 80, pending: 15, error: 5 })),
+        all: vi.fn(() => [])
+      };
+    }
+    // Match getArticleCountByStatus - GROUP BY embedding_status
+    if (sql.includes('GROUP BY') && sql.includes('embedding_status')) {
+      return {
+        get: vi.fn(() => ({ pending: 10, processing: 2, embedded: 85, error: 3 })),
+        all: vi.fn(() => [
+          { embedding_status: 'pending', count: 10 },
+          { embedding_status: 'processing', count: 2 },
+          { embedding_status: 'embedded', count: 85 },
+          { embedding_status: 'error', count: 3 }
+        ])
+      };
+    }
+    // Default mock - for SELECT queries like getNewsArticleByUrl, getUnembeddedArticles
+    return {
       run: vi.fn(),
-      get: vi.fn(),
+      get: vi.fn(() => null),
       all: vi.fn(() => [])
-    }))
-  }))
-}));
+    };
+  });
+
+  return {
+    default: {
+      prepare: mockPrepare,
+      pragma: vi.fn()
+    }
+  };
+});
 
 // Import after mocking
 import {

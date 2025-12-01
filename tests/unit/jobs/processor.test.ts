@@ -93,16 +93,34 @@ describe('JobProcessor', () => {
       // GIVEN: Custom concurrency config
       const customProcessor = new JobProcessor({ maxConcurrency: 5 });
 
-      // THEN: Config is applied (internal state)
+      // THEN: Config is applied and accessible
       expect(customProcessor).toBeDefined();
+      expect(customProcessor.getMaxConcurrency()).toBe(5);
     });
 
     it('[P1] 6.2-UNIT-029: should accept custom poll interval', () => {
       // GIVEN: Custom poll interval
       const customProcessor = new JobProcessor({ pollIntervalMs: 500 });
 
-      // THEN: Config is applied
+      // THEN: Config is applied and accessible
       expect(customProcessor).toBeDefined();
+      expect(customProcessor.getPollIntervalMs()).toBe(500);
+    });
+
+    it('[P1] 6.2-UNIT-043: should use default concurrency when not specified', () => {
+      // GIVEN: No custom config
+      const defaultProcessor = new JobProcessor();
+
+      // THEN: Default concurrency is 2
+      expect(defaultProcessor.getMaxConcurrency()).toBe(2);
+    });
+
+    it('[P1] 6.2-UNIT-044: should use default poll interval when not specified', () => {
+      // GIVEN: No custom config
+      const defaultProcessor = new JobProcessor();
+
+      // THEN: Default poll interval is 1000ms
+      expect(defaultProcessor.getPollIntervalMs()).toBe(1000);
     });
   });
 

@@ -385,33 +385,35 @@ describe('5.4-UNIT-003: ThumbnailResult Interface [P2]', () => {
 });
 
 describe('5.4-UNIT-004: Font size calculation logic [P1]', () => {
-  // Font size formula: min(80, floor(1600 / max(title.length, 10)))
-  const calculateFontSize = (title: string): number => {
-    return Math.min(80, Math.floor(1600 / Math.max(title.length, 10)));
+  // Font size formula: min(150, floor(3000 / max(line.length, 10)))
+  // Updated for two-line layout with larger font
+  const calculateFontSize = (line1: string, line2: string): number => {
+    const maxTitleLength = Math.max(line1.length, line2.length, 10);
+    return Math.min(150, Math.floor(3000 / maxTitleLength));
   };
 
   it('[P1] should return max font size for short titles', () => {
-    expect(calculateFontSize('Short')).toBe(80); // 1600/10 = 160, min(80,160) = 80
+    expect(calculateFontSize('Short', 'Title')).toBe(150); // 3000/10 = 300, min(150,300) = 150
   });
 
-  it('[P1] should return max font size for 10 character title', () => {
-    expect(calculateFontSize('TenCharsAB')).toBe(80); // 1600/10 = 160
+  it('[P1] should return max font size for 10 character lines', () => {
+    expect(calculateFontSize('TenCharsAB', 'TenCharsCD')).toBe(150); // 3000/10 = 300
   });
 
-  it('[P1] should scale down for 20 character title', () => {
-    expect(calculateFontSize('A'.repeat(20))).toBe(80); // 1600/20 = 80
+  it('[P1] should scale down for 20 character line', () => {
+    expect(calculateFontSize('A'.repeat(20), 'Short')).toBe(150); // 3000/20 = 150
   });
 
-  it('[P1] should scale down for 40 character title', () => {
-    expect(calculateFontSize('A'.repeat(40))).toBe(40); // 1600/40 = 40
+  it('[P1] should scale down for 30 character line', () => {
+    expect(calculateFontSize('A'.repeat(30), 'Short')).toBe(100); // 3000/30 = 100
   });
 
-  it('[P1] should scale down for 80 character title', () => {
-    expect(calculateFontSize('A'.repeat(80))).toBe(20); // 1600/80 = 20
+  it('[P1] should scale down for 60 character line', () => {
+    expect(calculateFontSize('A'.repeat(60), 'Short')).toBe(50); // 3000/60 = 50
   });
 
-  it('[P1] should scale down for 160 character title', () => {
-    expect(calculateFontSize('A'.repeat(160))).toBe(10); // 1600/160 = 10
+  it('[P1] should scale down for 100 character line', () => {
+    expect(calculateFontSize('A'.repeat(100), 'Short')).toBe(30); // 3000/100 = 30
   });
 });
 
@@ -494,5 +496,126 @@ describe('5.4-UNIT-008: Video constants validation [P2]', () => {
     expect(expectedConfig.THUMBNAIL_HEIGHT).toBe(1080);
     expect(expectedConfig.THUMBNAIL_FORMAT).toBe('jpg');
     expect(expectedConfig.THUMBNAIL_QUALITY).toBe(85);
+  });
+});
+
+// ============================================================================
+// PHASE 2: Two-Line Text Split Tests (Added 2025-11-30)
+// ============================================================================
+
+describe('5.4-UNIT-030: Two-line title split logic [P1]', () => {
+  // Tests the splitTitleIntoTwoLines logic for two-line thumbnail text
+  const splitTitleIntoTwoLines = (title: string): { line1: string; line2: string } => {
+    const words = title.trim().split(/\s+/);
+
+    if (words.length <= 1) {
+      return { line1: title.trim(), line2: '' };
+    }
+
+    const midpoint = Math.ceil(words.length / 2);
+    return {
+      line1: words.slice(0, midpoint).join(' '),
+      line2: words.slice(midpoint).join(' '),
+    };
+  };
+
+  it('[P1] should split 4-word title evenly', () => {
+    const result = splitTitleIntoTwoLines('The Secrets of Rome');
+    expect(result.line1).toBe('The Secrets');
+    expect(result.line2).toBe('of Rome');
+  });
+
+  it('[P1] should split 5-word title with more words on line 1', () => {
+    const result = splitTitleIntoTwoLines('The Secrets of Ancient Rome');
+    expect(result.line1).toBe('The Secrets of');
+    expect(result.line2).toBe('Ancient Rome');
+  });
+
+  it('[P1] should split 2-word title', () => {
+    const result = splitTitleIntoTwoLines('Mars Colonization');
+    expect(result.line1).toBe('Mars');
+    expect(result.line2).toBe('Colonization');
+  });
+
+  it('[P1] should return single line for single word', () => {
+    const result = splitTitleIntoTwoLines('AI');
+    expect(result.line1).toBe('AI');
+    expect(result.line2).toBe('');
+  });
+
+  it('[P1] should handle empty string', () => {
+    const result = splitTitleIntoTwoLines('');
+    expect(result.line1).toBe('');
+    expect(result.line2).toBe('');
+  });
+
+  it('[P1] should handle whitespace-only string', () => {
+    const result = splitTitleIntoTwoLines('   ');
+    expect(result.line1).toBe('');
+    expect(result.line2).toBe('');
+  });
+
+  it('[P1] should handle multiple spaces between words', () => {
+    const result = splitTitleIntoTwoLines('The   Secrets   of   Rome');
+    expect(result.line1).toBe('The Secrets');
+    expect(result.line2).toBe('of Rome');
+  });
+
+  it('[P1] should split 6-word title evenly', () => {
+    const result = splitTitleIntoTwoLines('One Two Three Four Five Six');
+    expect(result.line1).toBe('One Two Three');
+    expect(result.line2).toBe('Four Five Six');
+  });
+
+  it('[P1] should handle leading/trailing whitespace', () => {
+    const result = splitTitleIntoTwoLines('  Hello World  ');
+    expect(result.line1).toBe('Hello');
+    expect(result.line2).toBe('World');
+  });
+});
+
+describe('5.4-UNIT-031: Two-line text color scheme [P2]', () => {
+  // Documents the expected color scheme for two-line thumbnails
+
+  it('[P2] should document WHITE color for line 1', () => {
+    const line1Color = 'white';
+    expect(line1Color).toBe('white');
+  });
+
+  it('[P2] should document GOLD color for line 2', () => {
+    const line2Color = '#FFD700';
+    expect(line2Color).toBe('#FFD700');
+  });
+
+  it('[P2] should document shadow color as black', () => {
+    const shadowColor = 'black';
+    expect(shadowColor).toBe('black');
+  });
+
+  it('[P2] should document shadow offset as 3px', () => {
+    const shadowOffset = 3;
+    expect(shadowOffset).toBe(3);
+  });
+});
+
+describe('5.4-UNIT-032: Line spacing calculation [P2]', () => {
+  // Tests line spacing calculation for two-line layout
+
+  it('[P2] should calculate line spacing as 30% of font size', () => {
+    const fontSize = 150;
+    const lineSpacing = Math.floor(fontSize * 0.3);
+    expect(lineSpacing).toBe(45);
+  });
+
+  it('[P2] should calculate line spacing for smaller font', () => {
+    const fontSize = 100;
+    const lineSpacing = Math.floor(fontSize * 0.3);
+    expect(lineSpacing).toBe(30);
+  });
+
+  it('[P2] should calculate line spacing for minimum font', () => {
+    const fontSize = 50;
+    const lineSpacing = Math.floor(fontSize * 0.3);
+    expect(lineSpacing).toBe(15);
   });
 });

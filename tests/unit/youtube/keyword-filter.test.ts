@@ -89,16 +89,48 @@ describe('filterByKeywords - AC33 Negative Filtering', () => {
       // Given: Videos with commentary
       const videos = [
         createMockVideo({ videoId: 'v1', title: 'Gameplay with Commentary' }),
-        createMockVideo({ videoId: 'v2', title: 'No Commentary Gameplay' }), // This is OK - "no commentary"
-        createMockVideo({ videoId: 'v3', title: 'Cinematic 4K Footage' }),
+        createMockVideo({ videoId: 'v2', title: 'Cinematic 4K Footage' }),
       ];
 
       // When: Filtering
       const filtered = filterByKeywords(videos);
 
       // Then: Commentary video should be removed
-      // Note: "No Commentary" also contains "commentary" so it gets filtered too
-      expect(filtered.map(v => v.videoId)).toContain('v3');
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].videoId).toBe('v2');
+    });
+
+    it('should KEEP videos with "no commentary" (negated pattern)', () => {
+      // Given: Videos with negated commentary patterns
+      const videos = [
+        createMockVideo({ videoId: 'v1', title: 'Gameplay No Commentary' }),
+        createMockVideo({ videoId: 'v2', title: 'No Commentary Walkthrough' }),
+        createMockVideo({ videoId: 'v3', title: 'Dark Souls Sorcerer Run No Commentary #1' }),
+        createMockVideo({ videoId: 'v4', title: 'Without Commentary Gameplay' }),
+      ];
+
+      // When: Filtering
+      const filtered = filterByKeywords(videos);
+
+      // Then: All "no commentary" videos should be KEPT
+      expect(filtered).toHaveLength(4);
+      expect(filtered.map(v => v.videoId)).toEqual(['v1', 'v2', 'v3', 'v4']);
+    });
+
+    it('should filter videos with both negated and non-negated commentary', () => {
+      // Given: Videos with both patterns
+      const videos = [
+        createMockVideo({ videoId: 'v1', title: 'Gameplay with Commentary' }), // Filter
+        createMockVideo({ videoId: 'v2', title: 'No Commentary Boss Fight' }), // Keep
+        createMockVideo({ videoId: 'v3', title: 'My Commentary on No Commentary Videos' }), // Filter - has "My Commentary"
+      ];
+
+      // When: Filtering
+      const filtered = filterByKeywords(videos);
+
+      // Then: Only pure "no commentary" video should pass
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].videoId).toBe('v2');
     });
   });
 

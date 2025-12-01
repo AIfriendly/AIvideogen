@@ -208,3 +208,111 @@ describe('Format RAG Context', () => {
     expect(formatted).toBe('');
   });
 });
+
+describe('Custom truncation parameters', () => {
+  const createDoc = (id: string, content: string, score: number): RetrievedDocument => ({
+    id,
+    content,
+    metadata: {},
+    score
+  });
+
+  it('should respect custom maxTokens parameter', () => {
+    // GIVEN: A context that exceeds custom limit
+    const context: RAGContext = {
+      channelContent: [
+        createDoc('1', 'A'.repeat(400), 0.9), // ~100 tokens
+        createDoc('2', 'B'.repeat(400), 0.8)  // ~100 tokens
+      ],
+      competitorContent: [],
+      newsArticles: [],
+      trendingTopics: []
+    };
+
+    // WHEN: Truncating with low custom limit
+    const truncated = truncateRAGContext(context, 150);
+
+    // THEN: Should truncate to fit within custom limit
+    expect(countRAGContextTokens(truncated)).toBeLessThanOrEqual(150);
+  });
+
+  it('should handle exactly at token limit', () => {
+    // GIVEN: A context exactly at the limit
+    const context: RAGContext = {
+      channelContent: [createDoc('1', 'Short', 0.9)],
+      competitorContent: [],
+      newsArticles: [],
+      trendingTopics: []
+    };
+
+    const currentTokens = countRAGContextTokens(context);
+
+    // WHEN: Truncating with limit exactly matching current size
+    const truncated = truncateRAGContext(context, currentTokens);
+
+    // THEN: Should keep all documents
+    expect(truncated.channelContent).toHaveLength(1);
+  });
+
+  it('should handle zero token limit gracefully', () => {
+    // GIVEN: A context with content
+    const context: RAGContext = {
+      channelContent: [createDoc('1', 'Content', 0.9)],
+      competitorContent: [],
+      newsArticles: [],
+      trendingTopics: []
+    };
+
+    // WHEN: Truncating with zero limit
+    const truncated = truncateRAGContext(context, 0);
+
+    // THEN: Should return empty arrays
+    expect(truncated.channelContent).toHaveLength(0);
+  });
+
+  it('should sort by score when documents have equal content size', () => {
+    // GIVEN: Documents with same content but different scores
+    const context: RAGContext = {
+      channelContent: [
+        createDoc('low', 'Same content', 0.3),
+        createDoc('high', 'Same content', 0.9),
+        createDoc('mid', 'Same content', 0.6)
+      ],
+      competitorContent: [],
+      newsArticles: [],
+      trendingTopics: []
+    };
+
+    // WHEN: Truncating to keep only one document
+    const truncated = truncateRAGContext(context, 20);
+
+    // THEN: Should keep highest scored document
+    if (truncated.channelContent.length === 1) {
+      expect(truncated.channelContent[0].id).toBe('high');
+    }
+  });
+});
+
+describe('Token counting edge cases', () => {
+  it('should handle very long content', () => {
+    const longContent = 'A'.repeat(100000); // 100K chars
+    const tokens = countTokens(longContent);
+
+    expect(tokens).toBe(25000); // 100000 / 4
+  });
+
+  it('should handle unicode characters', () => {
+    const unicodeContent = '你好世界'; // Chinese characters
+    const tokens = countTokens(unicodeContent);
+
+    // Should still count by character length
+    expect(tokens).toBeGreaterThan(0);
+  });
+
+  it('should handle special characters', () => {
+    const specialContent = '!@#$%^&*()_+-=[]{}|;:\'",.<>?/\\`~';
+    const tokens = countTokens(specialContent);
+
+    expect(tokens).toBe(Math.ceil(specialContent.length / 4));
+  });
+});

@@ -56,10 +56,41 @@ const GLOBAL_PRIORITY_PATTERNS: string[] = [
 ];
 
 /**
+ * Negation prefixes that indicate the keyword should be KEPT, not filtered
+ * Example: "no commentary" should KEEP the video, not filter it
+ */
+const NEGATION_PREFIXES = ['no ', 'without ', 'non-', 'non '];
+
+/**
+ * Check if a pattern match is negated (e.g., "no commentary" vs "commentary")
+ *
+ * @param text - Full text to search in
+ * @param pattern - Pattern that was matched
+ * @param matchIndex - Index where pattern was found
+ * @returns true if the match is negated (should be kept), false otherwise
+ */
+function isNegatedMatch(text: string, pattern: string, matchIndex: number): boolean {
+  // Check if any negation prefix appears immediately before the pattern
+  for (const prefix of NEGATION_PREFIXES) {
+    const prefixStart = matchIndex - prefix.length;
+    if (prefixStart >= 0) {
+      const precedingText = text.substring(prefixStart, matchIndex);
+      if (precedingText.toLowerCase() === prefix.toLowerCase()) {
+        return true; // This is a negated match like "no commentary"
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * Filter videos by global keyword patterns (Story 3.7 - Tier 1)
  *
  * Removes videos with titles/descriptions containing low-quality patterns
  * (reaction, commentary, vlog, etc.) regardless of content type.
+ *
+ * IMPORTANT: Negated patterns like "no commentary" are KEPT, not filtered.
+ * This ensures videos explicitly marked as commentary-free are preserved.
  *
  * @param results - Array of video results to filter
  * @returns Filtered array with low-quality videos removed
@@ -72,9 +103,20 @@ export function filterByKeywords(results: VideoResult[]): VideoResult[] {
 
     // Check for filter patterns (these indicate low-quality B-roll)
     for (const pattern of GLOBAL_FILTER_PATTERNS) {
-      if (combinedText.includes(pattern.toLowerCase())) {
-        console.log(`[filterByKeywords] Filtered video (contains "${pattern}"):`, video.title);
-        return false;
+      const patternLower = pattern.toLowerCase();
+      let searchStart = 0;
+      let matchIndex: number;
+
+      // Find all occurrences of the pattern
+      while ((matchIndex = combinedText.indexOf(patternLower, searchStart)) !== -1) {
+        // Check if this match is negated (e.g., "no commentary")
+        if (!isNegatedMatch(combinedText, patternLower, matchIndex)) {
+          // Not negated - this is a genuine match, filter it out
+          console.log(`[filterByKeywords] Filtered video (contains "${pattern}"):`, video.title);
+          return false;
+        }
+        // Move past this negated match to check for other occurrences
+        searchStart = matchIndex + patternLower.length;
       }
     }
 

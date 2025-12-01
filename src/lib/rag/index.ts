@@ -59,3 +59,15 @@ export {
   type ContextBuilderOptions,
   type RAGContextStats
 } from './retrieval';
+
+// Generation (Story 6.6)
+export {
+  buildRAGPrompt,
+  formatChannelContent,
+  formatCompetitorContent,
+  formatNewsContent,
+  formatTrendingTopics,
+  getRAGContextUsage,
+  getRAGContextMessage,
+  type RAGContextUsage
+} from './generation';

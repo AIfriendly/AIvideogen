@@ -5,16 +5,18 @@
  *
  * This endpoint orchestrates the script generation pipeline:
  * 1. Validates project exists and has a confirmed topic
- * 2. Delegates to business logic layer for LLM interaction and retry
- * 3. Transforms LLM output (camelCase) to database format (snake_case)
- * 4. Saves scenes to database in a transaction
- * 5. Updates project status flags (script_generated, current_step)
+ * 2. Optionally retrieves RAG context if rag_enabled (Story 6.6)
+ * 3. Delegates to business logic layer for LLM interaction and retry
+ * 4. Transforms LLM output (camelCase) to database format (snake_case)
+ * 5. Saves scenes to database in a transaction
+ * 6. Updates project status flags (script_generated, current_step)
  *
  * Standard response format:
- * Success: { success: true, data: { projectId, sceneCount, scenes, attempts } }
+ * Success: { success: true, data: { projectId, sceneCount, scenes, attempts, ragContextUsed? } }
  * Error: { success: false, error: string }
  *
  * Story 2.4: LLM-Based Script Generation (Professional Quality)
+ * Story 6.6: RAG-Augmented Script Generation
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -30,6 +32,14 @@ import {
 import { initializeDatabase } from '@/lib/db/init';
 import { generateScriptWithRetry, ScriptGenerationError } from '@/lib/llm/script-generator';
 import { sanitizeTopicInput } from '@/lib/llm/sanitize-text';
+import {
+  retrieveRAGContext,
+  getProjectRAGConfig,
+  buildRAGPrompt,
+  getRAGContextUsage,
+  getRAGContextMessage,
+  type RAGContextUsage
+} from '@/lib/rag';
 
 // Remove timeout limit for script generation (can take 2-5 minutes with retries)
 export const maxDuration = 1200; // 20 minutes for long scripts with multiple retries
@@ -96,6 +106,15 @@ export async function POST(
 ) {
   try {
     const { id: projectId } = await params;
+
+    // Parse optional rag_enabled parameter from request body (Story 6.6)
+    let ragEnabledParam: boolean | undefined;
+    try {
+      const body = await request.json();
+      ragEnabledParam = body?.rag_enabled;
+    } catch {
+      // Empty body or non-JSON is acceptable - use project defaults
+    }
 
     console.log(`[Script Generation API] Starting generation for project: ${projectId}`);
 
@@ -181,14 +200,76 @@ export async function POST(
       console.warn('[Script Generation API] Could not load persona, using default script style:', error);
     }
 
+    // ========================================================================
+    // RAG Context Retrieval (Story 6.6)
+    // ========================================================================
+    let ragContextUsed: RAGContextUsage | undefined;
+    let ragPromptSection = '';
+    let ragMode: 'established' | 'cold_start' = 'established';
+
+    // Determine if RAG should be used (explicit param > project config)
+    const { enabled: projectRagEnabled, config: ragConfig } = getProjectRAGConfig(projectId);
+    const shouldUseRag = ragEnabledParam !== undefined ? ragEnabledParam : projectRagEnabled;
+
+    if (shouldUseRag && ragConfig) {
+      console.log(`[Script Generation API] RAG enabled - retrieving context for topic: "${sanitizedTopic}"`);
+      ragMode = ragConfig.mode || 'established';
+
+      try {
+        const ragStartTime = Date.now();
+
+        // Retrieve RAG context using Story 6.5 infrastructure
+        const ragContext = await retrieveRAGContext(projectId, sanitizedTopic);
+        const ragRetrievalTime = Date.now() - ragStartTime;
+
+        // Calculate usage statistics
+        ragContextUsed = getRAGContextUsage(ragContext, ragRetrievalTime);
+
+        console.log(`[Script Generation API] RAG context retrieved in ${ragRetrievalTime}ms:`,
+          `channel=${ragContextUsed.channelVideos},`,
+          `competitors=${ragContextUsed.competitorVideos},`,
+          `news=${ragContextUsed.newsArticles}`
+        );
+
+        // Build RAG prompt section if we have context
+        if (ragContextUsed.totalDocuments > 0) {
+          ragPromptSection = buildRAGPrompt(ragContext, ragMode);
+          const contextMsg = getRAGContextMessage(ragContextUsed);
+          console.log(`[Script Generation API] ${contextMsg}`);
+        } else {
+          console.log(`[Script Generation API] No RAG context available - proceeding without`);
+        }
+      } catch (ragError) {
+        // Graceful degradation - proceed without RAG on error
+        console.warn(`[Script Generation API] RAG retrieval failed, proceeding without:`, ragError);
+        ragContextUsed = undefined;
+      }
+    } else if (shouldUseRag && !ragConfig) {
+      console.log(`[Script Generation API] RAG enabled but no config found - proceeding without RAG`);
+    }
+
+    // ========================================================================
+    // Script Generation with optional RAG augmentation
+    // ========================================================================
+
     // Call business logic layer for script generation with retry
     console.log(`[Script Generation API] Calling script generator with config:`, projectConfig);
     if (personaName) {
       console.log(`[Script Generation API] Script style will be influenced by persona: ${personaName}`);
     }
+    if (ragPromptSection) {
+      console.log(`[Script Generation API] RAG context will be injected into prompt`);
+    }
+
+    // Combine persona prompt with RAG context if available
+    // RAG context is prepended to persona so the persona style is applied to the RAG-informed content
+    const combinedPersonaPrompt = ragPromptSection
+      ? `${ragPromptSection}\n\n${personaPrompt || ''}`
+      : personaPrompt;
+
     let result;
     try {
-      result = await generateScriptWithRetry(sanitizedTopic, projectConfig, 6, personaPrompt);
+      result = await generateScriptWithRetry(sanitizedTopic, projectConfig, 6, combinedPersonaPrompt);
     } catch (error) {
       if (error instanceof ScriptGenerationError) {
         console.error(
@@ -248,7 +329,7 @@ export async function POST(
 
     console.log(`[Script Generation API] ✓ Script generation complete for project ${projectId}`);
 
-    // Return success response
+    // Return success response with optional RAG context usage (Story 6.6)
     return NextResponse.json(
       {
         success: true,
@@ -257,6 +338,8 @@ export async function POST(
           sceneCount: savedScenes.length,
           scenes: savedScenes,
           attempts: attempts,
+          // Include RAG context usage if RAG was used (Story 6.6)
+          ...(ragContextUsed && { ragContextUsed }),
         },
       },
       { status: 200 }

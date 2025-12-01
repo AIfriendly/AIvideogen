@@ -234,3 +234,126 @@ describe('Date range filtering', () => {
     });
   });
 });
+
+describe('Empty and edge case filters', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearEmbeddingCache();
+  });
+
+  it('should pass no where clause when filters are empty', async () => {
+    // GIVEN: ChromaDB client is available
+    const mockClient = {
+      query: vi.fn().mockResolvedValue({ ids: [], documents: [], metadatas: [], distances: [] })
+    };
+    vi.mocked(getChromaClientIfEnabled).mockResolvedValue(mockClient as never);
+    vi.mocked(generateEmbedding).mockResolvedValue({
+      embedding: new Array(384).fill(0.1),
+      dimensions: 384,
+      model: 'all-MiniLM-L6-v2'
+    });
+
+    // WHEN: Querying with empty filters object
+    await queryRelevantContent('test query', 'channel_content', {
+      filters: {}
+    });
+
+    // THEN: Should pass undefined for where clause (no filtering)
+    const whereClause = mockClient.query.mock.calls[0][3];
+    expect(whereClause).toBeUndefined();
+  });
+
+  it('should pass no where clause when filters are not provided', async () => {
+    // GIVEN: ChromaDB client is available
+    const mockClient = {
+      query: vi.fn().mockResolvedValue({ ids: [], documents: [], metadatas: [], distances: [] })
+    };
+    vi.mocked(getChromaClientIfEnabled).mockResolvedValue(mockClient as never);
+    vi.mocked(generateEmbedding).mockResolvedValue({
+      embedding: new Array(384).fill(0.1),
+      dimensions: 384,
+      model: 'all-MiniLM-L6-v2'
+    });
+
+    // WHEN: Querying without filters
+    await queryRelevantContent('test query', 'channel_content');
+
+    // THEN: Should pass undefined for where clause
+    const whereClause = mockClient.query.mock.calls[0][3];
+    expect(whereClause).toBeUndefined();
+  });
+
+  it('should handle partial date range (start only)', async () => {
+    // GIVEN: ChromaDB client is available
+    const mockClient = {
+      query: vi.fn().mockResolvedValue({ ids: [], documents: [], metadatas: [], distances: [] })
+    };
+    vi.mocked(getChromaClientIfEnabled).mockResolvedValue(mockClient as never);
+    vi.mocked(generateEmbedding).mockResolvedValue({
+      embedding: new Array(384).fill(0.1),
+      dimensions: 384,
+      model: 'all-MiniLM-L6-v2'
+    });
+
+    // WHEN: Querying with only start date
+    await queryRelevantContent('test query', 'news_articles', {
+      filters: {
+        dateRange: {
+          start: '2025-11-24T00:00:00Z',
+          end: ''
+        }
+      }
+    });
+
+    // THEN: Should include start filter but not end
+    const whereClause = mockClient.query.mock.calls[0][3];
+    if (whereClause?.$and) {
+      expect(whereClause.$and).toContainEqual({
+        published_at: { $gte: '2025-11-24T00:00:00Z' }
+      });
+    }
+  });
+
+  it('should use default topK of 5 when not specified', async () => {
+    // GIVEN: ChromaDB client is available
+    const mockClient = {
+      query: vi.fn().mockResolvedValue({ ids: [], documents: [], metadatas: [], distances: [] })
+    };
+    vi.mocked(getChromaClientIfEnabled).mockResolvedValue(mockClient as never);
+    vi.mocked(generateEmbedding).mockResolvedValue({
+      embedding: new Array(384).fill(0.1),
+      dimensions: 384,
+      model: 'all-MiniLM-L6-v2'
+    });
+
+    // WHEN: Querying without topK
+    await queryRelevantContent('test query', 'channel_content');
+
+    // THEN: Should use default topK of 5
+    expect(mockClient.query).toHaveBeenCalledWith(
+      'channel_content',
+      expect.any(Array),
+      5, // default topK
+      undefined
+    );
+  });
+
+  it('should handle empty query string', async () => {
+    // GIVEN: ChromaDB client is available
+    const mockClient = {
+      query: vi.fn().mockResolvedValue({ ids: [], documents: [], metadatas: [], distances: [] })
+    };
+    vi.mocked(getChromaClientIfEnabled).mockResolvedValue(mockClient as never);
+    vi.mocked(generateEmbedding).mockResolvedValue({
+      embedding: new Array(384).fill(0.1),
+      dimensions: 384,
+      model: 'all-MiniLM-L6-v2'
+    });
+
+    // WHEN: Querying with empty string
+    const results = await queryRelevantContent('', 'channel_content');
+
+    // THEN: Should still work (embedding service handles empty string)
+    expect(results).toEqual([]);
+  });
+});
