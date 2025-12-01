@@ -76,6 +76,20 @@ export class JobProcessor {
   }
 
   /**
+   * Get max concurrency setting
+   */
+  getMaxConcurrency(): number {
+    return this.config.maxConcurrency;
+  }
+
+  /**
+   * Get poll interval setting
+   */
+  getPollIntervalMs(): number {
+    return this.config.pollIntervalMs;
+  }
+
+  /**
    * Start the job processor
    */
   async start(): Promise<void> {
