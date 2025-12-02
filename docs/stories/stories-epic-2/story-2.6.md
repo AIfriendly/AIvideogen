@@ -1090,4 +1090,79 @@ The "fetch" substring match triggered first, returning a misleading "Network err
 
 ---
 
+## Voiceover Preview Page Implementation
+
+### Enhancement: Full Voiceover Preview Page
+
+**Date:** 2025-11-30
+**Implemented By:** Claude Code (Dev Agent)
+**Change Type:** Feature Enhancement (Major)
+
+**Issue Identified:**
+
+The `/projects/[id]/voiceover-preview` page was still a placeholder showing only a warning banner and skip button. Users navigating back from visual-curation or using the navigation breadcrumb would land on an incomplete page with no functionality.
+
+**Root Cause:**
+
+Story 2.6 originally focused on enhancing the script-review page with AudioPlayer components, but the voiceover-preview page itself was created as a placeholder and never fully implemented. The page is referenced from:
+- Visual Curation back button
+- Navigation breadcrumb component
+- Workflow navigation flow
+
+**Enhancement Applied:**
+
+**Files Created:**
+1. `src/app/api/voices/[id]/route.ts` - New API endpoint
+   - Returns voice profile information by ID
+   - Uses existing `getVoiceById()` from voice-profiles.ts
+
+**Files Modified:**
+1. `src/app/projects/[id]/voiceover-preview/VoiceoverPreviewClient.tsx` - Complete rewrite
+   - Fetches scenes from `/api/projects/[id]/scenes` API
+   - Fetches voice profile from new `/api/voices/[id]` API
+   - Displays statistics: total scenes, audio ready count, total duration, total words
+   - Shows voice profile info (name, gender, accent, tone)
+   - Scene-by-scene cards with:
+     - Scene number badge
+     - Word count and duration
+     - Full script text
+     - AudioPlayer component for audio playback
+     - Status indicator (checkmark for ready, warning for missing audio)
+   - Status banners (green for all complete, amber for missing audio)
+   - "Regenerate All" button to regenerate voiceovers
+   - Navigation to visual sourcing/visual curation
+   - Back buttons to script review and voiceover generation
+   - Loading, error, and empty states handled
+
+2. `src/app/projects/[id]/voiceover-preview/page.tsx` - Updated
+   - Passes full project data to client component
+   - Updated documentation comment
+
+**Features Implemented:**
+- ✅ Play/pause audio for each scene via AudioPlayer component
+- ✅ View script text alongside audio
+- ✅ See which scenes have audio generated (status indicators)
+- ✅ Regenerate all voiceovers with single button
+- ✅ Continue to visual sourcing when all audio ready
+- ✅ Navigate back to script review or voiceover generation
+- ✅ Voice profile display with metadata
+- ✅ Statistics dashboard (scenes, audio ready, duration, words)
+- ✅ Responsive layout with dark mode support
+- ✅ Proper error handling and loading states
+
+**Testing:**
+- ✅ Build passes without TypeScript errors
+- ✅ ESLint passes without warnings
+- ✅ Page accessible at `/projects/[id]/voiceover-preview`
+- ✅ Scenes API integration working
+- ✅ Voice API integration working
+- ✅ AudioPlayer components render correctly
+
+**Impact Assessment:**
+- **Scope:** Completes the voiceover preview workflow
+- **MVP Impact:** Resolves placeholder page issue
+- **User Benefit:** Users can now preview all voiceovers in a dedicated page with full functionality
+
+---
+
 **Post-Implementation Status:** ✅ COMPLETE + ENHANCED - Production Ready

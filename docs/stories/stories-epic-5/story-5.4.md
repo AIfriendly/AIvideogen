@@ -854,6 +854,42 @@ Title is positioned at bottom center with:
 
 **Rationale:** Centered, larger text provides better visibility and a more professional thumbnail appearance consistent with AC7 (Text Legibility).
 
+### Post-Completion Enhancement (2025-11-30)
+
+**Issue:** User requested more visually appealing thumbnail text - two-line layout with color differentiation.
+
+**Enhancement Applied:**
+1. **Two-Line Layout:** Title is now automatically split at word boundary into two lines
+2. **Line 1 Color:** WHITE (#FFFFFF) - for first half of words
+3. **Line 2 Color:** GOLD (#FFD700) - for second half of words
+4. **Font Size:** Increased from `min(120, 2400/title.length)` to `min(150, 3000/title.length)`
+5. **Line Spacing:** 30% of font size between lines
+6. **Single-Word Fallback:** Single-word titles display as single white line (centered)
+
+**Files Modified:**
+- `src/lib/video/ffmpeg.ts` - Major update to `addTextOverlay()` method:
+  - Added `splitTitleIntoTwoLines()` helper method
+  - Added `escapeTextForFFmpeg()` helper method
+  - Updated filter complex for two-line rendering with WHITE/GOLD colors
+- `tests/unit/video/thumbnail.test.ts` - Added 3 new test suites:
+  - `5.4-UNIT-030`: Two-line title split logic (9 tests)
+  - `5.4-UNIT-031`: Two-line text color scheme (4 tests)
+  - `5.4-UNIT-032`: Line spacing calculation (3 tests)
+
+**Example Output:**
+```
+"The Secrets of Ancient Rome"
+
+        ┌─────────────────────────────────┐
+        │                                 │
+        │      The Secrets of             │  ← WHITE
+        │       Ancient Rome              │  ← GOLD
+        │                                 │
+        └─────────────────────────────────┘
+```
+
+**Rationale:** Two-line layout with contrasting colors provides stronger visual impact and improved thumbnail aesthetics while maintaining AC7 (Text Legibility) compliance.
+
 ---
 
 ## References

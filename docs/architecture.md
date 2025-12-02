@@ -5,8 +5,18 @@
 **Type:** Level 2 Greenfield Software Project
 **Author:** Winston (BMAD Architect Agent)
 **Date:** 2025-11-12
-**Version:** 1.9
-**Last Updated:** 2025-11-26 (Story 3.7b Bug Fix - migration 011 adds visual_keywords column to scenes)
+**Version:** 2.0
+**Last Updated:** 2025-11-29
+
+**Recent Changes (v2.0 - 2025-11-29):**
+- Added Feature 2.7: Channel Intelligence & Content Research (RAG-Powered) architecture
+- Added RAG database schema (channels, channel_videos, embeddings, news_sources tables)
+- Added Background Job Queue architecture for daily sync operations
+- Added version verification dates to Decision Summary
+- Aligned with PRD v2.0
+
+**Previous Changes (v1.9 - 2025-11-26):**
+- Story 3.7b Bug Fix - migration 011 adds visual_keywords column to scenes
 
 ---
 
@@ -38,7 +48,9 @@ The primary technology stack is FOSS (Free and Open-Source Software) compliant p
 16. [Deployment Architecture](#deployment-architecture)
 17. [Cloud Migration Path](#cloud-migration-path)
 18. [Cross-Epic Integration Architecture](#cross-epic-integration-architecture)
-19. [Architecture Decision Records](#architecture-decision-records)
+19. [Feature 2.7: Channel Intelligence & RAG Architecture](#feature-27-channel-intelligence--rag-architecture)
+20. [Background Job Queue Architecture](#background-job-queue-architecture)
+21. [Architecture Decision Records](#architecture-decision-records)
 
 ---
 
@@ -82,25 +94,31 @@ This establishes the base architecture with:
 
 ## Decision Summary
 
-| Category | Decision | Version | FOSS | Affects Epics | Rationale |
-|----------|----------|---------|------|---------------|-----------|
-| **Frontend Framework** | Next.js | 15.5 | ✅ | All | React-based, server components, excellent DX, starter provides foundation |
-| **Language** | TypeScript | Latest via Next.js | ✅ | All | Type safety, better tooling, prevents runtime errors |
-| **Styling** | Tailwind CSS | v4 | ✅ | Epic 4 | Rapid styling, matches UX spec, utility-first |
-| **Component Library** | shadcn/ui | Latest | ✅ | Epic 4 | Accessible, customizable, Tailwind-based, per UX spec |
-| **State Management** | Zustand | 5.0.8 | ✅ | All | Lightweight (3KB), TypeScript-friendly, React 18 optimized |
-| **Database** | SQLite via better-sqlite3 | 12.4.1 | ✅ | All | Embedded, no server, perfect for local single-user |
-| **LLM Service (Primary)** | Ollama + Llama 3.2 | llama3.2 (3B) | ✅ | Epic 1, 2 | Local execution, FOSS-compliant, 128K context, no API costs |
-| **LLM Service (Optional)** | Google Gemini 2.5 | gemini-2.5-flash/pro | ✅ Free tier | Epic 1, 2 | Cloud alternative, 1,500 req/day free, no local setup required |
-| **LLM SDK (Ollama)** | ollama (npm) | 0.6.2 | ✅ | Epic 1, 2 | Official JavaScript SDK for Ollama |
-| **LLM SDK (Gemini)** | @google/generative-ai | 0.21.0 | ✅ Free tier | Epic 1, 2 | Official JavaScript SDK for Google Gemini |
-| **Text-to-Speech** | KokoroTTS | 82M model | ✅ | Epic 2 | 48+ voices, fast (3.2x XTTS), high quality (4.35 MOS) |
-| **YouTube Downloader** | yt-dlp | 2025.10.22 | ✅ | Epic 3 | Industry standard, actively maintained, robust |
-| **Video Processing** | FFmpeg | 7.1.2 | ✅ | Epic 5 | Direct via child_process, future-proof, full control |
-| **Video Player** | Plyr | 3.7.8 | ✅ | Epic 4 | Lightweight, accessible, per UX spec recommendation |
-| **API Layer** | Next.js API Routes | 15.5 | ✅ | All | Built-in, REST-style, server-side execution |
-| **File Storage** | Local Filesystem | N/A | ✅ | All | `.cache/` directory for temporary files |
-| **Testing** | Vitest | 2.1.x | ✅ | All | Native ESM, fast execution, Vite-powered, jest-compatible API |
+**Version Verification Date:** 2025-11-29
+
+| Category | Decision | Version | Verified | FOSS | Affects | Rationale |
+|----------|----------|---------|----------|------|---------|-----------|
+| **Frontend Framework** | Next.js | 15.5 | 2025-11-29 | ✅ | All | React-based, server components, excellent DX |
+| **Language** | TypeScript | 5.x | 2025-11-29 | ✅ | All | Type safety, better tooling |
+| **Styling** | Tailwind CSS | v4 | 2025-11-29 | ✅ | Epic 4 | Rapid styling, utility-first |
+| **Component Library** | shadcn/ui | Latest | 2025-11-29 | ✅ | Epic 4 | Accessible, Tailwind-based |
+| **State Management** | Zustand | 5.0.8 | 2025-11-29 | ✅ | All | Lightweight (3KB), TypeScript-friendly |
+| **Database** | SQLite via better-sqlite3 | 12.4.1 | 2025-11-29 | ✅ | All | Embedded, no server, local single-user |
+| **Vector Database** | ChromaDB | 0.5.x | 2025-11-29 | ✅ | Feature 2.7 | Local FOSS vector DB, Python native |
+| **Embeddings** | all-MiniLM-L6-v2 | Latest | 2025-11-29 | ✅ | Feature 2.7 | Local embeddings, sentence-transformers |
+| **LLM (Primary)** | Ollama + Llama 3.2 | 3B | 2025-11-29 | ✅ | Epic 1, 2 | Local, FOSS, 128K context |
+| **LLM (Optional)** | Google Gemini 2.5 | flash/pro | 2025-11-29 | ✅ Free | Epic 1, 2 | Cloud, 1,500 req/day free |
+| **LLM SDK (Ollama)** | ollama (npm) | 0.6.2 | 2025-11-29 | ✅ | Epic 1, 2 | Official JavaScript SDK |
+| **LLM SDK (Gemini)** | @google/generative-ai | 0.21.0 | 2025-11-29 | ✅ Free | Epic 1, 2 | Official JavaScript SDK |
+| **Text-to-Speech** | KokoroTTS | 82M | 2025-11-29 | ✅ | Epic 2 | 48+ voices, high quality |
+| **YouTube Downloader** | yt-dlp | 2025.10.22 | 2025-11-29 | ✅ | Epic 3 | Industry standard, robust |
+| **Caption Scraping** | youtube-transcript-api | 0.6.x | 2025-11-29 | ✅ | Feature 2.7 | Python, auto-captions |
+| **Video Processing** | FFmpeg | 7.1.2 | 2025-11-29 | ✅ | Epic 5 | Full control, future-proof |
+| **Video Player** | Plyr | 3.7.8 | 2025-11-29 | ✅ | Epic 4 | Lightweight, accessible |
+| **Job Scheduler** | node-cron | 3.0.x | 2025-11-29 | ✅ | Feature 2.7 | Simple cron-like scheduling |
+| **API Layer** | Next.js API Routes | 15.5 | 2025-11-29 | ✅ | All | Built-in, REST-style |
+| **File Storage** | Local Filesystem | N/A | N/A | ✅ | All | `.cache/` directory |
+| **Testing** | Vitest | 2.1.x | 2025-11-29 | ✅ | All | Native ESM, fast, Vite-powered |
 
 ---
 
@@ -4048,14 +4066,59 @@ const db = new Database(dbPath);
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
 
-// Initialize schema (run on first startup)
-export function initializeDatabase() {
-  const schema = readFileSync('./lib/db/schema.sql', 'utf-8');
-  db.exec(schema);
-}
-
 export default db;
 ```
+
+```typescript
+// lib/db/init.ts
+// Database initialization with globalThis singleton pattern
+// Uses globalThis to persist across Next.js hot reloads in development mode
+
+import { readFileSync } from 'fs';
+import path from 'path';
+import db from './client';
+
+// Global singleton - survives module reloads in Next.js dev mode
+declare global {
+  var __dbInitialized: boolean | undefined;
+  var __dbInitPromise: Promise<void> | undefined;
+}
+
+const isInitialized = (): boolean => globalThis.__dbInitialized === true;
+const setInitialized = (value: boolean): void => { globalThis.__dbInitialized = value; };
+const getInitPromise = (): Promise<void> | undefined => globalThis.__dbInitPromise;
+const setInitPromise = (promise: Promise<void> | undefined): void => { globalThis.__dbInitPromise = promise; };
+
+export async function initializeDatabase(): Promise<void> {
+  // Return immediately if already initialized (persists across module reloads)
+  if (isInitialized()) {
+    return;
+  }
+
+  // If initialization is in progress, wait for it to complete
+  const existingPromise = getInitPromise();
+  if (existingPromise) {
+    return existingPromise;
+  }
+
+  // Start initialization
+  const initPromise = (async () => {
+    const schemaPath = path.join(process.cwd(), 'src', 'lib', 'db', 'schema.sql');
+    const schema = readFileSync(schemaPath, 'utf-8');
+    db.exec(schema);
+
+    // Run migrations...
+    await runMigrations();
+
+    setInitialized(true);
+  })();
+
+  setInitPromise(initPromise);
+  return initPromise;
+}
+```
+
+**Why globalThis?** In Next.js development mode, modules are hot-reloaded frequently. Module-level variables like `let isInitialized = false` reset on each reload, causing database initialization to run on every API request. Using `globalThis` ensures the initialization state persists within the same Node.js process, so initialization runs only once per server start.
 
 **Database Query Functions (Story 1.6 - Project Management):**
 ```typescript
@@ -6020,6 +6083,1356 @@ try {
 
 ---
 
+## Feature 2.7: Channel Intelligence & RAG Architecture
+
+**PRD Reference:** Feature 2.7 - Channel Intelligence & Content Research (RAG-Powered)
+
+### Overview
+
+A VidIQ-style intelligence system that syncs with YouTube channels, analyzes competitors, monitors trends, and generates scripts informed by the user's niche and style. Uses RAG (Retrieval-Augmented Generation) to give the LLM full context of channel content, competitor videos, and trending topics.
+
+### Architecture Pattern: Retrieval-Augmented Generation (RAG)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     RAG Pipeline Architecture                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
+│  │   YouTube    │    │  News Sites  │    │   YouTube    │       │
+│  │   Channels   │    │  (Military)  │    │   Trends     │       │
+│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘       │
+│         │                   │                   │                │
+│         ▼                   ▼                   ▼                │
+│  ┌─────────────────────────────────────────────────────┐        │
+│  │              Data Ingestion Layer                    │        │
+│  │  - youtube-transcript-api (captions)                 │        │
+│  │  - YouTube Data API (metadata)                       │        │
+│  │  - Web scraping (news headlines)                     │        │
+│  └──────────────────────┬──────────────────────────────┘        │
+│                         │                                        │
+│                         ▼                                        │
+│  ┌─────────────────────────────────────────────────────┐        │
+│  │              Embedding Generation                    │        │
+│  │  - all-MiniLM-L6-v2 (local, FOSS)                   │        │
+│  │  - sentence-transformers library                     │        │
+│  │  - 384-dimensional vectors                           │        │
+│  └──────────────────────┬──────────────────────────────┘        │
+│                         │                                        │
+│                         ▼                                        │
+│  ┌─────────────────────────────────────────────────────┐        │
+│  │              Vector Storage (ChromaDB)               │        │
+│  │  - Local SQLite + DuckDB backend                    │        │
+│  │  - Collections: channels, videos, news              │        │
+│  │  - Metadata filtering for retrieval                 │        │
+│  └──────────────────────┬──────────────────────────────┘        │
+│                         │                                        │
+│                         ▼                                        │
+│  ┌─────────────────────────────────────────────────────┐        │
+│  │              RAG Retrieval Layer                     │        │
+│  │  - Semantic similarity search                        │        │
+│  │  - Metadata filtering (date, source, niche)         │        │
+│  │  - Top-K retrieval with relevance scoring           │        │
+│  └──────────────────────┬──────────────────────────────┘        │
+│                         │                                        │
+│                         ▼                                        │
+│  ┌─────────────────────────────────────────────────────┐        │
+│  │              LLM Context Augmentation                │        │
+│  │  - Retrieved docs injected into prompt              │        │
+│  │  - Ollama/Gemini generates informed response        │        │
+│  │  - Script generation with channel awareness         │        │
+│  └─────────────────────────────────────────────────────┘        │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Operating Modes
+
+#### Mode 1: Established Channel
+User connects their existing YouTube channel. System syncs content and learns their style.
+
+```typescript
+// lib/rag/modes/established-channel.ts
+interface EstablishedChannelConfig {
+  channelId: string;           // User's YouTube channel ID
+  syncFrequency: 'daily';      // Daily sync via cron job
+  competitorChannels: string[]; // Up to 5 competitor channel IDs
+  trackTrends: boolean;        // Monitor YouTube trends in niche
+  newsEnabled: boolean;        // Fetch news from configured sources
+}
+
+async function initializeEstablishedChannel(config: EstablishedChannelConfig): Promise<void> {
+  // 1. Fetch channel metadata via YouTube Data API
+  const channelMeta = await fetchChannelMetadata(config.channelId);
+
+  // 2. Scrape auto-captions for all videos
+  const transcripts = await scrapeChannelTranscripts(config.channelId);
+
+  // 3. Generate embeddings and store in ChromaDB
+  await embedAndStore(transcripts, { source: 'user_channel', channelId: config.channelId });
+
+  // 4. Index competitors if specified
+  for (const competitorId of config.competitorChannels) {
+    await indexCompetitorChannel(competitorId);
+  }
+
+  // 5. Schedule daily sync job
+  scheduleChannelSync(config);
+}
+```
+
+#### Mode 2: Cold Start (New Channel)
+User declares their niche. System indexes top channels in that niche to learn successful patterns.
+
+```typescript
+// lib/rag/modes/cold-start.ts
+interface ColdStartConfig {
+  niche: string;               // e.g., "military", "gaming", "cooking"
+  nicheKeywords: string[];     // Additional keywords for YouTube search
+  autoSelectTopChannels: boolean; // Auto-select top 5 channels in niche
+  manualChannels?: string[];   // Or user specifies channels
+}
+
+async function initializeColdStart(config: ColdStartConfig): Promise<void> {
+  let channelIds: string[];
+
+  if (config.autoSelectTopChannels) {
+    // 1. Search YouTube for top channels in niche
+    channelIds = await findTopChannelsInNiche(config.niche, config.nicheKeywords);
+  } else {
+    channelIds = config.manualChannels || [];
+  }
+
+  // 2. Index each channel's content
+  for (const channelId of channelIds.slice(0, 5)) {
+    await indexCompetitorChannel(channelId);
+  }
+
+  // 3. Load niche-specific news sources (e.g., military news for military niche)
+  const newsSources = getNicheNewsSources(config.niche);
+  await initializeNewsSources(newsSources);
+
+  // 4. Schedule daily sync
+  scheduleColdStartSync(config);
+}
+```
+
+### Data Ingestion Components
+
+#### YouTube Caption Scraping
+
+```typescript
+// lib/rag/ingestion/youtube-captions.ts
+import { spawn } from 'child_process';
+
+interface TranscriptSegment {
+  text: string;
+  start: number;
+  duration: number;
+}
+
+interface VideoTranscript {
+  videoId: string;
+  title: string;
+  description: string;
+  transcript: TranscriptSegment[];
+  fullText: string;          // Concatenated transcript
+  publishedAt: string;
+  channelId: string;
+}
+
+/**
+ * Scrape auto-captions using youtube-transcript-api (Python)
+ */
+async function scrapeVideoTranscript(videoId: string): Promise<VideoTranscript | null> {
+  return new Promise((resolve, reject) => {
+    const python = spawn('python', [
+      '-c',
+      `
+from youtube_transcript_api import YouTubeTranscriptApi
+import json
+
+try:
+    transcript = YouTubeTranscriptApi.get_transcript('${videoId}')
+    print(json.dumps(transcript))
+except Exception as e:
+    print(json.dumps({"error": str(e)}))
+      `
+    ]);
+
+    let output = '';
+    python.stdout.on('data', (data) => { output += data.toString(); });
+    python.on('close', (code) => {
+      try {
+        const result = JSON.parse(output);
+        if (result.error) {
+          resolve(null); // No transcript available
+        } else {
+          resolve({
+            videoId,
+            transcript: result,
+            fullText: result.map((s: TranscriptSegment) => s.text).join(' ')
+          } as VideoTranscript);
+        }
+      } catch {
+        resolve(null);
+      }
+    });
+  });
+}
+
+/**
+ * Scrape all videos from a channel
+ */
+async function scrapeChannelTranscripts(
+  channelId: string,
+  limit: number = 50
+): Promise<VideoTranscript[]> {
+  // 1. Get list of video IDs from channel via YouTube Data API
+  const videoIds = await getChannelVideoIds(channelId, limit);
+
+  // 2. Scrape each video's transcript (with rate limiting)
+  const transcripts: VideoTranscript[] = [];
+  for (const videoId of videoIds) {
+    const transcript = await scrapeVideoTranscript(videoId);
+    if (transcript) {
+      transcripts.push(transcript);
+    }
+    await sleep(500); // Rate limit: 2 requests/second
+  }
+
+  return transcripts;
+}
+```
+
+#### News Source Ingestion
+
+```typescript
+// lib/rag/ingestion/news-sources.ts
+
+interface NewsSource {
+  id: string;
+  name: string;
+  url: string;
+  niche: string;
+  fetchMethod: 'rss' | 'scrape';
+  selectors?: {
+    headline: string;
+    summary: string;
+    link: string;
+  };
+}
+
+// Pre-configured military news sources (PRD Feature 2.7)
+export const MILITARY_NEWS_SOURCES: NewsSource[] = [
+  {
+    id: 'the_war_zone',
+    name: 'The War Zone',
+    url: 'https://www.thedrive.com/the-war-zone',
+    niche: 'military',
+    fetchMethod: 'rss'
+  },
+  {
+    id: 'military_com',
+    name: 'Military.com',
+    url: 'https://www.military.com/daily-news',
+    niche: 'military',
+    fetchMethod: 'rss'
+  },
+  {
+    id: 'defense_news',
+    name: 'Defense News',
+    url: 'https://www.defensenews.com/',
+    niche: 'military',
+    fetchMethod: 'rss'
+  },
+  {
+    id: 'breaking_defense',
+    name: 'Breaking Defense',
+    url: 'https://breakingdefense.com/',
+    niche: 'military',
+    fetchMethod: 'rss'
+  },
+  {
+    id: 'defense_one',
+    name: 'Defense One',
+    url: 'https://www.defenseone.com/',
+    niche: 'military',
+    fetchMethod: 'rss'
+  },
+  {
+    id: 'military_times',
+    name: 'Military Times',
+    url: 'https://www.militarytimes.com/',
+    niche: 'military',
+    fetchMethod: 'rss'
+  },
+  {
+    id: 'janes',
+    name: 'Janes',
+    url: 'https://www.janes.com/osint-insights/defence-news',
+    niche: 'military',
+    fetchMethod: 'rss'
+  }
+];
+
+interface NewsArticle {
+  id: string;
+  sourceId: string;
+  headline: string;
+  summary: string;
+  url: string;
+  publishedAt: string;
+  niche: string;
+}
+
+async function fetchNewsFromSource(source: NewsSource): Promise<NewsArticle[]> {
+  if (source.fetchMethod === 'rss') {
+    return await fetchRSSFeed(source);
+  } else {
+    return await scrapeNewsPage(source);
+  }
+}
+
+async function fetchAllNicheNews(niche: string): Promise<NewsArticle[]> {
+  const sources = getNicheNewsSources(niche);
+  const allArticles: NewsArticle[] = [];
+
+  for (const source of sources) {
+    try {
+      const articles = await fetchNewsFromSource(source);
+      allArticles.push(...articles);
+    } catch (error) {
+      console.warn(`Failed to fetch from ${source.name}:`, error);
+    }
+  }
+
+  return allArticles;
+}
+```
+
+### Vector Database Integration
+
+```typescript
+// lib/rag/vector-db/chroma-client.ts
+import { ChromaClient, Collection } from 'chromadb';
+
+const CHROMA_PATH = '.cache/chroma';
+
+class RAGVectorStore {
+  private client: ChromaClient;
+  private collections: Map<string, Collection> = new Map();
+
+  async initialize(): Promise<void> {
+    this.client = new ChromaClient({ path: CHROMA_PATH });
+
+    // Create collections
+    this.collections.set('channels', await this.client.getOrCreateCollection({
+      name: 'channel_content',
+      metadata: { 'hnsw:space': 'cosine' }
+    }));
+
+    this.collections.set('news', await this.client.getOrCreateCollection({
+      name: 'news_articles',
+      metadata: { 'hnsw:space': 'cosine' }
+    }));
+
+    this.collections.set('trends', await this.client.getOrCreateCollection({
+      name: 'trending_topics',
+      metadata: { 'hnsw:space': 'cosine' }
+    }));
+  }
+
+  async addVideoContent(video: VideoTranscript, embedding: number[]): Promise<void> {
+    const collection = this.collections.get('channels')!;
+
+    await collection.add({
+      ids: [video.videoId],
+      embeddings: [embedding],
+      metadatas: [{
+        channelId: video.channelId,
+        title: video.title,
+        publishedAt: video.publishedAt,
+        type: 'video_transcript'
+      }],
+      documents: [video.fullText]
+    });
+  }
+
+  async addNewsArticle(article: NewsArticle, embedding: number[]): Promise<void> {
+    const collection = this.collections.get('news')!;
+
+    await collection.add({
+      ids: [article.id],
+      embeddings: [embedding],
+      metadatas: [{
+        sourceId: article.sourceId,
+        niche: article.niche,
+        publishedAt: article.publishedAt,
+        url: article.url
+      }],
+      documents: [`${article.headline}\n\n${article.summary}`]
+    });
+  }
+
+  async queryRelevantContent(
+    queryEmbedding: number[],
+    options: {
+      collection: 'channels' | 'news' | 'trends';
+      niche?: string;
+      channelId?: string;
+      limit?: number;
+      minDate?: string;
+    }
+  ): Promise<QueryResult[]> {
+    const collection = this.collections.get(options.collection)!;
+
+    const whereFilter: Record<string, any> = {};
+    if (options.niche) whereFilter.niche = options.niche;
+    if (options.channelId) whereFilter.channelId = options.channelId;
+
+    const results = await collection.query({
+      queryEmbeddings: [queryEmbedding],
+      nResults: options.limit || 10,
+      where: Object.keys(whereFilter).length > 0 ? whereFilter : undefined
+    });
+
+    return results.documents[0].map((doc, idx) => ({
+      document: doc,
+      metadata: results.metadatas[0][idx],
+      distance: results.distances?.[0]?.[idx] || 0
+    }));
+  }
+}
+
+export const vectorStore = new RAGVectorStore();
+```
+
+### Embedding Generation
+
+```typescript
+// lib/rag/embeddings/local-embeddings.ts
+import { spawn } from 'child_process';
+
+/**
+ * Generate embeddings using sentence-transformers (Python)
+ * Model: all-MiniLM-L6-v2 (384 dimensions, ~80MB)
+ */
+async function generateEmbedding(text: string): Promise<number[]> {
+  return new Promise((resolve, reject) => {
+    const python = spawn('python', [
+      '-c',
+      `
+from sentence_transformers import SentenceTransformer
+import json
+import sys
+
+model = SentenceTransformer('all-MiniLM-L6-v2')
+text = '''${text.replace(/'/g, "\\'")}'''
+embedding = model.encode(text).tolist()
+print(json.dumps(embedding))
+      `
+    ]);
+
+    let output = '';
+    python.stdout.on('data', (data) => { output += data.toString(); });
+    python.stderr.on('data', (data) => { console.error(data.toString()); });
+    python.on('close', (code) => {
+      if (code === 0) {
+        resolve(JSON.parse(output));
+      } else {
+        reject(new Error(`Embedding generation failed with code ${code}`));
+      }
+    });
+  });
+}
+
+/**
+ * Batch embedding for efficiency
+ */
+async function generateEmbeddings(texts: string[]): Promise<number[][]> {
+  // For large batches, use Python batch processing
+  return new Promise((resolve, reject) => {
+    const python = spawn('python', [
+      '-c',
+      `
+from sentence_transformers import SentenceTransformer
+import json
+import sys
+
+model = SentenceTransformer('all-MiniLM-L6-v2')
+texts = json.loads('''${JSON.stringify(texts)}''')
+embeddings = model.encode(texts).tolist()
+print(json.dumps(embeddings))
+      `
+    ]);
+
+    let output = '';
+    python.stdout.on('data', (data) => { output += data.toString(); });
+    python.on('close', (code) => {
+      if (code === 0) {
+        resolve(JSON.parse(output));
+      } else {
+        reject(new Error('Batch embedding failed'));
+      }
+    });
+  });
+}
+```
+
+### RAG-Augmented Script Generation
+
+```typescript
+// lib/rag/generation/rag-script-generator.ts
+import { vectorStore } from '../vector-db/chroma-client';
+import { generateEmbedding } from '../embeddings/local-embeddings';
+import { getLLMProvider } from '@/lib/llm/factory';
+import { getProjectPersona } from '@/lib/db/queries';
+
+interface RAGContext {
+  channelContent: string[];    // Relevant videos from user's channel
+  competitorContent: string[]; // What competitors are doing
+  newsArticles: string[];      // Recent news in niche
+  trendingTopics: string[];    // Current YouTube trends
+}
+
+async function retrieveRAGContext(
+  topic: string,
+  projectId: string
+): Promise<RAGContext> {
+  // Generate query embedding
+  const queryEmbedding = await generateEmbedding(topic);
+
+  // Get project's RAG configuration
+  const ragConfig = await getProjectRAGConfig(projectId);
+
+  // Query each collection
+  const [channelResults, competitorResults, newsResults, trendResults] = await Promise.all([
+    vectorStore.queryRelevantContent(queryEmbedding, {
+      collection: 'channels',
+      channelId: ragConfig.userChannelId,
+      limit: 5
+    }),
+    vectorStore.queryRelevantContent(queryEmbedding, {
+      collection: 'channels',
+      // Exclude user's channel, get competitors only
+      limit: 5
+    }),
+    vectorStore.queryRelevantContent(queryEmbedding, {
+      collection: 'news',
+      niche: ragConfig.niche,
+      limit: 5,
+      minDate: getDateDaysAgo(7) // Last 7 days
+    }),
+    vectorStore.queryRelevantContent(queryEmbedding, {
+      collection: 'trends',
+      limit: 3
+    })
+  ]);
+
+  return {
+    channelContent: channelResults.map(r => r.document),
+    competitorContent: competitorResults.map(r => r.document),
+    newsArticles: newsResults.map(r => r.document),
+    trendingTopics: trendResults.map(r => r.document)
+  };
+}
+
+async function generateRAGAugmentedScript(
+  topic: string,
+  projectId: string
+): Promise<Script> {
+  // 1. Retrieve relevant context
+  const context = await retrieveRAGContext(topic, projectId);
+
+  // 2. Build augmented prompt
+  const augmentedPrompt = buildRAGPrompt(topic, context);
+
+  // 3. Get project's persona
+  const personaPrompt = getProjectPersona(projectId);
+
+  // 4. Generate script with full context
+  const llm = getLLMProvider();
+  const response = await llm.chat([
+    { role: 'user', content: augmentedPrompt }
+  ], personaPrompt);
+
+  return parseScriptResponse(response);
+}
+
+function buildRAGPrompt(topic: string, context: RAGContext): string {
+  return `Generate a video script about: "${topic}"
+
+## Your Channel's Style & Previous Content
+${context.channelContent.length > 0
+  ? context.channelContent.map((c, i) => `[Video ${i+1}]: ${c.substring(0, 500)}...`).join('\n\n')
+  : '(New channel - no previous content)'}
+
+## What Competitors Are Doing
+${context.competitorContent.map((c, i) => `[Competitor ${i+1}]: ${c.substring(0, 300)}...`).join('\n\n')}
+
+## Recent News in Your Niche
+${context.newsArticles.map((a, i) => `[News ${i+1}]: ${a}`).join('\n\n')}
+
+## Current Trending Topics
+${context.trendingTopics.join('\n')}
+
+---
+
+Based on the above context:
+1. Match your channel's established tone and style (if available)
+2. Differentiate from competitors while learning from their successful patterns
+3. Incorporate relevant current events and news angles
+4. Leverage trending topics where naturally relevant
+
+Generate a structured video script with numbered scenes.`;
+}
+```
+
+### API Endpoints
+
+```typescript
+// app/api/rag/setup/route.ts
+export async function POST(req: Request) {
+  const { projectId, mode, config } = await req.json();
+
+  if (mode === 'established') {
+    await initializeEstablishedChannel(config);
+  } else if (mode === 'cold_start') {
+    await initializeColdStart(config);
+  }
+
+  // Update project with RAG config
+  db.prepare(`
+    UPDATE projects
+    SET rag_enabled = true, rag_config = ?
+    WHERE id = ?
+  `).run(JSON.stringify(config), projectId);
+
+  return Response.json({ success: true });
+}
+
+// app/api/rag/sync/route.ts
+export async function POST(req: Request) {
+  const { projectId } = await req.json();
+
+  // Trigger manual sync
+  await syncProjectRAGData(projectId);
+
+  return Response.json({ success: true });
+}
+
+// app/api/rag/status/route.ts
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const projectId = searchParams.get('projectId');
+
+  const status = db.prepare(`
+    SELECT
+      rag_enabled,
+      rag_config,
+      rag_last_sync,
+      (SELECT COUNT(*) FROM rag_sync_jobs WHERE project_id = ? AND status = 'pending') as pending_jobs
+    FROM projects WHERE id = ?
+  `).get(projectId, projectId);
+
+  return Response.json({ success: true, data: status });
+}
+```
+
+### Project Structure Extension
+
+```
+lib/
+├── rag/                           # RAG system (Feature 2.7)
+│   ├── index.ts                   # Main exports
+│   ├── modes/
+│   │   ├── established-channel.ts # Existing channel sync
+│   │   └── cold-start.ts          # New channel niche learning
+│   ├── ingestion/
+│   │   ├── youtube-captions.ts    # Caption scraping
+│   │   ├── youtube-metadata.ts    # Channel/video metadata
+│   │   ├── news-sources.ts        # News RSS/scraping
+│   │   └── trends.ts              # YouTube trends
+│   ├── embeddings/
+│   │   ├── local-embeddings.ts    # sentence-transformers
+│   │   └── gemini-embeddings.ts   # Optional cloud embeddings
+│   ├── vector-db/
+│   │   ├── chroma-client.ts       # ChromaDB wrapper
+│   │   └── collections.ts         # Collection schemas
+│   ├── retrieval/
+│   │   ├── semantic-search.ts     # Similarity search
+│   │   └── filters.ts             # Metadata filtering
+│   └── generation/
+│       ├── rag-script-generator.ts # RAG-augmented generation
+│       └── topic-suggestions.ts    # AI topic recommendations
+```
+
+### Environment Variables
+
+```bash
+# .env.local - RAG Configuration (Feature 2.7)
+
+# ============================================
+# RAG System Configuration
+# ============================================
+RAG_ENABLED=true
+RAG_SYNC_SCHEDULE="0 6 * * *"  # Daily at 6 AM (cron format)
+
+# Vector Database
+CHROMA_PATH=.cache/chroma
+CHROMA_COLLECTION_PREFIX=aivideogen
+
+# Embeddings (local by default)
+EMBEDDING_PROVIDER=local  # local | gemini
+EMBEDDING_MODEL=all-MiniLM-L6-v2
+
+# YouTube API (shared with Epic 3)
+# YOUTUBE_API_KEY already configured
+
+# News Scraping
+NEWS_FETCH_ENABLED=true
+NEWS_MAX_ARTICLES_PER_SOURCE=20
+```
+
+---
+
+## Background Job Queue Architecture
+
+**Purpose:** Execute scheduled and long-running tasks outside the HTTP request lifecycle.
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   Background Job Architecture                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
+│  │  Cron Jobs   │    │  API Trigger │    │  Event-Based │       │
+│  │  (Scheduled) │    │  (Manual)    │    │  (On-Demand) │       │
+│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘       │
+│         │                   │                   │                │
+│         └───────────────────┼───────────────────┘                │
+│                             ▼                                    │
+│  ┌─────────────────────────────────────────────────────┐        │
+│  │                   Job Queue                          │        │
+│  │  - SQLite-backed (jobs table)                       │        │
+│  │  - Priority levels (high, normal, low)              │        │
+│  │  - Retry logic with exponential backoff             │        │
+│  └──────────────────────┬──────────────────────────────┘        │
+│                         │                                        │
+│                         ▼                                        │
+│  ┌─────────────────────────────────────────────────────┐        │
+│  │                  Job Processor                       │        │
+│  │  - Concurrent execution (configurable limit)        │        │
+│  │  - Job-type handlers                                │        │
+│  │  - Progress tracking                                │        │
+│  │  - Error isolation                                  │        │
+│  └──────────────────────┬──────────────────────────────┘        │
+│                         │                                        │
+│  ┌──────────────────────┼──────────────────────────────┐        │
+│  │                Job Type Handlers                     │        │
+│  │                                                      │        │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │        │
+│  │  │ RAG Sync    │  │ Video       │  │ News        │  │        │
+│  │  │ Channel     │  │ Assembly    │  │ Fetch       │  │        │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  │        │
+│  │                                                      │        │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │        │
+│  │  │ Embedding   │  │ CV Analysis │  │ Cleanup     │  │        │
+│  │  │ Generation  │  │ (Batch)     │  │ (Cache)     │  │        │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  │        │
+│  │                                                      │        │
+│  └──────────────────────────────────────────────────────┘        │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Database Schema
+
+```sql
+-- Background jobs table (Migration 013)
+CREATE TABLE background_jobs (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,           -- 'rag_sync', 'video_assembly', 'news_fetch', 'embedding_gen', 'cv_batch', 'cache_cleanup'
+  status TEXT DEFAULT 'pending', -- 'pending', 'running', 'completed', 'failed', 'cancelled'
+  priority INTEGER DEFAULT 5,   -- 1 (highest) to 10 (lowest)
+  payload TEXT,                 -- JSON job-specific data
+  result TEXT,                  -- JSON result or error
+  progress INTEGER DEFAULT 0,   -- 0-100
+  attempt INTEGER DEFAULT 0,    -- Current attempt number
+  max_attempts INTEGER DEFAULT 3,
+  project_id TEXT,              -- Optional project association
+  scheduled_for TEXT,           -- When to run (NULL = immediate)
+  started_at TEXT,
+  completed_at TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_jobs_status ON background_jobs(status);
+CREATE INDEX idx_jobs_type ON background_jobs(type);
+CREATE INDEX idx_jobs_scheduled ON background_jobs(scheduled_for);
+CREATE INDEX idx_jobs_project ON background_jobs(project_id);
+
+-- Cron schedules table
+CREATE TABLE cron_schedules (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  job_type TEXT NOT NULL,
+  cron_expression TEXT NOT NULL, -- e.g., "0 6 * * *" (daily at 6 AM)
+  payload TEXT,                  -- Default payload for scheduled jobs
+  enabled BOOLEAN DEFAULT true,
+  last_run TEXT,
+  next_run TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+```
+
+### Job Queue Implementation
+
+```typescript
+// lib/jobs/queue.ts
+import db from '@/lib/db/client';
+import { randomUUID } from 'crypto';
+
+export interface Job {
+  id: string;
+  type: JobType;
+  status: JobStatus;
+  priority: number;
+  payload: any;
+  result?: any;
+  progress: number;
+  attempt: number;
+  maxAttempts: number;
+  projectId?: string;
+  scheduledFor?: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export type JobType =
+  | 'rag_sync_channel'
+  | 'rag_sync_news'
+  | 'rag_sync_trends'
+  | 'embedding_generation'
+  | 'video_assembly'
+  | 'cv_batch_analysis'
+  | 'cache_cleanup';
+
+export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export class JobQueue {
+  /**
+   * Add a new job to the queue
+   */
+  async enqueue(
+    type: JobType,
+    payload: any,
+    options: {
+      priority?: number;
+      projectId?: string;
+      scheduledFor?: Date;
+      maxAttempts?: number;
+    } = {}
+  ): Promise<string> {
+    const id = randomUUID();
+
+    db.prepare(`
+      INSERT INTO background_jobs (id, type, payload, priority, project_id, scheduled_for, max_attempts)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      type,
+      JSON.stringify(payload),
+      options.priority || 5,
+      options.projectId || null,
+      options.scheduledFor?.toISOString() || null,
+      options.maxAttempts || 3
+    );
+
+    return id;
+  }
+
+  /**
+   * Get next job to process
+   */
+  async dequeue(): Promise<Job | null> {
+    const now = new Date().toISOString();
+
+    const job = db.prepare(`
+      SELECT * FROM background_jobs
+      WHERE status = 'pending'
+        AND (scheduled_for IS NULL OR scheduled_for <= ?)
+      ORDER BY priority ASC, created_at ASC
+      LIMIT 1
+    `).get(now) as any;
+
+    if (!job) return null;
+
+    // Mark as running
+    db.prepare(`
+      UPDATE background_jobs
+      SET status = 'running', started_at = ?, attempt = attempt + 1, updated_at = ?
+      WHERE id = ?
+    `).run(now, now, job.id);
+
+    return {
+      ...job,
+      payload: JSON.parse(job.payload || '{}'),
+      result: job.result ? JSON.parse(job.result) : undefined
+    };
+  }
+
+  /**
+   * Mark job as completed
+   */
+  async complete(jobId: string, result?: any): Promise<void> {
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      UPDATE background_jobs
+      SET status = 'completed', result = ?, progress = 100, completed_at = ?, updated_at = ?
+      WHERE id = ?
+    `).run(
+      result ? JSON.stringify(result) : null,
+      now,
+      now,
+      jobId
+    );
+  }
+
+  /**
+   * Mark job as failed (with retry logic)
+   */
+  async fail(jobId: string, error: Error): Promise<void> {
+    const now = new Date().toISOString();
+
+    const job = db.prepare('SELECT attempt, max_attempts FROM background_jobs WHERE id = ?').get(jobId) as any;
+
+    if (job.attempt < job.max_attempts) {
+      // Schedule retry with exponential backoff
+      const backoffMs = Math.pow(2, job.attempt) * 1000; // 2s, 4s, 8s...
+      const retryAt = new Date(Date.now() + backoffMs).toISOString();
+
+      db.prepare(`
+        UPDATE background_jobs
+        SET status = 'pending', scheduled_for = ?, result = ?, updated_at = ?
+        WHERE id = ?
+      `).run(retryAt, JSON.stringify({ error: error.message }), now, jobId);
+    } else {
+      // Max attempts reached, mark as failed
+      db.prepare(`
+        UPDATE background_jobs
+        SET status = 'failed', result = ?, completed_at = ?, updated_at = ?
+        WHERE id = ?
+      `).run(JSON.stringify({ error: error.message }), now, now, jobId);
+    }
+  }
+
+  /**
+   * Update job progress
+   */
+  async updateProgress(jobId: string, progress: number): Promise<void> {
+    db.prepare(`
+      UPDATE background_jobs
+      SET progress = ?, updated_at = ?
+      WHERE id = ?
+    `).run(progress, new Date().toISOString(), jobId);
+  }
+}
+
+export const jobQueue = new JobQueue();
+```
+
+### Job Processor
+
+```typescript
+// lib/jobs/processor.ts
+import { jobQueue, Job, JobType } from './queue';
+import { ragSyncChannelHandler } from './handlers/rag-sync';
+import { videoAssemblyHandler } from './handlers/video-assembly';
+import { newsFetchHandler } from './handlers/news-fetch';
+import { embeddingHandler } from './handlers/embedding';
+import { cacheCleanupHandler } from './handlers/cleanup';
+
+type JobHandler = (job: Job) => Promise<any>;
+
+const handlers: Record<JobType, JobHandler> = {
+  rag_sync_channel: ragSyncChannelHandler,
+  rag_sync_news: newsFetchHandler,
+  rag_sync_trends: ragSyncChannelHandler, // Reuse with different payload
+  embedding_generation: embeddingHandler,
+  video_assembly: videoAssemblyHandler,
+  cv_batch_analysis: cvBatchHandler,
+  cache_cleanup: cacheCleanupHandler
+};
+
+export class JobProcessor {
+  private running = false;
+  private concurrency: number;
+  private activeJobs = 0;
+
+  constructor(concurrency: number = 2) {
+    this.concurrency = concurrency;
+  }
+
+  async start(): Promise<void> {
+    this.running = true;
+    console.log(`Job processor started (concurrency: ${this.concurrency})`);
+
+    while (this.running) {
+      if (this.activeJobs < this.concurrency) {
+        const job = await jobQueue.dequeue();
+        if (job) {
+          this.processJob(job);
+        }
+      }
+
+      // Poll interval
+      await sleep(1000);
+    }
+  }
+
+  async stop(): Promise<void> {
+    this.running = false;
+    // Wait for active jobs to complete
+    while (this.activeJobs > 0) {
+      await sleep(100);
+    }
+    console.log('Job processor stopped');
+  }
+
+  private async processJob(job: Job): Promise<void> {
+    this.activeJobs++;
+
+    try {
+      const handler = handlers[job.type];
+      if (!handler) {
+        throw new Error(`Unknown job type: ${job.type}`);
+      }
+
+      console.log(`Processing job ${job.id} (${job.type})`);
+      const result = await handler(job);
+      await jobQueue.complete(job.id, result);
+      console.log(`Job ${job.id} completed`);
+    } catch (error) {
+      console.error(`Job ${job.id} failed:`, error);
+      await jobQueue.fail(job.id, error as Error);
+    } finally {
+      this.activeJobs--;
+    }
+  }
+}
+```
+
+### Cron Scheduler
+
+```typescript
+// lib/jobs/scheduler.ts
+import cron from 'node-cron';
+import db from '@/lib/db/client';
+import { jobQueue, JobType } from './queue';
+
+interface CronSchedule {
+  id: string;
+  name: string;
+  jobType: JobType;
+  cronExpression: string;
+  payload: any;
+  enabled: boolean;
+}
+
+export class CronScheduler {
+  private tasks: Map<string, cron.ScheduledTask> = new Map();
+
+  async initialize(): Promise<void> {
+    // Load schedules from database
+    const schedules = db.prepare(`
+      SELECT * FROM cron_schedules WHERE enabled = true
+    `).all() as any[];
+
+    for (const schedule of schedules) {
+      this.scheduleJob(schedule);
+    }
+
+    console.log(`Cron scheduler initialized with ${schedules.length} jobs`);
+  }
+
+  private scheduleJob(schedule: CronSchedule): void {
+    const task = cron.schedule(schedule.cronExpression, async () => {
+      console.log(`Cron trigger: ${schedule.name}`);
+
+      // Enqueue job
+      await jobQueue.enqueue(
+        schedule.jobType as JobType,
+        JSON.parse(schedule.payload || '{}'),
+        { priority: 3 } // Scheduled jobs get higher priority
+      );
+
+      // Update last_run
+      db.prepare(`
+        UPDATE cron_schedules SET last_run = ? WHERE id = ?
+      `).run(new Date().toISOString(), schedule.id);
+    });
+
+    this.tasks.set(schedule.id, task);
+  }
+
+  /**
+   * Register default cron schedules (run once on startup)
+   */
+  async registerDefaults(): Promise<void> {
+    const defaults: Partial<CronSchedule>[] = [
+      {
+        name: 'Daily RAG Channel Sync',
+        jobType: 'rag_sync_channel',
+        cronExpression: '0 6 * * *', // Daily at 6 AM
+        payload: '{}'
+      },
+      {
+        name: 'Daily News Fetch',
+        jobType: 'rag_sync_news',
+        cronExpression: '0 */4 * * *', // Every 4 hours
+        payload: '{}'
+      },
+      {
+        name: 'Weekly Cache Cleanup',
+        jobType: 'cache_cleanup',
+        cronExpression: '0 3 * * 0', // Sunday at 3 AM
+        payload: '{"maxAgeDays": 30}'
+      }
+    ];
+
+    for (const def of defaults) {
+      const existing = db.prepare(
+        'SELECT id FROM cron_schedules WHERE name = ?'
+      ).get(def.name);
+
+      if (!existing) {
+        db.prepare(`
+          INSERT INTO cron_schedules (id, name, job_type, cron_expression, payload)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(
+          randomUUID(),
+          def.name,
+          def.jobType,
+          def.cronExpression,
+          def.payload
+        );
+      }
+    }
+  }
+
+  stop(): void {
+    for (const task of this.tasks.values()) {
+      task.stop();
+    }
+    this.tasks.clear();
+  }
+}
+
+export const cronScheduler = new CronScheduler();
+```
+
+### Job Handlers
+
+```typescript
+// lib/jobs/handlers/rag-sync.ts
+import { Job } from '../queue';
+import { jobQueue } from '../queue';
+import { scrapeChannelTranscripts } from '@/lib/rag/ingestion/youtube-captions';
+import { generateEmbeddings } from '@/lib/rag/embeddings/local-embeddings';
+import { vectorStore } from '@/lib/rag/vector-db/chroma-client';
+
+export async function ragSyncChannelHandler(job: Job): Promise<any> {
+  const { channelId, projectId } = job.payload;
+
+  // 1. Fetch new videos since last sync
+  await jobQueue.updateProgress(job.id, 10);
+  const newVideos = await getNewVideosSinceLastSync(channelId);
+
+  if (newVideos.length === 0) {
+    return { synced: 0, message: 'No new videos' };
+  }
+
+  // 2. Scrape transcripts
+  await jobQueue.updateProgress(job.id, 30);
+  const transcripts = await scrapeChannelTranscripts(channelId, newVideos);
+
+  // 3. Generate embeddings
+  await jobQueue.updateProgress(job.id, 60);
+  const texts = transcripts.map(t => t.fullText);
+  const embeddings = await generateEmbeddings(texts);
+
+  // 4. Store in vector DB
+  await jobQueue.updateProgress(job.id, 80);
+  for (let i = 0; i < transcripts.length; i++) {
+    await vectorStore.addVideoContent(transcripts[i], embeddings[i]);
+  }
+
+  // 5. Update last sync timestamp
+  await jobQueue.updateProgress(job.id, 100);
+  await updateLastSyncTimestamp(projectId, channelId);
+
+  return {
+    synced: transcripts.length,
+    channelId,
+    timestamp: new Date().toISOString()
+  };
+}
+
+// lib/jobs/handlers/news-fetch.ts
+export async function newsFetchHandler(job: Job): Promise<any> {
+  const { niche, sourceIds } = job.payload;
+
+  // 1. Get news sources for niche
+  const sources = sourceIds
+    ? getSourcesByIds(sourceIds)
+    : getNicheNewsSources(niche);
+
+  let totalArticles = 0;
+
+  // 2. Fetch from each source
+  for (let i = 0; i < sources.length; i++) {
+    await jobQueue.updateProgress(job.id, Math.round((i / sources.length) * 80));
+
+    try {
+      const articles = await fetchNewsFromSource(sources[i]);
+
+      // 3. Generate embeddings and store
+      const texts = articles.map(a => `${a.headline}\n\n${a.summary}`);
+      const embeddings = await generateEmbeddings(texts);
+
+      for (let j = 0; j < articles.length; j++) {
+        await vectorStore.addNewsArticle(articles[j], embeddings[j]);
+      }
+
+      totalArticles += articles.length;
+    } catch (error) {
+      console.warn(`Failed to fetch from ${sources[i].name}:`, error);
+    }
+  }
+
+  return {
+    fetched: totalArticles,
+    sources: sources.length,
+    timestamp: new Date().toISOString()
+  };
+}
+```
+
+### Startup Integration
+
+```typescript
+// lib/jobs/init.ts
+import { JobProcessor } from './processor';
+import { CronScheduler, cronScheduler } from './scheduler';
+
+let processor: JobProcessor | null = null;
+
+export async function initializeJobSystem(): Promise<void> {
+  // Only run in main process, not in API routes
+  if (process.env.NEXT_PHASE === 'phase-production-build') {
+    return;
+  }
+
+  // Register default cron schedules
+  await cronScheduler.registerDefaults();
+
+  // Initialize cron scheduler
+  await cronScheduler.initialize();
+
+  // Start job processor
+  processor = new JobProcessor(2); // 2 concurrent jobs
+  processor.start();
+
+  console.log('Background job system initialized');
+}
+
+export async function shutdownJobSystem(): Promise<void> {
+  cronScheduler.stop();
+  if (processor) {
+    await processor.stop();
+  }
+}
+
+// app/layout.tsx or middleware.ts
+// Call initializeJobSystem() on app startup
+```
+
+### API Endpoints
+
+```typescript
+// app/api/jobs/route.ts
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const projectId = searchParams.get('projectId');
+  const status = searchParams.get('status');
+
+  let query = 'SELECT * FROM background_jobs WHERE 1=1';
+  const params: any[] = [];
+
+  if (projectId) {
+    query += ' AND project_id = ?';
+    params.push(projectId);
+  }
+  if (status) {
+    query += ' AND status = ?';
+    params.push(status);
+  }
+
+  query += ' ORDER BY created_at DESC LIMIT 50';
+
+  const jobs = db.prepare(query).all(...params);
+
+  return Response.json({ success: true, data: jobs });
+}
+
+// app/api/jobs/[id]/route.ts
+export async function GET(req: Request, { params }: { params: { id: string } }) {
+  const job = db.prepare('SELECT * FROM background_jobs WHERE id = ?').get(params.id);
+
+  if (!job) {
+    return Response.json({ success: false, error: 'Job not found' }, { status: 404 });
+  }
+
+  return Response.json({ success: true, data: job });
+}
+
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+  // Cancel pending job
+  db.prepare(`
+    UPDATE background_jobs SET status = 'cancelled' WHERE id = ? AND status = 'pending'
+  `).run(params.id);
+
+  return Response.json({ success: true });
+}
+```
+
+### Environment Variables
+
+```bash
+# .env.local - Job System Configuration
+
+# ============================================
+# Background Job Configuration
+# ============================================
+JOB_CONCURRENCY=2              # Max concurrent jobs
+JOB_POLL_INTERVAL_MS=1000      # Queue poll interval
+JOB_DEFAULT_MAX_ATTEMPTS=3     # Default retry attempts
+
+# Cron Schedule Overrides (optional)
+# CRON_RAG_SYNC="0 6 * * *"    # Daily at 6 AM
+# CRON_NEWS_FETCH="0 */4 * * *" # Every 4 hours
+# CRON_CACHE_CLEANUP="0 3 * * 0" # Weekly Sunday 3 AM
+```
+
+---
+
 ## Architecture Decision Records
 
 ### ADR-001: Next.js 15.5 as Primary Framework
@@ -6270,6 +7683,155 @@ Implement automatic CV pipeline integration with:
 - Error isolation: CV failure never blocks download success
 - Non-blocking: Download status updated before CV runs
 - Backwards compatible: NULL cv_score treated as "show"
+
+---
+
+### ADR-009: ChromaDB for Vector Database (Feature 2.7)
+
+**Status:** Accepted
+**Date:** 2025-11-29
+
+**Context:**
+Feature 2.7 (Channel Intelligence & RAG) requires a vector database for storing embeddings of YouTube transcripts, news articles, and trends. Need FOSS-compliant, local-first solution that integrates well with Python ML ecosystem.
+
+**Decision:**
+Use ChromaDB as the vector database with local persistence:
+- Local SQLite + DuckDB backend (no external services)
+- Python-native with good JavaScript interop
+- Collections for different data types (channels, news, trends)
+- HNSW indexing with cosine similarity
+
+**Consequences:**
+- ✅ FOSS compliant (Apache 2.0)
+- ✅ Local-first (no cloud dependency)
+- ✅ Easy Python integration (sentence-transformers ecosystem)
+- ✅ Persistent storage in `.cache/chroma`
+- ✅ Fast semantic search with HNSW indexing
+- ⚠️ Requires Python runtime for embedding generation
+- ⚠️ Limited to single-node deployment (fine for local app)
+
+**Alternatives Considered:**
+- **LanceDB:** Good alternative, Rust-based, but less Python ecosystem integration
+- **Milvus:** Overkill for single-user app, requires separate server
+- **Pinecone:** Cloud-based, violates local-first requirement
+- **SQLite with pgvector extension:** Complex setup, less semantic search optimized
+
+---
+
+### ADR-010: all-MiniLM-L6-v2 for Local Embeddings (Feature 2.7)
+
+**Status:** Accepted
+**Date:** 2025-11-29
+
+**Context:**
+Need embedding model for RAG system. Must be local (FOSS requirement), fast, and produce quality embeddings for semantic search across video transcripts and news articles.
+
+**Decision:**
+Use `all-MiniLM-L6-v2` from sentence-transformers:
+- 384-dimensional embeddings
+- ~80MB model size
+- Runs locally via Python
+- Good balance of speed and quality
+
+**Consequences:**
+- ✅ FOSS compliant (Apache 2.0)
+- ✅ Local execution (no API costs)
+- ✅ Small model size (~80MB)
+- ✅ Fast inference on CPU
+- ✅ Good quality for semantic search tasks
+- ⚠️ Python dependency
+- ⚠️ Not as accurate as larger models (acceptable for use case)
+
+**Alternatives Considered:**
+- **OpenAI text-embedding-ada-002:** Cloud-based, API costs
+- **Gemini embeddings:** Cloud-based, would break local-first
+- **E5-large:** Better quality but 4x larger, slower
+- **BGE-small:** Similar quality but less community adoption
+
+---
+
+### ADR-011: SQLite-Backed Job Queue (Feature 2.7)
+
+**Status:** Accepted
+**Date:** 2025-11-29
+
+**Context:**
+Feature 2.7 requires background job processing for:
+- Daily channel sync (caption scraping, embedding generation)
+- News fetching (RSS, web scraping)
+- Batch embedding generation
+- Cache cleanup
+
+Need lightweight job queue without external dependencies (Redis, RabbitMQ).
+
+**Decision:**
+Implement SQLite-backed job queue with:
+- `background_jobs` table for job storage
+- `cron_schedules` table for recurring jobs
+- node-cron for schedule management
+- Custom processor with concurrency control
+
+**Consequences:**
+- ✅ No external dependencies (uses existing SQLite)
+- ✅ Persistent queue (survives restarts)
+- ✅ Simple implementation (~200 lines)
+- ✅ Built-in retry with exponential backoff
+- ✅ Progress tracking for long-running jobs
+- ⚠️ Not suitable for high-throughput (fine for single-user)
+- ⚠️ No distributed processing (acceptable for local app)
+
+**Alternatives Considered:**
+- **BullMQ + Redis:** Requires Redis server, overkill
+- **Agenda + MongoDB:** Wrong database
+- **node-cron only:** No persistence, no retry logic
+- **AWS SQS/Lambda:** Cloud-based, violates local-first
+
+**Job Types:**
+| Job Type | Trigger | Frequency |
+|----------|---------|-----------|
+| rag_sync_channel | Cron | Daily 6 AM |
+| rag_sync_news | Cron | Every 4 hours |
+| embedding_generation | On-demand | Per video |
+| cv_batch_analysis | On-demand | Per project |
+| cache_cleanup | Cron | Weekly Sunday 3 AM |
+
+---
+
+### ADR-012: youtube-transcript-api for Caption Scraping (Feature 2.7)
+
+**Status:** Accepted
+**Date:** 2025-11-29
+
+**Context:**
+Need to extract video transcripts (auto-captions) from YouTube videos for RAG knowledge base. YouTube doesn't provide official transcript API.
+
+**Decision:**
+Use `youtube-transcript-api` Python library:
+- Extracts auto-generated and manual captions
+- Works with video IDs (no authentication required)
+- Returns timestamped transcript segments
+- FOSS (MIT license)
+
+**Consequences:**
+- ✅ FOSS compliant (MIT)
+- ✅ No API key required
+- ✅ Supports auto-generated captions
+- ✅ Returns timestamps for potential future features
+- ⚠️ Depends on YouTube's internal structures (may break)
+- ⚠️ Some videos have no captions (graceful degradation)
+- ⚠️ Rate limiting recommended (2 req/sec)
+
+**Alternatives Considered:**
+- **yt-dlp subtitle extraction:** Heavier, downloads whole metadata
+- **Manual scraping:** Brittle, maintenance burden
+- **Third-party APIs:** Cloud-based, costs money
+
+**Integration Pattern:**
+```python
+# Called from Node.js via child_process.spawn
+from youtube_transcript_api import YouTubeTranscriptApi
+transcript = YouTubeTranscriptApi.get_transcript(video_id)
+```
 
 ---
 

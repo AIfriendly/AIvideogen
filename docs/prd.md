@@ -1,58 +1,58 @@
 # Product Requirements Document (PRD): AI Video Generator
 
-*This document outlines the requirements for the AI Video Generator MVP. It is a living document and will be updated as the project progresses.*
+*This document outlines the requirements for the AI Video Generator. It is a living document and will be updated as the project progresses.*
 
-**Last Updated:** 2025-11-27
-**Version:** 1.8
+**Last Updated:** 2025-12-01
+**Version:** 3.2
 **Repository:** <https://github.com/AIfriendly/AIvideogen>
 
 **Project Type:** Web Application
 **Domain:** Content Creation
 **Complexity:** Level 2 (BMad Method)
+**Status:** Core Features Complete - Enhancement Phase
 
-**Recent Changes (v1.8 - 2025-11-27):**
-- **MAJOR:** Moved Feature 2.6 (LLM Configuration & Script Personas) to Feature 1.9 (Epic 1 - MVP)
-- **Enhanced Blackpill Realist Persona:** Added specific use cases (AI dystopia, western collapse, lookism/dating inequality, blackpill economics)
-- **Enhanced Blackpill Realist Persona:** Detailed delivery style (brutal honesty, nihilistic framing, elimination of false hope, focus on systemic failures)
-- Added functional requirements FR-1.9.01 through FR-1.9.08 for persona system
-- Added acceptance criteria AC1-AC4 including specific Blackpill Realist script generation test
-- Renumbered Future Enhancements: 2.6 → Local Computer Vision, 2.7 → Topic Research
+**Recent Changes (v3.2 - 2025-12-01):**
+- Added Feature 1.14: Unified API Usage Dashboard
+- Dedicated page at `/settings/api-usage` for all API monitoring
+- Tracks Gemini, YouTube Data API, and ElevenLabs usage
+- Per-request logging with 7-day history retention
+- Warning thresholds at 80% and 95% with global banner alerts
+- Consolidates ElevenLabs tracking from Feature 1.13
 
-**Previous Changes (v1.7 - 2025-11-27):**
-- Added Future Enhancement 2.7: Local Computer Vision (MediaPipe + Tesseract.js) as FOSS alternative to Google Cloud Vision API
-- Detailed hardware requirements, performance comparison, and implementation approach
+**Previous Changes (v3.1 - 2025-12-01):**
+- Added Feature 1.13: ElevenLabs TTS Integration
+- Cloud-based TTS alternative to local Kokoro engine
+- Per-project TTS provider selection (Kokoro vs ElevenLabs)
+- Separate voice catalogs for each provider
+- Usage tracking UI with quota warnings
 
-**Previous Changes (v1.6 - 2025-11-26):**
-- **MAJOR:** Added Executive Summary with product vision, target users, and key value proposition
-- Articulated "FOSS-first, cloud-enhanced" product differentiator
-- Added Project Classification (Type: Web Application, Domain: Content Creation, Complexity: Level 2)
+**Previous Changes (v3.0 - 2025-12-01):**
+- **MILESTONE:** Core features (1.1-1.9) complete - transitioned from MVP to Enhancement phase
+- Restructured document: "Core Features" (complete) + "Enhancement Features" (in development)
+- Removed MVP labels throughout document
+- Features 1.10-1.12 now categorized as Enhancement Features
 
-**Previous Changes (v1.5 - 2025-11-26):**
-- Enhanced Feature 1.5: Tightened face detection threshold from 15% to 10% for stricter talking head filtering
-- Enhanced Feature 1.5: Added 'queued' status to download status tracking
-- Enhanced Feature 1.5: Added CV pipeline auto-trigger requirements (FR-5.27a-e)
-- Enhanced Feature 1.5: Added UI filtering for low cv_score suggestions
-- Updated AC10 to reflect 10% face area threshold
+**Previous Changes (v2.3 - 2025-11-30):**
+- Added Feature 1.12: Automate Mode - Full Automation Pipeline
+- Project-level setting for fully automated video production (topic → export)
+- Pre-automation configuration: voice selection + video source provider selection
+- Automated visual selection based on relevance ranking (keyword match, cv_score, duration fit)
+- Pipeline stages: Script → Voiceover → Visual Sourcing → Auto-Selection → Music → Assembly → Export
 
-**Previous Changes (v1.4 - 2025-11-22):**
-- **MAJOR:** Moved Feature 2.2 (Advanced Content Filtering) into MVP Feature 1.5
-- Enhanced Feature 1.5: Added pure B-roll requirements (no commentary, captions, reaction content)
-- Enhanced Feature 1.5: Added Google Cloud Vision API integration (face detection, OCR, label verification)
-- Enhanced Feature 1.5: Added content-type aware query generation (gaming, historical, conceptual)
-- Enhanced Feature 1.5: Added audio stripping from downloaded segments
-- Added 7 new acceptance criteria (AC8-AC14) for advanced filtering features
+**Previous Changes (v2.2 - 2025-11-30):**
+- Added Feature 1.11: AI-Generated Video Metadata
+- Auto-generates optimized title, description (~150 chars with hashtags), and tags for completed videos
+- Platform-specific variants for YouTube and TikTok
 
-**Previous Changes (v1.3 - 2025-11-16):**
-- Enhanced Feature 1.5: AI-Powered Visual Sourcing with duration filtering (1x-3x ratio, 5-minute max)
-- Enhanced Feature 1.5: Added automatic default segment download for instant preview capability
-- Added database schema extensions for video duration tracking and segment management
+**Previous Changes (v2.1 - 2025-11-30):**
+- Added Feature 1.10: Automated Background Music
+- Multi-track music selection based on video topic and scene mood
+- LLM-generated music search queries, YouTube audio download via yt-dlp
 
-**Previous Changes (v1.2 - 2025-11-01):**
-- Expanded Feature 1.9 (formerly 2.6): LLM Configuration to include System Prompts & Persona Configuration
-- Added preset personas (Creative Assistant, Viral Strategist, Educational Designer, Documentary Filmmaker)
-- Added custom persona creation and per-project persona overrides
-- Specified MVP implementation: default Creative Assistant persona hardcoded, UI configuration post-MVP
-- Previous updates (v1.1): Added Voice Selection as Feature 1.3, specified YouTube Data API v3
+**Previous Changes (v2.0 - 2025-11-29):**
+- Replaced Feature 2.7 (Topic Research & Web Search) with Channel Intelligence & Content Research (RAG-Powered)
+
+*See version history in git for earlier changes.*
 
 ---
 
@@ -71,14 +71,14 @@
 ### NFR 1: Technology Stack
 *   **Requirement:** The system must be implemented using a hybrid local-first and cloud architecture, prioritizing free and open-source (FOSS) technologies for core components.
 *   **Rationale:** To ensure the project is accessible, modifiable, and has minimal licensing costs while leveraging cloud services where they provide significant quality improvements.
-*   **Implication:** This constrains the choice of services for AI models (LLMs, TTS), stock media providers, and all underlying libraries. Any external service must have a free tier that is sufficient for the MVP's purposes without requiring payment.
-*   **Cloud API Exception:** Cloud APIs with free tiers (e.g., Google Cloud Vision API, Gemini API) are acceptable for non-core processing tasks such as content filtering and quality verification. Users may optionally upgrade to paid tiers for increased quotas and better results. This does not conflict with the FOSS philosophy as the MVP operates in a hybrid local+cloud model.
+*   **Implication:** This constrains the choice of services for AI models (LLMs, TTS), stock media providers, and all underlying libraries. Any external service must have a free tier that is sufficient for the project's purposes without requiring payment.
+*   **Cloud API Exception:** Cloud APIs with free tiers (e.g., Google Cloud Vision API, Gemini API) are acceptable for non-core processing tasks such as content filtering and quality verification. Users may optionally upgrade to paid tiers for increased quotas and better results. This does not conflict with the FOSS philosophy as the system operates in a hybrid local+cloud model.
 
 ---
 
 ## Success Criteria
 
-The following measurable criteria define MVP success:
+The following measurable criteria define product success:
 
 ### User Experience Metrics
 - **SC-1:** Users can complete end-to-end video creation (idea → final video) in under 20 minutes
@@ -99,11 +99,13 @@ The following measurable criteria define MVP success:
 
 ### Quality Metrics
 - **SC-12:** Zero critical bugs in core workflow (topic → script → voice → visuals → assembly)
-- **SC-13:** All acceptance criteria for MVP features pass automated and manual testing
+- **SC-13:** All acceptance criteria for core features pass automated and manual testing
 
 ---
 
-## 1. Features
+## 1. Core Features (Complete)
+
+*Features 1.1-1.9 comprise the core product functionality and are fully implemented.*
 
 ### 1.1. Conversational AI Agent
 
@@ -489,10 +491,10 @@ The following measurable criteria define MVP success:
                 *   **Tone Characteristics:** Nihilistic framing, elimination of false hope and platitudes, direct confrontation with uncomfortable truths, fatalistic outlook on human agency
             *   **Documentary Filmmaker** (balanced narrative, human stories, investigative journalism)
             *   **Educational Designer** (TED-Ed style, learning-focused, accessible explanations)
-        *   **Custom Personas (Post-MVP):** UI for creating and saving custom system prompts with full control over tone, restrictions, and delivery style.
+        *   **Custom Personas (Future):** UI for creating and saving custom system prompts with full control over tone, restrictions, and delivery style.
         *   **Per-Project Personas:** Ability to select persona on a per-project basis via project settings (e.g., use "Scientific Analyst" for gaming analysis, "Blackpill Realist" for societal critique content).
     *   **Rationale:** Local Ollama deployment provides complete control over LLM behavior without content restrictions or censorship. Gemini offers cloud-based alternative with generous free tier (1,500 requests/day). Script personas ensure the system adapts to different ideological frameworks and content types without imposing editorial bias.
-    *   **MVP Implementation:**
+    *   **Core Implementation:**
         *   Ollama (primary, FOSS) and Gemini (optional, cloud) providers implemented ✅
         *   Provider selection via .env.local configuration ✅
         *   **Preset Personas:** 3-5 built-in personas optimized for script generation:
@@ -503,7 +505,7 @@ The following measurable criteria define MVP success:
         *   **Persona Selection UI:** Dropdown in project settings to select persona for script generation
         *   **Per-Project Personas:** Selected persona stored in `projects.system_prompt_id` and used for script generation
         *   Personas stored in `system_prompts` table (database infrastructure already exists)
-    *   **POST-MVP Enhancements:**
+    *   **Future Enhancements:**
         *   Custom persona creation UI (user-defined system prompts with full editorial control)
         *   Persona editing and deletion interface
         *   Advanced provider configuration UI (API keys, custom endpoints)
@@ -544,19 +546,362 @@ The following measurable criteria define MVP success:
 
 ---
 
+## 1b. Enhancement Features (In Development)
+
+*Features 1.10-1.12 are enhancement features currently in development, building on top of the core product.*
+
+### 1.10. Automated Background Music
+
+*   **Description:** The system automatically selects and applies background music that matches the video's topic and mood. Music is sourced via YouTube (yt-dlp) and mixed at reduced volume beneath the voiceover. For longer videos, multiple tracks are selected and transitioned at scene boundaries to maintain variety and engagement.
+
+*   **User Stories:**
+    1.  **As a creator,** I want background music automatically added to my video based on its topic, **so that** my videos feel professional without me manually searching for music.
+    2.  **As a creator,** I want the music volume balanced beneath my voiceover, **so that** the narration remains clear and the music enhances rather than distracts.
+    3.  **As a creator,** I want longer videos to have multiple music tracks, **so that** the audio doesn't feel repetitive over 10+ minute videos.
+
+*   **Functional Requirements:**
+    *   **Music Analysis & Search:**
+        *   **FR-10.01:** The system shall analyze the confirmed video topic and scene content to determine appropriate music keywords.
+        *   **FR-10.02:** The system shall use the LLM to generate music search queries based on topic, mood, and content type (e.g., "military" → "epic military orchestral no copyright", "Dark Souls" → "dark souls ambient soundtrack royalty free").
+        *   **FR-10.03:** The system shall append "no copyright", "royalty free", "background music" to all music search queries.
+    *   **Multi-Track Selection:**
+        *   **FR-10.04:** The system shall determine the number of music tracks based on video duration:
+            *   < 2 minutes: 1 track
+            *   2-5 minutes: 2 tracks
+            *   5-10 minutes: 3-4 tracks
+            *   10+ minutes: 4-5 tracks
+        *   **FR-10.05:** The system shall use the LLM to generate per-segment music search queries based on scene content and mood progression.
+        *   **FR-10.06:** The system shall assign music tracks to scene groups (e.g., scenes 1-2 use track A, scenes 3-4 use track B).
+    *   **Music Download:**
+        *   **FR-10.07:** The system shall search YouTube for background music using generated keywords.
+        *   **FR-10.08:** The system shall download audio-only from search results using yt-dlp.
+        *   **FR-10.09:** The system shall store downloaded music in `.cache/audio/music/{projectId}/`.
+    *   **Audio Mixing:**
+        *   **FR-10.10:** The system shall mix background music at -15dB to -20dB below voiceover level (configurable).
+        *   **FR-10.11:** The system shall apply fade-in (2 seconds) at video start and fade-out (3 seconds) at video end.
+        *   **FR-10.12:** The system shall crossfade between tracks (1-2 second overlap) at scene transitions.
+        *   **FR-10.13:** The system shall loop individual tracks if scene group duration exceeds track length.
+        *   **FR-10.14:** The system shall use FFmpeg audio mixing to combine voiceover and background music tracks.
+    *   **Error Handling:**
+        *   **FR-10.15:** The system shall handle music download failures gracefully (video assembles without music rather than failing).
+        *   **FR-10.16:** The system shall log warnings when music tracks fail to download or mix.
+
+*   **Acceptance Criteria:**
+    *   **AC1: Topic-Based Music Selection**
+        *   **Given** a video about "Russian military operations".
+        *   **When** assembly completes.
+        *   **Then** the final video contains background music with military/epic orchestral characteristics.
+    *   **AC2: Content-Specific Music**
+        *   **Given** a video about "Dark Souls boss strategies".
+        *   **When** assembly completes.
+        *   **Then** the final video contains dark/atmospheric background music matching the game's tone.
+    *   **AC3: Volume Balance**
+        *   **Given** voiceover audio at 0dB.
+        *   **When** music is mixed.
+        *   **Then** music volume is between -15dB and -20dB (voiceover clearly audible over music).
+    *   **AC4: Multi-Track for Long Videos**
+        *   **Given** a 10-minute video with 8 scenes.
+        *   **When** assembly completes.
+        *   **Then** at least 3-4 different music tracks are used across the video.
+    *   **AC5: Track Transitions**
+        *   **Given** track A ends and track B begins at scene 4.
+        *   **When** played back.
+        *   **Then** there is a smooth 1-2 second crossfade between tracks.
+    *   **AC6: Track Looping**
+        *   **Given** a 3-minute scene group and 90-second music track.
+        *   **When** assembly completes.
+        *   **Then** the music loops seamlessly to cover full scene group duration.
+    *   **AC7: Graceful Failure**
+        *   **Given** 1 of 3 music downloads fails.
+        *   **When** assembly runs.
+        *   **Then** video completes with 2 working tracks and logs warning.
+    *   **AC8: Complete Failure Fallback**
+        *   **Given** all music downloads fail.
+        *   **When** assembly runs.
+        *   **Then** video completes successfully without background music.
+
+### 1.11. AI-Generated Video Metadata
+
+*   **Description:** The system automatically generates optimized title, description, and tags for the completed video, tailored for YouTube and TikTok platforms. Metadata is displayed on the Export page alongside the download options, enabling creators to copy and paste directly to their upload forms.
+
+*   **User Stories:**
+    1.  **As a creator,** I want AI-generated video titles, descriptions, and tags ready when my video is done, **so that** I can upload to YouTube/TikTok immediately without writing metadata manually.
+    2.  **As a creator,** I want platform-specific metadata formats (YouTube vs TikTok), **so that** I can optimize for each platform's requirements.
+
+*   **Functional Requirements:**
+    *   **FR-11.01:** The system shall generate metadata automatically after video assembly completes.
+    *   **FR-11.02:** The system shall use the video topic, script content, and scene themes as inputs for metadata generation.
+    *   **FR-11.03:** The system shall generate an optimized video title (max 100 characters, engaging, keyword-rich).
+    *   **FR-11.04:** The system shall generate a short description (~150 characters) with relevant hashtags.
+    *   **FR-11.05:** The system shall generate 10-15 comma-separated tags optimized for discoverability.
+    *   **FR-11.06:** The system shall provide YouTube-optimized and TikTok-optimized variants.
+    *   **FR-11.07:** The system shall display metadata on the Export page with copy-to-clipboard functionality.
+    *   **FR-11.08:** The system shall store generated metadata in the project record.
+
+*   **Acceptance Criteria:**
+    *   **AC1: Metadata Generation**
+        *   **Given** a video has been assembled with topic "Russian military operations in Ukraine".
+        *   **When** the Export page loads.
+        *   **Then** AI-generated title, description (with hashtags), and tags are displayed.
+    *   **AC2: Platform Variants**
+        *   **Given** generated metadata is displayed.
+        *   **When** user switches between YouTube and TikTok tabs.
+        *   **Then** description format and hashtag placement adjust for each platform.
+    *   **AC3: Copy Functionality**
+        *   **Given** metadata is displayed on Export page.
+        *   **When** user clicks copy button for title, description, or tags.
+        *   **Then** the text is copied to clipboard with success feedback.
+
+### 1.12. Automate Mode (Full Automation Pipeline)
+
+*   **Description:** A project-level setting that enables fully automated video production from topic confirmation to final export. When enabled, the system automatically generates the script, creates voiceovers, sources and selects the most relevant B-roll footage, applies background music, assembles the video, and navigates directly to the export page. Users select their preferred voice and video source provider before automation begins.
+
+*   **User Stories:**
+    1.  **As a creator,** I want to enable "Automate Mode" for a project, **so that** I can generate complete videos with minimal manual intervention.
+    2.  **As a creator,** I want to select my preferred voice before automation begins, **so that** the narration matches my content's style.
+    3.  **As a creator,** I want to choose my video source provider (YouTube, DVIDS, Pexels/Pixabay) before automation begins, **so that** I get footage from my preferred source.
+    4.  **As a creator,** I want the system to automatically select the most relevant B-roll for each scene, **so that** I don't have to manually curate visuals.
+    5.  **As a creator,** I want to skip directly to the export page when automation completes, **so that** I can download my video immediately.
+
+*   **Functional Requirements:**
+    *   **Project Configuration:**
+        *   **FR-12.01:** The system shall provide an "Automate Mode" toggle in project settings (default: OFF).
+        *   **FR-12.02:** When Automate Mode is enabled, the system shall display voice selection UI before proceeding.
+        *   **FR-12.03:** When Automate Mode is enabled, the system shall display video source selection UI (YouTube, DVIDS, Pexels/Pixabay) before proceeding.
+        *   **FR-12.04:** The system shall store automation preferences (`automate_mode`, `video_source`) in project metadata.
+        *   **FR-12.05:** Video source options shall include: YouTube (available), DVIDS (when implemented), Pexels/Pixabay (when implemented), with unavailable sources visually disabled.
+    *   **Automated Pipeline Execution:**
+        *   **FR-12.06:** Upon topic confirmation with Automate Mode enabled, the system shall execute the full pipeline without user intervention.
+        *   **FR-12.07:** The pipeline shall execute in sequence: Script Generation → Voiceover Generation → Visual Sourcing → Auto-Selection → Music Selection → Video Assembly → Export.
+        *   **FR-12.08:** The system shall display a progress indicator showing current pipeline stage and overall progress.
+    *   **Automated Visual Selection:**
+        *   **FR-12.09:** The system shall auto-select one video clip per scene based on relevance ranking.
+        *   **FR-12.10:** Relevance ranking shall prioritize: (1) keyword match score, (2) cv_score (if available), (3) duration match, (4) B-roll quality indicators.
+        *   **FR-12.11:** The system shall skip suggestions with cv_score < 0.5 during auto-selection.
+        *   **FR-12.12:** If no suitable clips are found for a scene, the system shall retry with relaxed filters (remove duration cap, reduce keyword strictness).
+    *   **Automated Music Selection:**
+        *   **FR-12.13:** The system shall auto-select background music based on video topic and scene mood (per Feature 1.10).
+    *   **Navigation & Completion:**
+        *   **FR-12.14:** Upon successful assembly, the system shall automatically navigate to the Export page.
+        *   **FR-12.15:** The Export page shall display the completed video with download options.
+    *   **Error Handling:**
+        *   **FR-12.16:** If visual sourcing fails after retry, the system shall halt and notify the user with option to: (a) retry, (b) switch to manual curation, (c) skip scene.
+        *   **FR-12.17:** The system shall log all automation decisions for user review (which clips were selected, why).
+
+*   **Acceptance Criteria:**
+    *   **AC1: Automate Mode Toggle**
+        *   **Given** a user creates or edits a project.
+        *   **When** they access project settings.
+        *   **Then** they must see an "Automate Mode" toggle (default OFF).
+    *   **AC2: Pre-Automation Configuration**
+        *   **Given** a user enables Automate Mode and confirms their topic.
+        *   **When** the automation flow begins.
+        *   **Then** the user must first select a voice AND video source before the pipeline executes.
+    *   **AC3: Video Source Selection**
+        *   **Given** the pre-automation configuration screen.
+        *   **When** the user views video source options.
+        *   **Then** they must see YouTube (enabled), DVIDS (disabled/coming soon), Pexels/Pixabay (disabled/coming soon).
+    *   **AC4: Full Pipeline Execution**
+        *   **Given** a project with Automate Mode enabled, voice selected, and video source selected.
+        *   **When** the user confirms the topic "Benefits of solar energy".
+        *   **Then** the system must automatically: generate script → generate voiceovers → source visuals → auto-select clips → select music → assemble video → navigate to export.
+    *   **AC5: Auto-Selection Quality**
+        *   **Given** a scene about "solar panels on rooftops".
+        *   **When** auto-selection runs with 5 candidate clips.
+        *   **Then** the selected clip must have the highest combined relevance score (keyword match + cv_score + duration fit).
+    *   **AC6: Progress Indication**
+        *   **Given** automation is in progress.
+        *   **When** the user views the screen.
+        *   **Then** they must see: current stage name, stage progress (e.g., "Scene 3/5"), overall pipeline progress percentage.
+    *   **AC7: Retry on Failure**
+        *   **Given** visual sourcing returns 0 results for a scene.
+        *   **When** the system retries with relaxed filters.
+        *   **Then** it must remove duration cap and reduce keyword strictness before failing.
+    *   **AC8: Export Navigation**
+        *   **Given** video assembly completes successfully.
+        *   **When** the automation pipeline finishes.
+        *   **Then** the user must be automatically redirected to the Export page with the video ready for download.
+
+### 1.13. ElevenLabs TTS Integration
+
+*   **Description:** The system provides ElevenLabs as an alternative cloud-based TTS provider alongside the local Kokoro TTS engine. Users can select their preferred TTS provider per project, choosing between free local generation (Kokoro) or premium cloud voices (ElevenLabs). The system tracks ElevenLabs API usage and displays remaining quota in the UI.
+
+*   **User Stories:**
+    1.  **As a creator,** I want to choose between Kokoro (local/free) and ElevenLabs (cloud/premium) for voiceover generation, **so that** I can balance cost vs. voice quality based on my needs.
+    2.  **As a creator,** I want access to ElevenLabs' voice catalog separately from Kokoro voices, **so that** I can explore premium voice options.
+    3.  **As a creator,** I want to see my ElevenLabs API usage in the UI, **so that** I can track my quota and avoid unexpected limits.
+
+*   **Functional Requirements:**
+    *   **Provider Configuration:**
+        *   **FR-13.01:** The system shall support TTS provider selection: Kokoro (local, default) or ElevenLabs (cloud).
+        *   **FR-13.02:** The system shall store TTS provider preference per project in project metadata.
+        *   **FR-13.03:** The system shall allow global default TTS provider configuration via environment variables.
+    *   **ElevenLabs Integration:**
+        *   **FR-13.04:** The system shall integrate with ElevenLabs Text-to-Speech API v1.
+        *   **FR-13.05:** The system shall retrieve and display available ElevenLabs voices (separate catalog from Kokoro).
+        *   **FR-13.06:** The system shall generate voiceover audio using ElevenLabs API when selected as provider.
+        *   **FR-13.07:** The system shall store ElevenLabs API key securely via environment variables.
+    *   **Voice Selection:**
+        *   **FR-13.08:** The Voice Selection UI shall display provider toggle (Kokoro / ElevenLabs).
+        *   **FR-13.09:** The system shall show provider-specific voice options based on selection.
+        *   **FR-13.10:** The system shall provide voice preview samples for ElevenLabs voices.
+    *   **Usage Tracking:**
+        *   **FR-13.11:** The system shall track ElevenLabs API character usage per request.
+        *   **FR-13.12:** The system shall store cumulative usage in the database (daily/monthly totals).
+        *   **FR-13.13:** The system shall display current usage and remaining quota in the UI.
+        *   **FR-13.14:** The system shall warn users when approaching quota limits (80%, 95%).
+        *   **FR-13.15:** The system shall block generation and notify user when quota is exhausted.
+    *   **Error Handling:**
+        *   **FR-13.16:** The system shall handle ElevenLabs API errors gracefully with user-friendly messages.
+        *   **FR-13.17:** The system shall offer fallback to Kokoro when ElevenLabs fails or quota exceeded.
+
+*   **Acceptance Criteria:**
+    *   **AC1: Provider Selection**
+        *   **Given** a user creates or edits a project.
+        *   **When** they access voice selection.
+        *   **Then** they must see a provider toggle (Kokoro / ElevenLabs) before voice options.
+    *   **AC2: Separate Voice Catalogs**
+        *   **Given** user selects Kokoro provider.
+        *   **When** voice options load.
+        *   **Then** only Kokoro voices are displayed.
+        *   **Given** user selects ElevenLabs provider.
+        *   **When** voice options load.
+        *   **Then** only ElevenLabs voices are displayed (fetched from API).
+    *   **AC3: ElevenLabs Voice Generation**
+        *   **Given** a project configured with ElevenLabs provider and a selected ElevenLabs voice.
+        *   **When** voiceover generation runs.
+        *   **Then** audio files are generated using ElevenLabs API.
+    *   **AC4: Usage Tracking Display**
+        *   **Given** ElevenLabs is configured.
+        *   **When** user views the settings or voice selection screen.
+        *   **Then** current character usage and remaining quota are displayed.
+    *   **AC5: Quota Warning**
+        *   **Given** ElevenLabs usage reaches 80% of monthly quota.
+        *   **When** user attempts voiceover generation.
+        *   **Then** a warning is displayed before proceeding.
+    *   **AC6: Quota Exhausted**
+        *   **Given** ElevenLabs quota is exhausted.
+        *   **When** user attempts voiceover generation with ElevenLabs.
+        *   **Then** generation is blocked with message offering Kokoro fallback.
+    *   **AC7: Graceful Fallback**
+        *   **Given** ElevenLabs API returns an error.
+        *   **When** voiceover generation fails.
+        *   **Then** user is offered option to retry or switch to Kokoro.
+
+### 1.14. Unified API Usage Dashboard
+
+*   **Description:** A dedicated dashboard page (`/settings/api-usage`) that provides unified monitoring of all external API usage across the application. The system tracks per-request usage for Gemini API, YouTube Data API, and ElevenLabs API, displaying current usage against free tier limits with warning thresholds. This consolidates API tracking into a single view for cost management and quota monitoring.
+
+*   **User Stories:**
+    1.  **As a creator,** I want to see all my API usage in one dashboard, **so that** I can monitor my consumption across all services without checking multiple places.
+    2.  **As a creator,** I want to see how close I am to each API's free tier limit, **so that** I can plan my video production to avoid hitting quotas.
+    3.  **As a creator,** I want warnings when I'm approaching API limits, **so that** I'm not surprised by service interruptions.
+    4.  **As a creator,** I want to see my usage history over the past 7 days, **so that** I can understand my consumption patterns.
+
+*   **Functional Requirements:**
+    *   **Dashboard Page:**
+        *   **FR-14.01:** The system shall provide a dedicated API usage page at `/settings/api-usage`.
+        *   **FR-14.02:** The dashboard shall display usage cards for each tracked API (Gemini, YouTube Data API, ElevenLabs).
+        *   **FR-14.03:** Each usage card shall show: current usage, free tier limit, percentage used, and visual progress bar.
+    *   **Per-Request Logging:**
+        *   **FR-14.04:** The system shall log each API request with: timestamp, API name, endpoint, usage units consumed, project ID (if applicable).
+        *   **FR-14.05:** The system shall store API usage logs in a dedicated database table.
+        *   **FR-14.06:** The system shall retain usage logs for 7 days, with automatic cleanup of older records.
+    *   **API-Specific Tracking:**
+        *   **FR-14.07:** Gemini API tracking shall count requests per day against the 1,500 requests/day free tier.
+        *   **FR-14.08:** YouTube Data API tracking shall count quota units per day against the 10,000 units/day free tier.
+        *   **FR-14.09:** ElevenLabs API tracking shall count characters per month against the monthly character quota.
+    *   **Warning System:**
+        *   **FR-14.10:** The system shall display a warning indicator when any API reaches 80% of its quota.
+        *   **FR-14.11:** The system shall display a critical warning when any API reaches 95% of its quota.
+        *   **FR-14.12:** The system shall display a global warning banner in the main UI when any API is at critical level.
+    *   **Usage History:**
+        *   **FR-14.13:** The dashboard shall display a 7-day usage history chart for each API.
+        *   **FR-14.14:** The system shall show daily breakdown of usage for daily-quota APIs (Gemini, YouTube).
+        *   **FR-14.15:** The system shall show cumulative monthly usage for monthly-quota APIs (ElevenLabs).
+    *   **Quota Reset Information:**
+        *   **FR-14.16:** The dashboard shall display when each API's quota resets (daily at midnight UTC, monthly on billing date).
+        *   **FR-14.17:** The system shall automatically reset daily counters at midnight UTC.
+
+*   **Acceptance Criteria:**
+    *   **AC1: Dashboard Access**
+        *   **Given** a user is logged into the application.
+        *   **When** they navigate to `/settings/api-usage`.
+        *   **Then** they see a dashboard with usage cards for Gemini, YouTube Data API, and ElevenLabs.
+    *   **AC2: Usage Display**
+        *   **Given** user has made 500 Gemini requests today.
+        *   **When** they view the Gemini usage card.
+        *   **Then** it shows "500 / 1,500 requests (33%)" with a progress bar at 33%.
+    *   **AC3: Per-Request Logging**
+        *   **Given** a script generation request uses Gemini API.
+        *   **When** the request completes.
+        *   **Then** a log entry is created with timestamp, API name, endpoint, and usage units.
+    *   **AC4: Warning at 80%**
+        *   **Given** YouTube API usage reaches 8,000 units (80%).
+        *   **When** user views the dashboard.
+        *   **Then** the YouTube card shows a yellow warning indicator.
+    *   **AC5: Critical Warning at 95%**
+        *   **Given** Gemini API usage reaches 1,425 requests (95%).
+        *   **When** user views any page in the application.
+        *   **Then** a global warning banner appears indicating Gemini quota is nearly exhausted.
+    *   **AC6: 7-Day History**
+        *   **Given** user has been using the application for 7+ days.
+        *   **When** they view the usage history chart.
+        *   **Then** they see daily usage bars for the past 7 days for each API.
+    *   **AC7: Quota Reset Display**
+        *   **Given** it is 3pm UTC.
+        *   **When** user views Gemini usage card.
+        *   **Then** it shows "Resets in 9 hours" (midnight UTC).
+
+---
+
 ## 2. Future Enhancements
 
-*This section lists features and improvements that are considered for future versions of the product beyond the MVP.*
+*This section lists features and improvements planned for future versions of the product.*
 
-**Note:** Voice Selection (originally 2.1) has been moved to MVP as Feature 1.3.
+**Note:** Voice Selection (originally 2.1) has been moved to Core Features as Feature 1.3.
+
+### 2.0. Domain-Specific Video Sources (DVIDS Military Footage)
+*   **Description:** Add DVIDS (Defense Visual Information Distribution Service) as a domain-specific alternative video source alongside YouTube. When creating military-themed content, users can toggle "Military Mode" to search the official U.S. Department of Defense media repository instead of YouTube. This provides access to 1.8M+ public domain military assets including combat operations, training exercises, equipment demonstrations, and historical footage.
+*   **Rationale:** Military content creators need authentic, high-quality B-roll footage that YouTube cannot reliably provide. DVIDS offers curated, public domain content from all U.S. military branches with no copyright concerns or content filtering needed. This establishes the pattern for adding additional domain-specific sources (NASA for space, Europeana for historical European content, etc.).
+*   **Technical Components:**
+    *   **DVIDS API Integration:**
+        *   REST/JSON API at `https://api.dvidshub.net/`
+        *   Search endpoint: `GET /search` with parameters for keywords, content type, duration, HD filtering
+        *   Asset endpoint: `GET /asset` returns multiple quality MP4 download URLs (300kbps → 9Mbps)
+        *   Free API key registration required
+        *   Categories: Combat Operations, Training, Equipment, Humanitarian, Ceremonies, Historical
+    *   **VideoSourceProvider Abstraction:**
+        *   Create unified interface for video sources (`searchVideos`, `getVideoDetails`, `downloadSegment`)
+        *   YouTube and DVIDS implement the same interface
+        *   Easy to add future sources (NASA, Pexels, Europeana)
+    *   **Source Selection UI:**
+        *   Project-level setting: "Video Source" dropdown (YouTube, DVIDS Military)
+        *   Or per-scene override in Visual Curation UI
+        *   Visual indicator showing which source is active
+*   **API Comparison:**
+    | Feature | YouTube | DVIDS |
+    |---------|---------|-------|
+    | Content | General, mixed quality | Military-specific, curated |
+    | Licensing | Varies, often restricted | **Public Domain** |
+    | CV Filtering Needed | Heavy (faces, captions) | Minimal |
+    | Quality | Up to 720p | Up to HD (1280x720, 9Mbps) |
+    | Cost | Free (quota limited) | **Free** |
+*   **Implementation Approach:**
+    *   Create `lib/video-sources/dvids-client.ts` implementing `VideoSourceProvider` interface
+    *   Add `video_source` column to `projects` table (default: 'youtube')
+    *   Update Visual Sourcing service to use selected provider
+    *   Reuse existing download, caching, and preview infrastructure
+*   **User Value:** Military content creators get direct access to authentic DoD footage without copyright concerns. The abstraction layer enables future domain-specific sources, making the platform more versatile for niche content creation.
+*   **FOSS Compliance:** DVIDS API is free to use. All content is U.S. Government public domain.
 
 ### 2.1. Stock Footage API Integration
 *   **Description:** Add professional stock footage sources (Pexels, Pixabay) as alternatives or supplements to YouTube content. This provides access to high-quality, royalty-free stock video clips for creators who need more polished visuals or want commercial-grade footage.
 
 ### 2.2. Advanced Content Filtering
-*   **Status:** ✅ **MOVED TO MVP** - See Feature 1.5 (AI-Powered Visual Sourcing)
+*   **Status:** ✅ **MOVED TO CORE** - See Feature 1.5 (AI-Powered Visual Sourcing)
 *   **Description:** ~~Enhance the YouTube sourcing capabilities with advanced filtering techniques to identify visually clean footage. For gaming content, this includes filtering for 'no commentary', 'gameplay only' to avoid unwanted overlays, face cams, or watermarks. Implement content quality scoring and advanced licensing detection.~~
-*   **Note:** This feature has been incorporated into MVP Feature 1.5 with the following enhancements:
+*   **Note:** This feature has been incorporated into Core Feature 1.5 with the following enhancements:
     *   Pure B-roll keyword filtering (no commentary, reaction, vlog content)
     *   Google Cloud Vision API integration (face detection, OCR, label verification)
     *   Content-type aware query generation (gaming, historical, conceptual)
@@ -610,20 +955,79 @@ The following measurable criteria define MVP success:
 *   **User Value:** Creators can analyze unlimited B-roll footage with zero cloud costs. The slight accuracy trade-off (85-90% vs 95%+) is acceptable for filtering obvious faces/text overlays, which is the primary use case.
 *   **FOSS Compliance:** All components (MediaPipe, Tesseract.js, TensorFlow.js) are open-source and free to use commercially.
 
-### 2.7. Topic Research & Web Search
-*   **Description:** Enhance the conversational AI agent (Epic 1) with real-time web search capability to research topics, verify current trends, and incorporate up-to-date information into brainstorming sessions. When discussing video topics, the assistant can search for recent developments, trending content, current events, and factual information to provide more relevant and timely suggestions.
-*   **Technical Approach:**
-    *   Integrate FOSS web search API (DuckDuckGo, Brave Search, or SearXNG)
-    *   LLM determines when web search would enhance topic suggestions
-    *   Search results summarized and incorporated into conversation naturally
-    *   Cache search results to respect API rate limits
+### 2.7. Channel Intelligence & Content Research (RAG-Powered)
+*   **Description:** A VidIQ-style intelligence system that syncs with your YouTube channel, analyzes competitors, monitors trends, and generates scripts informed by your niche and style. Uses RAG (Retrieval-Augmented Generation) to give the LLM full context of your channel, competitor content, and trending topics when generating scripts.
+*   **Operating Modes:**
+    *   **Established Channel Mode:** Sync your existing YouTube channel, analyze your content style and what performs well, generate new scripts matching YOUR voice plus current trends
+    *   **Cold Start Mode (New Channel):** User declares their niche (e.g., "military videos"), system indexes top channels in that niche, learns successful patterns, generates scripts based on proven formulas + trending topics
+*   **Data Sources:**
+    | Source | Method | Refresh |
+    |--------|--------|---------|
+    | Your YouTube Channel | Auto-caption scraping via `youtube-transcript-api` + YouTube Data API (titles, descriptions, tags, metrics) | Daily |
+    | Competitor Channels | Same scraping approach, up to 5 channels | Daily |
+    | YouTube Trends | YouTube Search API + Google Trends (unofficial) for niche-specific trending videos | Daily |
+    | News Discovery | Automated via Google News / news aggregators filtered by niche keywords | Daily |
+*   **Technical Architecture:**
+    | Component | Technology |
+    |-----------|------------|
+    | Caption Scraping | `youtube-transcript-api` (Python, FOSS) |
+    | Vector Database | ChromaDB or LanceDB (local, FOSS) |
+    | Embeddings | `all-MiniLM-L6-v2` (local) or Gemini |
+    | YouTube Data | YouTube Data API v3 |
+    | Trend Detection | YouTube Search API + Google Trends |
+    | News Discovery | Google News API / web scraping |
+*   **Military Niche Pre-configured Sources:**
+    When user selects military niche, system prioritizes these authoritative sources:
+    | Source | Focus | URL |
+    |--------|-------|-----|
+    | The War Zone | Investigative reports, satellite imagery, advanced systems | https://www.thedrive.com/the-war-zone |
+    | Military.com | Daily news, benefits, careers | https://www.military.com/daily-news |
+    | Defense News | Policy, contractors, strategic analysis | https://www.defensenews.com/ |
+    | Breaking Defense | Industry news, analysis | https://breakingdefense.com/ |
+    | Defense One | Future of national security | https://www.defenseone.com/ |
+    | Military Times | Independent service member news | https://www.militarytimes.com/ |
+    | Janes | Technical data, capability assessments | https://www.janes.com/osint-insights/defence-news |
+*   **User Flow Example:**
+    ```
+    1. User: "I want to start a military channel"
+
+    2. System indexes:
+       - Top 5 military YouTube channels (user picks or auto-suggested)
+       - Trending military videos on YouTube
+       - Military news (The War Zone, Defense News, etc.)
+
+    3. User: "What video should I make?"
+
+    4. LLM (with RAG context):
+       - "Based on trending: Navy just unveiled new destroyer class..."
+       - "Competitor X got 2M views covering similar topic last week..."
+       - "Here's a script matching successful patterns in your niche..."
+    ```
 *   **Use Cases:**
-    *   User: "I want to make a video about AI developments in 2025" → Assistant searches for latest AI news and trends
-    *   User: "What's trending in gaming right now?" → Assistant researches current gaming trends and popular titles
-    *   User: "Help me find a unique angle on climate change" → Assistant searches for recent studies, viral content, or emerging narratives
-*   **User Value:** Creators receive suggestions based on current, real-world data rather than static LLM knowledge. The assistant becomes more helpful for trending topics, current events, and time-sensitive content ideas.
-*   **MVP Implementation:** Epic 1 uses only LLM's pre-trained knowledge (no web search). Web search added post-MVP as enhancement to conversational agent.
-*   **FOSS Compliance:** Use DuckDuckGo HTML scraping (no API key required), Brave Search API (free tier), or self-hosted SearXNG instance.
+    *   New creator: "I want to make military videos" → System learns from top military channels, generates scripts based on what works
+    *   Established creator: "What's trending in my niche?" → System analyzes competitor uploads, news, YouTube trends
+    *   Content planning: "Give me 5 video ideas for this week" → System cross-references your style + gaps in your content + trending topics
+    *   Script generation: Full awareness of your channel voice, competitor positioning, and current events
+*   **User Value:** Creators get data-driven content recommendations based on real channel performance, competitor analysis, and trend data—not just generic LLM suggestions. The system learns YOUR niche and style.
+*   **Note:** Core features use only LLM's pre-trained knowledge. This RAG-powered intelligence system is planned for future enhancement.
+*   **FOSS Compliance:** All core components are open-source: `youtube-transcript-api` (MIT), ChromaDB (Apache 2.0), LanceDB (Apache 2.0), `sentence-transformers` (Apache 2.0).
+
+### 2.8. Pixabay Music Provider
+
+*   **Description:** Replace YouTube/yt-dlp music sourcing with Pixabay Music API for fully legal, royalty-free background music. This provider swap enables commercial distribution of the application without YouTube Terms of Service concerns.
+*   **Rationale:** YouTube's Terms of Service prohibit separating audio from video content. While yt-dlp works for personal use, commercial release requires a legally compliant music source. Pixabay offers royalty-free music with a REST API (500 requests/hour free tier).
+*   **Technical Approach:**
+    *   Create MusicSourceProvider interface (mirrors VideoSourceProvider pattern)
+    *   Implement PixabayMusicProvider as drop-in replacement for YouTubeMusicProvider
+    *   Configuration option: `MUSIC_PROVIDER=youtube|pixabay` in environment
+    *   Same search/download/cache interface for seamless switching
+*   **API Details:**
+    *   Endpoint: `https://pixabay.com/api/`
+    *   Free tier: 500 requests/hour
+    *   No attribution required
+    *   Categories: ambient, electronic, cinematic, classical, etc.
+*   **User Value:** Enables legal commercial distribution of the AI Video Generator application.
+*   **FOSS Compliance:** Pixabay API is free to use. All content is royalty-free.
 
 ---
 
@@ -636,7 +1040,7 @@ The following measurable criteria define MVP success:
 
 ### Data Storage
 - User project data stored locally in SQLite database
-- No user authentication required for MVP (single-user local application)
+- No user authentication required (single-user local application)
 - Downloaded video segments stored in cache directory with configurable retention period
 - Cache cleanup process to prevent unbounded disk usage
 
@@ -645,7 +1049,7 @@ The following measurable criteria define MVP success:
 - Rate limiting implemented to prevent accidental abuse and quota exhaustion
 - Graceful degradation when APIs are unavailable
 
-### Future Security Considerations (Post-MVP)
+### Future Security Considerations
 - User authentication if multi-user support added
 - Encrypted storage for API keys
 - Audit logging for API usage
@@ -655,14 +1059,13 @@ The following measurable criteria define MVP success:
 
 ## Out of Scope
 
-The following items are explicitly excluded from the MVP:
+The following items are explicitly excluded from the current scope:
 
 ### Features
 - User authentication and multi-user support
 - Cloud storage or sync between devices
 - Real-time collaboration
 - Video editing capabilities (trimming, effects, transitions beyond basic assembly)
-- Custom music/background audio
 - Multiple language support for TTS
 - Mobile application
 
@@ -695,3 +1098,6 @@ The following items are explicitly excluded from the MVP:
 - Google Cloud Vision API Documentation
 - Ollama Documentation
 - Google Gemini API Documentation
+- [DVIDS API Documentation](https://api.dvidshub.net/) (Feature 2.0)
+- [NASA Image and Video Library API](https://api.nasa.gov/) (Future consideration)
+- [Pexels API Documentation](https://www.pexels.com/api/documentation/) (Feature 2.1)

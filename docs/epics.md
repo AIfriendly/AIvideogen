@@ -1,10 +1,20 @@
 # AI Video Generator - Development Epics
 
-*This document organizes the PRD features into logical development epics for the AI Video Generator MVP.*
+*This document organizes the PRD features into logical development epics for the AI Video Generator.*
 
 **Project:** AI Video Generator (Level 2)
 **Repository:** <https://github.com/AIfriendly/AIvideogen>
-**Last Updated:** 2025-11-25
+**Last Updated:** 2025-12-01
+**Status:** Core Features Complete - Enhancement Phase
+
+**Recent Changes (2025-12-01):**
+- **MILESTONE:** Core features (Epics 1-5) complete - transitioned to Enhancement phase
+- Removed MVP labels throughout document
+- Epic 6 now in "Enhancement" category
+
+**Previous Changes (2025-11-29):**
+- Added Epic 6: Channel Intelligence & Content Research (RAG-Powered) with 7 stories
+- Aligned with PRD v2.0 and Architecture v2.0
 
 ---
 
@@ -14,11 +24,11 @@
 
 **Features Included:**
 - 1.1. Conversational AI Agent
-- 1.9. LLM Configuration & Script Personas (MVP: Ollama + Gemini providers, 4 preset personas with selector UI)
+- 1.9. LLM Configuration & Script Personas (Ollama + Gemini providers, 4 preset personas with selector UI)
 
 **User Value:** Creators can explore ideas naturally and receive AI guidance to refine their video topics before production begins. The AI assistant adapts its personality and behavior to match different content creation workflows. Users can choose between local Ollama (FOSS) or cloud-based Gemini (free tier) providers.
 
-**Story Count Estimate:** 8 stories (MVP: Stories 1.1-1.8)
+**Story Count Estimate:** 8 stories (Stories 1.1-1.8)
 
 **Dependencies:** None (foundational epic)
 
@@ -32,7 +42,7 @@
 
 ### System Prompt/Persona Configuration (Epic 1)
 
-**MVP Implementation (Feature 1.9):**
+**Core Implementation (Feature 1.9):**
 
 **Unified Persona System:**
 The persona defines the LLM's personality, tone, and delivery style for BOTH chat brainstorming AND script generation. This unified approach ensures consistent behavior throughout the content creation workflow.
@@ -40,7 +50,7 @@ The persona defines the LLM's personality, tone, and delivery style for BOTH cha
 - **Persona = WHO:** Defines tone, worldview, delivery style
 - **Task Prompts = WHAT:** Defines output format (JSON for scripts, conversational for chat)
 
-**MVP Preset Personas:**
+**Preset Personas:**
 1. **Scientific Analyst (Default)** - Neutral, data-driven, factual delivery. Best for technical explanations, research summaries, and objective analysis.
 2. **Blackpill Realist** - Brutal honesty about harsh realities. Nihilistic framing, no sugar-coating. Best for societal critique, collapse scenarios, and uncomfortable truths.
 3. **Documentary Filmmaker** - Balanced narrative with focus on human stories and emotional authenticity. Best for historical content, profiles, and investigative pieces.
@@ -54,7 +64,7 @@ The persona defines the LLM's personality, tone, and delivery style for BOTH cha
 - Provider selection via .env.local: LLM_PROVIDER=ollama|gemini
 - Persona selection UI appears after project creation, before first chat message
 
-**LLM Provider Support (MVP):**
+**LLM Provider Support:**
 - **Ollama (Primary, FOSS):** Local deployment with Llama 3.2 or other open models
   - Fully complies with NFR 1 (FOSS requirement)
   - Complete privacy and control
@@ -83,12 +93,12 @@ CREATE TABLE system_prompts (
 ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(id);
 ```
 
-**UI Components (MVP):**
+**UI Components:**
 - PersonaSelector.tsx: Card-based selector with persona name, description, and selection state
 - Appears after "New Chat" before first message (or optionally in project settings)
 - Selected persona shown in chat header
 
-**Post-MVP Enhancement:**
+**Future Enhancement:**
 - Custom persona creation UI
 - Per-project persona switching mid-workflow
 - Persona import/export
@@ -234,7 +244,7 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 - Display project metadata (auto-generated name, last_active timestamp)
 - Auto-generate project names from first user message in conversation
 - Persist selected projectId in localStorage across page reloads
-- Add project deletion functionality (optional for MVP)
+- Add project deletion functionality (optional)
 
 **Acceptance Criteria:**
 - Users can click "New Chat" button to start a fresh conversation in a new project
@@ -343,7 +353,7 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 **Features Included:**
 - 1.2. Automated Script Generation
 - 1.3. Automated Voiceover
-- 2.1. Voice Selection (moved from post-MVP to MVP)
+- 2.1. Voice Selection (moved to core features)
 
 **User Value:** Creators receive production-ready scripts and narration without manual writing or recording, with the ability to choose a voice that matches their content's tone.
 
@@ -384,7 +394,7 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 **UI Considerations:**
 - Simple, quick selection (don't slow down workflow)
 - Audio preview for each voice option
-- Option to change voice later (post-MVP: Epic 6)
+- Option to change voice later (future enhancement)
 
 ---
 
@@ -483,7 +493,7 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 - **Task prompt specifies WHAT to generate (not HOW to deliver):**
   - **Output format:** Structured JSON with scene breakdown
   - **Scene structure:** scene_number, text (50-200 words per scene)
-  - **Scene count:** 3-5 scenes for MVP
+  - **Scene count:** 3-5 scenes
   - **Text cleanliness:** ONLY spoken narration text - no markdown, scene labels, titles, or formatting
 - **Persona provides delivery style (loaded from project.system_prompt_id via Story 1.8):**
   - Scientific Analyst: Data-driven, factual, objective analysis
@@ -1532,6 +1542,252 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 ---
 
+## Epic 6: Channel Intelligence & Content Research (RAG-Powered)
+
+**Goal:** Enable VidIQ-style intelligence by syncing with YouTube channels, analyzing competitors, monitoring trends, and generating scripts informed by the user's niche and content style using RAG (Retrieval-Augmented Generation).
+
+**Features Included:**
+- 2.7. Channel Intelligence & Content Research (RAG-Powered)
+
+**User Value:** Creators get AI-powered topic suggestions based on their channel's content, competitor analysis, trending topics, and current news in their niche. Scripts are generated with full awareness of the creator's style and what works in their space.
+
+**Technical Approach:**
+- Vector database (ChromaDB) for semantic search across channel content
+- Local embeddings (all-MiniLM-L6-v2) for FOSS compliance
+- YouTube caption scraping via youtube-transcript-api
+- Background job queue for daily sync operations
+- RAG-augmented script generation with context injection
+
+**Story Count:** 7 stories
+
+**Dependencies:**
+- Epic 1 (LLM provider abstraction)
+- Epic 2 (script generation pipeline)
+
+**Acceptance:**
+- Users can connect their YouTube channel or declare a niche (Cold Start mode)
+- System syncs channel content daily via background jobs
+- Up to 5 competitor channels can be tracked
+- News sources fetched and embedded for niche awareness
+- Script generation uses RAG context for informed output
+- Channel Intelligence UI shows sync status and recommendations
+
+---
+
+### Epic 6 Stories
+
+#### Story 6.1: RAG Infrastructure Setup
+**Goal:** Set up ChromaDB, sentence-transformers, and youtube-transcript-api dependencies with database migrations
+
+**Tasks:**
+- Install Python dependencies: chromadb, sentence-transformers, youtube-transcript-api
+- Create ChromaDB client wrapper (lib/rag/vector-db/chroma-client.ts)
+- Initialize vector collections: channel_content, news_articles, trending_topics
+- Create embeddings service (lib/rag/embeddings/local-embeddings.ts) calling Python
+- Add database migration 013: background_jobs and cron_schedules tables
+- Create environment variables for RAG configuration (.env.local)
+- Implement ChromaDB persistence in .cache/chroma directory
+- Add health check endpoint for RAG system status
+
+**Acceptance Criteria:**
+- ChromaDB initializes successfully with 3 collections
+- Embeddings service generates 384-dimensional vectors using all-MiniLM-L6-v2
+- background_jobs table created with status, priority, retry logic columns
+- cron_schedules table created for recurring job definitions
+- Environment variables documented: RAG_ENABLED, CHROMA_PATH, EMBEDDING_PROVIDER
+- Health check returns ChromaDB connection status and collection counts
+- All dependencies install without conflicts with existing Python packages
+
+**References:**
+- Architecture Section 19: Feature 2.7 RAG Architecture
+- Architecture ADR-009: ChromaDB for Vector Database
+- Architecture ADR-010: all-MiniLM-L6-v2 for Local Embeddings
+
+---
+
+#### Story 6.2: Background Job Queue & Cron Scheduler
+**Goal:** Implement SQLite-backed job queue with cron scheduling for daily sync operations
+
+**Tasks:**
+- Create JobQueue class (lib/jobs/queue.ts) with enqueue, dequeue, complete, fail methods
+- Implement retry logic with exponential backoff (2s, 4s, 8s delays)
+- Create JobProcessor class (lib/jobs/processor.ts) with concurrency control (max 2 jobs)
+- Implement CronScheduler (lib/jobs/scheduler.ts) using node-cron
+- Register default cron schedules: daily channel sync (6 AM), news fetch (every 4 hours)
+- Create job status API endpoints: GET /api/jobs, GET /api/jobs/[id], DELETE /api/jobs/[id]
+- Implement job progress tracking (0-100%)
+- Add startup initialization for job system (lib/jobs/init.ts)
+- Create job type handlers structure (lib/jobs/handlers/)
+
+**Acceptance Criteria:**
+- Jobs persist in SQLite and survive application restarts
+- Failed jobs retry up to 3 times with exponential backoff
+- Concurrent job limit prevents resource exhaustion (max 2 parallel)
+- Cron scheduler triggers jobs at configured times
+- Job status API returns pending, running, completed, failed jobs
+- Progress updates visible via API during long-running jobs
+- Job system initializes automatically on application startup
+- Cancelling a pending job sets status to 'cancelled'
+
+**References:**
+- Architecture Section 20: Background Job Queue Architecture
+- Architecture ADR-011: SQLite-Backed Job Queue
+
+---
+
+#### Story 6.3: YouTube Channel Sync & Caption Scraping
+**Goal:** Implement channel content ingestion via YouTube API and caption scraping
+
+**Tasks:**
+- Create scrapeVideoTranscript() function using youtube-transcript-api (Python)
+- Implement scrapeChannelTranscripts() to fetch all video transcripts for a channel
+- Create channel metadata fetcher using YouTube Data API v3
+- Implement rate limiting (2 requests/second for caption scraping)
+- Generate embeddings for each video transcript
+- Store embeddings in ChromaDB channel_content collection with metadata
+- Create rag_sync_channel job handler (lib/jobs/handlers/rag-sync.ts)
+- Implement incremental sync (only fetch new videos since last sync)
+- Track last sync timestamp per channel
+- Handle missing captions gracefully (some videos have none)
+
+**Acceptance Criteria:**
+- Given a YouTube channel ID, system fetches all video transcripts (up to 50 most recent)
+- Transcripts scraped via youtube-transcript-api Python library
+- Each transcript embedded and stored in ChromaDB with channelId, videoId, title, publishedAt metadata
+- Rate limiting prevents API abuse (max 15 requests/second)
+- Incremental sync only processes videos published after last sync
+- Videos without captions logged but don't fail the sync
+- Sync job updates progress (10%, 30%, 60%, 80%, 100%)
+- Channel sync completes within 5 minutes for 50 videos
+
+**References:**
+- Architecture Section 19: YouTube Caption Scraping
+- Architecture ADR-012: youtube-transcript-api for Caption Scraping
+- PRD Feature 2.7: Channel Intelligence
+
+---
+
+#### Story 6.4: News Source Ingestion & Trend Monitoring
+**Goal:** Fetch and embed news articles from configured sources for niche awareness
+
+**Tasks:**
+- Create NewsSource interface and MILITARY_NEWS_SOURCES constant (lib/rag/ingestion/news-sources.ts)
+- Implement RSS feed fetcher for news sources
+- Create news article parser (headline, summary, URL, publishedAt)
+- Generate embeddings for news articles
+- Store in ChromaDB news_articles collection with niche, sourceId metadata
+- Create rag_sync_news job handler (lib/jobs/handlers/news-fetch.ts)
+- Implement deduplication (don't re-embed same article)
+- Add configurable news sources per niche (military, gaming, tech, etc.)
+- Implement 7-day retention (remove old news embeddings)
+- Create getNicheNewsSources() helper function
+
+**Acceptance Criteria:**
+- 7 military news sources pre-configured (The War Zone, Military.com, Defense News, etc.)
+- RSS feeds parsed successfully for headline, summary, URL
+- News articles embedded and stored with niche and source metadata
+- Deduplication prevents duplicate embeddings (check by URL)
+- News older than 7 days automatically pruned from vector store
+- News fetch job runs every 4 hours via cron scheduler
+- Each source fetch isolated (one failure doesn't stop others)
+- News fetch completes within 2 minutes for all sources
+
+**References:**
+- Architecture Section 19: News Source Ingestion
+- PRD Feature 2.7: Pre-configured Military News Sources
+
+---
+
+#### Story 6.5: RAG Retrieval & Context Building
+**Goal:** Implement semantic search and context assembly for RAG-augmented generation
+
+**Tasks:**
+- Create queryRelevantContent() function for semantic search across collections
+- Implement metadata filtering (by niche, channelId, date range)
+- Create retrieveRAGContext() function that queries all collections
+- Build RAGContext interface: channelContent[], competitorContent[], newsArticles[], trendingTopics[]
+- Implement relevance scoring and top-K retrieval (default K=5 per collection)
+- Create context truncation logic (limit total context tokens)
+- Add caching for frequently accessed queries (5-minute TTL)
+- Implement fallback for empty collections (graceful degradation)
+
+**Acceptance Criteria:**
+- Semantic search returns top 5 most relevant documents per collection
+- Metadata filters correctly narrow results (e.g., only user's channel, only last 7 days news)
+- RAGContext assembled with content from all 4 categories
+- Context truncation prevents exceeding LLM token limits (keep under 4000 tokens)
+- Empty collections return empty arrays (don't fail)
+- Query caching reduces repeated embedding generation
+- Retrieval completes within 500ms for typical queries
+
+**References:**
+- Architecture Section 19: RAG Retrieval Layer
+- Architecture Section 19: Vector Database Integration
+
+---
+
+#### Story 6.6: RAG-Augmented Script Generation
+**Goal:** Integrate RAG context into script generation for informed, niche-aware scripts
+
+**Tasks:**
+- Create buildRAGPrompt() function that injects context into generation prompt
+- Modify script generation endpoint to optionally use RAG context
+- Create getProjectRAGConfig() helper to check if RAG enabled for project
+- Implement context formatting (channel style, competitor analysis, news angles, trends)
+- Add RAG toggle to script generation API (rag_enabled parameter)
+- Create comparison mode: generate with and without RAG for A/B testing
+- Update script generation prompts to leverage injected context
+- Add RAG context preview in script generation loading state
+
+**Acceptance Criteria:**
+- Script generation endpoint accepts optional rag_enabled parameter
+- When enabled, RAG context retrieved and injected into prompt
+- Generated scripts reference channel style (if established channel mode)
+- Generated scripts incorporate recent news angles when relevant
+- Scripts differentiate from competitor content while learning patterns
+- RAG context displayed to user during generation ("Using context from 5 videos, 3 news articles...")
+- Non-RAG generation still works (backwards compatible)
+- RAG-augmented generation adds <3 seconds to total generation time
+
+**References:**
+- Architecture Section 19: RAG-Augmented Script Generation
+- PRD Feature 2.7: Informed Script Generation
+
+---
+
+#### Story 6.7: Channel Intelligence UI & Setup Wizard
+**Goal:** Build UI for RAG configuration, channel connection, and sync status monitoring
+
+**Tasks:**
+- Create ChannelIntelligence.tsx page at /settings/channel-intelligence
+- Implement setup wizard with two modes: Established Channel vs Cold Start
+- Build channel connection flow (enter channel URL/ID, validate via YouTube API)
+- Create competitor channel management (add up to 5 channels)
+- Display sync status: last sync time, videos indexed, news articles count
+- Add manual sync trigger button
+- Create niche selector for Cold Start mode (military, gaming, tech, cooking, etc.)
+- Display RAG health status (ChromaDB connection, collection sizes)
+- Add news source configuration (enable/disable sources)
+- Create topic suggestions based on RAG analysis
+
+**Acceptance Criteria:**
+- Setup wizard guides user through mode selection (Established vs Cold Start)
+- Established Channel mode: user enters channel URL, system validates and starts sync
+- Cold Start mode: user selects niche, system auto-indexes top 5 channels in niche
+- Competitor management allows adding/removing up to 5 channels
+- Sync status shows: "Last synced: 2 hours ago | 47 videos indexed | 23 news articles"
+- Manual sync button triggers immediate rag_sync_channel job
+- Niche selector includes pre-configured options with appropriate news sources
+- RAG health shows: "ChromaDB: Connected | Videos: 142 | News: 89 | Trends: 12"
+- Topic suggestions display 3-5 AI-generated topic ideas based on RAG analysis
+
+**References:**
+- PRD Feature 2.7: User Flow Example
+- PRD Feature 2.7: Operating Modes
+- Architecture Section 19: API Endpoints
+
+---
+
 ## Epic Summary
 
 | Epic | Name | Stories | Dependencies | Phase |
@@ -1541,35 +1797,39 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 | 3 | Visual Content Sourcing (YouTube API + Duration Filtering + Segment Downloads + Advanced CV Filtering) | 9 | Epic 2 | Core |
 | 4 | Visual Curation Interface | 6 | Epic 2, 3 | Core |
 | 5 | Video Assembly & Output | 5 | Epic 2, 4 | Delivery |
+| 6 | Channel Intelligence & Content Research (RAG-Powered) | 7 | Epic 1, 5 | Enhancement |
 
-**Total Stories:** 34 stories
+**Total Stories:** 41 stories
 
 **Notes:**
 - Epic 1 includes Story 1.8 for the unified persona system (Feature 1.9) with 4 preset personas
 - Epic 3 includes Stories 3.2b, 3.7, and 3.7b for advanced CV content filtering
 - Story 2.4 uses the project's selected persona for script generation style
+- Epic 6 implements PRD Feature 2.7 (RAG-Powered Channel Intelligence) with ChromaDB vector search
 
 **Recommended Development Order:**
-1. Epic 1 → Epic 2 → Epic 3 → Epic 4 → Epic 5
+1. **Core Features:** Epic 1 → Epic 2 → Epic 3 → Epic 4 → Epic 5 ✅ Complete
+2. **Enhancement:** Epic 6 (in development)
 
-**Critical Path:** All epics are sequential and required for MVP functionality.
+**Critical Path:** Epics 1-5 are sequential and comprise the core functionality. Epic 6 enhances the brainstorming experience with channel-specific context.
 
 ---
 
-## Future Epics (Post-MVP)
+## Future Epics
 
 Based on PRD Section 2 (Future Enhancements):
 
-- **Epic 6:** Advanced Editing & Customization (script editing in UI, voiceover regeneration per scene, voice switching)
-- **Epic 7:** Enhanced Visual Control (manual search within UI, text overlays)
-- **Epic 8:** Stock Footage API Integration (Pexels, Pixabay as alternative/supplementary sources to YouTube)
-- **Epic 9:** Custom Persona Creation (user-defined personas, persona import/export, advanced LLM settings)
+- **Epic 7:** Advanced Editing & Customization (script editing in UI, voiceover regeneration per scene, voice switching)
+- **Epic 8:** Enhanced Visual Control (manual search within UI, text overlays)
+- **Epic 9:** Stock Footage API Integration (Pexels, Pixabay as alternative/supplementary sources to YouTube)
+- **Epic 10:** Custom Persona Creation (user-defined personas, persona import/export, advanced LLM settings)
 
 **Notes:**
-- Voice selection moved from Epic 6 to MVP Epic 2
-- Preset persona system moved from Epic 9 to MVP Epic 1 (Story 1.8)
+- Voice selection moved from Epic 6 to Core Epic 2
+- Preset persona system moved from Epic 9 to Core Epic 1 (Story 1.8)
+- Channel Intelligence (RAG) moved from Future Epic 6 to Enhancement Epic 6 (2025-11-29)
 
-### Epic 8 Details (Post-MVP)
+### Epic 9 Details (Future)
 
 **Goal:** Add professional stock footage sources as alternatives or supplements to YouTube content.
 

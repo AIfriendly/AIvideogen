@@ -803,7 +803,7 @@ DATABASE_PATH=./ai-video-generator.db
 
 ---
 
-**Document Status:** Complete and Ready for Implementation (Updated 2025-11-04 to include Stories 1.6 and 1.7)
+**Document Status:** Complete and Ready for Implementation (Updated 2025-11-29 to include database singleton fix)
 **Next Steps:**
 1. Set up Next.js project with TypeScript and Tailwind CSS (Architecture initialization commands)
 2. Implement database schema and initialize SQLite (includes projects and messages tables)
@@ -822,6 +822,38 @@ DATABASE_PATH=./ai-video-generator.db
 ---
 
 ## Post-Review Follow-ups
+
+**Added:** 2025-11-29 (Database Initialization Singleton Fix)
+
+### Database Initialization Pattern (Next.js Development Mode)
+
+The database initialization in `lib/db/init.ts` uses `globalThis` to persist initialization state across Next.js hot reloads. This is critical for preventing redundant database initialization on every API request.
+
+**Problem:** Module-level singleton variables (`isInitialized`, `initializationPromise`) reset when Next.js hot-reloads modules in development mode, causing:
+- "Database initialization completed successfully" logged on every API request
+- Migration checks running repeatedly (40+ times per session)
+- Performance degradation from redundant schema.sql execution
+
+**Solution:** Use `globalThis` for initialization state persistence:
+
+```typescript
+// lib/db/init.ts
+declare global {
+  var __dbInitialized: boolean | undefined;
+  var __dbInitPromise: Promise<void> | undefined;
+}
+
+const isInitialized = (): boolean => globalThis.__dbInitialized === true;
+const setInitialized = (value: boolean): void => { globalThis.__dbInitialized = value; };
+```
+
+**Key Points:**
+- `globalThis` persists across module reloads within the same Node.js process
+- First API request initializes database, subsequent requests skip immediately
+- On server restart, initialization runs once as expected
+- Production builds are unaffected (no hot reloading)
+
+---
 
 **Added:** 2025-11-02 (Story 1.1 Review)
 

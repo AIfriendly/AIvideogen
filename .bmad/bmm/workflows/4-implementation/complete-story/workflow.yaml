@@ -73,11 +73,6 @@ context_documents:
     alias: "prd"
     required: true
 
-  - path: "{output_folder}/ux-design-specification.md"
-    alias: "ux-design-specification.md"
-    required: true
-
-
   - path: "{output_folder}/workflow-status.md"
     alias: "workflow_status"
     required: true

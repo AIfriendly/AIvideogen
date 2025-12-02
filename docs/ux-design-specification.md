@@ -8,9 +8,10 @@ _Updated on 2025-11-13 to add comprehensive UX patterns, accessibility standards
 _Updated on 2025-11-18 to complete Epic 4 (Visual Curation Interface) with all 6 stories fully specified_
 _Updated on 2025-11-22 to add Silent Video Indicator for VideoPreviewPlayer (audio stripped per Story 3.7)_
 _Updated on 2025-11-23 to add Epic 5 (Video Assembly Progress UI + Export Page UI) - FULL MVP COMPLETE_
+_Updated on 2025-11-30 to add Loading State Patterns (Section 1.2.8), Comprehensive Assembly Error States (Section 7.6.4), and Responsive Grid Adaptation Table (Section 3.4)_
 _Generated using BMad Method - Create UX Design Workflow v1.0_
 
-**Version:** 3.5 (Production-Ready: Epic 1-5 Complete - Full MVP UX Specification)
+**Version:** 3.6 (Production-Ready: Epic 1-5 Complete - Enhanced Error States & Responsive Documentation)
 
 ---
 
@@ -320,6 +321,85 @@ Secondary: [Cancel] (Ghost)
 
 **Tooltip on Hover:** Show full timestamp ("December 28, 2024 at 1:20:35 PM")
 
+#### 1.2.8 Loading State Patterns
+
+**This section consolidates all loading state specifications for consistency across the application.**
+
+**Loading Pattern Types:**
+
+**1. Spinner (Indeterminate Progress)**
+- **Usage:** Unknown duration tasks, API calls, content fetching
+- **Size Options:**
+  - Small: 16px (inline, buttons)
+  - Medium: 24px (component-level)
+  - Large: 64px (full-screen overlays)
+- **Style:** Circular ring with gradient (Indigo 500 → Violet 500)
+- **Animation:** Smooth rotation, 1.2s duration, infinite loop
+- **Background:** Semi-transparent overlay when blocking content
+
+**2. Progress Bar (Determinate Progress)**
+- **Usage:** Known duration tasks, multi-step processes, file downloads
+- **Height:** 4px (compact), 6px (standard), 8px (prominent)
+- **Background:** `#334155` (Slate 700)
+- **Fill:** Linear gradient (`#6366f1` → `#8b5cf6`)
+- **Border Radius:** Half of height (rounded ends)
+- **Animation:** Smooth width transition (0.3s ease)
+- **Percentage Display:** Optional, right-aligned or above bar
+
+**3. Skeleton Loader**
+- **Usage:** Content placeholders, list items, cards, images
+- **Background:** `#334155` (Slate 700)
+- **Animation:** Shimmer effect (lighter gradient sweeping left-to-right)
+- **Shimmer Color:** `#475569` (Slate 600) at peak
+- **Animation Duration:** 1.5s, infinite loop
+- **Border Radius:** Match content shape (8px for cards, 4px for text lines)
+
+**4. Typing Indicator (Chat-Specific)**
+- **Usage:** AI response loading in chat interface
+- **Style:** Three animated dots in assistant message bubble
+- **Dot Size:** 8px diameter
+- **Dot Color:** `#94a3b8` (Slate 400)
+- **Animation:** Sequential bounce, 0.6s cycle
+
+**Loading State Specifications by Context:**
+
+**Full-Screen Loading Overlay:**
+- **Background:** `#0f172a` (Slate 900, 95% opacity)
+- **Backdrop Blur:** 8px
+- **Z-Index:** 9999
+- **Content:** Centered box (Slate 800, 16px border-radius)
+- **Elements:** Large spinner + main message + stage message
+- **Stage Message Animation:** Fade transition (0.3s) between stages
+
+**Component-Level Loading:**
+- **Overlay:** Semi-transparent background on component
+- **Spinner:** Medium (24px), centered
+- **Text:** "Loading..." (optional, Slate 400)
+- **Interaction:** Component disabled during load
+
+**Button Loading State:**
+- **Spinner:** Small (16px), replaces icon or before text
+- **Text:** Changes to action verb + "..." (e.g., "Saving...", "Assembling...")
+- **Background:** Same as enabled state (Indigo 500)
+- **Interaction:** Button disabled, cursor: not-allowed
+
+**List/Grid Loading:**
+- **Skeleton Count:** 3-5 items for lists, 6-9 for grids
+- **Staggered Animation:** Optional 0.1s delay between items
+- **Shape:** Match expected content shape
+
+**Error Recovery from Loading:**
+- **Error Icon:** Red circle with X or ! icon
+- **Error Message:** Clear, actionable (e.g., "Failed to load. Check your connection.")
+- **Retry Button:** Secondary style, positioned below error message
+- **Transition:** Smooth fade from loading to error state
+
+**Accessibility for Loading States:**
+- **ARIA:** `aria-busy="true"` on loading container
+- **ARIA Live:** `aria-live="polite"` for stage message updates
+- **Screen Reader:** Announce loading start and completion
+- **Focus:** Maintain or trap focus appropriately during load
+
 ---
 
 ## 2. Application Architecture & Layout
@@ -463,6 +543,31 @@ Secondary: [Cancel] (Ghost)
 - **Desktop:** 1024px+ (full sidebar, 3-column grids)
 - **Tablet:** 768-1023px (collapsible sidebar, 2-column grids)
 - **Mobile:** <768px (overlay sidebar, 1-column grids)
+
+**Responsive Grid Adaptation Table:**
+
+| Component | Desktop (1024px+) | Tablet (768-1023px) | Mobile (<768px) |
+|-----------|-------------------|---------------------|-----------------|
+| **Sidebar** | 280px fixed, always visible | Collapsible, hamburger toggle | Overlay (full-screen modal) |
+| **Voice Selection Cards** | 3 columns, ~320px each | 2 columns, ~340px each | 1 column, full width |
+| **Visual Curation Clip Grid** | 3 columns, 200px thumbnails | 2 columns, 220px thumbnails | 1 column, full width thumbnails |
+| **Scene Cards** | Full width, inline clip grid | Full width, 2-col clip grid | Stacked, 1-col clip grid |
+| **Export Layout** | 2fr/1fr (Video 66%, Thumbnail 33%) | Single column, video full width | Single column, all stacked |
+| **Chat Interface** | Max 800px, centered | Max 800px, centered | Full width with 16px padding |
+| **Progress Tracker** | Inline with header, 200px bar | Below header, full width | Below header, full width |
+| **Assembly Progress List** | Max 600px, centered | Max 600px, centered | Full width with 16px padding |
+| **Metadata Card** | Single row, flex wrap | Two rows | Vertical stack |
+| **Action Buttons** | Inline row, space-between | Inline row | Stacked, full width each |
+
+**Grid Gap Adjustments:**
+- **Desktop:** 24px (lg) gaps between grid items
+- **Tablet:** 16px (md) gaps between grid items
+- **Mobile:** 12px (sm) gaps between grid items
+
+**Container Width Behavior:**
+- **Desktop:** Max-width containers (1400px curation, 800px chat, 600px modals)
+- **Tablet:** Max-width preserved but with reduced padding (24px → 16px)
+- **Mobile:** Full width with 16px side padding, no max-width constraints
 
 ---
 
@@ -2434,24 +2539,137 @@ Epic 2: Voiceover Preview → [Continue Button] → Epic 3: Visual Sourcing → 
 - Checkmark animation (green, centered)
 - Auto-navigate to Export Page after 1 second
 
-**Error State:**
-- Progress bar stops
-- Error icon (red circle with X) on failed scene
-- Scene status: "✗ Failed"
-- Error message below: "FFmpeg encoding failed" or specific error
-- **Retry Button** appears:
-  - Style: Primary button
-  - Text: "Retry Assembly"
-  - Action: Retries from failed scene (not from beginning)
-- **Back Button:**
-  - Style: Ghost button
-  - Text: "Back to Visual Curation"
-  - Action: Returns to Visual Curation for clip changes
+**Error States (Comprehensive):**
+
+**Scenario 1: FFmpeg Encoding Failure (Single Scene)**
+- **Trigger:** FFmpeg fails to process a specific scene (codec issue, corrupt file)
+- **Progress Bar:** Stops at current percentage
+- **Failed Scene Status:** Red error icon (✗), "Encoding failed"
+- **Other Scenes:** Completed scenes remain ✓, pending scenes remain ○
+- **Main Message:** "Assembly Error: Scene {N} Failed"
+- **Error Detail:** "FFmpeg couldn't process Scene {N}. The video clip may be corrupted."
+- **Recovery Options:**
+  - **"Retry Scene"** (Primary button): Re-attempts only the failed scene
+  - **"Skip Scene"** (Secondary button): Continues assembly without this scene
+  - **"Change Clip"** (Ghost button): Returns to Visual Curation to select different clip
+- **Toast Notification:** Error toast with "Scene {N} encoding failed" (persistent until dismissed)
+
+**Scenario 2: FFmpeg Concatenation Failure**
+- **Trigger:** FFmpeg fails during final video concatenation (incompatible formats, disk space)
+- **Progress Bar:** Stops at ~85-95%
+- **All Scenes:** Show ✓ Complete (individual scenes succeeded)
+- **Main Message:** "Assembly Error: Final Video Creation Failed"
+- **Error Detail:** "Couldn't combine scenes into final video. This may be due to disk space or format incompatibility."
+- **Recovery Options:**
+  - **"Retry Assembly"** (Primary button): Re-attempts concatenation only (not scene encoding)
+  - **"Back to Visual Curation"** (Ghost button): Return to re-select clips
+- **Technical Detail:** Show expandable "Technical Details" with FFmpeg error output (for advanced users)
+
+**Scenario 3: Disk Space Error**
+- **Trigger:** Insufficient disk space during assembly
+- **Progress Bar:** Stops at failure point
+- **Main Message:** "Assembly Error: Insufficient Storage"
+- **Error Detail:** "Not enough disk space to complete video assembly. Free up at least 500MB and try again."
+- **Icon:** Storage/disk icon (orange warning)
+- **Recovery Options:**
+  - **"Check Storage"** (Primary button): Opens system storage info (if possible) or provides guidance
+  - **"Retry Assembly"** (Secondary button): Re-attempts after user frees space
+- **No "Skip" Option:** Storage issue affects entire process
+
+**Scenario 4: Voiceover File Missing**
+- **Trigger:** Voiceover audio file not found for a scene during assembly
+- **Progress Bar:** Stops when reaching affected scene
+- **Failed Scene Status:** Orange warning icon (⚠), "Audio missing"
+- **Main Message:** "Assembly Error: Missing Audio"
+- **Error Detail:** "Voiceover file for Scene {N} is missing. Regenerate voiceovers or return to script preview."
+- **Recovery Options:**
+  - **"Regenerate Voiceovers"** (Primary button): Navigate to Epic 2 voiceover generation
+  - **"Skip Scene"** (Secondary button): Continues without this scene
+  - **"Back to Script Preview"** (Ghost button): Return to review/regenerate
+
+**Scenario 5: Video Clip File Missing or Corrupt**
+- **Trigger:** Selected video clip file not found or corrupted
+- **Progress Bar:** Stops when reaching affected scene
+- **Failed Scene Status:** Red error icon (✗), "Video clip unavailable"
+- **Main Message:** "Assembly Error: Missing Video Clip"
+- **Error Detail:** "The selected clip for Scene {N} couldn't be loaded. Re-download or select a different clip."
+- **Recovery Options:**
+  - **"Re-download Clip"** (Primary button): Re-triggers download for this clip
+  - **"Change Clip"** (Secondary button): Navigate to Visual Curation for this scene
+  - **"Skip Scene"** (Ghost button): Continues without this scene
+
+**Scenario 6: Partial Failure (Multiple Scenes)**
+- **Trigger:** Some scenes fail while others succeed
+- **Progress Bar:** Shows partial completion (e.g., 60% if 3/5 scenes succeeded)
+- **Scene Status:** Mix of ✓ Complete, ✗ Failed
+- **Main Message:** "Assembly Partially Complete"
+- **Error Detail:** "{X} of {N} scenes assembled successfully. {Y} scenes failed."
+- **Recovery Options:**
+  - **"Retry Failed Scenes"** (Primary button): Re-attempts only failed scenes
+  - **"Continue with Partial Video"** (Secondary button): Creates video with only successful scenes
+  - **"Back to Visual Curation"** (Ghost button): Return to fix problematic clips
+
+**Scenario 7: Thumbnail Generation Failure**
+- **Trigger:** FFmpeg fails to generate thumbnail after video assembly succeeds
+- **Progress Bar:** 100% complete
+- **All Scenes:** ✓ Complete
+- **Main Message:** "Video Ready! (Thumbnail Failed)"
+- **Error Detail:** "Your video was created successfully, but thumbnail generation failed. You can download the video or retry thumbnail."
+- **Recovery Options:**
+  - **"Download Video Anyway"** (Primary button): Navigate to Export page without thumbnail
+  - **"Retry Thumbnail"** (Secondary button): Re-attempts thumbnail extraction
+- **Note:** Non-blocking error - user can proceed to download video
+
+**Scenario 8: Server/API Error**
+- **Trigger:** Backend API returns 500 error or assembly service unavailable
+- **Progress Bar:** Stops at current position
+- **Main Message:** "Server Error"
+- **Error Detail:** "Our servers encountered an issue. Your progress is saved. Please try again in a few minutes."
+- **Recovery Options:**
+  - **"Retry Assembly"** (Primary button): Re-attempts from where it stopped
+  - **"Contact Support"** (Link): Opens support/help page
+- **Auto-Retry:** System attempts automatic retry after 30 seconds (up to 3 attempts)
+- **Progress Preservation:** Completed scenes are saved, assembly resumes from failure point
 
 **Network/Connection Error:**
-- Error message: "Connection lost. Assembly will resume when reconnected."
-- Spinner continues (optimistic)
-- Auto-retry when connection restored
+- **Trigger:** Network disconnection during assembly
+- **Progress Bar:** Pauses at current position (grayed out)
+- **Main Message:** "Connection Lost"
+- **Error Detail:** "Assembly paused. Will resume automatically when connection is restored."
+- **Icon:** Wi-Fi disconnect icon (orange)
+- **Behavior:**
+  - Spinner shows "Reconnecting..." animation
+  - Optimistic retry every 5 seconds
+  - Auto-resumes when connection restored
+  - After 60 seconds: Show "Retry Connection" button
+- **Recovery Options:**
+  - **"Retry Now"** (Primary button): Manually trigger reconnection attempt
+  - **"Download Later"** (Ghost button): Save progress and exit (can resume from project page)
+
+**Error State Visual Design:**
+
+**Error Container:**
+- **Background:** `#1e293b` (Slate 800) with red-tinted border (`#ef4444` 20% opacity)
+- **Border:** 1px solid `#ef4444` (Red 500)
+- **Border Radius:** 12px
+- **Padding:** 24px
+- **Margin:** 16px 0
+
+**Error Icon:**
+- **Size:** 48px
+- **Color:** `#ef4444` (Red 500) for errors, `#f59e0b` (Amber 500) for warnings
+- **Position:** Centered above error message
+
+**Error Message:**
+- **Main Message:** 1.25rem (20px), `#f8fafc` (Slate 50), font-weight 600
+- **Error Detail:** 0.875rem (14px), `#cbd5e1` (Slate 300), font-weight 400
+- **Technical Detail:** 0.75rem (12px), `#94a3b8` (Slate 400), monospace font, collapsible
+
+**Error Buttons:**
+- **Layout:** Flex row, center-aligned, 12px gap
+- **Primary:** Indigo 500 background (same as normal primary)
+- **Secondary:** Transparent with Indigo border
+- **Ghost:** Transparent, Slate 300 text
 
 ### 7.6.5 Accessibility
 

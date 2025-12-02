@@ -86,6 +86,17 @@ so that project data and conversation history can be stored and retrieved reliab
 
 ## Change Log
 
+### 2025-11-29 - Database Initialization Singleton Fix
+- **Issue:** Database initialization ran on almost every API request in Next.js dev mode
+- **Root Cause:** Module-level singleton flags (`isInitialized`, `initializationPromise`) reset on hot reload
+- **Solution:** Updated `src/lib/db/init.ts` to use `globalThis` for storing initialization state
+- **Changes:**
+  - Added TypeScript global declarations for `__dbInitialized` and `__dbInitPromise`
+  - Replaced direct variable access with accessor functions using `globalThis`
+  - Initialization now persists across Next.js module reloads in the same Node.js process
+- **Impact:** Eliminates ~40+ redundant "Database initialization completed" log messages per session
+- **Files Modified:** `src/lib/db/init.ts`
+
 ### 2025-11-02 - Story Completed
 - **Status Change:** Ready → Done
 - **Completed By:** Amelia (Developer Agent)

@@ -89,3 +89,14 @@ development_status:
   5-4-automated-thumbnail-generation: done
   5-5-export-ui-download-workflow: done
   epic-5-retrospective: completed
+
+  # Epic 6: Channel Intelligence & Content Research (RAG-Powered)
+  epic-6: contexted
+  6-1-rag-infrastructure-setup: done
+  6-2-background-job-queue-cron-scheduler: done
+  6-3-youtube-channel-sync-caption-scraping: backlog
+  6-4-news-source-ingestion-trend-monitoring: backlog
+  6-5-rag-retrieval-context-building: backlog
+  6-6-rag-augmented-script-generation: done
+  6-7-channel-intelligence-ui-setup-wizard: backlog
+  epic-6-retrospective: optional
