@@ -21,9 +21,9 @@ PHASE_4_COMPLETE: false
 
 ## Story Queue (Epic 6)
 
-TODO_STORY: 6.7
-IN_PROGRESS_STORY: 6.6
-DONE_STORY: 6.1, 6.2, 6.3, 6.4, 6.5
+TODO_STORY: -
+IN_PROGRESS_STORY: 6.8b
+DONE_STORY: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8a
 BACKLOG_STORY: -
 
 ## Epic 1 Status
@@ -70,16 +70,16 @@ ALL_STORIES_DONE: 5/5
 ## Epic 6 Status
 
 EPIC_6_COMPLETE: false
-EPIC_6_STORIES_TOTAL: 7
-EPIC_6_STORIES_DONE: 6.1, 6.2, 6.3, 6.4, 6.5
-EPIC_6_STORIES_IN_PROGRESS: 6.6
-EPIC_6_STORIES_TODO: 6.7
+EPIC_6_STORIES_TOTAL: 9
+EPIC_6_STORIES_DONE: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8a
+EPIC_6_STORIES_IN_PROGRESS: 6.8b
+EPIC_6_STORIES_TODO: -
 EPIC_6_STORIES_BACKLOG: -
-ALL_STORIES_DONE: 5/7
+ALL_STORIES_DONE: 8/9
 
 ## Next Action
 
-NEXT_ACTION: Implement Story 6.6 - RAG-Enhanced Generation
+NEXT_ACTION: Implement Story 6.8b - QPF One-Click Creation (Full Pipeline Automation)
 NEXT_COMMAND: *complete-story
 NEXT_AGENT: sm (orchestrator)
 CURRENT_EPIC: Epic 6
@@ -109,4 +109,4 @@ CURRENT_EPIC: Epic 6
 
 ---
 
-_Last Updated: 2025-12-01 (Story 6.5 complete, Story 6.6 in progress)_
+_Last Updated: 2025-12-03 (Story 6.8a reviewed & complete, Story 6.8b in progress)_
