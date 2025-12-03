@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,7 +38,7 @@ interface UserPreferences {
   persona_name?: string;
 }
 
-export default function QuickProductionSettingsPage() {
+function QuickProductionSettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const promptMessage = searchParams.get('prompt');
@@ -345,5 +345,17 @@ export default function QuickProductionSettingsPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function QuickProductionSettingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <QuickProductionSettingsContent />
+    </Suspense>
   );
 }
