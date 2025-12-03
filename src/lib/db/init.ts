@@ -74,6 +74,8 @@ const MIGRATIONS = [
   { name: '011_add_visual_keywords', path: './migrations/011_add_visual_keywords' },
   { name: '012_seed_preset_personas', path: './migrations/012_seed_preset_personas' },
   { name: '013_rag_infrastructure', path: './migrations/013_rag_infrastructure' },
+  { name: '014_news_embedding_status', path: './migrations/014_news_embedding_status' },
+  { name: '015_user_preferences', path: './migrations/015_user_preferences' },
 ];
 
 /**
