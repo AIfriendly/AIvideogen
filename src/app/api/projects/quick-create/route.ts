@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
+import { headers } from 'next/headers';
 import db from '@/lib/db/client';
 import { initializeDatabase } from '@/lib/db/init';
 import {
@@ -171,10 +172,28 @@ export async function POST(request: NextRequest): Promise<NextResponse<QuickCrea
 
     console.log(`[quick-create] Project created: ${projectId}`);
 
-    // Trigger script generation asynchronously
-    // The frontend will poll pipeline-status to track progress
-    // We don't await here - let it run in the background
-    triggerPipeline(projectId, topic, preferences.default_persona_id, body.ragContext);
+    // Get base URL from request headers for internal API calls
+    const headersList = await headers();
+    const host = headersList.get('host') || 'localhost:3000';
+    const protocol = headersList.get('x-forwarded-proto') || 'http';
+    const baseUrl = `${protocol}://${host}`;
+
+    // Trigger pipeline and wait for initial confirmation
+    // This ensures the pipeline starts successfully before returning to user
+    const pipelineStarted = await triggerPipeline(projectId, topic, preferences.default_persona_id, baseUrl, body.ragContext);
+
+    if (!pipelineStarted) {
+      // Pipeline failed to start - update project and return error
+      db.prepare(`UPDATE projects SET status = 'error' WHERE id = ?`).run(projectId);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'PIPELINE_FAILED',
+          message: 'Failed to start video generation pipeline. Please try again.',
+        },
+        { status: 500 }
+      );
+    }
 
     // Return success with redirect URL
     return NextResponse.json(
@@ -201,22 +220,24 @@ export async function POST(request: NextRequest): Promise<NextResponse<QuickCrea
 }
 
 /**
- * Trigger the video production pipeline asynchronously.
- * This function starts script generation and the subsequent stages.
+ * Trigger the video production pipeline.
+ * Returns true if the pipeline started successfully, false otherwise.
+ *
+ * The pipeline runs: script → voiceover → visuals → assembly
+ * Each stage is triggered sequentially after the previous completes.
  */
 async function triggerPipeline(
   projectId: string,
   topic: string,
   personaId: string,
+  baseUrl: string,
   ragContext?: QuickCreateRequest['ragContext']
-): Promise<void> {
+): Promise<boolean> {
   try {
     console.log(`[quick-create] Triggering pipeline for project: ${projectId}`);
+    console.log(`[quick-create] Using base URL: ${baseUrl}`);
 
     // Call the script generation API
-    // This is a fire-and-forget call - the frontend will poll pipeline-status
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-
     const response = await fetch(`${baseUrl}/api/projects/${projectId}/generate-script`, {
       method: 'POST',
       headers: {
@@ -227,36 +248,48 @@ async function triggerPipeline(
       }),
     });
 
+    // Parse response once to avoid stream reuse error
+    const scriptData = await response.json();
+
     if (!response.ok) {
-      const data = await response.json();
-      console.error(`[quick-create] Script generation failed:`, data);
-      // Update project status to indicate error
+      console.error(`[quick-create] Script generation failed:`, scriptData);
       db.prepare(`UPDATE projects SET status = 'error' WHERE id = ?`).run(projectId);
-      return;
+      return false;
     }
 
     console.log(`[quick-create] Script generation started for project: ${projectId}`);
 
-    // After script completes, the generate-script endpoint updates current_step to 'voiceover'
-    // The frontend polls pipeline-status which reads current_step to determine progress
-    // The user can then continue the pipeline or it auto-continues in automate mode
-
-    // For Quick Production, we need to chain the entire pipeline
-    // Let's call voiceover generation after script completes
-    const scriptData = await response.json();
+    // Script generation succeeded - continue pipeline asynchronously
+    // The remaining stages run in the background while user sees progress page
     if (scriptData.success) {
       console.log(`[quick-create] Script generated successfully, triggering voiceovers...`);
-      await triggerVoiceovers(projectId, baseUrl);
+      // Don't await - let remaining pipeline run in background
+      // Frontend polls pipeline-status to track progress
+      continuesPipeline(projectId, baseUrl).catch((err) => {
+        console.error(`[quick-create] Background pipeline error:`, err);
+        db.prepare(`UPDATE projects SET status = 'error' WHERE id = ?`).run(projectId);
+      });
     }
+
+    return true;
   } catch (error) {
     console.error(`[quick-create] Pipeline error:`, error);
-    // Update project status to indicate error
     try {
       db.prepare(`UPDATE projects SET status = 'error' WHERE id = ?`).run(projectId);
     } catch (dbError) {
       console.error(`[quick-create] Failed to update project status:`, dbError);
     }
+    return false;
   }
+}
+
+/**
+ * Continue the pipeline after script generation.
+ * Runs voiceover → visuals → assembly stages sequentially.
+ * This runs in the background after initial response is sent.
+ */
+async function continuesPipeline(projectId: string, baseUrl: string): Promise<void> {
+  await triggerVoiceovers(projectId, baseUrl);
 }
 
 /**
