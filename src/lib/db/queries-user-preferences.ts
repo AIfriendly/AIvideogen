@@ -136,7 +136,6 @@ export function updateUserPreferences(data: UserPreferencesUpdate): UserPreferen
     }
 
     const sql = `UPDATE user_preferences SET ${updates.join(', ')} WHERE id = 'default'`;
-    values.push(); // No additional params needed for WHERE clause
 
     const stmt = db.prepare(sql);
     stmt.run(...values);
