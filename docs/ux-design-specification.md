@@ -9,9 +9,10 @@ _Updated on 2025-11-18 to complete Epic 4 (Visual Curation Interface) with all 6
 _Updated on 2025-11-22 to add Silent Video Indicator for VideoPreviewPlayer (audio stripped per Story 3.7)_
 _Updated on 2025-11-23 to add Epic 5 (Video Assembly Progress UI + Export Page UI) - FULL MVP COMPLETE_
 _Updated on 2025-11-30 to add Loading State Patterns (Section 1.2.8), Comprehensive Assembly Error States (Section 7.6.4), and Responsive Grid Adaptation Table (Section 3.4)_
+_Updated on 2025-12-03 to add Feature 2.7: Channel Intelligence UI, Topic Suggestions, Quick Production Settings, Quick Production Progress (Sections 7.8-7.12)_
 _Generated using BMad Method - Create UX Design Workflow v1.0_
 
-**Version:** 3.6 (Production-Ready: Epic 1-5 Complete - Enhanced Error States & Responsive Documentation)
+**Version:** 4.0 (Feature 2.7: Channel Intelligence & Quick Production Flow Added)
 
 ---
 
@@ -2964,6 +2965,594 @@ Epic 2: Voiceover Preview → [Continue Button] → Epic 3: Visual Sourcing → 
 
 ---
 
+## 7.8. Channel Intelligence UI (Feature 2.7)
+
+**PRD Reference:** Feature 2.7 - Channel Intelligence & Content Research (RAG-Powered)
+
+**User Value:** Creators get AI-powered topic suggestions based on their channel's content, competitor analysis, and trending news. The Quick Production Flow enables one-click video creation from these suggestions.
+
+### 7.8.1 Channel Intelligence Settings Page
+
+**Route:** `/settings/channel-intelligence`
+
+**Purpose:** Configure RAG system - connect YouTube channel or declare niche for cold start mode.
+
+**Layout:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  [← Back to Settings]                    Channel Intelligence   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  🧠 Channel Intelligence Setup                           │   │
+│  │                                                          │   │
+│  │  Connect your YouTube channel to get personalized       │   │
+│  │  topic suggestions based on your content style.         │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌─────────────────────┐  ┌─────────────────────┐              │
+│  │  📺 Established     │  │  🌱 Cold Start      │              │
+│  │     Channel         │  │     (New Creator)   │              │
+│  │                     │  │                     │              │
+│  │  I have an existing │  │  I'm starting fresh │              │
+│  │  YouTube channel    │  │  or exploring       │              │
+│  │                     │  │                     │              │
+│  │  [Select]           │  │  [Select]           │              │
+│  └─────────────────────┘  └─────────────────────┘              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Mode Selection Cards:**
+- **Width:** 280px each
+- **Height:** 180px
+- **Background:** Slate 800
+- **Border:** 1px solid Slate 700, 2px Indigo 500 when selected
+- **Border Radius:** 12px
+- **Icon:** 48px, centered at top
+- **Title:** 18px font-semibold, Slate 100
+- **Description:** 14px, Slate 400
+- **Button:** Secondary style, bottom of card
+
+### 7.8.2 Established Channel Setup
+
+**Displayed after selecting "Established Channel" mode:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  📺 Connect Your YouTube Channel                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Enter your YouTube channel URL:                                │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  https://youtube.com/@YourChannel                       │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                       [Validate]│
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  ✓ Channel Found                                        │   │
+│  │  ┌──────┐  Your Channel Name                            │   │
+│  │  │ 📺   │  125K subscribers • 342 videos                │   │
+│  │  └──────┘                                               │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  📊 Add Competitor Channels (Optional - up to 5)               │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  https://youtube.com/@Competitor1                       │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│  [+ Add Another Competitor]                                     │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  [Cancel]                              [Save & Start Sync]      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Validation States:**
+- **Empty:** Placeholder text "https://youtube.com/@..."
+- **Validating:** Spinner icon, "Checking channel..."
+- **Valid:** Green checkmark, channel preview card appears
+- **Invalid:** Red border, error message below input
+
+**Channel Preview Card:**
+- **Background:** Slate 700
+- **Border Radius:** 8px
+- **Thumbnail:** 64x64px rounded
+- **Channel Name:** 16px font-semibold
+- **Stats:** 14px Slate 400
+
+### 7.8.3 Cold Start Setup
+
+**Displayed after selecting "Cold Start" mode:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🌱 Choose Your Niche                                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  What type of content do you want to create?                   │
+│                                                                 │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │
+│  │ 🎖️       │ │ 🎮       │ │ 💻       │ │ 🍳       │           │
+│  │ Military │ │ Gaming   │ │ Tech     │ │ Cooking  │           │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘           │
+│                                                                 │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │
+│  │ 💰       │ │ 🏋️       │ │ ✈️       │ │ 📚       │           │
+│  │ Finance  │ │ Fitness  │ │ Travel   │ │ Education│           │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘           │
+│                                                                 │
+│  Selected: Military                                             │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  🔍 We'll analyze top channels in this niche:                  │
+│  • The War Zone                                                │
+│  • Military History Not Visualized                             │
+│  • Task & Purpose                                              │
+│  • Binkov's Battlegrounds                                      │
+│  • Military TV                                                 │
+│                                                                 │
+│  [Cancel]                              [Save & Start Learning]  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Niche Selection Pills:**
+- **Size:** 100px x 80px
+- **Background:** Slate 800
+- **Selected:** Indigo 500 border, Indigo 900 background
+- **Icon:** 32px emoji
+- **Label:** 14px font-medium
+
+### 7.8.4 RAG System Status Panel
+
+**Displayed on Channel Intelligence page after setup:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  RAG System Health                                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │ ✅ Healthy  │  │ ChromaDB    │  │ Embeddings  │             │
+│  │             │  │ Vector DB   │  │ all-MiniLM  │             │
+│  │ 3 collections│ │ Connected   │  │ 384 dims    │             │
+│  └─────────────┘  └─────────────┘  └─────────────┘             │
+│                                                                 │
+│  Collections:                                                   │
+│  • channel_content: 156 videos indexed                         │
+│  • news_articles: 87 articles (last 7 days)                    │
+│  • trending_topics: 12 trends                                  │
+│                                                                 │
+│  Last Sync: 2 hours ago                    [Sync Now]          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Status Indicators:**
+- **Healthy:** Green background, checkmark icon
+- **Syncing:** Yellow background, spinner icon
+- **Error:** Red background, warning icon
+
+---
+
+## 7.9. Topic Suggestions UI (Feature 2.7)
+
+**Location:** Channel Intelligence page, below RAG status
+
+**Purpose:** Display AI-generated video ideas with one-click video creation.
+
+### 7.9.1 Topic Suggestions Panel
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🎯 Topic Suggestions                          [Get New Ideas]  │
+│  AI-generated video ideas based on your channel and niche      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  Why Modern Drone Warfare is Changing Naval Strategy    │   │
+│  │                                                          │   │
+│  │  Analysis of how autonomous drones are reshaping        │   │
+│  │  maritime combat doctrine and carrier operations...     │   │
+│  │                                                          │   │
+│  │  📰 Trending in News  •  92% match to your style        │   │
+│  │                                                          │   │
+│  │                                      [Create Video]      │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  F-35 Maintenance Costs: The Hidden Crisis              │   │
+│  │                                                          │   │
+│  │  Deep dive into the lifecycle costs and maintenance     │   │
+│  │  challenges facing the F-35 program...                  │   │
+│  │                                                          │   │
+│  │  📺 Competitor Gap  •  87% match to your style          │   │
+│  │                                                          │   │
+│  │                                      [Create Video]      │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  China's New Aircraft Carrier: Capabilities Analysis    │   │
+│  │                                                          │   │
+│  │  Technical breakdown of the Fujian carrier and what     │   │
+│  │  it means for Pacific power balance...                  │   │
+│  │                                                          │   │
+│  │  🔥 Your Channel Style  •  95% match                    │   │
+│  │                                                          │   │
+│  │                                      [Create Video]      │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 7.9.2 TopicSuggestionCard Component
+
+**Specifications:**
+
+| Property | Value |
+|----------|-------|
+| **Width** | 100% (max 720px) |
+| **Background** | Slate 800 |
+| **Border** | 1px solid Slate 700 |
+| **Border Radius** | 12px |
+| **Padding** | 20px |
+| **Margin Bottom** | 16px |
+
+**Content Layout:**
+
+| Element | Style |
+|---------|-------|
+| **Title** | 18px font-semibold, Slate 100, line-height 1.4 |
+| **Description** | 14px, Slate 400, max 2 lines with ellipsis |
+| **Source Badge** | 12px, pill shape, colored by type |
+| **Match Score** | 14px, Slate 300, percentage display |
+| **Create Video Button** | Primary button, right-aligned |
+
+**Source Badge Colors:**
+
+| Source | Background | Text |
+|--------|------------|------|
+| 📰 Trending in News | Amber 900 | Amber 200 |
+| 📺 Competitor Gap | Purple 900 | Purple 200 |
+| 🔥 Your Channel Style | Indigo 900 | Indigo 200 |
+| 🌐 Industry Trend | Cyan 900 | Cyan 200 |
+
+### 7.9.3 Create Video Button States
+
+**Default State (Defaults Configured):**
+```
+┌───────────────────┐
+│   Create Video    │  ← Primary button (Indigo 500)
+└───────────────────┘
+```
+
+**Hover State:**
+```
+┌───────────────────┐
+│   Create Video    │  ← Darker indigo, slight scale up
+└───────────────────┘
+    ┌─────────────────────────────────────┐
+    │ One-click: Uses your default voice  │  ← Tooltip
+    │ (Sophia) and persona (Documentary)  │
+    └─────────────────────────────────────┘
+```
+
+**No Defaults Configured State:**
+```
+┌─────────────────────────┐
+│ ⚙️ Configure Defaults   │  ← Secondary button
+└─────────────────────────┘
+```
+- Clicking navigates to `/settings/quick-production`
+
+**Loading State (After Click):**
+```
+┌───────────────────┐
+│   ⏳ Creating...  │  ← Disabled, spinner
+└───────────────────┘
+```
+
+### 7.9.4 Quick Production Confirmation Toast
+
+**Displayed after clicking "Create Video":**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🚀 Creating Video                                              │
+│                                                                 │
+│  Topic: "Why Modern Drone Warfare is Changing Naval Strategy" │
+│                                                                 │
+│  Using:                                                         │
+│  • Voice: Sophia (af_nova)                                     │
+│  • Persona: Documentary Filmmaker                               │
+│                                                                 │
+│  Redirecting to progress page...                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Toast Specifications:**
+- **Position:** Top-right
+- **Width:** 400px
+- **Duration:** 3 seconds (auto-dismiss)
+- **Background:** Slate 800
+- **Border:** 1px solid Indigo 500
+- **Icon:** Rocket emoji
+
+---
+
+## 7.10. Quick Production Settings UI
+
+**Route:** `/settings/quick-production`
+
+**Purpose:** Configure default voice and persona for one-click video creation.
+
+### 7.10.1 Settings Page Layout
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  [← Back to Settings]                Quick Production Defaults  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  ⚡ Quick Production                                     │   │
+│  │                                                          │   │
+│  │  Configure defaults for one-click video creation from   │   │
+│  │  topic suggestions. Skip the setup steps and go         │   │
+│  │  straight to video generation.                          │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  Default Voice                                                  │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  Sophia (af_nova)                                    ▼  │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  🔊 Preview: "Welcome to the AI Video Generator..."     │   │
+│  │  ▶ [Play Sample]                                        │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  Default Persona                                                │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  Documentary Filmmaker                               ▼  │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  📝 Persona Preview:                                    │   │
+│  │  "Creates cinematic, educational content with clear    │   │
+│  │   narrative structure and compelling storytelling."    │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  ☑️ Enable Quick Production                                    │
+│     Show "Create Video" button on topic suggestions            │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  [Cancel]                                    [Save Defaults]    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 7.10.2 Form Elements
+
+**Voice Dropdown:**
+- Shows all 20 available voices
+- Groups by category (Female, Male)
+- Shows voice ID in parentheses
+- Selected voice shows preview button
+
+**Persona Dropdown:**
+- Shows all 4 preset personas
+- Shows brief description of each
+- Selected persona shows full description
+
+**Enable Toggle:**
+- Checkbox style
+- When unchecked, "Create Video" buttons are hidden
+- Default: Enabled
+
+### 7.10.3 Save Confirmation
+
+**On successful save:**
+```
+┌─────────────────────────────────────────────┐
+│  ✓ Quick Production defaults saved          │
+│                                             │
+│  Voice: Sophia (af_nova)                    │
+│  Persona: Documentary Filmmaker             │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 7.11. Quick Production Progress UI
+
+**Route:** `/projects/[id]/progress`
+
+**Purpose:** Show real-time progress of automated video pipeline after one-click creation.
+
+### 7.11.1 Progress Page Layout
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│                    🚀 Creating Your Video                       │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  Topic: "Why Modern Drone Warfare is Changing Naval    │   │
+│  │         Strategy"                                        │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  Using your defaults:                                           │
+│  • Voice: Sophia (af_nova)                                     │
+│  • Persona: Documentary Filmmaker                               │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  ┌─────┐    ┌─────┐    ┌─────┐    ┌─────┐    ┌─────┐          │
+│  │ ✅  │───▶│ ✅  │───▶│ 🔄  │───▶│ ○   │───▶│ ○   │          │
+│  │📝   │    │🎙️   │    │🎬   │    │🔧   │    │✅   │          │
+│  │Script│   │Voice │   │Visual│   │Assem│   │Done │          │
+│  └─────┘    └─────┘    └─────┘    └─────┘    └─────┘          │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  🎬 Sourcing Visuals                                    │   │
+│  │                                                          │   │
+│  │  ████████████░░░░░░░░  60%                              │   │
+│  │                                                          │   │
+│  │  Searching YouTube for scene 3 of 5...                  │   │
+│  │  Found 12 matching clips                                │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  Estimated time remaining: ~2 minutes                          │
+│                                                                 │
+│                                        [Cancel Production]      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 7.11.2 Pipeline Stages
+
+| Stage | Icon | Label | Description |
+|-------|------|-------|-------------|
+| Script | 📝 | Script | Generating script with RAG context |
+| Voice | 🎙️ | Voiceover | Creating voiceover audio |
+| Visual | 🎬 | Visuals | Sourcing and selecting B-roll |
+| Assembly | 🔧 | Assembly | Combining video and audio |
+| Complete | ✅ | Done | Ready for export |
+
+**Stage States:**
+
+| State | Icon | Border | Background |
+|-------|------|--------|------------|
+| Pending | ○ | Slate 600 | Slate 800 |
+| Active | 🔄 | Indigo 500 (animated pulse) | Indigo 900 |
+| Complete | ✅ | Green 500 | Green 900 |
+| Error | ❌ | Red 500 | Red 900 |
+
+### 7.11.3 Progress Details Panel
+
+**Specifications:**
+- **Background:** Slate 800
+- **Border Radius:** 12px
+- **Padding:** 24px
+- **Progress Bar:** Indigo 500 fill, Slate 700 background
+
+**Content Updates (Polling every 2 seconds):**
+- Current stage name
+- Stage progress percentage
+- Current action description
+- Items processed count
+
+### 7.11.4 Completion Behavior
+
+**On Pipeline Complete:**
+1. All stage icons show ✅
+2. Progress bar reaches 100%
+3. Success message displays
+4. Auto-redirect to `/projects/[id]/export` after 2 seconds
+
+**Completion Message:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│                    ✅ Video Created Successfully!               │
+│                                                                 │
+│  Your video is ready. Redirecting to export page...            │
+│                                                                 │
+│  [View Video Now]                                               │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 7.11.5 Error Handling
+
+**On Pipeline Error:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│                    ❌ Video Creation Failed                     │
+│                                                                 │
+│  Error during: Voiceover Generation                            │
+│  "TTS service unavailable. Please check KokoroTTS is running." │
+│                                                                 │
+│  [Retry]                    [Cancel & Start Over]              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 7.12. Navigation Updates for Quick Production
+
+### 7.12.1 Settings Sidebar Extension
+
+**Add to Settings navigation:**
+```
+Settings
+├── General
+├── LLM Provider
+├── Voice Settings
+├── Channel Intelligence    ← NEW
+└── Quick Production        ← NEW
+```
+
+### 7.12.2 Main Sidebar Enhancement
+
+**Add Channel Intelligence to main sidebar:**
+```
+┌─────────────────────┐
+│  AI Video Generator │
+├─────────────────────┤
+│  🏠 Home            │
+│  💬 Projects        │
+│  ─────────────────  │
+│  🧠 Channel Intel   │  ← NEW: Quick access to topic suggestions
+│  ─────────────────  │
+│  ⚙️ Settings        │
+└─────────────────────┘
+```
+
+### 7.12.3 User Journey: Quick Production Flow
+
+```
+1. User navigates to Channel Intelligence (sidebar)
+           ↓
+2. Views Topic Suggestions panel
+           ↓
+3. Clicks "Create Video" on interesting topic
+           ↓
+4. System validates defaults exist
+   ├── No defaults → Redirect to /settings/quick-production
+   └── Has defaults → Continue
+           ↓
+5. Toast notification confirms action
+           ↓
+6. Redirect to /projects/[id]/progress
+           ↓
+7. Watch real-time pipeline progress
+           ↓
+8. Auto-redirect to /projects/[id]/export
+           ↓
+9. Download and share video
+```
+
+---
+
 ## 8. Component Library
 
 ### 8.1 Component Strategy
@@ -4441,13 +5030,17 @@ This UX Design Specification serves as input to:
 - ✅ Visual Curation UI (Epic 4) - Complete specification
 - ✅ Video Assembly Progress UI (Epic 5) - Complete specification
 - ✅ Export Page UI (Epic 5) - Complete specification
+- ✅ Channel Intelligence UI (Feature 2.7) - Complete specification
+- ✅ Topic Suggestions UI (Feature 2.7) - Complete specification
+- ✅ Quick Production Settings UI (Feature 2.7) - Complete specification
+- ✅ Quick Production Progress UI (Feature 2.7) - Complete specification
 - ✅ Component library for all interfaces
 - ✅ End-to-end user journeys across all workflows
 - ✅ Responsive design and accessibility for entire app
 
 **Future Additions (Post-MVP):**
-- 🔄 Settings/Preferences UI - Post-MVP feature
 - 🔄 Social Sharing UI - Post-MVP enhancement
+- 🔄 SEO Toolkit UI (Feature 1.11) - Future enhancement
 
 ### Design Decisions Summary
 
@@ -4487,6 +5080,16 @@ This UX Design Specification serves as input to:
 | 2025-10-31 | 1.0     | Initial UX Design Specification (Visual Curation UI only)      | lichking  |
 | 2025-11-04 | 2.0     | Major update: Added Project Management UI + Chat Interface + Full app architecture | lichking  |
 | 2025-11-22 | 3.4     | Added Silent Video Indicator to VideoPreviewPlayer for audio-stripped previews (Story 3.7) | lichking  |
+| 2025-12-03 | 4.0     | Added Feature 2.7: Channel Intelligence UI, Topic Suggestions, Quick Production Settings & Progress | Sally (UX) |
+
+**v4.0 Changes:**
+- Added Section 7.8: Channel Intelligence UI (setup wizard, mode selection, RAG status)
+- Added Section 7.9: Topic Suggestions UI (suggestion cards, "Create Video" button states)
+- Added Section 7.10: Quick Production Settings UI (default voice/persona configuration)
+- Added Section 7.11: Quick Production Progress UI (pipeline stages, progress tracking, error handling)
+- Added Section 7.12: Navigation Updates (sidebar extension, user journey flow)
+- Added TopicSuggestionCard, QuickProductionProgress components to library
+- Updated Scope Coverage to include Feature 2.7 components
 
 **v2.0 Changes:**
 - Added Executive Summary covering full application scope

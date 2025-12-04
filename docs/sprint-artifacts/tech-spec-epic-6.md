@@ -224,7 +224,7 @@ ALTER TABLE projects ADD COLUMN rag_last_sync TEXT;
 ALTER TABLE projects ADD COLUMN niche TEXT;
 
 -- Quick Production Flow: User preferences table (Migration 015)
--- Stores default voice and persona for one-click video creation
+-- Stores default voice, persona, and duration for one-click video creation
 -- Note: default_voice_id has no FK because voices are defined in TypeScript (voice-profiles.ts)
 -- Voice validation happens at the API layer via getVoiceById()
 CREATE TABLE IF NOT EXISTS user_preferences (
@@ -239,6 +239,10 @@ CREATE TABLE IF NOT EXISTS user_preferences (
 
 -- Insert default row (single-user app)
 INSERT OR IGNORE INTO user_preferences (id) VALUES ('default');
+
+-- Migration 016: Add default_duration column
+-- Stores target video duration in minutes (1-20 range, default 2)
+ALTER TABLE user_preferences ADD COLUMN default_duration INTEGER DEFAULT 2;
 ```
 
 #### TypeScript Interfaces
@@ -326,6 +330,7 @@ export interface UserPreferences {
   id: string;
   default_voice_id: string | null;
   default_persona_id: string | null;
+  default_duration: number;            // Video duration in minutes (1-20, default 2)
   quick_production_enabled: boolean;
   created_at: string;
   updated_at: string;
@@ -482,8 +487,9 @@ Response: {
     id: string;
     default_voice_id: string | null;
     default_persona_id: string | null;
+    default_duration: number;          // Video duration in minutes (1-20, default 2)
     quick_production_enabled: boolean;
-    voice_name?: string;               // Joined from voices table
+    voice_name?: string;               // Joined from voice-profiles.ts
     persona_name?: string;             // Joined from system_prompts table
   }
 }
@@ -493,6 +499,7 @@ Response: {
 Request: {
   default_voice_id?: string;
   default_persona_id?: string;
+  default_duration?: number;           // Must be 1-20 minutes
   quick_production_enabled?: boolean;
 }
 Response: {
@@ -792,34 +799,40 @@ chromadb>=0.5.0                   # Vector database
 
 **PRD Reference:** Feature 2.7 - Quick Production Flow (FR-2.7.QPF.02, FR-2.7.QPF.08)
 
-**Overview:** Establishes the backend infrastructure for Quick Production Flow, including the user preferences system for storing default voice/persona and the pipeline status API for tracking progress.
+**Overview:** Establishes the backend infrastructure for Quick Production Flow, including the user preferences system for storing default voice/persona/duration and the pipeline status API for tracking progress.
 
 **Scope:**
-- `user_preferences` database table (Migration 014)
+- `user_preferences` database table (Migration 015)
+- `default_duration` column (Migration 016)
 - GET/PUT `/api/user-preferences` endpoints
 - Settings page `/settings/quick-production`
 - GET `/api/projects/[id]/pipeline-status` endpoint
+- Navigation links (ProjectSidebar, TopicSuggestions)
 
 **Functional Requirements:**
 
-- **FR-6.8a.01:** The system shall store user default preferences (default_voice_id, default_persona_id, quick_production_enabled) in the user_preferences table.
+- **FR-6.8a.01:** The system shall store user default preferences (default_voice_id, default_persona_id, default_duration, quick_production_enabled) in the user_preferences table.
 - **FR-6.8a.02:** The system shall provide GET `/api/user-preferences` to retrieve current defaults with joined voice/persona names.
-- **FR-6.8a.03:** The system shall provide PUT `/api/user-preferences` to update default voice, persona, and enabled status.
-- **FR-6.8a.04:** The system shall provide a settings page at `/settings/quick-production` with dropdowns for voice and persona selection.
+- **FR-6.8a.03:** The system shall provide PUT `/api/user-preferences` to update default voice, persona, duration, and enabled status.
+- **FR-6.8a.04:** The system shall provide a settings page at `/settings/quick-production` with dropdowns for voice/persona selection and duration selector with presets (1,2,3,5,10,15,20 min) and slider.
 - **FR-6.8a.05:** The system shall provide GET `/api/projects/[id]/pipeline-status` returning current stage, progress percentage, and status message.
+- **FR-6.8a.06:** The system shall provide navigation to Quick Production settings via ProjectSidebar and TopicSuggestions.
 
 **Acceptance Criteria:**
 
-- **AC-6.8a.1:** Given the database is initialized, when Migration 014 runs, then the user_preferences table exists with default row (id='default').
-- **AC-6.8a.2:** Given a user visits `/settings/quick-production`, when they select a voice and persona and click save, then the preferences are persisted to the database.
-- **AC-6.8a.3:** Given preferences are saved, when GET `/api/user-preferences` is called, then it returns the stored defaults with voice_name and persona_name.
+- **AC-6.8a.1:** Given the database is initialized, when Migrations 015 and 016 run, then the user_preferences table exists with default row (id='default') and default_duration column (default 2 minutes).
+- **AC-6.8a.2:** Given a user visits `/settings/quick-production`, when they select a voice, persona, and duration and click save, then the preferences are persisted to the database.
+- **AC-6.8a.2b:** Given a user is anywhere in the application, when they look at the sidebar, then they see a "Quick Production" link below "Channel Intelligence" that navigates to settings.
+- **AC-6.8a.3:** Given preferences are saved, when GET `/api/user-preferences` is called, then it returns the stored defaults including default_duration with voice_name and persona_name.
 - **AC-6.8a.4:** Given a project is in pipeline execution, when GET `/api/projects/[id]/pipeline-status` is called, then it returns currentStage, stageProgress, overallProgress, and currentMessage.
 
 **UI Components:**
 
 | Component | Description | Location |
 |-----------|-------------|----------|
-| `QuickProductionSettings` | Settings page for configuring default voice and persona | /settings/quick-production |
+| `QuickProductionSettings` | Settings page for configuring default voice, persona, and duration | /settings/quick-production |
+| `ProjectSidebar` | Sidebar with Quick Production navigation link | All pages with sidebar |
+| `TopicSuggestions` | Settings button always visible with dynamic label | Channel Intelligence page |
 
 ---
 

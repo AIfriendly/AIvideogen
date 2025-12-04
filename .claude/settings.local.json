@@ -49,7 +49,19 @@
       "Bash(cmd /c:*)",
       "Bash(npx tsc:*)",
       "Bash(npx vitest:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(find:*)",
+      "Bash(git pull:*)",
+      "Bash(git rebase:*)",
+      "Bash(git checkout:*)",
+      "Bash(taskkill /F /PID 17692)",
+      "Bash(npm run dev:*)",
+      "Bash(where:*)",
+      "Bash(python -m venv:*)",
+      "Bash(\"D:\\BMAD video generator\\ai-video-generator\\.venv\\Scripts\\pip.exe\" install -r \"D:\\BMAD video generator\\ai-video-generator\\requirements.txt\")",
+      "Bash(\"D:\\BMAD video generator\\ai-video-generator\\.venv\\Scripts\\chroma.exe\" run:*)",
+      "Bash(timeout /t 10 /nobreak)",
+      "Bash(\"D:\\BMAD video generator\\ai-video-generator\\.venv\\Scripts\\python.exe\" -c \"from sentence_transformers import SentenceTransformer; print(''sentence-transformers OK'')\")"
     ],
     "deny": [],
     "ask": []

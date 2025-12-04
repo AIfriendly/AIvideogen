@@ -1,6 +1,6 @@
 # Sprint Status - AI Video Generator
 # ===================================
-# generated: 2025-11-30
+# generated: 2025-12-03
 # project: AI Video Generator
 # project_key: ai-video-generator
 # tracking_system: file-system
@@ -25,7 +25,7 @@
 #   - optional: Can be completed but not required
 #   - completed: Retrospective has been done
 
-generated: "2025-11-30"
+generated: "2025-12-03"
 project: "AI Video Generator"
 project_key: "ai-video-generator"
 tracking_system: "file-system"
@@ -86,13 +86,15 @@ development_status:
   5-5-export-ui-download-workflow: done
   epic-5-retrospective: optional
 
-  # Epic 6: Channel Intelligence & Content Research (RAG-Powered)
-  epic-6: contexted
+  # Epic 6: Channel Intelligence & Content Research (RAG-Powered + Quick Production Flow)
+  epic-6: complete
   6-1-rag-infrastructure-setup: done
   6-2-background-job-queue-cron-scheduler: done
   6-3-youtube-channel-sync-caption-scraping: done
   6-4-news-source-ingestion-trend-monitoring: done
   6-5-rag-retrieval-context-building: done
-  6-6-rag-augmented-script-generation: in-progress
-  6-7-channel-intelligence-ui-setup-wizard: backlog
+  6-6-rag-augmented-script-generation: done
+  6-7-channel-intelligence-ui-setup-wizard: done
+  6-8a-qpf-infrastructure-user-preferences: done
+  6-8b-qpf-ui-integration-one-click-video: done
   epic-6-retrospective: optional

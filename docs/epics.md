@@ -4,10 +4,17 @@
 
 **Project:** AI Video Generator (Level 2)
 **Repository:** <https://github.com/AIfriendly/AIvideogen>
-**Last Updated:** 2025-12-01
+**Last Updated:** 2025-12-03
 **Status:** Core Features Complete - Enhancement Phase
 
-**Recent Changes (2025-12-01):**
+**Recent Changes (2025-12-03):**
+- Added Stories 6.8a and 6.8b: Quick Production Flow (One-Click Video Creation)
+- Story 6.8a: QPF Infrastructure (user_preferences, settings page, pipeline-status API)
+- Story 6.8b: QPF UI & Integration (TopicSuggestionCard, quick-create API, progress UI)
+- Aligned with PRD v3.3 Quick Production Flow addition
+- Epic 6 story count updated from 7 to 9 stories
+
+**Previous Changes (2025-12-01):**
 - **MILESTONE:** Core features (Epics 1-5) complete - transitioned to Enhancement phase
 - Removed MVP labels throughout document
 - Epic 6 now in "Enhancement" category
@@ -1788,6 +1795,93 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 
 ---
 
+#### Story 6.8a: QPF Infrastructure (User Preferences & Pipeline Status)
+**Goal:** Establish backend infrastructure for Quick Production Flow with user preferences and pipeline status tracking
+
+**PRD Reference:** Feature 2.7 - Quick Production Flow (FR-2.7.QPF.02, FR-2.7.QPF.08)
+
+**Tasks:**
+- Create database migration 014: user_preferences table with default_voice_id, default_persona_id, quick_production_enabled
+- Implement GET /api/user-preferences endpoint returning defaults with joined voice/persona names
+- Implement PUT /api/user-preferences endpoint for updating preferences
+- Create QuickProductionSettings.tsx page at /settings/quick-production
+- Build voice and persona dropdown selectors using existing voices and system_prompts tables
+- Implement GET /api/projects/[id]/pipeline-status endpoint for real-time progress tracking
+- Add pipeline_stage and pipeline_progress columns to projects table (or use existing current_step)
+
+**Acceptance Criteria:**
+- **AC-6.8a.1:** Given the database is initialized, when Migration 014 runs, then the user_preferences table exists with default row (id='default').
+- **AC-6.8a.2:** Given a user visits `/settings/quick-production`, when they select a voice and persona and click save, then the preferences are persisted to the database.
+- **AC-6.8a.3:** Given preferences are saved, when GET `/api/user-preferences` is called, then it returns the stored defaults with voice_name and persona_name.
+- **AC-6.8a.4:** Given a project is in pipeline execution, when GET `/api/projects/[id]/pipeline-status` is called, then it returns currentStage, stageProgress, overallProgress, and currentMessage.
+
+**Database Schema:**
+```sql
+CREATE TABLE IF NOT EXISTS user_preferences (
+  id TEXT PRIMARY KEY DEFAULT 'default',
+  default_voice_id TEXT,
+  default_persona_id TEXT,
+  quick_production_enabled BOOLEAN DEFAULT true,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (default_voice_id) REFERENCES voices(id),
+  FOREIGN KEY (default_persona_id) REFERENCES system_prompts(id)
+);
+INSERT OR IGNORE INTO user_preferences (id) VALUES ('default');
+```
+
+**References:**
+- Tech Spec Epic 6 v1.2, Story 6.8a
+- PRD Feature 2.7 Quick Production Flow
+- Architecture Section 21: Quick Production Flow
+
+---
+
+#### Story 6.8b: QPF UI & Integration (One-Click Video Creation)
+**Goal:** Implement one-click video creation from topic suggestions with automatic pipeline execution
+
+**PRD Reference:** Feature 2.7 - Quick Production Flow (FR-2.7.QPF.01, FR-2.7.QPF.03-07)
+
+**Dependencies:** Story 6.8a (user_preferences, pipeline-status API)
+
+**Tasks:**
+- Create TopicSuggestionCard.tsx component with "Create Video" button
+- Implement defaults check before quick-create (redirect to settings if missing)
+- Create POST /api/projects/quick-create endpoint that:
+  - Validates user has configured defaults
+  - Creates project with topic_confirmed=true
+  - Applies default_voice_id and default_persona_id
+  - Triggers Automate Mode pipeline (reuse from Feature 1.12)
+  - Returns projectId and redirectUrl
+- Create QuickProductionProgress.tsx component at /projects/[id]/progress
+- Implement real-time status polling using pipeline-status API
+- Add auto-redirect to /projects/[id]/export on pipeline completion
+- Handle pipeline errors with retry/edit options
+
+**Acceptance Criteria:**
+- **AC-6.8b.1:** Given a user has configured default voice and persona, when they click "Create Video" on a topic suggestion, then a new project is created with topic_confirmed=true and the pipeline starts automatically.
+- **AC-6.8b.2:** Given the pipeline is running, when the user views the progress page, then they see real-time status updates for each stage (script, voiceover, visuals, assembly).
+- **AC-6.8b.3:** Given the pipeline completes successfully, when assembly finishes, then the user is automatically redirected to the export page.
+- **AC-6.8b.4:** Given a user has NOT configured defaults, when they click "Create Video", then they are redirected to /settings/quick-production with a message prompting them to select voice and persona.
+
+**Integration with Automate Mode (Feature 1.12):**
+
+| Aspect | Automate Mode (1.12) | Quick Production Flow (6.8b) |
+|--------|---------------------|----------------------------|
+| Entry Point | Chat → Confirm Topic → Enable Automate | Topic Suggestion → Click "Create Video" |
+| Configuration | Per-project toggle | Global user_preferences table |
+| Voice Selection | Before automation starts | Pre-configured default |
+| Persona Selection | Project-level setting | Pre-configured default |
+| RAG Context | Optional | Always included (from suggestion) |
+| Pipeline | Same orchestration logic | Same orchestration logic (reused) |
+
+**References:**
+- Tech Spec Epic 6 v1.2, Story 6.8b
+- PRD Feature 2.7 Quick Production Flow
+- PRD Feature 1.12 Automate Mode (pipeline reuse)
+
+---
+
 ## Epic Summary
 
 | Epic | Name | Stories | Dependencies | Phase |
@@ -1797,15 +1891,16 @@ ALTER TABLE projects ADD COLUMN system_prompt_id TEXT REFERENCES system_prompts(
 | 3 | Visual Content Sourcing (YouTube API + Duration Filtering + Segment Downloads + Advanced CV Filtering) | 9 | Epic 2 | Core |
 | 4 | Visual Curation Interface | 6 | Epic 2, 3 | Core |
 | 5 | Video Assembly & Output | 5 | Epic 2, 4 | Delivery |
-| 6 | Channel Intelligence & Content Research (RAG-Powered) | 7 | Epic 1, 5 | Enhancement |
+| 6 | Channel Intelligence & Content Research (RAG-Powered + Quick Production Flow) | 9 | Epic 1, 5 | Enhancement |
 
-**Total Stories:** 41 stories
+**Total Stories:** 43 stories
 
 **Notes:**
 - Epic 1 includes Story 1.8 for the unified persona system (Feature 1.9) with 4 preset personas
 - Epic 3 includes Stories 3.2b, 3.7, and 3.7b for advanced CV content filtering
 - Story 2.4 uses the project's selected persona for script generation style
 - Epic 6 implements PRD Feature 2.7 (RAG-Powered Channel Intelligence) with ChromaDB vector search
+- Epic 6 includes Stories 6.8a and 6.8b for Quick Production Flow (one-click video creation from topic suggestions)
 
 **Recommended Development Order:**
 1. **Core Features:** Epic 1 → Epic 2 → Epic 3 → Epic 4 → Epic 5 ✅ Complete

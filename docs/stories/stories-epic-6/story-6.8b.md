@@ -1,8 +1,8 @@
-# Story 6.8b: QPF UI & Integration (One-Click Video Creation)
+cd/# Story 6.8b: QPF UI & Integration (One-Click Video Creation)
 
 ## Story Info
 - **Epic:** 6 - Channel Intelligence & Content Research (RAG-Powered)
-- **Status:** Draft
+- **Status:** Done
 - **Priority:** P1 (High)
 - **Points:** 8
 - **Dependencies:** Story 6.8a (User Preferences & Pipeline Status)
@@ -187,53 +187,58 @@ Quick Production Flow reuses Automate Mode pipeline from Feature 1.12:
 ## Tasks
 
 ### Task 1: Create TopicSuggestionCard Component
-- [ ] Create `components/features/rag/TopicSuggestionCard.tsx`
-- [ ] Display topic title, description, source badge, relevance score
-- [ ] Add "Create Video" button with loading state
-- [ ] Handle hasDefaults prop to enable/disable button
-- [ ] Style consistent with existing card components
+- [x] Create `components/features/rag/TopicSuggestionCard.tsx`
+- [x] Display topic title, description, source badge, relevance score
+- [x] Add "Create Video" button with loading state
+- [x] Handle hasDefaults prop to enable/disable button
+- [x] Style consistent with existing card components
 
 ### Task 2: Create POST /api/projects/quick-create Endpoint
-- [ ] Create `app/api/projects/quick-create/route.ts`
-- [ ] Validate request body (topic required)
-- [ ] Check user_preferences for defaults
-- [ ] If no defaults, return DEFAULTS_NOT_CONFIGURED error
-- [ ] Create project with topic_confirmed=true
-- [ ] Apply default_voice_id and default_persona_id
-- [ ] Store ragContext in project (if provided)
-- [ ] Trigger Automate Mode pipeline
-- [ ] Return projectId and redirectUrl
+- [x] Create `app/api/projects/quick-create/route.ts`
+- [x] Validate request body (topic required)
+- [x] Check user_preferences for defaults
+- [x] If no defaults, return DEFAULTS_NOT_CONFIGURED error
+- [x] Create project with topic_confirmed=true
+- [x] Apply default_voice_id and default_persona_id
+- [x] Store ragContext in project (if provided)
+- [x] Trigger Automate Mode pipeline
+- [x] Return projectId and redirectUrl
 
 ### Task 3: Create QuickProductionProgress Component
-- [ ] Create `components/features/rag/QuickProductionProgress.tsx`
-- [ ] Poll pipeline-status API every 2 seconds
-- [ ] Display 4-stage progress indicator (script, voiceover, visuals, assembly)
-- [ ] Show current stage with animation
-- [ ] Display stage progress and overall progress
-- [ ] Show current message
-- [ ] Handle error state with retry option
-- [ ] Call onComplete when currentStage = 'complete'
+- [x] Create `components/features/rag/QuickProductionProgress.tsx`
+- [x] Poll pipeline-status API every 2 seconds
+- [x] Display 4-stage progress indicator (script, voiceover, visuals, assembly)
+- [x] Show current stage with animation
+- [x] Display stage progress and overall progress
+- [x] Show current message
+- [x] Handle error state with retry option
+- [x] Call onComplete when currentStage = 'complete'
 
 ### Task 4: Create Progress Page Route
-- [ ] Create `app/projects/[id]/progress/page.tsx`
-- [ ] Render QuickProductionProgress component
-- [ ] Handle auto-redirect to export on completion
-- [ ] Add beforeunload warning during pipeline
-- [ ] Handle error states with retry/edit/cancel options
+- [x] Create `app/projects/[id]/progress/page.tsx`
+- [x] Render QuickProductionProgress component
+- [x] Handle auto-redirect to export on completion
+- [x] Add beforeunload warning during pipeline
+- [x] Handle error states with retry/edit/cancel options
 
 ### Task 5: Update Channel Intelligence Page
-- [ ] Add TopicSuggestionCard to topic suggestions section
-- [ ] Integrate with GET /api/rag/topic-suggestions
-- [ ] Handle "Create Video" click → call quick-create API
-- [ ] Handle redirect to progress page on success
-- [ ] Handle redirect to settings on DEFAULTS_NOT_CONFIGURED
+- [x] Add TopicSuggestionCard to topic suggestions section
+- [x] Integrate with GET /api/rag/topic-suggestions
+- [x] Handle "Create Video" click → call quick-create API
+- [x] Handle redirect to progress page on success
+- [x] Handle redirect to settings on DEFAULTS_NOT_CONFIGURED
+
+### Task 5b: Settings Navigation Enhancement (Sprint Change 2025-12-03)
+- [x] Update TopicSuggestions to always show settings button (not only when unconfigured)
+- [x] Dynamic button label: "Setup Quick Production" when no defaults, "QPF Settings" when configured
+- [x] Ensures users can modify voice/persona/duration settings at any time
 
 ### Task 6: Integration Testing
-- [ ] Test one-click flow with configured defaults
-- [ ] Test redirect to settings when no defaults
-- [ ] Test progress page updates during pipeline
-- [ ] Test auto-redirect to export on completion
-- [ ] Test error handling and retry functionality
+- [x] Test one-click flow with configured defaults
+- [x] Test redirect to settings when no defaults
+- [x] Test progress page updates during pipeline
+- [x] Test auto-redirect to export on completion
+- [x] Test error handling and retry functionality
 
 ---
 
@@ -273,18 +278,18 @@ Quick Production Flow reuses Automate Mode pipeline from Feature 1.12:
 
 ## Definition of Done
 
-- [ ] All Acceptance Criteria verified and passing
-- [ ] TopicSuggestionCard component created and functional
-- [ ] POST /api/projects/quick-create endpoint implemented
-- [ ] QuickProductionProgress component created and functional
-- [ ] Progress page route created at /projects/[id]/progress
-- [ ] Channel Intelligence page updated with topic suggestion cards
-- [ ] Integration with Automate Mode pipeline verified
-- [ ] Unit tests written and passing
-- [ ] API tests written and passing
-- [ ] No TypeScript errors
-- [ ] Code reviewed and approved
-- [ ] Documentation updated
+- [x] All Acceptance Criteria verified and passing
+- [x] TopicSuggestionCard component created and functional
+- [x] POST /api/projects/quick-create endpoint implemented
+- [x] QuickProductionProgress component created and functional
+- [x] Progress page route created at /projects/[id]/progress
+- [x] Channel Intelligence page updated with topic suggestion cards
+- [x] Integration with Automate Mode pipeline verified
+- [x] Unit tests written and passing
+- [x] API tests written and passing
+- [x] No TypeScript errors
+- [x] Code reviewed and approved
+- [x] Documentation updated
 
 ---
 
@@ -294,3 +299,4 @@ Quick Production Flow reuses Automate Mode pipeline from Feature 1.12:
 - **Reuses Automate Mode:** Leverages existing pipeline orchestration from Feature 1.12
 - **RAG Context:** The ragContext from topic suggestions is passed through to script generation for better results
 - **Error Recovery:** Pipeline failures should offer retry, edit, and cancel options
+- **Sprint Change (2025-12-03):** TopicSuggestions settings button now always visible with dynamic label for better settings accessibility

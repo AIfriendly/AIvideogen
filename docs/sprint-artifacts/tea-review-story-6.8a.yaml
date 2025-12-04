@@ -1,0 +1,504 @@
+tea_review:
+  story: "6.8a - QPF Infrastructure (User Preferences & Pipeline Status)"
+  reviewed_by: "TEA Agent (Test & Security Analyst)"
+  review_date: "2025-12-03"
+  verdict: "WARN"
+
+  executive_summary: |
+    Story 6.8a implements core Quick Production Flow infrastructure including user preferences
+    storage and pipeline status tracking. Security analysis reveals MODERATE risk due to lack
+    of authentication/authorization, though acceptable for single-user desktop context. Test
+    coverage is ABSENT - no unit, integration, or E2E tests exist for this story. Critical
+    gaps identified in input validation, error handling, and race condition protection.
+
+  security:
+    overall_risk_level: "MODERATE"
+
+    findings:
+      critical:
+        - id: "SEC-6.8a-001"
+          title: "No Authentication on API Endpoints"
+          severity: "CRITICAL"
+          category: "A07:2021 - Identification and Authentication Failures"
+          description: |
+            All API endpoints (/api/user-preferences, /api/projects/[id]/pipeline-status) are
+            completely unauthenticated. Any process with network access to localhost can read/modify
+            preferences and access project pipeline status.
+          affected_files:
+            - "src/app/api/user-preferences/route.ts"
+            - "src/app/api/projects/[id]/pipeline-status/route.ts"
+          risk: |
+            In single-user desktop context: LOW (as documented in architecture.md)
+            In future cloud deployment: CRITICAL (direct security breach)
+          recommendation: |
+            IMMEDIATE: Document this as architectural decision for single-user mode
+            FUTURE: Add middleware authentication layer before cloud migration (Epic requirement)
+          poc_exploit: |
+            curl http://localhost:3000/api/user-preferences -X PUT \
+              -H "Content-Type: application/json" \
+              -d '{"default_voice_id":"malicious","default_persona_id":"inject"}'
+
+      warning:
+        - id: "SEC-6.8a-002"
+          title: "SQL Injection Risk in updateUserPreferences (Low Probability)"
+          severity: "WARNING"
+          category: "A03:2021 - Injection"
+          description: |
+            Dynamic SQL construction in updateUserPreferences() builds UPDATE statements using
+            string concatenation. While parameterized values are used correctly, the column names
+            are constructed dynamically which could pose maintenance risk.
+          affected_files:
+            - "src/lib/db/queries-user-preferences.ts:109-151"
+          code_location: |
+            Line 138: const sql = `UPDATE user_preferences SET ${updates.join(', ')} WHERE id = 'default'`;
+          current_mitigation: |
+            - updates[] array only contains hardcoded strings ('default_voice_id = ?', etc.)
+            - All values are properly parameterized via prepared statement
+            - No user input flows into column names
+          risk: "LOW (properly mitigated, but pattern is fragile)"
+          recommendation: |
+            Consider using an ORM or query builder for better SQL injection protection and
+            maintainability. Current implementation is SAFE but requires code review discipline.
+
+        - id: "SEC-6.8a-003"
+          title: "Verbose Error Messages Leak Implementation Details"
+          severity: "WARNING"
+          category: "A05:2021 - Security Misconfiguration"
+          description: |
+            Error responses expose detailed stack traces and internal implementation details to clients.
+          affected_files:
+            - "src/app/api/user-preferences/route.ts:76"
+            - "src/app/api/projects/[id]/pipeline-status/route.ts:291"
+          examples: |
+            Line 76: error: error instanceof Error ? error.message : 'Failed to fetch user preferences'
+            Line 291: error: error instanceof Error ? error.message : 'Failed to fetch pipeline status'
+          risk: |
+            Information disclosure could reveal database schema, file paths, or query structure
+            to potential attackers during reconnaissance phase.
+          recommendation: |
+            - Log detailed errors server-side (console.error already done ✓)
+            - Return generic error messages to client in production
+            - Add error sanitization middleware
+
+        - id: "SEC-6.8a-004"
+          title: "No Rate Limiting on PUT Endpoint"
+          severity: "WARNING"
+          category: "A05:2021 - Security Misconfiguration"
+          description: |
+            PUT /api/user-preferences has no rate limiting, allowing rapid-fire updates that could
+            cause database contention or DoS in single-user app.
+          affected_files:
+            - "src/app/api/user-preferences/route.ts:100-163"
+          attack_scenario: |
+            Malicious script or browser bug sends 1000s of PUT requests per second, causing:
+            - SQLite database lock contention
+            - Excessive disk I/O
+            - UI slowdown/freeze
+          risk: "MODERATE (single-user reduces exposure)"
+          recommendation: |
+            Add simple rate limiting middleware (e.g., 10 requests/minute per IP)
+            or implement optimistic locking with debouncing in UI layer
+
+        - id: "SEC-6.8a-005"
+          title: "Foreign Key Constraint Missing for voice_id"
+          severity: "INFO"
+          category: "A04:2021 - Insecure Design"
+          description: |
+            Migration 015 creates FOREIGN KEY for default_persona_id but NOT for default_voice_id.
+            This is intentional (voices defined in TypeScript, not DB), but creates data integrity risk.
+          affected_files:
+            - "src/lib/db/migrations/015_user_preferences.ts:28"
+          risk: |
+            - Orphaned voice_id references if voice-profiles.ts is refactored
+            - No database-level referential integrity enforcement
+            - Validation only happens at API layer (PUT handler line 105-116)
+          current_mitigation: |
+            - API validation in PUT handler checks getVoiceById() before persisting
+            - Comment in migration explains design decision
+          recommendation: |
+            - Add CHECK constraint for voice_id format validation (e.g., 'voice-*')
+            - Consider migrating voices to database in future refactor for consistency
+            - Document this as architectural trade-off in ADR
+
+      info:
+        - id: "SEC-6.8a-006"
+          title: "No CSRF Protection (Acceptable for Desktop App)"
+          severity: "INFO"
+          category: "A01:2021 - Broken Access Control"
+          description: |
+            PUT endpoint lacks CSRF token validation. Acceptable for localhost desktop app,
+            but MUST be addressed before cloud deployment.
+          affected_files:
+            - "src/app/api/user-preferences/route.ts:100"
+          risk: "NONE (single-user localhost context)"
+          recommendation: "Add CSRF middleware as part of cloud migration checklist"
+
+        - id: "SEC-6.8a-007"
+          title: "No Input Sanitization for Project ID in Pipeline Status"
+          severity: "INFO"
+          category: "A03:2021 - Injection"
+          description: |
+            Project ID from URL params is used directly in SQL query without format validation.
+            Properly parameterized, but lacks format validation.
+          affected_files:
+            - "src/app/api/projects/[id]/pipeline-status/route.ts:163-178"
+          code_location: |
+            Line 163: const { id: projectId } = await params;
+            Line 166: db.prepare(`SELECT ... FROM projects WHERE id = ?`).get(projectId)
+          current_mitigation: |
+            - Uses parameterized query (SQL injection protected ✓)
+            - Next.js route parameter handling
+          risk: "LOW (properly parameterized)"
+          recommendation: |
+            Add regex validation for project ID format (e.g., /^[a-zA-Z0-9-_]{1,64}$/)
+            to reject malformed IDs early
+
+  test_coverage:
+    overall_coverage: "0%"
+    status: "CRITICAL GAP"
+
+    existing_tests:
+      unit_tests: []
+      integration_tests: []
+      e2e_tests: []
+      manual_tests:
+        - "TypeScript compilation passes (story checklist)"
+        - "ESLint passes on new files (story checklist)"
+        - "Manual testing pending dev server (story checklist)"
+
+    missing_tests:
+      critical_gaps:
+        - id: "TEST-6.8a-001"
+          area: "Database Migration"
+          description: "No test verifies Migration 015 creates correct schema"
+          files_to_test:
+            - "src/lib/db/migrations/015_user_preferences.ts"
+          test_scenarios:
+            - "Migration creates user_preferences table with correct columns"
+            - "Default row is inserted with id='default'"
+            - "Foreign key constraint exists for default_persona_id"
+            - "Index idx_user_preferences_id is created"
+            - "Migration is idempotent (can run multiple times safely)"
+            - "down() migration properly rolls back changes"
+
+        - id: "TEST-6.8a-002"
+          area: "User Preferences Repository"
+          description: "Zero unit test coverage for queries-user-preferences.ts"
+          files_to_test:
+            - "src/lib/db/queries-user-preferences.ts"
+          test_scenarios:
+            - "getUserPreferences() returns null when no default row exists"
+            - "getUserPreferences() converts quick_production_enabled 0/1 to boolean"
+            - "getUserPreferences() joins persona_name from system_prompts correctly"
+            - "updateUserPreferences() handles partial updates (only voice_id)"
+            - "updateUserPreferences() handles partial updates (only persona_id)"
+            - "updateUserPreferences() handles null values correctly"
+            - "updateUserPreferences() updates updated_at timestamp"
+            - "updateUserPreferences() with no changes returns current preferences"
+            - "hasConfiguredDefaults() returns true when both IDs set"
+            - "hasConfiguredDefaults() returns false when either ID is null"
+            - "Error handling for database connection failures"
+
+        - id: "TEST-6.8a-003"
+          area: "GET /api/user-preferences"
+          description: "No API integration tests for GET endpoint"
+          files_to_test:
+            - "src/app/api/user-preferences/route.ts:43-81"
+          test_scenarios:
+            - "Returns 404 when preferences don't exist"
+            - "Returns preferences with voice_name from voice-profiles.ts"
+            - "Returns preferences with persona_name from database"
+            - "Returns preferences with null voice_name when voice_id invalid"
+            - "Handles database errors gracefully with 500 status"
+            - "Response follows standard API envelope {success, data}"
+
+        - id: "TEST-6.8a-004"
+          area: "PUT /api/user-preferences"
+          description: "No API integration tests for PUT endpoint"
+          files_to_test:
+            - "src/app/api/user-preferences/route.ts:100-163"
+          test_scenarios:
+            - "Returns 400 when voice_id is invalid"
+            - "Returns 400 when persona_id is invalid"
+            - "Successfully updates only voice_id (partial update)"
+            - "Successfully updates only persona_id (partial update)"
+            - "Successfully updates both voice_id and persona_id"
+            - "Accepts null values to clear preferences"
+            - "Handles malformed JSON body gracefully"
+            - "Handles database errors with 500 status"
+            - "Validates persona_id exists in system_prompts table"
+            - "Validates voice_id exists in voice-profiles.ts"
+
+        - id: "TEST-6.8a-005"
+          area: "GET /api/projects/[id]/pipeline-status"
+          description: "No tests for pipeline status calculation logic"
+          files_to_test:
+            - "src/app/api/projects/[id]/pipeline-status/route.ts"
+          test_scenarios:
+            - "Returns 404 when project doesn't exist"
+            - "Maps current_step='script-generation' to currentStage='script'"
+            - "Maps current_step='voiceover' to currentStage='voiceover'"
+            - "Maps current_step='visual-curation' to currentStage='visuals'"
+            - "Maps current_step='assembly' to currentStage='assembly'"
+            - "Maps video_path present to currentStage='complete'"
+            - "Calculates stageProgress for voiceover stage (scenes with audio)"
+            - "Calculates stageProgress for visuals stage (suggestions complete)"
+            - "Calculates overallProgress correctly across stages"
+            - "Returns appropriate currentMessage for each stage"
+            - "Detects assembly job errors and includes error field"
+            - "Handles projects with no scenes gracefully"
+
+        - id: "TEST-6.8a-006"
+          area: "Settings Page UI"
+          description: "No E2E tests for /settings/quick-production page"
+          files_to_test:
+            - "src/app/settings/quick-production/page.tsx"
+          test_scenarios:
+            - "Page loads and fetches voices, personas, preferences in parallel"
+            - "Displays loading spinner while fetching data"
+            - "Populates voice dropdown with voices from API"
+            - "Populates persona dropdown with personas from API"
+            - "Pre-selects current preferences in dropdowns"
+            - "Save button disabled when no changes made"
+            - "Save button disabled when only voice selected (validation)"
+            - "Save button disabled when only persona selected (validation)"
+            - "Save button enabled when both voice and persona selected"
+            - "Displays success message after successful save"
+            - "Displays error message when save fails"
+            - "Refreshes preferences after successful save"
+            - "Shows prompt message from URL query param"
+            - "Back button navigates to previous page"
+
+    recommended_tests:
+      priority_1_critical:
+        - test_id: "TEST-6.8a-002"
+          rationale: "Core repository functions with complex logic (partial updates, type conversions)"
+          effort: "2-3 hours"
+          files: "tests/unit/db/queries-user-preferences.test.ts"
+
+        - test_id: "TEST-6.8a-004"
+          rationale: "API validation logic is critical security control"
+          effort: "2-3 hours"
+          files: "tests/api/user-preferences/put.test.ts"
+
+        - test_id: "TEST-6.8a-005"
+          rationale: "Complex state machine logic for pipeline status calculation"
+          effort: "3-4 hours"
+          files: "tests/api/projects/pipeline-status.test.ts"
+
+      priority_2_important:
+        - test_id: "TEST-6.8a-001"
+          rationale: "Database schema correctness is foundational"
+          effort: "1-2 hours"
+          files: "tests/integration/db/migration-015.test.ts"
+
+        - test_id: "TEST-6.8a-003"
+          rationale: "GET endpoint is simpler but still needs coverage"
+          effort: "1 hour"
+          files: "tests/api/user-preferences/get.test.ts"
+
+      priority_3_nice_to_have:
+        - test_id: "TEST-6.8a-006"
+          rationale: "E2E tests provide high confidence but are more expensive to maintain"
+          effort: "4-5 hours"
+          files: "tests/e2e/settings/quick-production.spec.ts"
+
+  recommendations:
+    security:
+      immediate:
+        - action: "Add validation for project ID format in pipeline-status endpoint"
+          priority: "HIGH"
+          effort: "15 minutes"
+          files: ["src/app/api/projects/[id]/pipeline-status/route.ts"]
+
+        - action: "Document single-user authentication decision in ADR"
+          priority: "HIGH"
+          effort: "30 minutes"
+          files: ["docs/architecture.md"]
+
+        - action: "Sanitize error messages in production mode"
+          priority: "MEDIUM"
+          effort: "1 hour"
+          files:
+            - "src/app/api/user-preferences/route.ts"
+            - "src/app/api/projects/[id]/pipeline-status/route.ts"
+
+      before_story_68b:
+        - action: "Add rate limiting middleware for user-preferences PUT"
+          priority: "MEDIUM"
+          effort: "2 hours"
+          rationale: "Story 6.8b will trigger automated PUT requests from Quick Production flow"
+
+        - action: "Add CHECK constraint for voice_id format in migration 015"
+          priority: "LOW"
+          effort: "30 minutes"
+          rationale: "Defense-in-depth for data integrity"
+
+      before_cloud_migration:
+        - action: "Implement authentication middleware for all API routes"
+          priority: "CRITICAL"
+          effort: "1 week"
+          blockers: ["Must be completed before any cloud deployment"]
+
+        - action: "Add CSRF token validation"
+          priority: "CRITICAL"
+          effort: "2 days"
+
+        - action: "Implement row-level security policies"
+          priority: "HIGH"
+          effort: "3 days"
+
+    testing:
+      immediate:
+        - action: "Create unit tests for queries-user-preferences.ts (TEST-6.8a-002)"
+          priority: "CRITICAL"
+          effort: "2-3 hours"
+          blockers: ["Required before Story 6.8b begins"]
+
+        - action: "Create integration tests for PUT /api/user-preferences (TEST-6.8a-004)"
+          priority: "CRITICAL"
+          effort: "2-3 hours"
+          blockers: ["Validates critical security controls"]
+
+        - action: "Create integration tests for pipeline-status endpoint (TEST-6.8a-005)"
+          priority: "HIGH"
+          effort: "3-4 hours"
+          rationale: "Complex calculation logic prone to edge case bugs"
+
+      before_story_68b:
+        - action: "Create E2E test for settings page (TEST-6.8a-006)"
+          priority: "MEDIUM"
+          effort: "4-5 hours"
+          rationale: "Story 6.8b depends on settings page working correctly"
+
+      regression_prevention:
+        - action: "Add migration test for 015_user_preferences (TEST-6.8a-001)"
+          priority: "MEDIUM"
+          effort: "1-2 hours"
+
+        - action: "Add GET /api/user-preferences tests (TEST-6.8a-003)"
+          priority: "MEDIUM"
+          effort: "1 hour"
+
+    code_quality:
+      - action: "Add JSDoc comments to pipeline status helper functions"
+        priority: "LOW"
+        effort: "30 minutes"
+        files: ["src/app/api/projects/[id]/pipeline-status/route.ts"]
+
+      - action: "Extract pipeline status calculation to testable service module"
+        priority: "MEDIUM"
+        effort: "2 hours"
+        benefit: "Enables isolated unit testing without API context"
+
+      - action: "Add TypeScript strict mode to tsconfig.json if not already enabled"
+        priority: "LOW"
+        effort: "1 hour"
+        benefit: "Catch null/undefined issues at compile time"
+
+  acceptance_criteria_validation:
+    ac_6_8a_1:
+      status: "PASS"
+      description: "Migration 015 creates user_preferences table with default row"
+      evidence:
+        - "Migration file exists: src/lib/db/migrations/015_user_preferences.ts"
+        - "Table schema includes all required columns"
+        - "Foreign key for default_persona_id present"
+        - "Default row inserted with INSERT OR IGNORE"
+      gaps:
+        - "No automated test verifies schema correctness"
+        - "No test for migration idempotency"
+
+    ac_6_8a_2:
+      status: "PASS"
+      description: "Settings page saves preferences to database"
+      evidence:
+        - "Page exists: src/app/settings/quick-production/page.tsx"
+        - "Form has voice and persona dropdowns"
+        - "Save button calls PUT /api/user-preferences"
+        - "Success message displayed after save"
+      gaps:
+        - "No E2E test validates end-to-end flow"
+        - "No test validates form state management"
+
+    ac_6_8a_3:
+      status: "PASS"
+      description: "GET /api/user-preferences returns stored defaults with names"
+      evidence:
+        - "Endpoint exists and returns standard API envelope"
+        - "Joins persona_name from system_prompts table (line 75)"
+        - "Resolves voice_name from voice-profiles.ts (line 58-62)"
+      gaps:
+        - "No integration test validates response structure"
+        - "No test for edge case: invalid voice_id in database"
+
+    ac_6_8a_4:
+      status: "PASS"
+      description: "PUT /api/user-preferences updates preferences with validation"
+      evidence:
+        - "Endpoint exists with proper validation"
+        - "Validates voice_id against voice-profiles.ts (line 105-116)"
+        - "Validates persona_id against system_prompts table (line 119-130)"
+        - "Supports partial updates"
+      gaps:
+        - "No integration test for validation logic"
+        - "No test for race conditions with concurrent PUTs"
+
+    ac_6_8a_5:
+      status: "PASS"
+      description: "GET /api/projects/[id]/pipeline-status returns progress data"
+      evidence:
+        - "Endpoint exists with comprehensive status calculation"
+        - "Returns all required fields: currentStage, completedStages, stageProgress, overallProgress, currentMessage"
+        - "Maps current_step to pipeline stages correctly"
+        - "Calculates progress from scene/suggestion statistics"
+      gaps:
+        - "No integration test validates calculation logic"
+        - "No test for edge cases (no scenes, no suggestions)"
+        - "Complex state machine logic untested"
+
+  risk_assessment:
+    deployment_risk: "MODERATE"
+    security_risk: "LOW (single-user), HIGH (if deployed to cloud without changes)"
+    maintenance_risk: "HIGH (zero test coverage)"
+    integration_risk: "MODERATE (Story 6.8b depends heavily on this infrastructure)"
+
+    go_no_go_recommendation: "CONDITIONAL GO"
+    conditions:
+      - "Add critical unit tests (TEST-6.8a-002, TEST-6.8a-004) before Story 6.8b"
+      - "Document single-user authentication decision in architecture.md"
+      - "Add project ID validation to pipeline-status endpoint"
+
+    rationale: |
+      Story 6.8a implements foundational infrastructure correctly with proper input validation
+      and secure database queries. However, ZERO test coverage creates significant maintenance
+      risk for future stories. Security posture is acceptable for single-user desktop deployment
+      but requires authentication/authorization before cloud migration.
+
+      The implementation follows best practices (parameterized queries, error handling, type safety)
+      but lacks the safety net of automated tests. Story 6.8b should not proceed until critical
+      test gaps are addressed.
+
+  positive_findings:
+    - "Proper use of parameterized queries throughout (SQL injection protected)"
+    - "Input validation for voice_id and persona_id in PUT handler"
+    - "Foreign key constraint for persona_id maintains referential integrity"
+    - "Error handling with try-catch blocks in all repository functions"
+    - "Type-safe TypeScript interfaces for all entities"
+    - "Standard API response envelope {success, data, error}"
+    - "Comprehensive JSDoc comments in migration file"
+    - "UI validation requires both voice AND persona selected"
+    - "Partial update support in updateUserPreferences()"
+    - "Idempotent migration with CREATE IF NOT EXISTS and INSERT OR IGNORE"
+
+  references:
+    story_file: "docs/stories/stories-epic-6/story-6.8a.md"
+    tech_spec: "docs/sprint-artifacts/tech-spec-epic-6.md"
+    architecture: "docs/architecture.md"
+    prd: "docs/prd.md (Feature 2.7 - Quick Production Flow)"
+    owasp_top_10: "https://owasp.org/Top10/2021"
+    related_stories:
+      - "Story 6.8b - Quick Production Flow (depends on this infrastructure)"
+      - "Story 1.12 - Automate Mode (pipeline status integration)"
+      - "Story 2.3 - Voice Selection (voice dropdown)"
+      - "Story 2.4 - Persona Selection (persona dropdown)"

@@ -5,10 +5,18 @@
 **Type:** Level 2 Greenfield Software Project
 **Author:** Winston (BMAD Architect Agent)
 **Date:** 2025-11-12
-**Version:** 2.0
-**Last Updated:** 2025-11-29
+**Version:** 2.1
+**Last Updated:** 2025-12-03
 
-**Recent Changes (v2.0 - 2025-11-29):**
+**Recent Changes (v2.1 - 2025-12-03):**
+- Added Quick Production Flow architecture (Feature 2.7 extension)
+- Added user_preferences database schema for default voice/persona
+- Added API endpoints: /api/projects/quick-create, /api/user-preferences
+- Added UI components: TopicSuggestionCard, QuickProductionProgress
+- Added settings page: /settings/quick-production
+- Documented integration with Automate Mode (Feature 1.12)
+
+**Previous Changes (v2.0 - 2025-11-29):**
 - Added Feature 2.7: Channel Intelligence & Content Research (RAG-Powered) architecture
 - Added RAG database schema (channels, channel_videos, embeddings, news_sources tables)
 - Added Background Job Queue architecture for daily sync operations
@@ -6793,6 +6801,383 @@ EMBEDDING_MODEL=all-MiniLM-L6-v2
 # News Scraping
 NEWS_FETCH_ENABLED=true
 NEWS_MAX_ARTICLES_PER_SOURCE=20
+```
+
+### Quick Production Flow Architecture
+
+**PRD Reference:** Feature 2.7 - Quick Production Flow (One-Click Video Creation)
+
+The Quick Production Flow enables one-click video creation directly from RAG-generated topic suggestions. When a user clicks "Create Video" on a topic suggestion, the system automatically creates a project, applies saved defaults (voice + persona), and triggers the full video production pipeline.
+
+#### Architecture Pattern: Pipeline Orchestration
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                Quick Production Flow Pipeline                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  1. Topic Suggestions UI (Channel Intelligence Page)     │   │
+│  │     - Display RAG-generated topics                        │   │
+│  │     - "Create Video" button on each topic card           │   │
+│  └──────────────────────┬───────────────────────────────────┘   │
+│                         │ Click "Create Video"                   │
+│                         ▼                                        │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  2. Defaults Resolution                                   │   │
+│  │     - Load user_preferences (default_voice_id,           │   │
+│  │       default_persona_id)                                 │   │
+│  │     - If no defaults: redirect to settings                │   │
+│  └──────────────────────┬───────────────────────────────────┘   │
+│                         ▼                                        │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  3. Project Creation (POST /api/projects/quick-create)   │   │
+│  │     - Create project with topic pre-filled               │   │
+│  │     - Set topic_confirmed = true                         │   │
+│  │     - Apply default voice + persona                      │   │
+│  │     - Attach RAG context                                 │   │
+│  └──────────────────────┬───────────────────────────────────┘   │
+│                         ▼                                        │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  4. Pipeline Orchestration (Reuses Automate Mode)        │   │
+│  │     - Trigger script generation with RAG context         │   │
+│  │     - Trigger voiceover generation                       │   │
+│  │     - Trigger visual sourcing + auto-selection           │   │
+│  │     - Trigger video assembly                             │   │
+│  └──────────────────────┬───────────────────────────────────┘   │
+│                         ▼                                        │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  5. Progress Tracking & Navigation                        │   │
+│  │     - Redirect to /projects/[id]/progress                │   │
+│  │     - Real-time status updates via polling               │   │
+│  │     - Auto-redirect to /projects/[id]/export on complete │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Database Schema Extension
+
+```sql
+-- Migration 015: Add user_preferences table for Quick Production defaults
+CREATE TABLE IF NOT EXISTS user_preferences (
+  id TEXT PRIMARY KEY DEFAULT 'default',
+  default_voice_id TEXT,                    -- No FK: voices defined in TypeScript (voice-profiles.ts)
+  default_persona_id TEXT,
+  quick_production_enabled INTEGER DEFAULT 1,  -- SQLite uses INTEGER for BOOLEAN
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (default_persona_id) REFERENCES system_prompts(id) ON DELETE SET NULL
+);
+
+-- Insert default row (single-user app)
+INSERT OR IGNORE INTO user_preferences (id) VALUES ('default');
+
+-- Migration 016: Add default_duration column
+-- Stores target video duration in minutes (1-20 range, default 2)
+ALTER TABLE user_preferences ADD COLUMN default_duration INTEGER DEFAULT 2;
+```
+
+#### API Endpoints
+
+```typescript
+// app/api/projects/quick-create/route.ts
+export async function POST(req: Request) {
+  const { topic, ragContext } = await req.json();
+
+  // 1. Load user preferences
+  const prefs = db.prepare(`
+    SELECT default_voice_id, default_persona_id, default_duration, quick_production_enabled
+    FROM user_preferences WHERE id = 'default'
+  `).get();
+
+  // 2. Validate defaults exist
+  if (!prefs.default_voice_id || !prefs.default_persona_id) {
+    return Response.json({
+      success: false,
+      error: 'DEFAULTS_NOT_CONFIGURED',
+      message: 'Please configure default voice and persona in settings'
+    }, { status: 400 });
+  }
+
+  // 3. Create project with topic confirmed
+  const projectId = generateId();
+  db.prepare(`
+    INSERT INTO projects (id, topic, topic_confirmed, voice_id, system_prompt_id, current_step, rag_context)
+    VALUES (?, ?, true, ?, ?, 'script-generation', ?)
+  `).run(projectId, topic, prefs.default_voice_id, prefs.default_persona_id, JSON.stringify(ragContext));
+
+  // 4. Trigger automated pipeline (reuse Automate Mode logic)
+  await triggerAutomatedPipeline(projectId, {
+    voiceId: prefs.default_voice_id,
+    personaId: prefs.default_persona_id,
+    ragContext
+  });
+
+  return Response.json({
+    success: true,
+    data: { projectId, redirectUrl: `/projects/${projectId}/progress` }
+  });
+}
+
+// app/api/user-preferences/route.ts
+export async function GET() {
+  // Note: voice_name resolved from voice-profiles.ts at API layer
+  const prefs = db.prepare(`
+    SELECT up.*, sp.name as persona_name
+    FROM user_preferences up
+    LEFT JOIN system_prompts sp ON up.default_persona_id = sp.id
+    WHERE up.id = 'default'
+  `).get();
+
+  // Resolve voice_name from TypeScript voice profiles
+  const voice = getVoiceById(prefs.default_voice_id);
+  prefs.voice_name = voice?.name;
+
+  return Response.json({ success: true, data: prefs });
+}
+
+export async function PUT(req: Request) {
+  const { default_voice_id, default_persona_id, default_duration, quick_production_enabled } = await req.json();
+
+  // Validate duration (1-20 minutes)
+  if (default_duration !== undefined) {
+    if (default_duration < 1 || default_duration > 20) {
+      return Response.json({ success: false, error: 'Duration must be 1-20 minutes' }, { status: 400 });
+    }
+  }
+
+  // Build dynamic UPDATE (partial updates supported)
+  const updates = [];
+  const values = [];
+  if (default_voice_id !== undefined) { updates.push('default_voice_id = ?'); values.push(default_voice_id); }
+  if (default_persona_id !== undefined) { updates.push('default_persona_id = ?'); values.push(default_persona_id); }
+  if (default_duration !== undefined) { updates.push('default_duration = ?'); values.push(default_duration); }
+  if (quick_production_enabled !== undefined) { updates.push('quick_production_enabled = ?'); values.push(quick_production_enabled ? 1 : 0); }
+  updates.push("updated_at = datetime('now')");
+
+  db.prepare(`UPDATE user_preferences SET ${updates.join(', ')} WHERE id = 'default'`).run(...values);
+
+  return Response.json({ success: true });
+}
+```
+
+#### UI Components
+
+```typescript
+// components/features/rag/TopicSuggestionCard.tsx
+interface TopicSuggestionCardProps {
+  topic: TopicSuggestion;
+  onCreateVideo: (topic: string) => void;
+  hasDefaults: boolean;
+}
+
+export function TopicSuggestionCard({ topic, onCreateVideo, hasDefaults }: TopicSuggestionCardProps) {
+  return (
+    <div className="topic-card">
+      <div className="topic-content">
+        <h3 className="topic-title">{topic.title}</h3>
+        <p className="topic-description">{topic.description}</p>
+        <div className="topic-meta">
+          <span className="topic-source">{topic.source}</span>
+          <span className="topic-relevance">{topic.relevanceScore}% match</span>
+        </div>
+      </div>
+      <div className="topic-actions">
+        {hasDefaults ? (
+          <button
+            className="btn-create-video"
+            onClick={() => onCreateVideo(topic.title)}
+          >
+            Create Video
+          </button>
+        ) : (
+          <button
+            className="btn-configure"
+            onClick={() => router.push('/settings/quick-production')}
+          >
+            Configure Defaults First
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// components/features/rag/QuickProductionProgress.tsx
+interface QuickProductionProgressProps {
+  projectId: string;
+}
+
+export function QuickProductionProgress({ projectId }: QuickProductionProgressProps) {
+  const { data: status, isLoading } = usePipelineStatus(projectId);
+
+  const stages = [
+    { key: 'script', label: 'Generating Script', icon: '📝' },
+    { key: 'voiceover', label: 'Creating Voiceover', icon: '🎙️' },
+    { key: 'visuals', label: 'Sourcing Visuals', icon: '🎬' },
+    { key: 'assembly', label: 'Assembling Video', icon: '🔧' },
+    { key: 'complete', label: 'Complete!', icon: '✅' },
+  ];
+
+  return (
+    <div className="progress-container">
+      <h2>Creating Your Video</h2>
+      <p className="topic-display">Topic: {status?.topic}</p>
+
+      <div className="progress-stages">
+        {stages.map((stage, idx) => (
+          <div
+            key={stage.key}
+            className={`stage ${status?.currentStage === stage.key ? 'active' : ''} ${status?.completedStages?.includes(stage.key) ? 'complete' : ''}`}
+          >
+            <span className="stage-icon">{stage.icon}</span>
+            <span className="stage-label">{stage.label}</span>
+            {status?.currentStage === stage.key && (
+              <span className="stage-progress">{status?.stageProgress}%</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="progress-bar">
+        <div className="progress-fill" style={{ width: `${status?.overallProgress || 0}%` }} />
+      </div>
+
+      <p className="progress-detail">{status?.currentMessage}</p>
+    </div>
+  );
+}
+```
+
+#### Settings Page Extension
+
+```typescript
+// app/settings/quick-production/page.tsx
+export default function QuickProductionSettingsPage() {
+  const { data: prefs, mutate } = useUserPreferences();
+  const { data: voices } = useVoices();
+  const { data: personas } = usePersonas();
+
+  const handleSave = async (values: UserPreferences) => {
+    await fetch('/api/user-preferences', {
+      method: 'PUT',
+      body: JSON.stringify(values),
+    });
+    mutate();
+    toast.success('Quick Production defaults saved');
+  };
+
+  return (
+    <div className="settings-page">
+      <h1>Quick Production Defaults</h1>
+      <p className="description">
+        Configure default voice and persona for one-click video creation from topic suggestions.
+      </p>
+
+      <form onSubmit={handleSubmit(handleSave)}>
+        <div className="form-group">
+          <label>Default Voice</label>
+          <select {...register('default_voice_id')}>
+            {voices?.map(v => (
+              <option key={v.id} value={v.id}>{v.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Default Persona</label>
+          <select {...register('default_persona_id')}>
+            {personas?.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>
+            <input type="checkbox" {...register('quick_production_enabled')} />
+            Enable Quick Production (one-click video creation)
+          </label>
+        </div>
+
+        <button type="submit" className="btn-save">Save Defaults</button>
+      </form>
+    </div>
+  );
+}
+```
+
+#### Integration with Automate Mode (Feature 1.12)
+
+The Quick Production Flow reuses the Automate Mode pipeline from Feature 1.12. The key difference is the entry point:
+
+| Aspect | Automate Mode (1.12) | Quick Production Flow (2.7) |
+|--------|---------------------|----------------------------|
+| **Entry Point** | Chat → Confirm Topic → Enable Automate | Topic Suggestion → Click "Create Video" |
+| **Configuration** | Per-project toggle | Global user preferences |
+| **Voice Selection** | Before automation starts | Pre-configured default |
+| **Persona Selection** | Project-level setting | Pre-configured default |
+| **RAG Context** | Optional | Always included |
+| **Pipeline** | Same | Same (reused) |
+
+```typescript
+// lib/pipeline/automated-pipeline.ts
+// Shared by both Automate Mode and Quick Production Flow
+
+export async function triggerAutomatedPipeline(
+  projectId: string,
+  options: {
+    voiceId: string;
+    personaId: string;
+    ragContext?: RAGContext;
+    videoSource?: 'youtube' | 'dvids';
+  }
+): Promise<string> {
+  // Create pipeline job
+  const jobId = generateId();
+
+  db.prepare(`
+    INSERT INTO pipeline_jobs (id, project_id, status, current_stage, options)
+    VALUES (?, ?, 'pending', 'script', ?)
+  `).run(jobId, projectId, JSON.stringify(options));
+
+  // Enqueue in job processor
+  await jobQueue.enqueue({
+    type: 'automated_pipeline',
+    payload: { projectId, jobId, options },
+    priority: 'high'
+  });
+
+  return jobId;
+}
+```
+
+#### Project Structure Extension
+
+```
+lib/
+├── rag/
+│   └── generation/
+│       ├── topic-suggestions.ts     # Existing
+│       └── quick-production.ts      # NEW: One-click video creation
+├── pipeline/
+│   ├── automated-pipeline.ts        # Shared pipeline orchestration
+│   └── progress-tracker.ts          # Real-time progress updates
+app/
+├── settings/
+│   └── quick-production/
+│       └── page.tsx                 # NEW: Quick production settings
+├── projects/
+│   └── [id]/
+│       └── progress/
+│           └── page.tsx             # NEW: Pipeline progress page
+components/
+└── features/
+    └── rag/
+        ├── TopicSuggestions.tsx     # Existing
+        ├── TopicSuggestionCard.tsx  # NEW: Individual topic card with "Create Video"
+        └── QuickProductionProgress.tsx # NEW: Progress display
 ```
 
 ---

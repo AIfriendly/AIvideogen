@@ -2,8 +2,8 @@
 
 *This document outlines the requirements for the AI Video Generator. It is a living document and will be updated as the project progresses.*
 
-**Last Updated:** 2025-12-01
-**Version:** 3.2
+**Last Updated:** 2025-12-03
+**Version:** 3.3
 **Repository:** <https://github.com/AIfriendly/AIvideogen>
 
 **Project Type:** Web Application
@@ -11,7 +11,16 @@
 **Complexity:** Level 2 (BMad Method)
 **Status:** Core Features Complete - Enhancement Phase
 
-**Recent Changes (v3.2 - 2025-12-01):**
+**Recent Changes (v3.3 - 2025-12-03):**
+- Expanded Feature 1.11 from basic metadata generation to full SEO Toolkit
+- Added 7 sub-components: Core Metadata, Keyword Research, Title Optimizer, Smart Tag Generation, Best Time to Post, Video Score/Audit, Thumbnail A/B Testing
+- Added 25 new functional requirements (FR-11.09 through FR-11.33)
+- Added 5 new acceptance criteria (AC4-AC8)
+- VidIQ-style intelligence features for video discoverability
+- Added Quick Production Flow to Feature 2.7 (RAG): one-click video creation from topic suggestions
+- Added 8 new FRs (FR-2.7.QPF.01-08) and 4 new ACs (AC-QPF.1-4) for Quick Production Flow
+
+**Previous Changes (v3.2 - 2025-12-01):**
 - Added Feature 1.14: Unified API Usage Dashboard
 - Dedicated page at `/settings/api-usage` for all API monitoring
 - Tracks Gemini, YouTube Data API, and ElevenLabs usage
@@ -620,23 +629,78 @@ The following measurable criteria define product success:
         *   **When** assembly runs.
         *   **Then** video completes successfully without background music.
 
-### 1.11. AI-Generated Video Metadata
+### 1.11. AI-Generated Video Metadata & SEO Toolkit
 
-*   **Description:** The system automatically generates optimized title, description, and tags for the completed video, tailored for YouTube and TikTok platforms. Metadata is displayed on the Export page alongside the download options, enabling creators to copy and paste directly to their upload forms.
+*   **Description:** A comprehensive SEO optimization system that generates metadata and provides VidIQ-style intelligence for video discoverability. The system automatically generates optimized titles, descriptions, and tags, while also providing keyword research, title scoring, best posting times, and pre-upload SEO audits. This transforms the Export page into a full SEO command center, helping creators maximize their video's reach on YouTube and TikTok.
 
 *   **User Stories:**
     1.  **As a creator,** I want AI-generated video titles, descriptions, and tags ready when my video is done, **so that** I can upload to YouTube/TikTok immediately without writing metadata manually.
     2.  **As a creator,** I want platform-specific metadata formats (YouTube vs TikTok), **so that** I can optimize for each platform's requirements.
+    3.  **As a creator,** I want keyword suggestions with search volume and competition data, **so that** I can target high-opportunity topics.
+    4.  **As a creator,** I want my titles scored and optimized, **so that** I can improve click-through rates.
+    5.  **As a creator,** I want to know the best time to post my video, **so that** I can maximize initial engagement.
+    6.  **As a creator,** I want an SEO audit before uploading, **so that** I can fix any issues that might hurt discoverability.
+
+*   **Feature Components:**
+    *   **1.11.1 - Core Metadata Generation:** Auto-generate title, description, tags after video assembly (baseline functionality)
+    *   **1.11.2 - Keyword Research:** Suggest high-volume, low-competition keywords based on RAG data + trend analysis
+    *   **1.11.3 - Title Optimizer:** Score titles (0-100), suggest improvements based on keyword placement, length, CTR patterns
+    *   **1.11.4 - Smart Tag Generation:** Rank tags by relevance + search volume, competitor tag gap analysis
+    *   **1.11.5 - Best Time to Post:** Analyze channel audience patterns or provide niche-based defaults for optimal upload timing
+    *   **1.11.6 - Video Score/Audit:** Pre-upload SEO checklist with overall score and actionable improvement suggestions
+    *   **1.11.7 - Thumbnail A/B Testing (Future):** Generate multiple thumbnail variants, track performance after upload
 
 *   **Functional Requirements:**
-    *   **FR-11.01:** The system shall generate metadata automatically after video assembly completes.
-    *   **FR-11.02:** The system shall use the video topic, script content, and scene themes as inputs for metadata generation.
-    *   **FR-11.03:** The system shall generate an optimized video title (max 100 characters, engaging, keyword-rich).
-    *   **FR-11.04:** The system shall generate a short description (~150 characters) with relevant hashtags.
-    *   **FR-11.05:** The system shall generate 10-15 comma-separated tags optimized for discoverability.
-    *   **FR-11.06:** The system shall provide YouTube-optimized and TikTok-optimized variants.
-    *   **FR-11.07:** The system shall display metadata on the Export page with copy-to-clipboard functionality.
-    *   **FR-11.08:** The system shall store generated metadata in the project record.
+    *   **Core Metadata (1.11.1):**
+        *   **FR-11.01:** The system shall generate metadata automatically after video assembly completes.
+        *   **FR-11.02:** The system shall use the video topic, script content, and scene themes as inputs for metadata generation.
+        *   **FR-11.03:** The system shall generate an optimized video title (max 100 characters, engaging, keyword-rich).
+        *   **FR-11.04:** The system shall generate a short description (~150 characters) with relevant hashtags.
+        *   **FR-11.05:** The system shall generate 10-15 comma-separated tags optimized for discoverability.
+        *   **FR-11.06:** The system shall provide YouTube-optimized and TikTok-optimized variants.
+        *   **FR-11.07:** The system shall display metadata on the Export page with copy-to-clipboard functionality.
+        *   **FR-11.08:** The system shall store generated metadata in the project record.
+    *   **Keyword Research (1.11.2):**
+        *   **FR-11.09:** The system shall analyze RAG data (news articles, competitor videos) to identify trending keywords in the user's niche.
+        *   **FR-11.10:** The system shall display search volume indicators (High/Medium/Low) for suggested keywords.
+        *   **FR-11.11:** The system shall display competition level for each keyword based on competitor content analysis.
+        *   **FR-11.12:** The system shall suggest 10-20 keywords ranked by opportunity score (high volume + low competition).
+    *   **Title Optimizer (1.11.3):**
+        *   **FR-11.13:** The system shall score generated titles from 0-100 based on SEO best practices.
+        *   **FR-11.14:** The system shall analyze keyword placement (front-loaded keywords score higher).
+        *   **FR-11.15:** The system shall analyze title length (optimal: 50-70 characters for YouTube).
+        *   **FR-11.16:** The system shall suggest 2-3 alternative title variants with scores.
+        *   **FR-11.17:** The system shall provide specific improvement suggestions (e.g., "Move keyword 'drone warfare' to beginning").
+    *   **Smart Tag Generation (1.11.4):**
+        *   **FR-11.18:** The system shall generate 15-20 tags ranked by relevance + estimated search volume.
+        *   **FR-11.19:** The system shall categorize tags: primary (topic), secondary (niche), trending (current events).
+        *   **FR-11.20:** The system shall analyze competitor tags to identify gaps (tags competitors use that you're missing).
+        *   **FR-11.21:** The system shall highlight high-opportunity tags (used by successful competitors, moderate competition).
+    *   **Best Time to Post (1.11.5):**
+        *   **FR-11.22:** For synced channels, the system shall analyze YouTube Analytics data to determine audience activity patterns.
+        *   **FR-11.23:** For new channels, the system shall provide niche-based default recommendations (e.g., military content peaks on weekday evenings).
+        *   **FR-11.24:** The system shall display recommended day(s) of week and hour range for posting.
+        *   **FR-11.25:** The system shall show timezone-aware recommendations based on user's locale.
+    *   **Video Score/Audit (1.11.6):**
+        *   **FR-11.26:** The system shall provide a pre-upload SEO checklist with pass/fail indicators.
+        *   **FR-11.27:** Checklist items shall include: title strength, description completeness, tag count, keyword coverage, thumbnail presence.
+        *   **FR-11.28:** The system shall calculate an overall SEO score (0-100) based on weighted checklist items.
+        *   **FR-11.29:** The system shall provide actionable suggestions for items scoring below threshold.
+        *   **FR-11.30:** The system shall compare video's SEO score to average scores in the user's niche.
+    *   **Thumbnail A/B Testing (1.11.7 - Future):**
+        *   **FR-11.31:** The system shall generate 2-3 thumbnail variants using different frame selections and text treatments.
+        *   **FR-11.32:** The system shall integrate with YouTube Analytics API to track thumbnail CTR after upload.
+        *   **FR-11.33:** The system shall recommend the best-performing thumbnail variant after 48 hours of data.
+
+*   **Data Sources:**
+    | Feature | Data Source |
+    |---------|-------------|
+    | Keyword Research | RAG news articles + competitor videos + YouTube Search API trends |
+    | Title Optimizer | Competitor title analysis + CTR patterns from successful videos |
+    | Tag Suggestions | Competitor tags + RAG context + LLM generation |
+    | Best Time to Post | YouTube Analytics API (if authorized) OR niche defaults |
+    | Video Score | All above combined into weighted score |
+    | Thumbnail A/B | YouTube Analytics API (requires OAuth + delayed metrics) |
 
 *   **Acceptance Criteria:**
     *   **AC1: Metadata Generation**
@@ -651,6 +715,26 @@ The following measurable criteria define product success:
         *   **Given** metadata is displayed on Export page.
         *   **When** user clicks copy button for title, description, or tags.
         *   **Then** the text is copied to clipboard with success feedback.
+    *   **AC4: Keyword Research Display**
+        *   **Given** the Export/SEO page is displayed.
+        *   **When** user views keyword suggestions.
+        *   **Then** keywords are shown with volume indicators (High/Med/Low) and competition levels.
+    *   **AC5: Title Scoring**
+        *   **Given** a generated title "Why Drone Warfare Changes Everything".
+        *   **When** title optimizer analyzes it.
+        *   **Then** a score (e.g., 78/100) is displayed with specific improvement suggestions.
+    *   **AC6: Tag Gap Analysis**
+        *   **Given** competitor videos use tags the user's video doesn't have.
+        *   **When** tag suggestions are displayed.
+        *   **Then** "competitor gap" tags are highlighted as opportunities.
+    *   **AC7: Best Time Recommendation**
+        *   **Given** user is in the military niche.
+        *   **When** best time to post is displayed.
+        *   **Then** recommendation shows optimal days/hours (e.g., "Tuesday-Thursday, 6-8 PM EST").
+    *   **AC8: SEO Audit Score**
+        *   **Given** a video is ready for export.
+        *   **When** user views SEO audit.
+        *   **Then** overall score (0-100) is displayed with checklist of pass/fail items and improvement suggestions.
 
 ### 1.12. Automate Mode (Full Automation Pipeline)
 
@@ -1008,6 +1092,43 @@ The following measurable criteria define product success:
     *   Established creator: "What's trending in my niche?" → System analyzes competitor uploads, news, YouTube trends
     *   Content planning: "Give me 5 video ideas for this week" → System cross-references your style + gaps in your content + trending topics
     *   Script generation: Full awareness of your channel voice, competitor positioning, and current events
+*   **Quick Production Flow (One-Click Video Creation):**
+    *   **Description:** Enable one-click video creation directly from RAG-generated topic suggestions. Users click a topic suggestion and the system automatically creates a project, applies saved defaults (voice + persona), and triggers the full video production pipeline.
+    *   **User Value:** Creators who trust the RAG system can go from "interesting topic idea" to "video in production" with a single click, eliminating the conversational brainstorming step entirely.
+    *   **Workflow:**
+        ```
+        1. User views Topic Suggestions (RAG-generated)
+        2. User clicks "Create Video" on a topic
+        3. System automatically:
+           - Creates new project with topic pre-filled
+           - Sets topic_confirmed = true
+           - Applies default voice (from user preferences)
+           - Applies default persona (from user preferences)
+           - Triggers script generation with RAG context
+           - Triggers voiceover generation
+           - Triggers visual sourcing + auto-selection
+           - Assembles video
+        4. User redirected to progress page, then export page when complete
+        ```
+    *   **Functional Requirements:**
+        *   **FR-2.7.QPF.01:** The system shall display a "Create Video" button on each topic suggestion card.
+        *   **FR-2.7.QPF.02:** The system shall store user default preferences (default_voice_id, default_persona_id) in user settings.
+        *   **FR-2.7.QPF.03:** When "Create Video" is clicked, the system shall create a new project with the topic pre-filled and confirmed.
+        *   **FR-2.7.QPF.04:** The system shall automatically apply the user's default voice and persona to the new project.
+        *   **FR-2.7.QPF.05:** The system shall trigger the full video production pipeline (script → voice → visuals → assembly) without user intervention.
+        *   **FR-2.7.QPF.06:** The system shall redirect the user to a progress page showing pipeline status.
+        *   **FR-2.7.QPF.07:** Upon completion, the system shall redirect to the export page with the finished video.
+        *   **FR-2.7.QPF.08:** If no defaults are configured, the system shall prompt the user to set defaults before proceeding.
+    *   **Acceptance Criteria:**
+        *   **AC-QPF.1:** Given a user has configured default voice and persona, when they click "Create Video" on a topic suggestion, then a new project is created and the pipeline starts automatically.
+        *   **AC-QPF.2:** Given the pipeline is running, when the user views the progress page, then they see real-time status updates for each stage.
+        *   **AC-QPF.3:** Given the pipeline completes successfully, when assembly finishes, then the user is automatically redirected to the export page.
+        *   **AC-QPF.4:** Given a user has NOT configured defaults, when they click "Create Video", then they are prompted to select voice and persona before proceeding.
+    *   **Technical Implementation:**
+        *   Add `POST /api/projects/quick-create` endpoint
+        *   Add `user_preferences` table or extend settings for default_voice_id, default_persona_id
+        *   Add "Create Video" button to TopicSuggestions component
+        *   Reuse existing pipeline from Automate Mode (Feature 1.12)
 *   **User Value:** Creators get data-driven content recommendations based on real channel performance, competitor analysis, and trend data—not just generic LLM suggestions. The system learns YOUR niche and style.
 *   **Note:** Core features use only LLM's pre-trained knowledge. This RAG-powered intelligence system is planned for future enhancement.
 *   **FOSS Compliance:** All core components are open-source: `youtube-transcript-api` (MIT), ChromaDB (Apache 2.0), LanceDB (Apache 2.0), `sentence-transformers` (Apache 2.0).
@@ -1100,4 +1221,4 @@ The following items are explicitly excluded from the current scope:
 - Google Gemini API Documentation
 - [DVIDS API Documentation](https://api.dvidshub.net/) (Feature 2.0)
 - [NASA Image and Video Library API](https://api.nasa.gov/) (Future consideration)
-- [Pexels API Documentation](https://www.pexels.com/api/documentation/) (Feature 2.1)
+- [Pexels API Documentation](https://www.pexels.com/api/documentation/) (Feature 2.1) 
