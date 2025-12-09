@@ -1,4 +1,4 @@
-# Story 6.8a: QPF Infrastructure (User Preferences & Pipeline Status)
+ but# Story 6.8a: QPF Infrastructure (User Preferences & Pipeline Status)
 
 **Epic:** 6 - Channel Intelligence & Content Research (RAG-Powered)
 **Story:** 6.8a - QPF Infrastructure (User Preferences & Pipeline Status)
