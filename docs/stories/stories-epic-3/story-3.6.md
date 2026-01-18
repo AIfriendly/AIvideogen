@@ -116,7 +116,7 @@ import { spawn } from 'child_process';
 const args = [
   `https://youtube.com/watch?v=${videoId}`,
   '--download-sections', `*0-${segmentDuration}`,
-  '-f', 'best[height<=720]',
+  '-f', '18',  // Format 18 (640x360 MP4 with audio) - Fix #9
   '-o', outputPath
 ];
 const process = spawn('yt-dlp', args);
@@ -949,7 +949,11 @@ const videoUrl = relativePath.replace('.cache/', '/cache/');
 
 **Segment Download Command:** `--download-sections "*0-N"` downloads first N seconds (0 to N)
 
-**Format Selection:** `-f "best[height<=720]"` limits resolution to 720p for performance and storage
+**Format Selection (Fix #9):** `-f "18"` uses format 18 (640x360 MP4 with audio)
+- **Previous:** `-f "best[height<=720]"` selected HLS formats causing ffmpeg error 3199971767
+- **Current:** `-f "18"` uses single MP4 format, avoiding HLS segmentation issues
+- **Trade-off:** 360p resolution instead of 720p, but reliable downloads without HTTP 403 errors
+- **Rationale:** Format 18 is always available, single file (no segments), and works consistently
 
 **Output Template:** `-o "path/to/file.mp4"` specifies exact output path
 
@@ -986,7 +990,7 @@ const paddedNumber = sceneNumber.toString().padStart(2, '0');
 ### Performance Considerations
 
 - **Concurrency Limit:** 3 concurrent downloads balances speed with network/CPU usage
-- **Resolution Cap:** 720p reduces download time and storage requirements
+- **Resolution Cap:** 360p (format 18) ensures reliable downloads, avoids HLS segmentation issues (Fix #9)
 - **Buffer Duration:** 5-second buffer provides timing flexibility for users
 - **Cache Retention:** 7-day retention balances instant preview availability with disk space
 - **Retry Strategy:** Exponential backoff prevents overwhelming YouTube servers during failures
@@ -994,8 +998,8 @@ const paddedNumber = sceneNumber.toString().padStart(2, '0');
 
 ### Storage Estimates
 
-- **Average segment size:** 3-5 MB for 10-15 seconds at 720p
-- **Project with 10 scenes, 5 suggestions each:** 50 segments × 4 MB = 200 MB
+- **Average segment size:** 2-3 MB for 10-15 seconds at 360p (format 18, Fix #9)
+- **Project with 10 scenes, 5 suggestions each:** 50 segments × 2.5 MB = 125 MB
 - **Retention period:** 7 days of cached segments
 - **Cleanup frequency:** Daily cleanup recommended to maintain storage health
 - **Disk space buffer:** 100MB safety margin for proactive checks
@@ -1188,10 +1192,36 @@ const paddedNumber = sceneNumber.toString().padStart(2, '0');
 - Updated AC9: "Maps deleted files to DB via filename parsing"
 - Added Technical Notes on database synchronization strategy
 
+### Fix #9: HLS Format Download Issue (Task 2, AC2)
+**Date:** 2026-01-16
+**Issue:** Format selector `best[height<=720]` selects HLS formats that cause ffmpeg exit code 3199971767.
+
+**Root Cause:**
+- HLS formats (like format 95) require downloading multiple HLS segments
+- Authentication tokens in segments can expire quickly, causing HTTP 403 Forbidden errors
+- ffmpeg cannot process incomplete HLS data, resulting in exit code 3199971767
+
+**Resolution:**
+- Changed format selector from `best[height<=${maxHeight}]` to format `'18'`
+- Format 18 = 640x360 MP4 with audio (single file, always available on YouTube)
+- Avoids HLS/DASH segmentation and associated HTTP 403 errors
+- Trade-off: Downloads at 360p instead of 720p for reliability
+- Updated code in `src/lib/youtube/download-segment.ts` lines 188-208
+- Verified fix: Test download completed successfully (485 KB file created)
+
+**Technical Details:**
+```typescript
+// OLD format selector (caused HLS issues):
+const formatSelector = `best[height<=${maxHeight}]`;
+
+// NEW format selector (reliable):
+const formatSelector = '18';  // 640x360 MP4 with audio
+```
+
 ### Summary of Changes:
-- **8 critical fixes** applied across 11 tasks and 15+ acceptance criteria
+- **9 critical fixes** applied across 11 tasks and 15+ acceptance criteria
 - **Security hardened:** Command injection prevention, input validation, path sanitization
-- **Reliability improved:** Queue persistence, crash recovery, transaction handling
+- **Reliability improved:** Queue persistence, crash recovery, transaction handling, HLS format fix
 - **Data integrity:** Database synchronization, file-to-record mapping, relative path strategy
 - **Operational readiness:** Health checks, disk space validation, zero-padding
 - **Documentation:** Technical Notes expanded with security, transactions, paths, and error recovery
@@ -1250,5 +1280,5 @@ const paddedNumber = sceneNumber.toString().padStart(2, '0');
 ---
 
 **Story Status:** TODO
-**Last Updated:** 2025-11-17
+**Last Updated:** 2026-01-16 (Fix #9: HLS Format Download Issue)
 **Created By:** SM Agent (Story Regeneration with Architect Feedback)

@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Epic 2 UI Mockups - AI Video Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .navigation {
+            max-width: 1200px;
+            margin: 0 auto 40px;
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+
+        .navigation h1 {
+            font-size: 1.5rem;
+            margin-bottom: 16px;
+            color: #f8fafc;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .nav-button {
+            padding: 10px 20px;
+            background: #334155;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            color: #cbd5e1;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .nav-button:hover {
+            background: #475569;
+            border-color: #6366f1;
+        }
+
+        .nav-button.active {
+            background: #6366f1;
+            border-color: #6366f1;
+            color: white;
+        }
+
+        .mockup-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: none;
+        }
+
+        .mockup-container.active {
+            display: block;
+        }
+
+        /* Voice Selection UI */
+        .voice-selection {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 32px;
+            background: #0f172a;
+        }
+
+        .voice-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .voice-header h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+            color: #f8fafc;
+        }
+
+        .voice-header p {
+            font-size: 0.875rem;
+            color: #cbd5e1;
+        }
+
+        .voice-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        @media (max-width: 768px) {
+            .voice-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .voice-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .voice-card {
+            background: #1e293b;
+            border: 2px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            min-height: 200px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            position: relative;
+        }
+
+        .voice-card:hover {
+            border-color: #6366f1;
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+        }
+
+        .voice-card.selected {
+            border: 3px solid #6366f1;
+            background: rgba(99, 102, 241, 0.05);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+        }
+
+        .voice-card.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 24px;
+            height: 24px;
+            background: #6366f1;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .voice-card.playing {
+            border-color: #8b5cf6;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(139, 92, 246, 0); }
+        }
+
+        .voice-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            font-size: 24px;
+        }
+
+        .voice-name {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #f8fafc;
+            margin-bottom: 8px;
+        }
+
+        .voice-meta {
+            font-size: 0.875rem;
+            color: #cbd5e1;
+            line-height: 1.6;
+            margin-bottom: 16px;
+            flex-grow: 1;
+        }
+
+        .preview-button {
+            padding: 8px 20px;
+            background: transparent;
+            border: 1px solid #6366f1;
+            border-radius: 6px;
+            color: #6366f1;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .preview-button:hover {
+            background: rgba(51, 65, 85, 0.3);
+        }
+
+        .continue-button {
+            display: block;
+            margin: 0 auto;
+            padding: 12px 48px;
+            background: #475569;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: not-allowed;
+            opacity: 0.5;
+            transition: all 0.2s;
+        }
+
+        .continue-button.enabled {
+            background: #6366f1;
+            cursor: pointer;
+            opacity: 1;
+        }
+
+        .continue-button.enabled:hover {
+            background: #4f46e5;
+        }
+
+        /* Script Generation Loading */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .loading-box {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 48px;
+            max-width: 500px;
+            text-align: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+
+        .spinner {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 24px;
+            border: 4px solid #334155;
+            border-top: 4px solid #6366f1;
+            border-radius: 50%;
+            animation: spin 1.2s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-message {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #f8fafc;
+            margin-bottom: 12px;
+        }
+
+        .loading-stage {
+            font-size: 1rem;
+            color: #cbd5e1;
+            margin-bottom: 20px;
+            min-height: 24px;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 4px;
+            background: #334155;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .quality-retry {
+            margin-top: 12px;
+            font-size: 0.875rem;
+            color: #f59e0b;
+            display: none;
+        }
+
+        .quality-retry.visible {
+            display: block;
+        }
+
+        /* Script Preview */
+        .script-preview {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 32px;
+        }
+
+        .preview-header {
+            background: #1e293b;
+            padding: 20px 32px;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            border-radius: 12px 12px 0 0;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .preview-title {
+            font-size: 1.5rem;
+            color: #f8fafc;
+        }
+
+        .duration-display {
+            background: rgba(51, 65, 85, 0.3);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 1rem;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+
+        .continue-sourcing {
+            padding: 10px 32px;
+            background: #6366f1;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .continue-sourcing:hover {
+            background: #4f46e5;
+        }
+
+        .continue-sourcing:disabled {
+            background: #475569;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .scene-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding-bottom: 48px;
+        }
+
+        .scene-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+        }
+
+        .scene-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateY(-2px);
+        }
+
+        .scene-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .scene-badge {
+            background: #6366f1;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 700;
+        }
+
+        .duration-badge {
+            background: #334155;
+            color: #cbd5e1;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .scene-text {
+            color: #f8fafc;
+            font-size: 1rem;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .audio-player {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: #0f172a;
+            border-radius: 8px;
+        }
+
+        .play-button {
+            width: 36px;
+            height: 36px;
+            background: #6366f1;
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .play-button:hover {
+            background: #4f46e5;
+            transform: scale(1.05);
+        }
+
+        .play-button:active {
+            transform: scale(0.95);
+        }
+
+        .progress-container {
+            flex-grow: 1;
+            height: 6px;
+            background: #334155;
+            border-radius: 3px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #6366f1;
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .time-display {
+            font-size: 0.75rem;
+            color: #cbd5e1;
+            font-weight: 500;
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .loading-voiceover {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: #0f172a;
+            border-radius: 8px;
+            color: #cbd5e1;
+            font-size: 0.875rem;
+        }
+
+        .small-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #334155;
+            border-top: 2px solid #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .info-panel {
+            max-width: 1200px;
+            margin: 0 auto 20px;
+            padding: 16px 20px;
+            background: #1e293b;
+            border-radius: 8px;
+            border-left: 4px solid #6366f1;
+        }
+
+        .info-panel h3 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+            color: #6366f1;
+        }
+
+        .info-panel p {
+            font-size: 0.875rem;
+            color: #cbd5e1;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="navigation">
+        <h1>🎨 Epic 2 Interactive UI Mockups</h1>
+        <div class="nav-buttons">
+            <button class="nav-button active" onclick="showMockup('voice')">Voice Selection</button>
+            <button class="nav-button" onclick="showMockup('loading')">Script Generation Loading</button>
+            <button class="nav-button" onclick="showMockup('preview')">Script & Voiceover Preview</button>
+        </div>
+    </div>
+
+    <!-- Voice Selection Mockup -->
+    <div id="voice-mockup" class="mockup-container active">
+        <div class="info-panel">
+            <h3>Voice Selection UI (Epic 2, Story 2.3)</h3>
+            <p><strong>Try it:</strong> Click any voice card to select it (checkmark appears, border highlights). Click "Preview" to simulate audio playback (violet pulse animation). Once selected, the "Continue" button enables.</p>
+        </div>
+
+        <div class="voice-selection">
+            <div class="voice-header">
+                <h2>Select Your Voice</h2>
+                <p>Choose a narrator for your video</p>
+            </div>
+
+            <div class="voice-grid">
+                <div class="voice-card" onclick="selectVoice(this, 1)">
+                    <div class="voice-avatar">🎙️</div>
+                    <div class="voice-name">Professional Alex</div>
+                    <div class="voice-meta">
+                        Male<br>
+                        American<br>
+                        Professional
+                    </div>
+                    <button class="preview-button" onclick="previewVoice(event, this)">▶ Preview</button>
+                </div>
+
+                <div class="voice-card" onclick="selectVoice(this, 2)">
+                    <div class="voice-avatar">🎤</div>
+                    <div class="voice-name">Friendly Sarah</div>
+                    <div class="voice-meta">
+                        Female<br>
+                        British<br>
+                        Friendly
+                    </div>
+                    <button class="preview-button" onclick="previewVoice(event, this)">▶ Preview</button>
+                </div>
+
+                <div class="voice-card" onclick="selectVoice(this, 3)">
+                    <div class="voice-avatar">🎵</div>
+                    <div class="voice-name">Energetic Marcus</div>
+                    <div class="voice-meta">
+                        Male<br>
+                        Neutral<br>
+                        Energetic
+                    </div>
+                    <button class="preview-button" onclick="previewVoice(event, this)">▶ Preview</button>
+                </div>
+
+                <div class="voice-card" onclick="selectVoice(this, 4)">
+                    <div class="voice-avatar">🎧</div>
+                    <div class="voice-name">Calm Emma</div>
+                    <div class="voice-meta">
+                        Female<br>
+                        American<br>
+                        Professional
+                    </div>
+                    <button class="preview-button" onclick="previewVoice(event, this)">▶ Preview</button>
+                </div>
+
+                <div class="voice-card" onclick="selectVoice(this, 5)">
+                    <div class="voice-avatar">🔊</div>
+                    <div class="voice-name">Dynamic Jordan</div>
+                    <div class="voice-meta">
+                        Male<br>
+                        British<br>
+                        Energetic
+                    </div>
+                    <button class="preview-button" onclick="previewVoice(event, this)">▶ Preview</button>
+                </div>
+            </div>
+
+            <button class="continue-button" id="continueButton" onclick="continueToScript()">Continue to Script Generation</button>
+        </div>
+    </div>
+
+    <!-- Script Generation Loading Mockup -->
+    <div id="loading-mockup" class="mockup-container">
+        <div class="info-panel">
+            <h3>Script Generation Loading (Epic 2, Story 2.4)</h3>
+            <p><strong>Try it:</strong> Click "Start Script Generation" below to see the loading animation with cycling stage messages and progress bar. Watch for quality check retry message.</p>
+        </div>
+
+        <div style="text-align: center; padding: 40px;">
+            <button class="continue-button enabled" onclick="startScriptGeneration()" style="display: inline-block;">Start Script Generation</button>
+        </div>
+    </div>
+
+    <!-- Script Preview Mockup -->
+    <div id="preview-mockup" class="mockup-container">
+        <div class="info-panel">
+            <h3>Script & Voiceover Preview (Epic 2, Story 2.6)</h3>
+            <p><strong>Try it:</strong> Click the play button (▶) on any scene to simulate voiceover playback. Progress bar fills, time updates. Click "Continue" when ready (enabled when all scenes have audio).</p>
+        </div>
+
+        <div class="script-preview">
+            <div class="preview-header">
+                <h2 class="preview-title">Review Your Script</h2>
+                <div class="duration-display">⏱ Total Duration: 2:05</div>
+                <button class="continue-sourcing" onclick="alert('Navigating to Visual Sourcing (Epic 4)...')">Continue to Visual Sourcing →</button>
+            </div>
+
+            <div class="scene-cards">
+                <div class="scene-card">
+                    <div class="scene-header">
+                        <span class="scene-badge">Scene 1</span>
+                        <span class="duration-badge">0:18</span>
+                    </div>
+                    <div class="scene-text">
+                        "Picture this: A million humans living on Mars by 2050. Sounds like science fiction, right? But SpaceX and NASA are betting everything on making it reality."
+                    </div>
+                    <div class="audio-player">
+                        <button class="play-button" onclick="playAudio(this, 18)">▶</button>
+                        <div class="progress-container" onclick="seekAudio(event, this)">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <div class="time-display">0:00 / 0:18</div>
+                    </div>
+                </div>
+
+                <div class="scene-card">
+                    <div class="scene-header">
+                        <span class="scene-badge">Scene 2</span>
+                        <span class="duration-badge">0:15</span>
+                    </div>
+                    <div class="scene-text">
+                        "The red planet, once just a distant dream, is now humanity's next home. Here's how we're actually going to pull it off."
+                    </div>
+                    <div class="audio-player">
+                        <button class="play-button" onclick="playAudio(this, 15)">▶</button>
+                        <div class="progress-container" onclick="seekAudio(event, this)">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <div class="time-display">0:00 / 0:15</div>
+                    </div>
+                </div>
+
+                <div class="scene-card">
+                    <div class="scene-header">
+                        <span class="scene-badge">Scene 3</span>
+                        <span class="duration-badge">0:22</span>
+                    </div>
+                    <div class="scene-text">
+                        "First challenge: Getting there alive. The journey takes seven months, and every ounce of fuel, water, and oxygen must be perfectly calculated."
+                    </div>
+                    <div class="audio-player">
+                        <button class="play-button" onclick="playAudio(this, 22)">▶</button>
+                        <div class="progress-container" onclick="seekAudio(event, this)">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <div class="time-display">0:00 / 0:22</div>
+                    </div>
+                </div>
+
+                <div class="scene-card">
+                    <div class="scene-header">
+                        <span class="scene-badge">Scene 4</span>
+                        <span class="duration-badge">0:20</span>
+                    </div>
+                    <div class="scene-text">
+                        "Once there, colonists will need shelter from radiation, food production systems, and reliable communication with Earth—all while building the first human settlement on another world."
+                    </div>
+                    <div class="audio-player">
+                        <button class="play-button" onclick="playAudio(this, 20)">▶</button>
+                        <div class="progress-container" onclick="seekAudio(event, this)">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <div class="time-display">0:00 / 0:20</div>
+                    </div>
+                </div>
+
+                <div class="scene-card">
+                    <div class="scene-header">
+                        <span class="scene-badge">Scene 5</span>
+                        <span class="duration-badge">0:10</span>
+                    </div>
+                    <div class="scene-text">
+                        "Mars 2050. It's not just a vision anymore—it's a timeline. The future of humanity is multiplanetary."
+                    </div>
+                    <div class="audio-player">
+                        <button class="play-button" onclick="playAudio(this, 10)">▶</button>
+                        <div class="progress-container" onclick="seekAudio(event, this)">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <div class="time-display">0:00 / 0:10</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedVoice = null;
+        let currentlyPlayingVoice = null;
+        let audioIntervals = {};
+
+        // Navigation
+        function showMockup(type) {
+            document.querySelectorAll('.mockup-container').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.nav-button').forEach(b => b.classList.remove('active'));
+
+            const mockupId = type + '-mockup';
+            document.getElementById(mockupId).classList.add('active');
+
+            event.target.classList.add('active');
+        }
+
+        // Voice Selection
+        function selectVoice(card, voiceId) {
+            if (event.target.classList.contains('preview-button')) return;
+
+            document.querySelectorAll('.voice-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            selectedVoice = voiceId;
+
+            const btn = document.getElementById('continueButton');
+            btn.classList.add('enabled');
+            btn.style.cursor = 'pointer';
+        }
+
+        function previewVoice(event, button) {
+            event.stopPropagation();
+
+            const card = button.closest('.voice-card');
+
+            if (currentlyPlayingVoice === card) {
+                stopVoicePreview(card, button);
+                return;
+            }
+
+            if (currentlyPlayingVoice) {
+                stopVoicePreview(currentlyPlayingVoice,
+                    currentlyPlayingVoice.querySelector('.preview-button'));
+            }
+
+            card.classList.add('playing');
+            button.textContent = '⏸ Playing...';
+            currentlyPlayingVoice = card;
+
+            setTimeout(() => {
+                if (currentlyPlayingVoice === card) {
+                    stopVoicePreview(card, button);
+                }
+            }, 3000);
+        }
+
+        function stopVoicePreview(card, button) {
+            card.classList.remove('playing');
+            button.textContent = '▶ Preview';
+            currentlyPlayingVoice = null;
+        }
+
+        function continueToScript() {
+            if (!selectedVoice) return;
+
+            showMockup('loading');
+            document.querySelectorAll('.nav-button')[1].classList.add('active');
+            document.querySelectorAll('.nav-button')[0].classList.remove('active');
+
+            setTimeout(() => startScriptGeneration(), 500);
+        }
+
+        // Script Generation Loading
+        function startScriptGeneration() {
+            const overlay = document.createElement('div');
+            overlay.className = 'loading-overlay';
+            overlay.innerHTML = `
+                <div class="loading-box">
+                    <div class="spinner"></div>
+                    <div class="loading-message">Generating Your Script...</div>
+                    <div class="loading-stage" id="loadingStage">Analyzing topic and structure...</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" id="progressBar"></div>
+                    </div>
+                    <div class="quality-retry" id="qualityRetry">⚠ Improving script quality, regenerating...</div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            const stages = [
+                { text: 'Analyzing topic and structure...', progress: 30 },
+                { text: 'Crafting professional narration...', progress: 60 },
+                { text: 'Structuring scenes...', progress: 80 },
+                { text: 'Quality check in progress...', progress: 90 },
+                { text: 'Finalizing your script...', progress: 100 }
+            ];
+
+            let currentStage = 0;
+            const stageElement = document.getElementById('loadingStage');
+            const progressBar = document.getElementById('progressBar');
+            const qualityRetry = document.getElementById('qualityRetry');
+
+            const interval = setInterval(() => {
+                if (currentStage < stages.length) {
+                    stageElement.textContent = stages[currentStage].text;
+                    progressBar.style.width = stages[currentStage].progress + '%';
+
+                    if (currentStage === 3) {
+                        setTimeout(() => {
+                            qualityRetry.classList.add('visible');
+                        }, 500);
+                    }
+
+                    currentStage++;
+                } else {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        document.body.removeChild(overlay);
+                        showMockup('preview');
+                        document.querySelectorAll('.nav-button')[2].classList.add('active');
+                        document.querySelectorAll('.nav-button')[1].classList.remove('active');
+                    }, 1000);
+                }
+            }, 1500);
+        }
+
+        // Script Preview Audio Players
+        function playAudio(button, duration) {
+            const player = button.closest('.audio-player');
+            const progressFill = player.querySelector('.progress-fill');
+            const timeDisplay = player.querySelector('.time-display');
+            const playerId = Math.random().toString(36);
+
+            // Stop other audio
+            document.querySelectorAll('.play-button').forEach(btn => {
+                if (btn !== button && btn.textContent === '⏸') {
+                    stopAudio(btn);
+                }
+            });
+
+            if (button.textContent === '▶') {
+                button.textContent = '⏸';
+                let elapsed = 0;
+                const interval = setInterval(() => {
+                    elapsed += 0.1;
+                    const progress = (elapsed / duration) * 100;
+                    progressFill.style.width = progress + '%';
+
+                    const currentSec = Math.floor(elapsed);
+                    timeDisplay.textContent = `0:${currentSec.toString().padStart(2, '0')} / 0:${duration}`;
+
+                    if (elapsed >= duration) {
+                        clearInterval(interval);
+                        button.textContent = '▶';
+                        progressFill.style.width = '0%';
+                        timeDisplay.textContent = `0:00 / 0:${duration}`;
+                        delete audioIntervals[playerId];
+                    }
+                }, 100);
+                audioIntervals[playerId] = interval;
+                button.dataset.intervalId = playerId;
+            } else {
+                stopAudio(button);
+            }
+        }
+
+        function stopAudio(button) {
+            const playerId = button.dataset.intervalId;
+            if (playerId && audioIntervals[playerId]) {
+                clearInterval(audioIntervals[playerId]);
+                delete audioIntervals[playerId];
+            }
+
+            button.textContent = '▶';
+            const player = button.closest('.audio-player');
+            const progressFill = player.querySelector('.progress-fill');
+            const timeDisplay = player.querySelector('.time-display');
+            const duration = timeDisplay.textContent.split(' / ')[1];
+
+            progressFill.style.width = '0%';
+            timeDisplay.textContent = `0:00 / ${duration}`;
+        }
+
+        function seekAudio(event, container) {
+            const rect = container.getBoundingClientRect();
+            const percent = (event.clientX - rect.left) / rect.width;
+            const progressFill = container.querySelector('.progress-fill');
+            progressFill.style.width = (percent * 100) + '%';
+        }
+    </script>
+</body>
+</html>

@@ -30,7 +30,7 @@ This story implements the user-facing Quick Production Flow (QPF), enabling one-
 
 ### PRD References
 
-- **Feature 2.7** - Quick Production Flow (FR-2.7.QPF.01, FR-2.7.QPF.03-07)
+- **Feature 2.9** - Automated Video Production Pipeline (FR-2.9.QPF.01, FR-2.9.QPF.03-07)
 - **AC-QPF.1** through **AC-QPF.4**
 
 ---

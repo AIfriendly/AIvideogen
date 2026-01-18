@@ -87,7 +87,7 @@ development_status:
   epic-5-retrospective: optional
 
   # Epic 6: Channel Intelligence & Content Research (RAG-Powered + Quick Production Flow)
-  epic-6: complete
+  epic-6: done
   6-1-rag-infrastructure-setup: done
   6-2-background-job-queue-cron-scheduler: done
   6-3-youtube-channel-sync-caption-scraping: done
@@ -97,4 +97,19 @@ development_status:
   6-7-channel-intelligence-ui-setup-wizard: done
   6-8a-qpf-infrastructure-user-preferences: done
   6-8b-qpf-ui-integration-one-click-video: done
+  6-9-mcp-video-provider-client: done
+  6-10-dvids-web-scraping-mcp-server: done
+  6-11-nasa-web-scraping-mcp-server: done
   epic-6-retrospective: optional
+
+# EPIC DEV SESSION (Phase-Level Mode for Ralph Loop)
+epic_dev_session:
+  epic: 6
+  current_story: "6-11-nasa-web-scraping-mcp-server"
+  phase: "validation_complete"
+  gate_decision: "PASS"
+  p0_coverage: 100
+  p1_coverage: 100
+  overall_coverage: 100
+  started: "2026-01-17T00:00:00Z"
+  last_updated: "2026-01-17T01:25:00Z"

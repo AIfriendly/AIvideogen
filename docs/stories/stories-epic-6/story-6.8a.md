@@ -14,7 +14,7 @@ Establish the backend infrastructure for Quick Production Flow (QPF), including 
 
 **User Value:** Creators can configure their default voice, persona, and video duration settings once, enabling faster video creation in the future. The pipeline status API provides real-time progress tracking for automated video production.
 
-**PRD Reference:** Feature 2.7 - Quick Production Flow (FR-2.7.QPF.02, FR-2.7.QPF.08)
+**PRD Reference:** Feature 2.9 - Automated Video Production Pipeline (FR-2.9.QPF.02, FR-2.9.QPF.08)
 
 ---
 
@@ -145,7 +145,7 @@ Establish the backend infrastructure for Quick Production Flow (QPF), including 
 
 ### Architecture References
 - **Tech Spec:** Epic 6 - Story 6.8a Acceptance Criteria (AC-6.8a.1 to AC-6.8a.4)
-- **PRD:** Feature 2.7 - Quick Production Flow
+- **PRD:** Feature 2.9 - Automated Video Production Pipeline
 
 ### Dependencies
 - **Story 2.3:** Voices table and API (for voice dropdown)
@@ -281,7 +281,7 @@ Navigation Access:
 
 ## References
 
-- PRD: Feature 2.7 - Channel Intelligence & Content Research (Quick Production Flow)
+- PRD: Feature 2.9 - Automated Video Production Pipeline (Quick Production Flow)
 - Epic File: docs/epics.md - Epic 6 Story 6.8a
 - Tech Spec: docs/sprint-artifacts/tech-spec-epic-6.md - Story 6.8a section
-- Architecture: docs/architecture.md
+- Architecture: docs/architecture/feature-29-automated-video-production-pipeline.md

@@ -2,8 +2,8 @@
 
 *This document outlines the requirements for the AI Video Generator. It is a living document and will be updated as the project progresses.*
 
-**Last Updated:** 2025-12-03
-**Version:** 3.3
+**Last Updated:** 2026-01-16
+**Version:** 3.4
 **Repository:** <https://github.com/AIfriendly/AIvideogen>
 
 **Project Type:** Web Application
@@ -11,14 +11,20 @@
 **Complexity:** Level 2 (BMad Method)
 **Status:** Core Features Complete - Enhancement Phase
 
-**Recent Changes (v3.3 - 2025-12-03):**
+**Recent Changes (v3.4 - 2026-01-16):**
+- **EPIC RESTRUCTURE:** Split Channel Intelligence (Epic 6) from Automated Video Production (Epic 7)
+- Moved Quick Production Flow from Feature 2.7 to new Feature 2.9 (Automated Video Production Pipeline)
+- Epic 6 now focuses exclusively on RAG-powered Channel Intelligence & Content Research
+- Epic 7 (Feature 2.9): Automated Video Production Pipeline with domain-specific content APIs
+- Added DVIDS (military footage) integration via MCP server with 30-second rate limiting
+- Added extensible architecture for NASA, stock footage APIs, and other automated video sources
+
+**Previous Changes (v3.3 - 2025-12-03):**
 - Expanded Feature 1.11 from basic metadata generation to full SEO Toolkit
 - Added 7 sub-components: Core Metadata, Keyword Research, Title Optimizer, Smart Tag Generation, Best Time to Post, Video Score/Audit, Thumbnail A/B Testing
 - Added 25 new functional requirements (FR-11.09 through FR-11.33)
 - Added 5 new acceptance criteria (AC4-AC8)
 - VidIQ-style intelligence features for video discoverability
-- Added Quick Production Flow to Feature 2.7 (RAG): one-click video creation from topic suggestions
-- Added 8 new FRs (FR-2.7.QPF.01-08) and 4 new ACs (AC-QPF.1-4) for Quick Production Flow
 
 **Previous Changes (v3.2 - 2025-12-01):**
 - Added Feature 1.14: Unified API Usage Dashboard
@@ -982,15 +988,7 @@ The following measurable criteria define product success:
 ### 2.1. Stock Footage API Integration
 *   **Description:** Add professional stock footage sources (Pexels, Pixabay) as alternatives or supplements to YouTube content. This provides access to high-quality, royalty-free stock video clips for creators who need more polished visuals or want commercial-grade footage.
 
-### 2.2. Advanced Content Filtering
-*   **Status:** ✅ **MOVED TO CORE** - See Feature 1.5 (AI-Powered Visual Sourcing)
-*   **Description:** ~~Enhance the YouTube sourcing capabilities with advanced filtering techniques to identify visually clean footage. For gaming content, this includes filtering for 'no commentary', 'gameplay only' to avoid unwanted overlays, face cams, or watermarks. Implement content quality scoring and advanced licensing detection.~~
-*   **Note:** This feature has been incorporated into Core Feature 1.5 with the following enhancements:
-    *   Pure B-roll keyword filtering (no commentary, reaction, vlog content)
-    *   Google Cloud Vision API integration (face detection, OCR, label verification)
-    *   Content-type aware query generation (gaming, historical, conceptual)
-    *   Audio stripping from downloaded segments
-
+ 
 ### 2.3. Manual Visual Search
 *   **Description:** In the Visual Curation UI, if a user is not satisfied with the AI-suggested clips for a scene, provide an option for them to enter keywords and manually search YouTube or connected stock footage sources for alternative clips.
 
@@ -1092,43 +1090,7 @@ The following measurable criteria define product success:
     *   Established creator: "What's trending in my niche?" → System analyzes competitor uploads, news, YouTube trends
     *   Content planning: "Give me 5 video ideas for this week" → System cross-references your style + gaps in your content + trending topics
     *   Script generation: Full awareness of your channel voice, competitor positioning, and current events
-*   **Quick Production Flow (One-Click Video Creation):**
-    *   **Description:** Enable one-click video creation directly from RAG-generated topic suggestions. Users click a topic suggestion and the system automatically creates a project, applies saved defaults (voice + persona), and triggers the full video production pipeline.
-    *   **User Value:** Creators who trust the RAG system can go from "interesting topic idea" to "video in production" with a single click, eliminating the conversational brainstorming step entirely.
-    *   **Workflow:**
-        ```
-        1. User views Topic Suggestions (RAG-generated)
-        2. User clicks "Create Video" on a topic
-        3. System automatically:
-           - Creates new project with topic pre-filled
-           - Sets topic_confirmed = true
-           - Applies default voice (from user preferences)
-           - Applies default persona (from user preferences)
-           - Triggers script generation with RAG context
-           - Triggers voiceover generation
-           - Triggers visual sourcing + auto-selection
-           - Assembles video
-        4. User redirected to progress page, then export page when complete
-        ```
-    *   **Functional Requirements:**
-        *   **FR-2.7.QPF.01:** The system shall display a "Create Video" button on each topic suggestion card.
-        *   **FR-2.7.QPF.02:** The system shall store user default preferences (default_voice_id, default_persona_id) in user settings.
-        *   **FR-2.7.QPF.03:** When "Create Video" is clicked, the system shall create a new project with the topic pre-filled and confirmed.
-        *   **FR-2.7.QPF.04:** The system shall automatically apply the user's default voice and persona to the new project.
-        *   **FR-2.7.QPF.05:** The system shall trigger the full video production pipeline (script → voice → visuals → assembly) without user intervention.
-        *   **FR-2.7.QPF.06:** The system shall redirect the user to a progress page showing pipeline status.
-        *   **FR-2.7.QPF.07:** Upon completion, the system shall redirect to the export page with the finished video.
-        *   **FR-2.7.QPF.08:** If no defaults are configured, the system shall prompt the user to set defaults before proceeding.
-    *   **Acceptance Criteria:**
-        *   **AC-QPF.1:** Given a user has configured default voice and persona, when they click "Create Video" on a topic suggestion, then a new project is created and the pipeline starts automatically.
-        *   **AC-QPF.2:** Given the pipeline is running, when the user views the progress page, then they see real-time status updates for each stage.
-        *   **AC-QPF.3:** Given the pipeline completes successfully, when assembly finishes, then the user is automatically redirected to the export page.
-        *   **AC-QPF.4:** Given a user has NOT configured defaults, when they click "Create Video", then they are prompted to select voice and persona before proceeding.
-    *   **Technical Implementation:**
-        *   Add `POST /api/projects/quick-create` endpoint
-        *   Add `user_preferences` table or extend settings for default_voice_id, default_persona_id
-        *   Add "Create Video" button to TopicSuggestions component
-        *   Reuse existing pipeline from Automate Mode (Feature 1.12)
+    *   **Quick Production Integration:** RAG-generated topic suggestions integrate with Feature 2.9 (Automated Video Production Pipeline) for one-click video creation.
 *   **User Value:** Creators get data-driven content recommendations based on real channel performance, competitor analysis, and trend data—not just generic LLM suggestions. The system learns YOUR niche and style.
 *   **Note:** Core features use only LLM's pre-trained knowledge. This RAG-powered intelligence system is planned for future enhancement.
 *   **FOSS Compliance:** All core components are open-source: `youtube-transcript-api` (MIT), ChromaDB (Apache 2.0), LanceDB (Apache 2.0), `sentence-transformers` (Apache 2.0).
@@ -1149,6 +1111,123 @@ The following measurable criteria define product success:
     *   Categories: ambient, electronic, cinematic, classical, etc.
 *   **User Value:** Enables legal commercial distribution of the AI Video Generator application.
 *   **FOSS Compliance:** Pixabay API is free to use. All content is royalty-free.
+
+### 2.9. Automated Video Production Pipeline
+
+*   **Description:** A one-click video creation system that transforms RAG-generated topic suggestions into complete, ready-to-export videos through fully automated script generation, TTS, visual sourcing, and assembly. Unlike the manual visual sourcing pipeline (Feature 1.5), this automated pipeline uses domain-specific content APIs accessed via MCP (Model Context Protocol) servers, enabling creators to go from "topic idea" to "finished video" with a single click.
+*   **Operating Modes:**
+    *   **Quick Production Flow (QPF):** One-click video creation from RAG topic suggestions
+    *   **Domain-Specific Automation:** Military content uses DVIDS API, space content uses NASA API, with future extensibility for stock footage, sports, news, and other domains
+    *   **No Manual Curation:** System automatically selects best-matching visuals (no user choice in clip selection)
+*   **Technical Architecture:**
+    | Component | Technology |
+    |-----------|------------|
+    | Pipeline Orchestration | Automate Mode (Feature 1.12) + QPF extensions |
+    | Visual Source APIs | Domain-specific APIs via MCP servers |
+    | Rate Limiting | MCP server layer (configurable per provider) |
+    | Video Selection | Automatic best-match algorithm |
+    | Progress Tracking | Real-time pipeline status API |
+*   **Quick Production Flow (One-Click Video Creation):**
+    *   **Description:** Enable one-click video creation directly from RAG-generated topic suggestions. Users click a topic suggestion and the system automatically creates a project, applies saved defaults (voice + persona), and triggers the full video production pipeline.
+    *   **User Value:** Creators who trust the RAG system can go from "interesting topic idea" to "video in production" with a single click, eliminating the conversational brainstorming step entirely.
+    *   **Workflow:**
+        ```
+        1. User views Topic Suggestions (RAG-generated from Feature 2.7)
+        2. User clicks "Create Video" on a topic
+        3. System automatically:
+           - Creates new project with topic pre-filled
+           - Sets topic_confirmed = true
+           - Applies default voice (from user preferences)
+           - Applies default persona (from user preferences)
+           - Triggers script generation with RAG context
+           - Triggers voiceover generation
+           - Triggers visual sourcing from domain-specific API (auto-selection)
+           - Assembles video
+        4. User redirected to progress page, then export page when complete
+        ```
+    *   **Functional Requirements:**
+        *   **FR-2.9.QPF.01:** The system shall display a "Create Video" button on each topic suggestion card.
+        *   **FR-2.9.QPF.02:** The system shall store user default preferences (default_voice_id, default_persona_id) in user settings.
+        *   **FR-2.9.QPF.03:** When "Create Video" is clicked, the system shall create a new project with the topic pre-filled and confirmed.
+        *   **FR-2.9.QPF.04:** The system shall automatically apply the user's default voice and persona to the new project.
+        *   **FR-2.9.QPF.05:** The system shall trigger the full video production pipeline (script → voice → visuals → assembly) without user intervention.
+        *   **FR-2.9.QPF.06:** The system shall redirect the user to a progress page showing pipeline status.
+        *   **FR-2.9.QPF.07:** Upon completion, the system shall redirect to the export page with the finished video.
+        *   **FR-2.9.QPF.08:** If no defaults are configured, the system shall prompt the user to set defaults before proceeding.
+    *   **Acceptance Criteria:**
+        *   **AC-QPF.1:** Given a user has configured default voice and persona, when they click "Create Video" on a topic suggestion, then a new project is created and the pipeline starts automatically.
+        *   **AC-QPF.2:** Given the pipeline is running, when the user views the progress page, then they see real-time status updates for each stage.
+        *   **AC-QPF.3:** Given the pipeline completes successfully, when assembly finishes, then the user is automatically redirected to the export page.
+        *   **AC-QPF.4:** Given a user has NOT configured defaults, when they click "Create Video", then they are prompted to select voice and persona before proceeding.
+    *   **Technical Implementation:**
+        *   Add `POST /api/projects/quick-create` endpoint
+        *   Add `user_preferences` table or extend settings for default_voice_id, default_persona_id
+        *   Add "Create Video" button to TopicSuggestions component
+        *   Reuse existing pipeline from Automate Mode (Feature 1.12)
+*   **Domain-Specific Content APIs:**
+    *   **DVIDS (Defense Visual Information Distribution Service):**
+        | Aspect | Details |
+        |--------|---------|
+        | Content | Official U.S. military footage (tanks, aircraft, ships, operations) |
+        | Access | Via MCP server (not direct API) |
+        | Rate Limit | 30 seconds per request |
+        | Licensing | Public domain (free to use) |
+        | Use Case | Military channel automation |
+        | Fallback | None (fails gracefully with error) |
+    *   **NASA API (Future):**
+        | Aspect | Details |
+        |--------|---------|
+        | Content | Space footage, launches, astronomy imagery |
+        | Access | Via MCP server |
+        | Rate Limit | 30 seconds per request |
+        | Licensing | Public domain (free to use) |
+        | Use Case | Space/astronomy channel automation |
+        | Status | Planned for future release |
+    *   **Future Providers:** Stock footage APIs (Pexels, Pixabay, Shutterstock), sports APIs, news APIs
+*   **MCP Server Architecture:**
+    *   **Purpose:** Act as API gateway between application and content sources
+    *   **Responsibilities:**
+        - Rate limiting enforcement (30-second default per request)
+        - Request queuing and caching
+        - API key management (keys stay in MCP server, not app)
+        - Error handling and retry logic
+        - Usage monitoring and logging
+    *   **Protocol:** Model Context Protocol (MCP) standard
+    *   **Deployment:** Separate server process, configurable endpoint
+*   **Automatic Visual Selection:**
+    *   **Algorithm:** Rank results by relevance score (keyword match, semantic similarity, duration fit)
+    *   **No User Choice:** System auto-selects best match (unlike manual pipeline where user selects from 5-8 options)
+    *   **Fallback Behavior:** If domain-specific API fails, pipeline fails gracefully with clear error (NO fallback to YouTube)
+*   **Rate Limiting Strategy:**
+    *   **Default:** 30 seconds between requests to prevent API abuse
+    *   **Implementation:** Enforced at MCP server layer
+    *   **Per-Provider:** Configurable per content API (DVIDS: 30s, NASA: 30s, etc.)
+    *   **User Experience:** Progress UI shows "Sourcing visuals (scene X of Y)..." during delays
+*   **Functional Requirements:**
+    *   **FR-2.9.01:** The system shall provide automated video production from RAG topic suggestions.
+    *   **FR-2.9.02:** The system shall use domain-specific content APIs for visual sourcing (not YouTube).
+    *   **FR-2.9.03:** The system shall access content APIs via MCP server layer.
+    *   **FR-2.9.04:** The system shall enforce rate limiting (default: 30 seconds per request).
+    *   **FR-2.9.05:** The system shall auto-select best-matching visuals (no user choice).
+    *   **FR-2.9.06:** The system shall NOT fallback to YouTube if domain-specific API fails.
+    *   **FR-2.9.07:** The system shall display real-time progress during pipeline execution.
+    *   **FR-2.9.08:** The system shall support extensible content providers (DVIDS, NASA, future APIs).
+*   **Acceptance Criteria:**
+    *   **AC-2.9.1:** Given a user clicks "Create Video" on a military topic suggestion, when QPF executes, then visuals are sourced from DVIDS via MCP server only.
+    *   **AC-2.9.2:** Given QPF is sourcing visuals for multiple scenes, when rate limit is active, then system waits 30 seconds between requests and shows progress.
+    *   **AC-2.9.3:** Given DVIDS API is unavailable, when QPF attempts visual sourcing, then pipeline fails gracefully with error message (no YouTube fallback).
+    *   **AC-2.9.4:** Given visual sourcing completes, when results are returned, then system auto-selects best match per scene without user intervention.
+*   **User Value:** Creators can automate entire video production for their specific domain (military, space, etc.) with authentic, professional footage from authoritative sources, not random YouTube videos.
+*   **Differentiation from Manual Pipeline:**
+    | Aspect | Manual Pipeline (Feature 1.5) | Automated Pipeline (Feature 2.9) |
+    |--------|------------------------------|-------------------------------|
+    | Entry Point | Conversational chat → topic confirmation | RAG topic suggestion → one click |
+    | Visual Source | YouTube API (general content) | Domain APIs via MCP (DVIDS, NASA) |
+    | Clip Selection | User selects from 5-8 options | System auto-selects best match |
+    | Workflow | Manual curation at each step | Fully automated |
+    | Use Case | General creators want control | Niche channels want automation |
+*   **Note:** Quick Production Flow builds upon RAG infrastructure from Feature 2.7 (Channel Intelligence) to provide topic suggestions with context.
+*   **FOSS Compliance:** MCP server protocol is open-source. DVIDS and NASA content is public domain.
 
 ---
 

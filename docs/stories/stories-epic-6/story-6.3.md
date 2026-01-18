@@ -5,6 +5,7 @@
 **Status:** Done
 **Created:** 2025-11-30
 **Completed:** 2025-11-30
+**Updated:** 2025-01-15 (Bug fixes & improvements)
 
 ---
 
@@ -249,3 +250,237 @@ python scripts/youtube-transcript.py --video-ids <id1>,<id2>,<id3>
 - Tech Spec: docs/sprint-artifacts/tech-spec-epic-6.md
 - Architecture: docs/architecture.md - Section 19 (RAG Architecture)
 - ADR-012: youtube-transcript-api for Caption Scraping
+
+---
+
+## Post-Implementation Updates (2025-01-15)
+
+### Bug Fixes
+
+#### Issue 1: Duplicate User Channel Bug
+**Problem:** When users changed their user channel, the old channel's `is_user_channel` flag was not cleared, resulting in multiple channels with `is_user_channel=1`. This caused:
+- `getUserChannel()` returning arbitrary results
+- RAG context retrieval breaking
+- UI showing stale/incorrect channel information
+
+**Root Cause:**
+- `updateChannel()` just set the flag without clearing others
+- `addChannel()` didn't clear existing user channel first
+- No database constraint enforcing uniqueness
+
+**Fixes Applied:**
+| File | Change |
+|------|--------|
+| `src/lib/db/queries-channels.ts:197-199` | Added SQL to clear `is_user_channel=0` from all channels when setting `isUserChannel: true` |
+| `src/lib/rag/ingestion/channel-sync.ts:107-112` | Added pre-clear of existing user channel in `addChannel()` before setting new one |
+| `src/lib/db/migrations/017_fix_duplicate_user_channels.ts` | Migration to clean up existing duplicates (keeps most recently updated channel) |
+| `tests/unit/rag/queries-channels.test.ts:211-290` | Added regression tests for user channel uniqueness |
+
+---
+
+#### Issue 2: ChromaDB Dependency Causing Sync Failures
+**Problem:** Sync process failed completely when ChromaDB was not running, preventing transcript scraping even though that step doesn't require ChromaDB.
+
+**Fix Applied:**
+| File | Change |
+|------|--------|
+| `src/lib/rag/ingestion/channel-sync.ts:292-313` | Added ChromaDB availability check at start of embedding stage; skips gracefully with warning if unavailable |
+
+**Behavior After Fix:**
+- **With ChromaDB down:** Fetch videos → Scrape transcripts → ⏭️ Skip embeddings → Complete
+- **With ChromaDB up:** Fetch videos → Scrape transcripts → Generate embeddings → Complete
+
+---
+
+#### Issue 3: Job Processor Not Auto-Starting
+**Problem:** Jobs were enqueued but never processed (stuck at 0% progress) because `JOBS_ENABLED=true` was not set.
+
+**Fixes Applied:**
+| File | Change |
+|------|--------|
+| `.env.local:43-44` | Added `JOBS_ENABLED=true` and `JOBS_CONCURRENCY=2` |
+| `src/app/api/jobs/init/route.ts` | Created endpoint to manually initialize job processor |
+| `src/app/api/rag/channels/[id]/sync/route.ts:26-31` | Added auto-initialization check before enqueueing sync jobs |
+
+---
+
+#### Issue 4: Missing Import Causing Runtime Error
+**Problem:** `getUserChannel is not defined` error when adding user channel.
+
+**Fix Applied:**
+| File | Change |
+|------|--------|
+| `src/lib/rag/ingestion/channel-sync.ts:25` | Added `getUserChannel` to imports |
+
+---
+
+### New Debug Capabilities
+
+#### Debug Sync Endpoint
+Created `/api/debug/sync` endpoint for manual sync testing without job queue:
+
+```bash
+curl -X POST http://localhost:3000/api/debug/sync \
+  -H "Content-Type: application/json" \
+  -d '{"maxVideos": 12, "incremental": false}'
+```
+
+**Benefits:**
+- Bypasses job queue for direct execution
+- Shows detailed progress logs in response
+- Useful for debugging sync issues
+
+---
+
+### Migration 017: Fix Duplicate User Channels
+
+**File:** `src/lib/db/migrations/017_fix_duplicate_user_channels.ts`
+
+**Purpose:** Clean up any existing duplicate user channels in the database.
+
+**Logic:**
+1. Detects multiple `is_user_channel=1` records
+2. Keeps the most recently updated channel (based on `updated_at`)
+3. Clears the flag from all others
+4. Logs cleanup actions for verification
+
+**Idempotent:** Safe to run multiple times.
+
+---
+
+## Post-Implementation Updates (2026-01-16)
+
+### Critical Bug Fix 1: Channel ID Foreign Key Mismatch
+
+**Problem:** Videos were successfully synced and inserted into the database, but they were not appearing in RAG queries. The sync process reported "videos found: 12, videos synced: 12" but subsequent queries returned 0 videos.
+
+**User Impact:** User's channel content appeared to be indexed (12 videos, 11 embedded) but RAG retrieval couldn't find any videos because the foreign key relationship was broken.
+
+**Root Cause:**
+- In `channel-sync.ts:213`, the sync process was passing `channel.channelId` (the YouTube channel ID: "UCRVNylF9IB9gcOJj3MrA3hw")
+- The `channel_videos` table's `channel_id` column is a foreign key that expects the internal database ID (like "28670561-5d71-4189-ba0c-9f52f63f800f")
+- This caused videos to be inserted with an invalid foreign key value
+
+**Fix Applied:**
+| File | Change |
+|------|--------|
+| `src/lib/rag/ingestion/channel-sync.ts:213` | Changed `channelId: channel.channelId` to `channelId: channel.id` |
+| Manual database fix | Updated 12 existing videos to use correct internal channel ID |
+
+**Database Schema:**
+```sql
+-- channels table:
+CREATE TABLE channels (
+  id TEXT PRIMARY KEY,              -- Internal UUID (e.g., "28670561-...")
+  channel_id TEXT NOT NULL UNIQUE,  -- YouTube channel ID (e.g., "UCRVNylF9IB9gcOJj3MrA3hw")
+  ...
+);
+
+-- channel_videos table:
+CREATE TABLE channel_videos (
+  ...
+  channel_id TEXT NOT NULL REFERENCES channels(id),  -- Must reference channels.id
+  ...
+);
+```
+
+**Before Fix:**
+```python
+# Videos were inserted with wrong channel_id:
+channel_id = "UCRVNylF9IB9gcOJj3MrA3hw"  # YouTube ID (invalid foreign key)
+
+# When querying:
+SELECT * FROM channel_videos WHERE channel_id = '28670561-5d71-4189-ba0c-9f52f63f800f'
+# Result: 0 videos (because they were inserted with YouTube ID)
+```
+
+**After Fix:**
+```python
+# Videos now inserted with correct channel_id:
+channel_id = "28670561-5d71-4189-ba0c-9f52f63f800f"  # Internal ID (valid foreign key)
+
+# Query works:
+SELECT * FROM channel_videos WHERE channel_id = '28670561-5d71-4189-ba0c-9f52f63f800f'
+# Result: 12 videos
+```
+
+**Verification:**
+```bash
+python -c "
+import sqlite3
+conn = sqlite3.connect('ai-video-generator.db')
+cursor = conn.cursor()
+cursor.execute('''
+  SELECT COUNT(*) FROM channel_videos
+  WHERE channel_id = '28670561-5d71-4189-ba0c-9f52f63f800f'
+''')
+print(f'Videos found: {cursor.fetchone()[0]}')  # Should be 12
+"
+```
+
+---
+
+### Critical Bug Fix 2: Videos With No Captions Never Retried
+
+**Problem:** Videos that initially had no auto-generated captions were marked with error statuses and permanently excluded from future sync attempts, even after captions were added to YouTube.
+
+**Root Cause:**
+- `getUnprocessedVideos()` only returned videos where `embedding_status = 'pending'`
+- Videos without captions were marked with 'error' or 'no_captions' status
+- These statuses were not included in the query, so videos were never retried
+
+**Fix Applied:**
+| File | Change |
+|------|--------|
+| `src/lib/db/queries-channels.ts:372-389` | Updated query to include 'no_captions', 'error', and 'unavailable' statuses |
+| `src/lib/db/migrations/018_add_video_embedding_status_values.ts` | Created migration to add missing status values to schema |
+
+**Updated Query:**
+```typescript
+export function getUnprocessedVideos(channelId: string, limit: number = 50): ChannelVideo[] {
+  const rows = db.prepare(`
+    SELECT * FROM channel_videos
+    WHERE channel_id = ?
+      AND transcript IS NULL
+      AND embedding_status IN ('pending', 'no_captions', 'error')  -- Now includes retryable statuses
+    ORDER BY
+      CASE embedding_status
+        WHEN 'no_captions' THEN 1  -- Prioritize retrying videos that may have gotten captions
+        WHEN 'error' THEN 2
+        ELSE 0
+      END,
+      published_at DESC
+    LIMIT ?
+  `).all(channelId, limit) as ChannelVideoRow[];
+
+  return rows.map(rowToChannelVideo);
+}
+```
+
+**Migration 018:**
+```typescript
+// Added missing status values to CHECK constraint
+embedding_status TEXT DEFAULT 'pending' CHECK(embedding_status IN (
+  'pending',
+  'processing',
+  'embedded',
+  'error',
+  'no_captions',      // NEW: Video has no captions (may be added later)
+  'unavailable',      // NEW: Video unavailable
+  'restricted'        // NEW: Video age-restricted
+))
+```
+
+**Impact:**
+- Videos that previously failed due to no captions will be automatically retried on next sync
+- Proper categorization of different failure modes
+- Users can add captions to YouTube videos and they'll be picked up on subsequent syncs
+
+---
+
+### Related Changes
+
+See also **Story 6.7** Post-Implementation Updates (2026-01-16) for:
+- RAG Auto-Initialization
+- Delete Channel Button
+- Additional TypeScript build fixes
