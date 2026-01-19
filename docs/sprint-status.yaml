@@ -94,9 +94,9 @@ development_status:
   epic-6: contexted
   6-1-rag-infrastructure-setup: done
   6-2-background-job-queue-cron-scheduler: done
-  6-3-youtube-channel-sync-caption-scraping: backlog
-  6-4-news-source-ingestion-trend-monitoring: backlog
-  6-5-rag-retrieval-context-building: backlog
+  6-3-youtube-channel-sync-caption-scraping: done
+  6-4-news-source-ingestion-trend-monitoring: done
+  6-5-rag-retrieval-context-building: done
   6-6-rag-augmented-script-generation: done
-  6-7-channel-intelligence-ui-setup-wizard: backlog
+  6-7-channel-intelligence-ui-setup-wizard: done
   epic-6-retrospective: optional
