@@ -1,0 +1,43 @@
+{
+  "providers": [
+    {
+      "id": "dvids",
+      "name": "DVIDS Military Videos",
+      "priority": 1,
+      "enabled": true,
+      "command": "python",
+      "args": ["-m", "mcp_servers.dvids_scraping_server"],
+      "env": {
+        "PYTHONPATH": "./ai-video-generator",
+        "DVIDS_CACHE_DIR": "./assets/cache/dvids",
+        "DVIDS_RATE_LIMIT": "30"
+      }
+    },
+    {
+      "id": "nasa",
+      "name": "NASA Space Videos",
+      "priority": 2,
+      "enabled": true,
+      "command": "python",
+      "args": ["-m", "mcp_servers.nasa"],
+      "env": {
+        "PYTHONPATH": "./ai-video-generator",
+        "NASA_CACHE_DIR": "./assets/cache/nasa",
+        "NASA_RATE_LIMIT": "10"
+      }
+    },
+    {
+      "id": "youtube",
+      "name": "YouTube Videos",
+      "priority": 3,
+      "enabled": true,
+      "command": "python",
+      "args": ["-m", "mcp_servers.youtube"],
+      "env": {
+        "PYTHONPATH": "./ai-video-generator",
+        "YOUTUBE_CACHE_DIR": "./assets/cache/youtube",
+        "YOUTUBE_RATE_LIMIT": "10"
+      }
+    }
+  ]
+}

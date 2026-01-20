@@ -78,27 +78,31 @@ def get_transcript(video_id: str, languages: List[str] = None) -> Dict[str, Any]
         TranscriptsDisabled,
         NoTranscriptFound,
         VideoUnavailable,
-        NoTranscriptAvailable
+        VideoUnplayable,
+        CouldNotRetrieveTranscript
     )
 
     if languages is None:
         languages = ['en', 'en-US', 'en-GB']
 
     try:
-        # Try to get transcript in preferred languages
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        # Create API instance
+        ytt_api = YouTubeTranscriptApi()
 
-        # Try manually created transcripts first, then auto-generated
+        # Get list of available transcripts
+        transcript_list = ytt_api.list(video_id)
+
+        # Try to find transcript in preferred languages
         transcript = None
         selected_language = None
 
-        # Try manual transcripts
+        # Try manually created transcripts first
         for lang in languages:
             try:
                 transcript = transcript_list.find_manually_created_transcript([lang])
                 selected_language = lang
                 break
-            except NoTranscriptFound:
+            except (NoTranscriptFound, CouldNotRetrieveTranscript):
                 continue
 
         # Fall back to auto-generated
@@ -108,7 +112,7 @@ def get_transcript(video_id: str, languages: List[str] = None) -> Dict[str, Any]
                     transcript = transcript_list.find_generated_transcript([lang])
                     selected_language = lang
                     break
-                except NoTranscriptFound:
+                except (NoTranscriptFound, CouldNotRetrieveTranscript):
                     continue
 
         # If still no transcript, try any available
@@ -123,22 +127,22 @@ def get_transcript(video_id: str, languages: List[str] = None) -> Dict[str, Any]
                 pass
 
         if transcript is None:
-            raise NoTranscriptAvailable(video_id)
+            raise NoTranscriptFound(video_id)
 
         # Fetch the actual transcript data
         segments = transcript.fetch()
 
         # Combine segments into full text
-        full_text = ' '.join([seg['text'] for seg in segments])
+        full_text = ' '.join([seg.text for seg in segments])
 
         return {
             'videoId': video_id,
             'text': full_text,
             'segments': [
                 {
-                    'text': seg['text'],
-                    'start': seg['start'],
-                    'duration': seg['duration']
+                    'text': seg.text,
+                    'start': seg.start,
+                    'duration': seg.duration
                 }
                 for seg in segments
             ],
@@ -150,17 +154,12 @@ def get_transcript(video_id: str, languages: List[str] = None) -> Dict[str, Any]
             'code': 'TRANSCRIPT_DISABLED',
             'message': f'Transcripts are disabled for video {video_id}'
         }))
-    except NoTranscriptFound:
+    except (NoTranscriptFound, CouldNotRetrieveTranscript):
         raise Exception(json.dumps({
             'code': 'NO_CAPTIONS',
             'message': f'No captions found for video {video_id}'
         }))
-    except NoTranscriptAvailable:
-        raise Exception(json.dumps({
-            'code': 'NO_CAPTIONS',
-            'message': f'No captions available for video {video_id}'
-        }))
-    except VideoUnavailable:
+    except (VideoUnavailable, VideoUnplayable):
         raise Exception(json.dumps({
             'code': 'VIDEO_UNAVAILABLE',
             'message': f'Video {video_id} is unavailable (private, deleted, or does not exist)'

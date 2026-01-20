@@ -39,7 +39,27 @@ export class Trimmer {
       );
     }
 
-    const videoDuration = await this.ffmpeg.getVideoDuration(videoPath);
+    // Get video duration with proper error handling
+    let videoDuration: number;
+    try {
+      videoDuration = await this.ffmpeg.getVideoDuration(videoPath);
+
+      // Validate duration is a valid number
+      if (!videoDuration || videoDuration <= 0 || !isFinite(videoDuration)) {
+        throw new Error(
+          `Invalid video duration: ${videoDuration}. ` +
+          `Video file may be corrupted or unsupported format.`
+        );
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(
+        `Failed to get video duration for scene ${scene.sceneNumber}. ` +
+        `Video path: ${videoPath}. ` +
+        `Error: ${errorMessage}`
+      );
+    }
+
     // CRITICAL: Use audioDuration (actual voiceover length), NOT clipDuration (YouTube video duration)
     // Videos must be trimmed to match voiceover duration for proper audio sync
     const audioDuration = scene.audioDuration;

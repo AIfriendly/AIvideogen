@@ -19,8 +19,12 @@ export const CHROMA_COLLECTIONS: ChromaCollection[] = [
   'trending_topics'
 ];
 
-// ChromaDB persistence path
-const CHROMA_PATH = path.join(process.cwd(), '.cache', 'chroma');
+// ChromaDB server URL (HTTP endpoint for the Python ChromaDB server)
+// Server should be started with: chroma run --path .cache/chroma --port 8000
+const CHROMA_URL = process.env.CHROMA_URL || 'http://localhost:8000';
+
+// ChromaDB persistence path (used for server startup, not client connection)
+const CHROMA_PATH = process.env.CHROMA_PATH || path.join(process.cwd(), '.cache', 'chroma');
 
 /**
  * ChromaDB client wrapper class
@@ -43,9 +47,9 @@ export class ChromaDBClient {
       // Dynamic import to handle cases where chromadb is not installed
       const { ChromaClient } = await import('chromadb');
 
-      // Create ChromaDB client with local persistence
+      // Create ChromaDB client connecting to HTTP server
       this.client = new ChromaClient({
-        path: CHROMA_PATH
+        path: CHROMA_URL
       });
 
       // Initialize all collections
@@ -162,6 +166,35 @@ export class ChromaDBClient {
   ): Promise<void> {
     const collection = this.getCollection(collectionName);
     await collection.delete({ ids });
+  }
+
+  /**
+   * Delete all documents for a specific channel from a collection
+   * Uses ChromaDB's where clause to filter by channelId metadata
+   */
+  async deleteDocumentsByChannel(
+    collectionName: ChromaCollection,
+    channelId: string
+  ): Promise<number> {
+    const collection = this.getCollection(collectionName);
+
+    // Get all documents in the collection to find ones matching the channelId
+    // Note: ChromaDB JS client doesn't support delete with where clause directly,
+    // so we need to query for documents and then delete by IDs
+    const results = await collection.get({
+      where: { channelId: channelId } as import('chromadb').Where
+    });
+
+    if (results.ids.length === 0) {
+      return 0;
+    }
+
+    // Delete the matching documents
+    await collection.delete({
+      ids: results.ids
+    });
+
+    return results.ids.length;
   }
 
   /**

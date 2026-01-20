@@ -13,7 +13,7 @@ import { getProject } from '@/lib/db/queries';
 import { getUserChannel, getCompetitorChannels, getAllChannels, getEmbeddedVideoCount, getChannelVideoCount } from '@/lib/db/queries-channels';
 import { getNewsSyncStats, getTotalArticleCount } from '@/lib/db/queries-news';
 import { jobQueue } from '@/lib/jobs/queue';
-import { getRAGHealthStatus, isRAGInitialized } from '@/lib/rag/init';
+import { getRAGHealthStatus, isRAGInitialized, initializeRAG } from '@/lib/rag/init';
 import { isRAGEnabled } from '@/lib/rag/vector-db/chroma-client';
 import type { RAGConfig } from '@/lib/rag/types';
 
@@ -21,6 +21,8 @@ import type { RAGConfig } from '@/lib/rag/types';
  * GET /api/rag/status
  *
  * Get RAG sync status and statistics.
+ *
+ * Auto-initializes RAG if not already initialized.
  *
  * Query params:
  * - projectId: Optional project ID for project-specific config
@@ -30,8 +32,20 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
 
-    // Check if RAG is enabled
+    // Auto-initialize RAG if enabled and not already initialized
     const ragEnabled = isRAGEnabled();
+    if (ragEnabled && !isRAGInitialized()) {
+      console.log('[RAG Status] RAG is enabled but not initialized, initializing...');
+      try {
+        await initializeRAG();
+        console.log('[RAG Status] RAG initialized successfully');
+      } catch (error) {
+        console.error('[RAG Status] Failed to initialize RAG:', error);
+        // Continue anyway - RAG failure is not fatal
+      }
+    }
+
+    // Check if RAG is enabled
     const ragInitialized = isRAGInitialized();
 
     // Get channels info

@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, ArrowLeft, Settings, Zap, Mic, User } from 'lucide-react';
+import { Loader2, ArrowLeft, Settings, Zap, Mic, User, Clock } from 'lucide-react';
 
 interface VoiceProfile {
   id: string;
@@ -33,6 +33,7 @@ interface UserPreferences {
   id: string;
   default_voice_id: string | null;
   default_persona_id: string | null;
+  default_duration: number;
   quick_production_enabled: boolean;
   voice_name?: string;
   persona_name?: string;
@@ -56,6 +57,7 @@ function QuickProductionSettingsContent() {
   // Form state
   const [selectedVoice, setSelectedVoice] = useState<string>('');
   const [selectedPersona, setSelectedPersona] = useState<string>('');
+  const [selectedDuration, setSelectedDuration] = useState<number>(2);
 
   // Fetch all required data
   const fetchData = useCallback(async () => {
@@ -94,6 +96,7 @@ function QuickProductionSettingsContent() {
         setPreferences(prefsData.data);
         setSelectedVoice(prefsData.data.default_voice_id || '');
         setSelectedPersona(prefsData.data.default_persona_id || '');
+        setSelectedDuration(prefsData.data.default_duration || 2);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load settings');
@@ -119,6 +122,7 @@ function QuickProductionSettingsContent() {
         body: JSON.stringify({
           default_voice_id: selectedVoice || null,
           default_persona_id: selectedPersona || null,
+          default_duration: selectedDuration,
         }),
       });
 
@@ -142,7 +146,8 @@ function QuickProductionSettingsContent() {
   // Check if form has changes
   const hasChanges =
     selectedVoice !== (preferences?.default_voice_id || '') ||
-    selectedPersona !== (preferences?.default_persona_id || '');
+    selectedPersona !== (preferences?.default_persona_id || '') ||
+    selectedDuration !== (preferences?.default_duration || 2);
 
   // Check if defaults are complete
   const hasCompleteDefaults = selectedVoice && selectedPersona;
@@ -270,8 +275,60 @@ function QuickProductionSettingsContent() {
               </p>
             </div>
 
+            {/* Duration Selection */}
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <Clock className="h-4 w-4" />
+                Default Video Duration
+              </label>
+              <div className="space-y-4">
+                {/* Quick Presets */}
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3, 5, 10, 15, 20].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setSelectedDuration(preset)}
+                      className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                        selectedDuration === preset
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background hover:bg-muted border-input'
+                      }`}
+                    >
+                      {preset} min
+                    </button>
+                  ))}
+                </div>
+                {/* Slider */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Custom:</span>
+                    <span className="text-lg font-semibold text-primary">
+                      {selectedDuration} {selectedDuration === 1 ? 'minute' : 'minutes'}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="20"
+                    value={selectedDuration}
+                    onChange={(e) => setSelectedDuration(parseInt(e.target.value))}
+                    className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>1 min</span>
+                    <span>10 min</span>
+                    <span>20 min</span>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Target duration for Quick Production videos. Actual length may vary based on content.
+              </p>
+            </div>
+
             {/* Current Settings Summary */}
-            {preferences && (preferences.voice_name || preferences.persona_name) && (
+            {preferences && (preferences.voice_name || preferences.persona_name || preferences.default_duration) && (
               <div className="rounded-lg bg-muted/50 p-4 space-y-2">
                 <h4 className="text-sm font-medium">Current Defaults</h4>
                 <div className="text-sm text-muted-foreground space-y-1">
@@ -282,6 +339,10 @@ function QuickProductionSettingsContent() {
                   <p>
                     <span className="font-medium">Persona:</span>{' '}
                     {preferences.persona_name || 'Not set'}
+                  </p>
+                  <p>
+                    <span className="font-medium">Duration:</span>{' '}
+                    {preferences.default_duration} {preferences.default_duration === 1 ? 'minute' : 'minutes'}
                   </p>
                 </div>
               </div>

@@ -19,6 +19,7 @@ export interface UserPreferencesRow {
   id: string;
   default_voice_id: string | null;
   default_persona_id: string | null;
+  default_duration: number | null; // Video duration in minutes
   quick_production_enabled: number; // SQLite stores boolean as 0/1
   created_at: string;
   updated_at: string;
@@ -31,6 +32,7 @@ export interface UserPreferences {
   id: string;
   default_voice_id: string | null;
   default_persona_id: string | null;
+  default_duration: number; // Video duration in minutes (default 2)
   quick_production_enabled: boolean;
   created_at: string;
   updated_at: string;
@@ -45,6 +47,7 @@ export interface UserPreferences {
 export interface UserPreferencesUpdate {
   default_voice_id?: string | null;
   default_persona_id?: string | null;
+  default_duration?: number;
   quick_production_enabled?: boolean;
 }
 
@@ -67,6 +70,7 @@ export function getUserPreferences(): UserPreferences | null {
         up.id,
         up.default_voice_id,
         up.default_persona_id,
+        up.default_duration,
         up.quick_production_enabled,
         up.created_at,
         up.updated_at,
@@ -86,6 +90,7 @@ export function getUserPreferences(): UserPreferences | null {
       id: row.id,
       default_voice_id: row.default_voice_id,
       default_persona_id: row.default_persona_id,
+      default_duration: row.default_duration ?? 2, // Default to 2 minutes
       quick_production_enabled: row.quick_production_enabled === 1,
       created_at: row.created_at,
       updated_at: row.updated_at,
@@ -120,6 +125,11 @@ export function updateUserPreferences(data: UserPreferencesUpdate): UserPreferen
     if (data.default_persona_id !== undefined) {
       updates.push('default_persona_id = ?');
       values.push(data.default_persona_id);
+    }
+
+    if (data.default_duration !== undefined) {
+      updates.push('default_duration = ?');
+      values.push(data.default_duration);
     }
 
     if (data.quick_production_enabled !== undefined) {

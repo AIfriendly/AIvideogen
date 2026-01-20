@@ -191,3 +191,83 @@ export function generateUniqueEmail(): string {
 export function generateProjectName(): string {
   return faker.company.catchPhrase();
 }
+
+/**
+ * Creates a test project with scenes for testing
+ *
+ * @param sceneCount - Number of scenes to generate (default: 3)
+ * @returns Object with projectId and scenes array
+ *
+ * @example
+ * const { projectId, scenes } = createProjectWithScenes(5);
+ */
+export function createProjectWithScenes(sceneCount: number = 3): {
+  projectId: string;
+  scenes: Array<{
+    id: string;
+    project_id: string;
+    scene_number: number;
+    text: string;
+    sanitized_text: string;
+    audio_file_path: string | null;
+    duration: number | null;
+    created_at: string;
+  }>;
+} {
+  const projectId = faker.string.uuid();
+  const now = new Date().toISOString();
+
+  const scenes = Array.from({ length: sceneCount }, (_, i) => ({
+    id: faker.string.uuid(),
+    project_id: projectId,
+    scene_number: i + 1,
+    text: generateProfessionalSceneText(),
+    sanitized_text: generateProfessionalSceneText().toLowerCase().replace(/[^a-z0-9\s]/g, ''),
+    audio_file_path: null,
+    duration: null,
+    created_at: now,
+  }));
+
+  return { projectId, scenes };
+}
+
+/**
+ * Creates a test project with scenes in the database
+ *
+ * This function both creates test data AND inserts it into the database.
+ *
+ * @param sceneCount - Number of scenes to generate (default: 3)
+ * @returns Object with projectId and scenes array
+ *
+ * @example
+ * const { projectId, scenes } = createProjectWithScenesInDb(5);
+ */
+export async function createProjectWithScenesInDb(sceneCount: number = 3): Promise<{
+  projectId: string;
+  scenes: Array<{
+    id: string;
+    project_id: string;
+    scene_number: number;
+    text: string;
+    sanitized_text: string;
+    audio_file_path: string | null;
+    duration: number | null;
+    created_at: string;
+  }>;
+}> {
+  const { projectId, scenes } = createProjectWithScenes(sceneCount);
+
+  // Dynamically import to avoid circular dependencies
+  const { createScenes } = await import('@/lib/db/queries');
+
+  // Insert scenes into database
+  createScenes(scenes.map(scene => ({
+    id: scene.id,
+    project_id: scene.project_id,
+    scene_number: scene.scene_number,
+    text: scene.text,
+    sanitized_text: scene.sanitized_text,
+  })));
+
+  return { projectId, scenes };
+}

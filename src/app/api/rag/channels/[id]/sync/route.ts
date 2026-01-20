@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getChannelById } from '@/lib/db/queries-channels';
 import { jobQueue } from '@/lib/jobs/queue';
+import { initializeJobs, isJobsInitialized } from '@/lib/jobs/init';
 
 /**
  * POST /api/rag/channels/[id]/sync
@@ -22,6 +23,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Auto-initialize job processor if needed
+    if (!isJobsInitialized()) {
+      console.log('[RAG Channel Sync] Job processor not initialized, initializing...');
+      await initializeJobs();
+      console.log('[RAG Channel Sync] Job processor initialized');
+    }
+
     const { id } = await params;
     const channel = getChannelById(id);
 

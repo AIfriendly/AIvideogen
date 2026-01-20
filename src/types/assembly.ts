@@ -114,6 +114,7 @@ export interface AssemblyScene {
   audioDuration: number;
 
   defaultSegmentPath?: string;
+  providerId?: string; // Story 6.12: MCP provider (youtube, dvids, nasa)
 }
 
 /**

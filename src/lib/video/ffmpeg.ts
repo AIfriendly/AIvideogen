@@ -69,13 +69,17 @@ export class FFmpegClient {
 
   /**
    * Probe a media file for metadata
+   * @throws Error if file not found, not readable, or ffprobe fails
    */
   async probe(filePath: string): Promise<FFProbeResult> {
-    // Verify file exists
+    // Verify file exists and is readable
     try {
       await accessAsync(filePath, constants.R_OK);
-    } catch {
-      throw new Error(`File not found or not readable: ${filePath}`);
+    } catch (accessError) {
+      throw new Error(
+        `File not found or not readable: ${filePath}. ` +
+        `Ensure the file exists and the application has read permissions.`
+      );
     }
 
     return new Promise((resolve, reject) => {
@@ -93,7 +97,10 @@ export class FFmpegClient {
 
       const timeout = setTimeout(() => {
         process.kill();
-        reject(new Error(`FFprobe timed out for ${filePath}`));
+        reject(new Error(
+          `FFprobe timed out after ${VIDEO_ASSEMBLY_CONFIG.PROBE_TIMEOUT}ms for ${filePath}. ` +
+          `File may be too large or corrupted.`
+        ));
       }, VIDEO_ASSEMBLY_CONFIG.PROBE_TIMEOUT);
 
       process.stdout.on('data', (data) => {
@@ -110,6 +117,15 @@ export class FFmpegClient {
         if (code === 0) {
           try {
             const result = JSON.parse(stdout);
+
+            // Validate we got useful data
+            if (!result.format && !result.streams) {
+              reject(new Error(
+                `FFprobe returned no valid data for ${filePath}. ` +
+                `Output: ${stdout}`
+              ));
+              return;
+            }
 
             // Transform to our interface
             const transformed: FFProbeResult = {
@@ -133,39 +149,69 @@ export class FFmpegClient {
             };
 
             resolve(transformed);
-          } catch (err) {
-            reject(new Error(`Failed to parse ffprobe output: ${err}`));
+          } catch (parseError) {
+            reject(new Error(
+              `Failed to parse ffprobe output for ${filePath}. ` +
+              `Error: ${parseError}. ` +
+              `Output: ${stdout.substring(0, 200)}`
+            ));
           }
         } else {
-          reject(new Error(`FFprobe failed (code ${code}): ${stderr}`));
+          reject(new Error(
+            `FFprobe failed with exit code ${code} for ${filePath}. ` +
+            `stderr: ${stderr || 'No error output'}`
+          ));
         }
       });
 
       process.on('error', (err) => {
         clearTimeout(timeout);
-        reject(new Error(`FFprobe error: ${err.message}`));
+        reject(new Error(
+          `FFprobe process error for ${filePath}: ${err.message}. ` +
+          `Ensure ffprobe is installed and accessible.`
+        ));
       });
     });
   }
 
   /**
    * Get video file duration in seconds
+   * @throws Error if file doesn't exist, can't be read, or duration can't be determined
    */
   async getVideoDuration(videoPath: string): Promise<number> {
-    const result = await this.probe(videoPath);
+    let result: FFProbeResult;
+    try {
+      result = await this.probe(videoPath);
+    } catch (error) {
+      throw new Error(
+        `Failed to probe video file: ${videoPath}. ` +
+        `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
 
     // Try to get duration from format first
     if (result.format.duration > 0) {
-      return result.format.duration;
+      const duration = parseFloat(result.format.duration.toString());
+      if (isFinite(duration) && duration > 0) {
+        return duration;
+      }
     }
 
     // Fall back to video stream duration
     const videoStream = result.streams.find(s => s.codec_type === 'video');
-    if (videoStream?.duration && videoStream.duration > 0) {
-      return videoStream.duration;
+    if (videoStream?.duration) {
+      const duration = parseFloat(videoStream.duration.toString());
+      if (isFinite(duration) && duration > 0) {
+        return duration;
+      }
     }
 
-    throw new Error(`Could not determine duration for ${videoPath}`);
+    throw new Error(
+      `Could not determine valid duration for ${videoPath}. ` +
+      `File may be corrupted or in an unsupported format. ` +
+      `Format duration: ${result.format.duration}, ` +
+      `Video stream duration: ${videoStream?.duration || 'N/A'}`
+    );
   }
 
   /**

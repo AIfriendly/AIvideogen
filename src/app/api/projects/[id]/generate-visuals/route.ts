@@ -117,7 +117,7 @@ export async function POST(
         // Step 2: Search YouTube with multiple queries
         const queries = [analysis.primaryQuery, ...analysis.alternativeQueries];
         const rawResults = await youtubeClient.searchWithMultipleQueries(queries, {
-          maxResults: 15, // Increased from 10 to get more candidates for filtering
+          maxResults: 15, // Standard YouTube API limit per query
           videoEmbeddable: true,
           relevanceLanguage: 'en',
           order: 'relevance'

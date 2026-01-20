@@ -1,83 +1,73 @@
 # AI Video Generator
 
-An automated video creation tool that transforms conversational ideas into fully produced videos with AI-generated scripts, voiceovers, and curated visuals.
+**Version:** 3.3 | **Last Updated:** 2025-12-06
+
+An automated video creation tool that transforms a simple topic into a complete, share-ready video with an AI-generated script, professional voiceover, relevant visuals, and an eye-catching thumbnail.
 
 ## Overview
 
-The AI Video Generator is a desktop-first web application built with Next.js 15 that automates end-to-end video creation. Through natural conversation, users brainstorm video topics, generate scripts, select AI voices, curate visuals from YouTube, and assemble professional videos.
+The AI Video Generator transforms video content creation from a multi-hour, multi-tool process into a streamlined 20-minute workflow. It's designed for content creators who value production speed and quality but lack the time, budget, or technical skills for traditional video production.
 
-## Features
+Our key value proposition is a **local-first, privacy-focused architecture**. Unlike cloud-dependent solutions, our system runs primarily on your own hardware using free and open-source (FOSS) technologies like Ollama and local TTS. For those seeking enhanced quality, the system seamlessly integrates with powerful cloud services like Google Gemini and ElevenLabs, maintaining a hybrid "FOSS-first, cloud-enhanced" approach with zero mandatory subscription costs.
 
-- **Conversational Topic Discovery** - Natural AI-powered brainstorming to develop video ideas
-- **Script Generation** - Automatic scene-by-scene script creation with narration and visual descriptions
-- **AI Voice Synthesis** - 48+ voice options using KokoroTTS (local TTS)
-- **YouTube B-roll Integration** - Search and download relevant video clips
-- **Visual Curation** - Interactive scene-by-scene visual selection
-- **Automated Assembly** - FFmpeg-powered video rendering with voiceover and visuals
+## Core Features (Complete)
+
+- **Conversational AI Agent:** Brainstorm and refine video ideas through a natural chat interface.
+- **Automated Script Generation:** Get a professional, human-sounding script divided into logical scenes.
+- **LLM Configuration & Script Personas:** Choose between local (Ollama) or cloud (Gemini) models and select from personas like 'Scientific Analyst' or 'Blackpill Realist' to define your content's tone.
+- **Voice Selection & Synthesis:** Select from a diverse catalog of local (FOSS) or cloud (ElevenLabs) voices to narrate your script.
+- **AI-Powered Visual Sourcing:** Automatically finds relevant B-roll from YouTube, using Google Cloud Vision to filter out talking heads, captions, and irrelevant content.
+- **Visual Curation UI:** Review and select the perfect video clip for each scene from AI-powered suggestions.
+- **Automated Video Assembly:** Automatically combines your selected visuals and voiceover into a final MP4 video using FFmpeg.
+- **Automated Thumbnail Generation:** Instantly get a compelling thumbnail with a relevant background and your video's title.
+
+## Enhancement Features (In Development)
+
+- **Automated Background Music:** Automatically selects, mixes, and applies topic-appropriate background music.
+- **AI-Generated SEO Toolkit:** A VidIQ-style command center that generates optimized titles, descriptions, and tags, plus keyword research and pre-upload SEO audits.
+- **Automate Mode:** A full, one-click automation pipeline from topic confirmation to final export.
+- **ElevenLabs TTS Integration:** Use premium cloud-based voices from ElevenLabs as an alternative to the local TTS engine.
+- **Unified API Usage Dashboard:** A single dashboard to monitor your usage and quotas for all integrated APIs (Gemini, YouTube, ElevenLabs).
 
 ## Technology Stack
 
 ### Frontend & Framework
-- **Next.js 15.5** - React framework with App Router
+- **Next.js 15** - React framework with App Router
 - **TypeScript** - Type-safe development
 - **Tailwind CSS v4** - Utility-first styling
 - **shadcn/ui** - Accessible component library
 
-### AI & Processing
-- **Ollama + Llama 3.2 (3B)** - Local LLM with 128K context window
-- **KokoroTTS** - High-quality text-to-speech (82M model, Apache 2.0)
-- **yt-dlp** - YouTube video downloading
-- **FFmpeg 7.1.2+** - Video processing and assembly
-- **Gemini 2.5 Free** - Free tier API
-
-### State & Data
-- **Zustand 5.0.8** - Lightweight client state management
-- **SQLite (better-sqlite3)** - Embedded database for conversation history and projects
-- **Local Filesystem** - Cached media storage
-
-## Architecture
-
-This is a **local-first, single-user application** designed for:
-- Complete privacy (all AI processing runs locally)
-- Fast performance (no network latency for LLM/TTS)
-- Full control (bring-your-own-models)
-- Clear cloud migration path (documented in architecture)
-
-See [Architecture Documentation](../docs/architecture.md) for complete technical specification.
+### AI & Data Processing
+- **LLM:** Ollama (Llama 3.2) for local processing, Google Gemini for cloud-enhanced generation.
+- **TTS:** KokoroTTS (local, FOSS), ElevenLabs (cloud).
+- **Visuals:** YouTube Data API for sourcing, Google Cloud Vision API for filtering.
+- **Audio/Video:** FFmpeg for assembly, yt-dlp for downloading.
+- **Databases:** SQLite for project data, ChromaDB/LanceDB for future RAG capabilities.
+- **State Management:** Zustand for lightweight client state.
 
 ## Prerequisites
 
 ### Required
-- **Node.js 18+** - JavaScript runtime
-- **Python 3.9+** - For TTS and video downloading
-- **UV Package Manager** - Python dependency management
-- **Ollama** - Local LLM runtime (with Llama 3.2 model)
-- **FFmpeg 7.1+** - Video processing
-
-### Installation
-
-1. **Install Node.js** - <https://nodejs.org>
-2. **Install Python** - <https://python.org>
-3. **Install UV** - <https://github.com/astral-sh/uv>
-4. **Install Ollama** - <https://ollama.com>
-   ```bash
-   ollama pull llama3.2:3b-instruct-q8_0
-   ```
-5. **Install FFmpeg** - <https://ffmpeg.org/download.html>
+- **Node.js 18+**
+- **Python 3.9+**
+- **UV Package Manager**
+- **Ollama** (with a pulled model, e.g., `llama3.2`)
+- **FFmpeg 7.1+**
 
 ## Setup
 
 ```bash
 # Clone repository
 git clone https://github.com/AIfriendly/AIvideogen.git
-cd AIvideogen
+cd AIvideogen/ai-video-generator
 
 # Install Node.js dependencies
 npm install
 
-# Install Python dependencies
+# Install Python dependencies (from parent directory)
 cd ..
 uv pip install -r requirements.txt
+cd ai-video-generator
 
 # Start development server
 npm run dev
@@ -85,58 +75,13 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to use the application.
 
-## Project Structure
+## Future Enhancements
 
-```
-ai-video-generator/
-├── src/
-│   ├── app/                 # Next.js App Router (pages & API routes)
-│   ├── components/          # React components (UI & features)
-│   ├── lib/                 # Utilities (LLM, TTS, video, database)
-│   ├── stores/              # Zustand state management
-│   └── types/               # TypeScript definitions
-├── .cache/                  # Temporary media files (git-ignored)
-├── data/                    # SQLite database (git-ignored)
-└── public/                  # Static assets
-```
-
-## Development Workflow
-
-This project follows the **BMAD Method** (BMad Architecture & Development):
-- **Phase 1-2**: Requirements & Planning (PRD, UX Design) ✅
-- **Phase 3**: Architecture & Solutioning ✅
-- **Phase 4**: Implementation (Current Phase)
-
-See [Workflow Status](../docs/workflow-status.md) for current progress.
-
-## Configuration
-
-### System Prompts (LLM Personas)
-The application includes configurable system prompts to control AI behavior:
-- **Creative Assistant** (default) - Unrestricted brainstorming
-- **Viral Content Strategist** - Engagement-focused
-- **Educational Content Designer** - Learning-focused
-- **Documentary Filmmaker** - Narrative-driven
-
-See architecture documentation for customization details.
-
-### LLM Provider Configuration
-Default: Local Ollama with Llama 3.2
-Post-MVP: Support for OpenAI, Anthropic, custom endpoints
+We are actively working on expanding our capabilities with features like:
+- **Domain-Specific Video Sources:** Adding official sources like DVIDS for military footage.
+- **Local Computer Vision:** A FOSS alternative to Google Vision using MediaPipe and Tesseract.js for zero-cost, private analysis.
+- **RAG-Powered Channel Intelligence:** A VidIQ-style system to analyze competitors, monitor trends, and generate scripts informed by your specific niche.
 
 ## License
 
 MIT License - See LICENSE file for details.
-
-## Support
-
-For issues and questions:
-- GitHub Issues: <https://github.com/AIfriendly/AIvideogen/issues>
-- [Architecture Documentation](../docs/architecture.md)
-- [Setup Guide](../docs/setup-guide.md)
-
----
-
-**Status**: Phase 4 - Implementation
-**Version**: 0.1.0 (MVP)
-**Last Updated**: 2025-11-28

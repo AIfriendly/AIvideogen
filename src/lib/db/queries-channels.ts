@@ -189,6 +189,16 @@ export function updateChannel(id: string, input: Partial<{
   lastSync: string | null;
   syncStatus: Channel['syncStatus'];
 }>): Channel | null {
+  // ======================================================================
+  // FIX: Ensure only one user channel at a time
+  // When setting isUserChannel to true, clear the flag from all other channels
+  // to prevent multiple user channels in the database.
+  // ======================================================================
+  if (input.isUserChannel === true) {
+    db.prepare('UPDATE channels SET is_user_channel = 0 WHERE is_user_channel = 1').run();
+  }
+  // ======================================================================
+
   const updates: string[] = [];
   const params: (string | number | null)[] = [];
 
@@ -243,8 +253,33 @@ export function updateChannel(id: string, input: Partial<{
 
 /**
  * Delete channel and its videos
+ * Also removes all associated embeddings from ChromaDB
  */
-export function deleteChannel(id: string): boolean {
+export async function deleteChannel(id: string): Promise<boolean> {
+  // Get the channel first to retrieve YouTube channel ID for ChromaDB cleanup
+  const channel = getChannelById(id);
+  if (!channel) {
+    return false;
+  }
+
+  // Delete embeddings from ChromaDB (in background, don't block deletion)
+  try {
+    const { getChromaClient } = await import('../rag/vector-db/chroma-client');
+    const chromaClient = await getChromaClient();
+    if (chromaClient && chromaClient.isInitialized()) {
+      // Delete all embeddings for this channel
+      const deleted = await chromaClient.deleteDocumentsByChannel(
+        'channel_content',
+        channel.channelId  // Use YouTube channel ID (stored in ChromaDB metadata)
+      );
+      console.log(`[deleteChannel] Deleted ${deleted} embeddings from ChromaDB for channel ${channel.channelId}`);
+    }
+  } catch (error) {
+    // Log error but don't fail the deletion
+    console.warn('[deleteChannel] Failed to delete ChromaDB embeddings:', error);
+  }
+
+  // Delete channel from database (cascades to videos)
   const result = db.prepare('DELETE FROM channels WHERE id = ?').run(id);
   return result.changes > 0;
 }
@@ -352,12 +387,26 @@ export function getChannelVideos(channelId: string, options: {
 
 /**
  * Get videos that need transcript scraping (pending embedding)
+ *
+ * Includes videos with:
+ * - No transcript yet (transcript IS NULL)
+ * - Status 'pending' (never processed)
+ * - Status 'no_captions' (previously had no captions, may have been added)
+ * - Status 'error' (previously failed, may be retryable)
  */
 export function getUnprocessedVideos(channelId: string, limit: number = 50): ChannelVideo[] {
   const rows = db.prepare(`
     SELECT * FROM channel_videos
-    WHERE channel_id = ? AND transcript IS NULL AND embedding_status = 'pending'
-    ORDER BY published_at DESC
+    WHERE channel_id = ?
+      AND transcript IS NULL
+      AND embedding_status IN ('pending', 'no_captions', 'error')
+    ORDER BY
+      CASE embedding_status
+        WHEN 'no_captions' THEN 1
+        WHEN 'error' THEN 2
+        ELSE 0
+      END,
+      published_at DESC
     LIMIT ?
   `).all(channelId, limit) as ChannelVideoRow[];
 

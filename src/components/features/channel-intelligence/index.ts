@@ -3,6 +3,7 @@
  *
  * Story 6.7 - Channel Intelligence UI & Setup Wizard
  * Story 6.8b - Quick Production Flow UI & Integration
+ * Story 6.11 - MCP Video Provider Integration (DVIDS, NASA)
  */
 
 export { SetupWizard } from './SetupWizard';
@@ -13,3 +14,5 @@ export { CompetitorManagement } from './CompetitorManagement';
 export { RAGHealth } from './RAGHealth';
 export { TopicSuggestions } from './TopicSuggestions';
 export { QuickProductionProgress } from './QuickProductionProgress';
+export { QuickProductionForm } from './QuickProductionForm';
+export { ProviderSelectionModal } from './ProviderSelectionModal';

@@ -68,3 +68,29 @@ nul
 
 # Development scripts
 scripts/init-db.ts
+
+# Python virtual environment
+.venv/
+
+# Test video files
+*.webm
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Test artifacts
+test-results/
+pytest-results.log
+test-run-summary.log
+
+# Temp files
+temp/
+test-debug.js
+
+# Pytest
+.pytest_cache/
+*.pytest.log

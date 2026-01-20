@@ -200,6 +200,94 @@ describe('Channel Database Queries', () => {
         expect(mockRun).toHaveBeenCalled();
         expect(result?.syncStatus).toBe('synced');
       });
+
+      // ======================================================================
+      // REGRESSION TEST: User Channel Uniqueness
+      // Bug: Multiple channels could have is_user_channel=1, causing getUserChannel()
+      // to return arbitrary results and breaking RAG context retrieval.
+      // Fix: updateChannel() now clears is_user_channel flag from all other channels
+      // when setting isUserChannel to true.
+      // ======================================================================
+      describe('user channel uniqueness', () => {
+        it('should clear other user channels when setting isUserChannel to true', () => {
+          // Mock: First call clears all user channels (changes = 2 for two channels)
+          // Second call gets the updated channel
+          mockRun.mockReturnValueOnce({ changes: 2 }); // Clear operation
+          mockRun.mockReturnValueOnce({ changes: 1 }); // Update operation
+
+          const updatedChannel = {
+            id: 'channel-2-id',
+            channel_id: 'UC_channel2',
+            name: 'Channel 2',
+            sync_status: 'synced',
+            is_user_channel: 1,
+            is_competitor: 0,
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01'
+          };
+
+          mockGet.mockReturnValue(updatedChannel);
+
+          // Set channel-2 as user channel
+          const result = updateChannel('channel-2-id', { isUserChannel: true });
+
+          // Verify the "clear" operation was called first
+          expect(mockPrepare).toHaveBeenCalledWith(
+            'UPDATE channels SET is_user_channel = 0 WHERE is_user_channel = 1'
+          );
+          expect(mockRun).toHaveBeenCalledTimes(2); // Clear + Update
+
+          // Verify the returned channel is now the user channel
+          expect(result?.isUserChannel).toBe(true);
+        });
+
+        it('should not clear user channels when setting isUserChannel to false', () => {
+          mockRun.mockReturnValue({ changes: 1 });
+
+          const updatedChannel = {
+            id: 'channel-id',
+            channel_id: 'UC_test',
+            name: 'Test Channel',
+            sync_status: 'synced',
+            is_user_channel: 0,
+            is_competitor: 0,
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01'
+          };
+
+          mockGet.mockReturnValue(updatedChannel);
+
+          const result = updateChannel('channel-id', { isUserChannel: false });
+
+          // Should only have the update call, no clear call
+          expect(mockRun).toHaveBeenCalledTimes(1);
+          expect(result?.isUserChannel).toBe(false);
+        });
+
+        it('should not clear user channels when isUserChannel is not being updated', () => {
+          mockRun.mockReturnValue({ changes: 1 });
+
+          const updatedChannel = {
+            id: 'channel-id',
+            channel_id: 'UC_test',
+            name: 'Updated Name',
+            sync_status: 'synced',
+            is_user_channel: 1,
+            is_competitor: 0,
+            created_at: '2024-01-01',
+            updated_at: '2024-01-01'
+          };
+
+          mockGet.mockReturnValue(updatedChannel);
+
+          const result = updateChannel('channel-id', { name: 'Updated Name' });
+
+          // Should only have the update call, no clear call
+          expect(mockRun).toHaveBeenCalledTimes(1);
+          expect(result?.name).toBe('Updated Name');
+        });
+      });
+      // ======================================================================
     });
 
     describe('deleteChannel', () => {

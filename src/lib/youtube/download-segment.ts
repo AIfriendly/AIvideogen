@@ -187,15 +187,24 @@ export async function downloadDefaultSegment(
 
     // Build yt-dlp command arguments (SECURE: argument array, NOT string interpolation)
     const youtubeUrl = `https://youtube.com/watch?v=${videoId}`;
+
+    // Format selector: Use format 18 to avoid HLS/DASH segmentation issues
+    // Format 18 = 640x360 MP4 with audio (always available on YouTube)
+    // This avoids HTTP 403 errors on HLS segments (ffmpeg exit code 3199971767)
+    // Note: We use format 18 instead of best[height<=720] because:
+    // - 720p formats (95, 136) require HLS/DASH with segmentation
+    // - HLS segments can return HTTP 403 due to expired auth tokens
+    // - Format 18 provides reliable downloads as a single MP4 file
+    const formatSelector = '18';
+
     const args = [
       youtubeUrl,
       '--download-sections', `*0-${segmentDuration}`,  // Download first N seconds
-      '-f', `best[height<=${maxHeight}]`,              // Resolution cap (720p)
+      '-f', formatSelector,                            // Use format 18 (360p MP4 with audio)
       '-o', sanitizedPath,                              // Output path
       '--no-playlist',                                  // Don't download playlists
       '--no-warnings',                                  // Suppress warnings
       '--quiet',                                        // Quiet mode (errors only)
-      '--postprocessor-args', 'ffmpeg:-an',            // Story 3.7: Strip audio (AC35)
     ];
 
     console.log(`[Download] Starting download: videoId=${videoId}, duration=${segmentDuration}s, path=${sanitizedPath}`);
@@ -249,10 +258,9 @@ export async function downloadDefaultSegment(
  */
 async function executeYtDlp(args: string[]): Promise<{ success: boolean; error?: string }> {
   return new Promise((resolve) => {
-    // Use yt-dlp.exe from project root if it exists, otherwise try system PATH
-    const ytDlpPath = process.platform === 'win32'
-      ? path.join(process.cwd(), 'yt-dlp.exe')
-      : 'yt-dlp';
+    // Use yt-dlp from system PATH
+    // Note: Avoid using bundled exe path because Turbopack's build cache makes __dirname unreliable
+    const ytDlpPath = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
 
     const ytDlpProcess = spawn(ytDlpPath, args);
 

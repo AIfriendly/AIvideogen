@@ -9,6 +9,29 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import db from './client';
 
+// Static imports for all migrations (required for Next.js Turbopack)
+import * as migration_002 from './migrations/002_content_generation_schema';
+import * as migration_003 from './migrations/003_visual_suggestions_schema';
+import * as migration_004 from './migrations/004_add_current_step_constraint';
+import * as migration_005 from './migrations/005_fix_current_step_constraint';
+import * as migration_006 from './migrations/006_add_selected_clip_id';
+import * as migration_007 from './migrations/007_add_cv_score';
+import * as migration_008 from './migrations/008_assembly_jobs';
+import * as migration_009 from './migrations/009_add_downloading_stage';
+import * as migration_010 from './migrations/010_add_queued_status';
+import * as migration_011 from './migrations/011_add_visual_keywords';
+import * as migration_012 from './migrations/012_seed_preset_personas';
+import * as migration_013 from './migrations/013_rag_infrastructure';
+import * as migration_014 from './migrations/014_news_embedding_status';
+import * as migration_015 from './migrations/015_user_preferences';
+import * as migration_016 from './migrations/016_user_preferences_duration';
+import * as migration_017 from './migrations/017_fix_duplicate_user_channels';
+import * as migration_018 from './migrations/018_add_video_embedding_status_values';
+import * as migration_019 from './migrations/019_visual_suggestions_provider';
+import * as migration_020 from './migrations/020_user_preferences_default_provider';
+import * as migration_021 from './migrations/021_add_source_url';
+import type Database from 'better-sqlite3';
+
 /**
  * Global singleton flag to ensure initialization runs only once.
  * Uses globalThis to persist across module reloads in Next.js dev mode.
@@ -59,30 +82,36 @@ function markMigrationApplied(name: string): void {
 }
 
 /**
- * Migration definitions - add new migrations here
+ * Migration definitions - uses static imports for Next.js Turbopack compatibility
  */
 const MIGRATIONS = [
-  { name: '002_content_generation_schema', path: './migrations/002_content_generation_schema' },
-  { name: '003_visual_suggestions_schema', path: './migrations/003_visual_suggestions_schema' },
-  { name: '004_add_current_step_constraint', path: './migrations/004_add_current_step_constraint' },
-  { name: '005_fix_current_step_constraint', path: './migrations/005_fix_current_step_constraint' },
-  { name: '006_add_selected_clip_id', path: './migrations/006_add_selected_clip_id' },
-  { name: '007_add_cv_score', path: './migrations/007_add_cv_score' },
-  { name: '008_assembly_jobs', path: './migrations/008_assembly_jobs' },
-  { name: '009_add_downloading_stage', path: './migrations/009_add_downloading_stage' },
-  { name: '010_add_queued_status', path: './migrations/010_add_queued_status' },
-  { name: '011_add_visual_keywords', path: './migrations/011_add_visual_keywords' },
-  { name: '012_seed_preset_personas', path: './migrations/012_seed_preset_personas' },
-  { name: '013_rag_infrastructure', path: './migrations/013_rag_infrastructure' },
-  { name: '014_news_embedding_status', path: './migrations/014_news_embedding_status' },
-  { name: '015_user_preferences', path: './migrations/015_user_preferences' },
+  { name: '002_content_generation_schema', module: migration_002 },
+  { name: '003_visual_suggestions_schema', module: migration_003 },
+  { name: '004_add_current_step_constraint', module: migration_004 },
+  { name: '005_fix_current_step_constraint', module: migration_005 },
+  { name: '006_add_selected_clip_id', module: migration_006 },
+  { name: '007_add_cv_score', module: migration_007 },
+  { name: '008_assembly_jobs', module: migration_008 },
+  { name: '009_add_downloading_stage', module: migration_009 },
+  { name: '010_add_queued_status', module: migration_010 },
+  { name: '011_add_visual_keywords', module: migration_011 },
+  { name: '012_seed_preset_personas', module: migration_012 },
+  { name: '013_rag_infrastructure', module: migration_013 },
+  { name: '014_news_embedding_status', module: migration_014 },
+  { name: '015_user_preferences', module: migration_015 },
+  { name: '016_user_preferences_duration', module: migration_016 },
+  { name: '017_fix_duplicate_user_channels', module: migration_017 },
+  { name: '018_add_video_embedding_status_values', module: migration_018 },
+  { name: '019_visual_suggestions_provider', module: migration_019 },
+  { name: '020_user_preferences_default_provider', module: migration_020 },
+  { name: '021_add_source_url', module: migration_021 },
 ];
 
 /**
  * Run database migrations
  * Only logs when migrations are actually applied (not when skipped)
  */
-async function runMigrations(): Promise<void> {
+function runMigrations(): void {
   ensureMigrationsTable();
 
   let appliedCount = 0;
@@ -91,8 +120,8 @@ async function runMigrations(): Promise<void> {
     if (!isMigrationApplied(migration.name)) {
       console.log(`[DB] Applying migration: ${migration.name}`);
       try {
-        const { up } = await import(migration.path);
-        up(db);
+        // Use statically imported module directly (Turbopack compatible)
+        migration.module.up(db);
         markMigrationApplied(migration.name);
         appliedCount++;
         console.log(`[DB] Migration ${migration.name} applied successfully`);
@@ -149,7 +178,7 @@ export async function initializeDatabase(): Promise<void> {
       db.exec(schema);
 
       // Run migrations (only logs when changes occur)
-      await runMigrations();
+      runMigrations();
 
       console.log('[DB] Database ready');
 

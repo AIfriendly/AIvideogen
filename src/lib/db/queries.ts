@@ -911,6 +911,8 @@ interface VisualSuggestionRow {
   download_status: string;
   cv_score: number | null; // Story 3.7b: CV quality score 0-1
   created_at: string;
+  provider?: string | null; // Story 6.11: MCP provider (dvids, nasa, youtube)
+  source_url?: string | null; // Story 6.12: Actual download URL for MCP providers
 }
 
 /**
@@ -931,6 +933,8 @@ export interface VisualSuggestion {
   downloadStatus: string;
   cvScore: number | null; // Story 3.7b: CV quality score 0-1
   createdAt: string;
+  provider?: string | null; // Story 6.11: MCP provider (dvids, nasa, youtube)
+  sourceUrl?: string | null; // Story 6.12: Actual download URL for MCP providers
 }
 
 /**
@@ -952,7 +956,9 @@ function transformVisualSuggestion(row: VisualSuggestionRow): VisualSuggestion {
     defaultSegmentPath: row.default_segment_path,
     downloadStatus: row.download_status,
     cvScore: row.cv_score, // Story 3.7b: CV quality score
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    provider: row.provider, // Story 6.11: MCP provider
+    sourceUrl: row.source_url, // Story 6.12: Actual download URL
   };
 }
 
@@ -966,6 +972,8 @@ export interface VideoResultForSave {
   channelTitle: string;
   embedUrl: string;
   duration?: string; // Duration as string from YouTube API (will be parsed to integer)
+  provider?: string; // Story 6.11: MCP provider (dvids, nasa, youtube)
+  sourceUrl?: string; // Story 6.12: Actual download URL for MCP providers
 }
 
 /**
@@ -986,9 +994,9 @@ export function saveVisualSuggestions(
     const insertStmt = db.prepare(`
       INSERT OR IGNORE INTO visual_suggestions (
         id, scene_id, video_id, title, thumbnail_url, channel_title,
-        embed_url, rank, duration, download_status
+        embed_url, rank, duration, download_status, provider, source_url
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
     `);
 
     const insertMany = db.transaction((suggestionsToInsert: typeof suggestions) => {
@@ -1015,7 +1023,9 @@ export function saveVisualSuggestions(
           suggestion.channelTitle || null,
           suggestion.embedUrl,
           rank,
-          durationInt
+          durationInt,
+          suggestion.provider || null, // Story 6.11: MCP provider
+          suggestion.sourceUrl || null // Story 6.12: Actual download URL
         );
       }
     });

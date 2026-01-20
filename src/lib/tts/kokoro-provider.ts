@@ -420,66 +420,135 @@ export class KokoroProvider implements TTSProvider {
           clearTimeout(timeout);
           this.service!.stdout!.off('data', onStdout);
 
-          const response: TTSResponse = JSON.parse(data.toString());
+          // Parse JSON from stdout, handling potential warning messages
+          const rawOutput = data.toString();
 
-          if (response.success) {
-            // Wait for file to be written to disk (with retry logic)
-            // The Python service returns success immediately, but file I/O may lag
-            const waitForFile = async (path: string, maxRetries = 10, delayMs = 100): Promise<void> => {
-              for (let i = 0; i < maxRetries; i++) {
-                if (existsSync(path)) {
-                  // File exists, give it 50ms to finish writing
-                  await new Promise(resolve => setTimeout(resolve, 50));
-                  return;
+          // Try to extract JSON from output (in case there are warnings before/after)
+          let jsonMatch = rawOutput.match(/\{[\s\S]*\}/);
+
+          // If no JSON object found, try parsing the entire output
+          const jsonString = jsonMatch ? jsonMatch[0] : rawOutput;
+
+          try {
+            const response: TTSResponse = JSON.parse(jsonString);
+
+            if (response.success) {
+              // Wait for file to be written to disk (with retry logic)
+              // The Python service returns success immediately, but file I/O may lag
+              const waitForFile = async (path: string, maxRetries = 10, delayMs = 100): Promise<void> => {
+                for (let i = 0; i < maxRetries; i++) {
+                  if (existsSync(path)) {
+                    // File exists, give it 50ms to finish writing
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    return;
+                  }
+                  await new Promise(resolve => setTimeout(resolve, delayMs));
                 }
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-              }
-              throw new Error(`File not found after ${maxRetries} retries: ${path}`);
-            };
+                throw new Error(`File not found after ${maxRetries} retries: ${path}`);
+              };
 
-            waitForFile(outputPath)
-              .then(() => {
-                console.log(`[DEBUG TTS] File ready: ${outputPath} (${readFileSync(outputPath).length} bytes)`);
+              waitForFile(outputPath)
+                .then(() => {
+                  console.log(`[DEBUG TTS] File ready: ${outputPath} (${readFileSync(outputPath).length} bytes)`);
 
-                // Read audio file
-                const audioBuffer = new Uint8Array(readFileSync(outputPath));
+                  // Read audio file
+                  const audioBuffer = new Uint8Array(readFileSync(outputPath));
 
-                resolve({
-                  audioBuffer,
-                  duration: response.duration || 0,
-                  filePath: response.filePath || outputPath,
-                  fileSize: response.fileSize || audioBuffer.length,
+                  resolve({
+                    audioBuffer,
+                    duration: response.duration || 0,
+                    filePath: response.filePath || outputPath,
+                    fileSize: response.fileSize || audioBuffer.length,
+                  });
+                })
+                .catch((error) => {
+                  reject(
+                    new TTSError(
+                      TTSErrorCode.TTS_SERVICE_ERROR,
+                      `File not available after waiting: ${error instanceof Error ? error.message : String(error)}`
+                    )
+                  );
                 });
-              })
-              .catch((error) => {
+            } else {
+              // Service returned error
+              const errorCode =
+                (response.error?.code as TTSErrorCode) ||
+                TTSErrorCode.TTS_SERVICE_ERROR;
+              reject(
+                new TTSError(
+                  errorCode,
+                  response.error?.message || 'Unknown error'
+                )
+              );
+            }
+          } catch (error) {
+            // Handle JSON parsing errors (e.g., when service returns plain text error)
+            if (error instanceof SyntaxError) {
+              // Response was plain text, not JSON - try to extract error message
+              const textError = rawOutput.trim();
+
+              // Try to identify common error patterns
+              if (textError.includes('Connection refused') || textError.includes('ECONNREFUSED')) {
                 reject(
                   new TTSError(
                     TTSErrorCode.TTS_SERVICE_ERROR,
-                    `File not available after waiting: ${error instanceof Error ? error.message : String(error)}`
+                    'TTS service connection failed - service may not be running'
                   )
                 );
-              });
-          } else {
-            // Service returned error
-            const errorCode =
-              (response.error?.code as TTSErrorCode) ||
-              TTSErrorCode.TTS_SERVICE_ERROR;
-            reject(
-              new TTSError(
-                errorCode,
-                response.error?.message || 'Unknown error'
-              )
-            );
+              } else if (textError.includes('Permission denied') || textError.includes('EACCES')) {
+                reject(
+                  new TTSError(
+                    TTSErrorCode.TTS_SERVICE_ERROR,
+                    'Permission denied accessing TTS service or files'
+                  )
+                );
+              } else if (textError.includes('No such file') || textError.includes('ENOENT')) {
+                reject(
+                  new TTSError(
+                    TTSErrorCode.TTS_SERVICE_ERROR,
+                    `TTS service file not found: ${textError}`
+                  )
+                );
+              } else if (textError.startsWith('Consider') || textError.startsWith('consider')) {
+                // Kokoro service returns "Consider using..." style error messages
+                // This happens when the service encounters an error and prints a suggestion
+                reject(
+                  new TTSError(
+                    TTSErrorCode.TTS_SERVICE_ERROR,
+                    `TTS service error: ${textError.substring(0, 200)}${textError.length > 200 ? '...' : ''}`
+                  )
+                );
+              } else {
+                // Generic plain text error - truncate to prevent massive error messages
+                const truncatedError = textError.length > 300 ? textError.substring(0, 300) + '...' : textError;
+                reject(
+                  new TTSError(
+                    TTSErrorCode.TTS_SERVICE_ERROR,
+                    `TTS service returned error: ${truncatedError}`
+                  )
+                );
+              }
+            } else {
+              // Re-throw non-JSON parsing errors
+              reject(
+                new TTSError(
+                  TTSErrorCode.TTS_SERVICE_ERROR,
+                  `Failed to parse service response: ${error instanceof Error ? error.message : String(error)}`
+                )
+              );
+            }
           }
         } catch (error) {
+          // Handle any unexpected errors in stdout processing
           reject(
             new TTSError(
               TTSErrorCode.TTS_SERVICE_ERROR,
-              `Failed to parse service response: ${error instanceof Error ? error.message : String(error)}`
+              `Unexpected error processing service response: ${error instanceof Error ? error.message : String(error)}`
             )
           );
         }
       };
+
 
       this.service!.stdout!.on('data', onStdout);
 

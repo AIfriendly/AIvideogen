@@ -15,9 +15,9 @@ import { videoAssembler } from '@/lib/video/assembler';
 import { Trimmer } from '@/lib/video/trimmer';
 import { FFmpegClient } from '@/lib/video/ffmpeg';
 import type { AssemblyScene } from '@/types/assembly';
-import { downloadWithRetry } from '@/lib/youtube/download-segment';
+import { downloadVideo } from '@/lib/download/universal-downloader'; // Story 6.12: Universal downloader
 import path from 'path';
-import { mkdir } from 'fs/promises';
+import { mkdir, access } from 'fs/promises';
 
 // Initialize database on first import (idempotent)
 initializeDatabase();
@@ -104,7 +104,8 @@ export async function POST(
         s.selected_clip_id as selectedClipId,
         s.duration as audioDuration,
         vs.video_id as videoId,
-        vs.duration as clipDuration
+        vs.duration as clipDuration,
+        vs.provider as providerId
       FROM scenes s
       INNER JOIN visual_suggestions vs ON s.selected_clip_id = vs.id
       WHERE s.project_id = ?
@@ -126,6 +127,7 @@ export async function POST(
       clipDuration: scene.clipDuration,
       audioDuration: scene.audioDuration, // Actual voiceover duration for audio timing
       duration: scene.audioDuration, // Alias for backward compatibility
+      providerId: scene.providerId || 'youtube', // Story 6.12: Provider for download routing
     }));
 
     // Validate all scenes have selections
@@ -161,38 +163,109 @@ export async function POST(
         // Update job to processing
         videoAssembler.updateJobProgress(jobId, 5, 'downloading');
 
-        // Step 1: Download YouTube videos for each scene
+        // Step 1: Download videos for each scene using universal downloader (Story 6.12)
         const tempDir = videoAssembler.getTempDir(jobId);
         const downloadsDir = path.join(tempDir, 'downloads');
         await mkdir(downloadsDir, { recursive: true });
 
         console.log(`[Assembly] Downloading ${scenes.length} videos for job ${jobId}`);
 
+        // Story 6.12: Track scene errors for graceful error handling
+        const sceneErrors: Array<{ sceneNumber: number; provider: string; error: string }> = [];
+        let successfulDownloads = 0;
+
         for (let i = 0; i < scenes.length; i++) {
           const scene = scenes[i];
           const downloadProgress = 5 + ((i / scenes.length) * 15); // 5-20% for downloads
           videoAssembler.updateJobProgress(jobId, downloadProgress, 'downloading', scene.sceneNumber);
 
-          // Download the YouTube video segment
-          // The download service expects a path starting with .cache/videos/{projectId}/
+          // CRITICAL: Validate clipDuration before using it
+          if (scene.clipDuration === null || scene.clipDuration === undefined) {
+            const errorMsg = `Scene ${scene.sceneNumber} has invalid clip duration (null/undefined). ` +
+              `Visual suggestion duration not populated. Check visual_suggestions.duration in database.`;
+            console.error(`[Assembly] ${errorMsg}`);
+            // Story 6.12: Log error but don't fail entire job - skip this scene
+            sceneErrors.push({
+              sceneNumber: scene.sceneNumber,
+              provider: scene.providerId || 'youtube',
+              error: errorMsg,
+            });
+            continue;
+          }
+
+          // Story 6.12: Use universal downloader for multi-provider support
           const downloadPath = path.join('.cache', 'videos', projectId, `scene-${scene.sceneNumber}-source.mp4`);
-          const downloadResult = await downloadWithRetry({
+          const providerId = scene.providerId || 'youtube'; // Default to YouTube for backward compatibility
+
+          console.log(`[Assembly] Downloading from ${providerId}: ${scene.videoId} for scene ${scene.sceneNumber}`);
+
+          const downloadResult = await downloadVideo({
             videoId: scene.videoId,
-            segmentDuration: scene.clipDuration + 5, // Add 5s buffer for trimming
+            providerId,
             outputPath: downloadPath,
-            maxHeight: 720 // Default to 720p for performance
+            segmentDuration: scene.clipDuration + 5, // Add 5s buffer for trimming
+            maxHeight: 720, // Default to 720p for performance
           });
 
           if (!downloadResult.success) {
-            throw new Error(`Failed to download video for scene ${scene.sceneNumber}: ${downloadResult.error}`);
+            // Story 6.12: Graceful error handling - skip failed clip, don't block entire assembly
+            const errorMsg = `Failed to download video for scene ${scene.sceneNumber}. ` +
+              `Provider: ${downloadResult.providerUsed}. ` +
+              `Video ID: ${scene.videoId}. ` +
+              `Error: ${downloadResult.error || 'Unknown error'}`;
+            console.error(`[Assembly] ${errorMsg}`);
+
+            sceneErrors.push({
+              sceneNumber: scene.sceneNumber,
+              provider: downloadResult.providerUsed,
+              error: downloadResult.error || 'Unknown error',
+            });
+            continue; // Skip this scene and continue with next
           }
 
           // Add the downloaded file path to the scene object
-          // The download service returns the full path
           const fullPath = downloadResult.filePath || path.join(process.cwd(), '.cache', 'videos', downloadPath);
           scene.video_path = fullPath;
           scene.defaultSegmentPath = fullPath; // Trimmer expects this property
-          console.log(`[Assembly] Downloaded scene ${scene.sceneNumber}: ${fullPath}`);
+
+          // Verify file exists before proceeding
+          try {
+            await access(fullPath);
+            console.log(`[Assembly] Downloaded scene ${scene.sceneNumber} from ${downloadResult.providerUsed}: ${fullPath}`);
+            successfulDownloads++;
+          } catch (accessError) {
+            const errorMsg = `Download reported success but file not found: ${fullPath}. ` +
+              `Scene ${scene.sceneNumber}, Video ID: ${scene.videoId}`;
+            console.error(`[Assembly] ${errorMsg}`);
+
+            sceneErrors.push({
+              sceneNumber: scene.sceneNumber,
+              provider: downloadResult.providerUsed,
+              error: errorMsg,
+            });
+            continue;
+          }
+        }
+
+        // Story 6.12: Fail entire job if ALL downloads failed
+        if (successfulDownloads === 0) {
+          const allErrorsMessage = sceneErrors.map(e =>
+            `Scene ${e.sceneNumber} (${e.provider}): ${e.error}`
+          ).join('; ');
+
+          throw new Error(`All scene downloads failed. ${allErrorsMessage}`);
+        }
+
+        // Story 6.12: Log partial success if some scenes failed
+        if (sceneErrors.length > 0) {
+          console.warn(`[Assembly] ${sceneErrors.length} scene(s) failed to download, continuing with ${successfulDownloads} successful downloads`);
+        }
+
+        // Filter out scenes without video_path (failed downloads)
+        const validScenes = scenes.filter(scene => scene.video_path);
+
+        if (validScenes.length === 0) {
+          throw new Error('No valid scenes remaining after download phase');
         }
 
         // Step 2: Trim scenes to match audio duration (Story 5.2)
@@ -200,7 +273,7 @@ export async function POST(
         const ffmpeg = new FFmpegClient();
         const trimmer = new Trimmer(ffmpeg);
         const trimmedPaths = await trimmer.trimScenes(
-          scenes,
+          validScenes, // Story 6.12: Use only scenes with successful downloads
           tempDir,
           (sceneNumber, total) => {
             // Calculate progress: trimming is 20-35% of total progress
@@ -216,7 +289,7 @@ export async function POST(
           jobId,
           projectId,
           trimmedPaths,
-          scenes
+          validScenes // Story 6.12: Use only scenes with successful downloads
         );
 
         // Step 3: Complete the job

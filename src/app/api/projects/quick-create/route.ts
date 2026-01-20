@@ -26,6 +26,7 @@ initializeDatabase();
 
 interface QuickCreateRequest {
   topic: string;
+  provider?: string; // Video provider ID (dvids, nasa, youtube)
   ragContext?: {
     channelContent?: any[];
     competitorContent?: any[];
@@ -124,12 +125,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<QuickCrea
     const projectId = randomUUID();
     const now = new Date().toISOString();
 
-    // Store RAG context in config_json if provided
+    // Store RAG context and provider preference in config_json
     let configJson: string | null = null;
-    if (body.ragContext) {
+    if (body.ragContext || body.provider) {
       configJson = JSON.stringify({
         ragContext: body.ragContext,
         quickProduction: true,
+        preferredProvider: body.provider, // Store provider preference for visual generation
       });
     } else {
       configJson = JSON.stringify({

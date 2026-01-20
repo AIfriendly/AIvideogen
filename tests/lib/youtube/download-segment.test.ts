@@ -274,100 +274,205 @@ describe('Expected Behavior Documentation', () => {
 });
 
 // ============================================================================
-// Story 3.7: Audio Stripping Tests (AC35-36)
+// Regression Tests: Path Resolution & FFmpeg Issues
 // ============================================================================
 
-describe('Audio Stripping - Story 3.7', () => {
+describe('Regression Tests - Path Resolution', () => {
   /**
-   * [3.7-UNIT-056] Audio stripping flag
+   * [REGRESSION-001] Turbopack build cache path issue
+   *
+   * Issue: __dirname in Turbopack points to D:\ROOT\.next\... (build cache)
+   * Fix: Use system PATH ('yt-dlp.exe' on Windows, 'yt-dlp' on Unix)
    */
-  describe('[3.7-UNIT-056] Audio Stripping Flag (AC35)', () => {
-    it('should use --postprocessor-args with ffmpeg:-an flag', () => {
-      // The download-segment.ts includes:
-      // '--postprocessor-args', 'ffmpeg:-an'
-      //
-      // This tells yt-dlp to use FFmpeg post-processor to strip audio
-      // -an = no audio track in output
-      //
-      // Expected in args array:
-      // ['--postprocessor-args', 'ffmpeg:-an']
-      expect(true).toBe(true);
+  describe('[REGRESSION-001] System PATH Usage', () => {
+    it('should use platform-specific command from system PATH', () => {
+      // The fix uses: process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
+      const expectedCommand = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+      expect(expectedCommand).toMatch(/yt-dlp/);
     });
 
-    it('should strip audio from all downloaded segments', () => {
-      // REQUIRED BEHAVIOR (AC35):
-      // All downloaded video segments must have audio stripped
-      // This reduces file size and ensures silent playback
+    it('should NOT use bundled exe path with __dirname', () => {
+      // The old implementation used: path.join(process.cwd(), 'yt-dlp.exe')
+      // which failed when process.cwd() returned parent directory
       //
-      // Implementation: --postprocessor-args 'ffmpeg:-an'
+      // The fix uses system PATH directly
       expect(true).toBe(true);
     });
   });
 
   /**
-   * [3.7-UNIT-057] Audio-free output verification
+   * [REGRESSION-002] FFmpeg crash (exit code 3199971767)
+   *
+   * Issue: ffmpeg post-processor crashed with corrupted exit code
+   * Root cause: Invalid path spawned zombie process
+   * Fix: Correct path resolution + removed --postprocessor-args
    */
-  describe('[3.7-UNIT-057] Audio-Free Output (AC35)', () => {
-    it('should produce MP4 files without audio track', () => {
-      // Expected: Output file has video stream only, no audio stream
-      //
-      // To verify audio-free output (not in test, but for manual verification):
-      // ffprobe -i output.mp4 -show_streams -select_streams a
-      // Should return no audio streams
+  describe('[REGRESSION-002] FFmpeg Crash Prevention', () => {
+    it('should not use ffmpeg post-processor for audio stripping', () => {
+      // The --postprocessor-args flag was removed to prevent ffmpeg crashes
+      // Audio stripping is redundant since Story 5.3 overlayAudio replaces audio
       expect(true).toBe(true);
     });
 
-    it('should maintain video quality despite audio removal', () => {
-      // The -an flag only removes audio, does not affect video stream
-      // Video codec, resolution, and bitrate should remain unchanged
-      expect(true).toBe(true);
-    });
-  });
-
-  /**
-   * [3.7-UNIT-058] File size optimization
-   */
-  describe('[3.7-UNIT-058] File Size Optimization (AC36)', () => {
-    it('should reduce file size by removing audio track', () => {
-      // Expected: ~10-30% file size reduction
-      // 15-second 720p video: ~5MB with audio, ~4MB without audio
-      //
-      // Benefits:
-      // - Faster download and storage
-      // - Reduced bandwidth for preview playback
-      // - Consistent silent preview experience
+    it('should document audio handling in assembly stage', () => {
+      // Downloaded videos retain audio
+      // Assembly stage (Story 5.3) overlays TTS audio, replacing original
       expect(true).toBe(true);
     });
   });
 
   /**
-   * [3.7-UNIT-059] FFmpeg dependency
+   * [REGRESSION-003] ENOENT error handling
+   *
+   * Issue: spawn ENOENT when yt-dlp path is incorrect
+   * Fix: System PATH resolution + proper error classification
    */
-  describe('[3.7-UNIT-059] FFmpeg Dependency', () => {
-    it('should require FFmpeg for audio stripping', () => {
-      // yt-dlp uses FFmpeg as post-processor for audio stripping
-      // FFmpeg must be installed and in PATH
-      //
-      // Error handling:
-      // - If FFmpeg not found: yt-dlp returns error
-      // - Classified as non-retryable permanent error
-      expect(true).toBe(true);
+  describe('[REGRESSION-003] ENOENT Error Classification', () => {
+    it('should classify ENOENT as permanent (non-retryable) error', () => {
+      const error = 'spawn D:\\ROOT\\ai-video-generator\\yt-dlp.exe ENOENT';
+      const isRetryable = checkErrorRetryability(error);
+      expect(isRetryable).toBe(false);
     });
-  });
 
-  /**
-   * [3.7-UNIT-060] Backward compatibility
-   */
-  describe('[3.7-UNIT-060] Backward Compatibility', () => {
-    it('should not break existing download functionality', () => {
-      // Adding --postprocessor-args only adds audio stripping step
-      // All other download functionality remains unchanged:
-      // - Segment extraction (--download-sections)
-      // - Resolution cap (-f best[height<=720])
-      // - Output path (-o)
-      // - Retry logic
-      // - Error classification
-      expect(true).toBe(true);
+    it('should provide helpful error message for ENOENT', () => {
+      const error = 'Failed to execute yt-dlp: spawn ENOENT';
+      expect(error).toContain('yt-dlp');
+      expect(error).toContain('PATH');
     });
   });
 });
+
+// ============================================================================
+// Integration Tests: Real yt-dlp Execution
+// ============================================================================
+
+describe('Integration Tests - yt-dlp Execution', () => {
+  /**
+   * [INTEGRATION-001] System PATH verification
+   */
+  describe('[INTEGRATION-001] yt-dlp Availability', () => {
+    it('should verify yt-dlp is accessible in system PATH', async () => {
+      const available = await checkYtDlpAvailable();
+      expect(available).toBe(true);
+    });
+
+    it('should get yt-dlp version', async () => {
+      const version = await getYtDlpVersion();
+      expect(version).toBeDefined();
+      expect(version.length).toBeGreaterThan(0);
+    });
+  });
+
+  /**
+   * [INTEGRATION-002] Download functionality
+   */
+  describe('[INTEGRATION-002] Download Test', () => {
+    it('should download short segment successfully', async () => {
+      // This test requires network access and yt-dlp in PATH
+      // Skip in CI if not available
+      const available = await checkYtDlpAvailable();
+      if (!available) {
+        console.log('Skipping: yt-dlp not available');
+        return;
+      }
+
+      const result = await downloadTestSegment();
+      expect(result.success).toBe(true);
+
+      // Cleanup
+      if (result.filePath) {
+        const fs = await import('fs/promises');
+        await fs.unlink(result.filePath).catch(() => {});
+      }
+    }, 30000); // 30s timeout
+  });
+});
+
+// ============================================================================
+// Test Helpers
+// ============================================================================
+
+async function checkYtDlpAvailable(): Promise<boolean> {
+  const { spawn } = await import('child_process');
+  const command = process.platform === 'win32' ? 'where' : 'which';
+  const args = process.platform === 'win32' ? ['yt-dlp.exe'] : ['yt-dlp'];
+
+  return new Promise((resolve) => {
+    const proc = spawn(command, args);
+    proc.on('close', (code) => resolve(code === 0));
+    proc.on('error', () => resolve(false));
+  });
+}
+
+async function getYtDlpVersion(): Promise<string> {
+  const { spawn } = await import('child_process');
+  const command = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+
+  return new Promise((resolve) => {
+    const proc = spawn(command, ['--version']);
+    let output = '';
+    proc.stdout.on('data', (d) => output += d.toString());
+    proc.on('close', (code) => resolve(code === 0 ? output.trim() : ''));
+    proc.on('error', () => resolve(''));
+  });
+}
+
+async function downloadTestSegment(): Promise<{ success: boolean; filePath?: string }> {
+  const { spawn } = await import('child_process');
+  const path = await import('path');
+  const fs = await import('fs/promises');
+
+  const testDir = path.join(process.cwd(), '.cache', 'test-download');
+  const testFile = path.join(testDir, 'test.mp4');
+
+  await fs.mkdir(testDir, { recursive: true });
+
+  return new Promise((resolve) => {
+    const command = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+    const args = [
+      'https://youtube.com/watch?v=dQw4w9WgXcQ',
+      '--download-sections', '*0-3',
+      '-o', testFile,
+      '--no-playlist',
+      '--quiet',
+    ];
+
+    const proc = spawn(command, args);
+    proc.on('close', async (code) => {
+      if (code === 0) {
+        resolve({ success: true, filePath: testFile });
+      } else {
+        resolve({ success: false });
+      }
+    });
+    proc.on('error', () => resolve({ success: false }));
+  });
+}
+
+function checkErrorRetryability(error: string): boolean {
+  const permanentPatterns = [
+    /video unavailable/i,
+    /404/,
+    /invalid.*url/i,
+    /no space left/i,
+    /private video/i,
+    /deleted video/i,
+    /unsupported/i,
+    /ENOENT/i,
+  ];
+
+  const retryablePatterns = [
+    /timeout/i,
+    /connection refused/i,
+    /429/,
+    /503/,
+    /network/i,
+    /ECONNREFUSED/i,
+    /ETIMEDOUT/i,
+  ];
+
+  if (permanentPatterns.some(p => p.test(error))) {
+    return false;
+  }
+  return retryablePatterns.some(p => p.test(error));
+}

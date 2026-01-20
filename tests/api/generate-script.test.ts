@@ -66,7 +66,7 @@ describe('[P1] POST /api/projects/[id]/generate-script', () => {
       const project = createTestProject({
         id: testProjectId,
         topic: 'Why octopuses are intelligent',
-        current_step: 'script',
+        current_step: 'script-generation',
         status: 'draft',
         script_generated: false,
       });
@@ -124,7 +124,7 @@ describe('[P1] POST /api/projects/[id]/generate-script', () => {
       const project = createTestProject({
         id: testProjectId,
         topic: 'Test topic',
-        current_step: 'script',
+        current_step: 'script-generation',
         status: 'draft',
       });
 
@@ -191,7 +191,7 @@ describe('[P1] POST /api/projects/[id]/generate-script', () => {
       const project = createTestProject({
         id: testProjectId,
         topic: 'Test topic',
-        current_step: 'script',
+        current_step: 'script-generation',
         status: 'draft',
       });
 
@@ -258,7 +258,7 @@ describe('[P1] POST /api/projects/[id]/generate-script', () => {
       const project = createTestProject({
         id: testProjectId,
         topic: 'Test topic',
-        current_step: 'script',
+        current_step: 'script-generation',
         status: 'draft',
         script_generated: false,
       });
@@ -279,9 +279,9 @@ describe('[P1] POST /api/projects/[id]/generate-script', () => {
         params: Promise.resolve({ id: testProjectId }),
       });
 
-      // Verify flag was updated
+      // Verify flag was updated (SQLite returns INTEGER for BOOLEAN)
       const project = getProject(testProjectId);
-      expect(project?.script_generated).toBe(true);
+      expect(project?.script_generated).toBeTruthy();
     });
 
     it('[2.4-INT-010] should update current_step to "voiceover"', async () => {
@@ -351,7 +351,7 @@ it('[2.4-INT-013] should return 500 when script generation fails', async () => {
       db.prepare(`
         INSERT INTO projects (id, name, topic, current_step, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(testProjectId, 'Test Project', 'Test topic', 'script', 'draft');
+      `).run(testProjectId, 'Test Project', 'Test topic', 'script-generation', 'draft');
 
       const request = new Request(
         `http://localhost:3000/api/projects/${testProjectId}/generate-script`,
@@ -392,7 +392,7 @@ it('[2.4-INT-013] should return 500 when script generation fails', async () => {
       const project = createTestProject({
         id: testProjectId,
         topic: 'Test topic',
-        current_step: 'script',
+        current_step: 'script-generation',
         status: 'draft',
       });
 

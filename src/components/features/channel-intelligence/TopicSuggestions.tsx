@@ -186,17 +186,15 @@ export function TopicSuggestions({ niche, onCreateProject }: TopicSuggestionsPro
           </CardDescription>
         </div>
         <div className="flex gap-2">
-          {hasDefaults === false && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push('/settings/quick-production')}
-              className="text-xs"
-            >
-              <Settings className="h-3 w-3 mr-1" />
-              Setup Quick Production
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push('/settings/quick-production')}
+            className="text-xs"
+          >
+            <Settings className="h-3 w-3 mr-1" />
+            {hasDefaults === false ? 'Setup Quick Production' : 'QPF Settings'}
+          </Button>
           <Button
             variant="outline"
             size="sm"

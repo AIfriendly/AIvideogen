@@ -12,6 +12,7 @@ export interface VoiceoverProgress {
   totalScenes: number;
   progress: number; // 0-100
   errorMessage?: string;
+  error?: string; // Alias for errorMessage for backward compatibility
   startedAt: Date;
   completedAt?: Date;
 }
@@ -86,6 +87,7 @@ export function failProgress(projectId: string, errorMessage: string): void {
     ...existing,
     status: 'error',
     errorMessage,
+    error: errorMessage, // Set both for compatibility
     completedAt: new Date()
   });
 }
@@ -107,6 +109,29 @@ export function cleanupOldProgress(): void {
     if (age > MAX_AGE_MS) {
       progressCache.delete(projectId);
     }
+  }
+}
+
+/**
+ * Clean up expired progress entries (alias for cleanupOldProgress)
+ */
+export async function cleanupExpiredProgress(): Promise<void> {
+  cleanupOldProgress();
+}
+
+/**
+ * Reconciles progress cache with database state
+ */
+export async function reconcileProgressCache(projectId: string): Promise<void> {
+  // In production, this would query the database and update the cache
+  // For now, this is a stub that can be implemented later
+  const existing = progressCache.get(projectId);
+  if (existing) {
+    // Reconcile logic would go here
+    // This would typically:
+    // 1. Query database for actual scene audio status
+    // 2. Update cache to match database state
+    // 3. Handle any inconsistencies
   }
 }
 

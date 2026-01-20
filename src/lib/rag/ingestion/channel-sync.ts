@@ -22,6 +22,7 @@ import {
   createChannel,
   getChannelById,
   getChannelByYouTubeId,
+  getUserChannel,
   updateChannel,
   upsertChannelVideo,
   getUnprocessedVideos,
@@ -100,6 +101,18 @@ export class ChannelSyncService {
       niche?: string;
     } = {}
   ): Promise<Channel> {
+    // ======================================================================
+    // FIX: If setting as user channel, clear existing user channel first
+    // This prevents multiple user channels from existing in the database.
+    // ======================================================================
+    if (options.isUserChannel) {
+      const existingUserChannel = getUserChannel();
+      if (existingUserChannel) {
+        updateChannel(existingUserChannel.id, { isUserChannel: false });
+      }
+    }
+    // ======================================================================
+
     // Resolve channel from YouTube
     const ytChannel = await this.youtubeService.resolveChannel(channelIdentifier);
 
@@ -197,7 +210,7 @@ export class ChannelSyncService {
       // Store video metadata in database
       for (const video of videos) {
         upsertChannelVideo({
-          channelId: channel.channelId,
+          channelId: channel.id, // Use internal channel ID, not YouTube channel ID
           videoId: video.videoId,
           title: video.title,
           description: video.description,
@@ -276,57 +289,81 @@ export class ChannelSyncService {
           message: 'Generating embeddings...'
         });
 
-        // Get videos with transcripts but no embeddings
-        const videosNeedingEmbedding = getVideosNeedingEmbedding(channel.channelId, maxVideos);
+        // Check if ChromaDB is available first
+        let chromaAvailable = false;
+        try {
+          const { getChromaClient } = await import('../vector-db/chroma-client');
+          const testClient = await getChromaClient();
+          chromaAvailable = !!testClient;
+        } catch (error) {
+          console.warn('[ChannelSync] ChromaDB not available, skipping embeddings:', error instanceof Error ? error.message : String(error));
+        }
 
-        for (let i = 0; i < videosNeedingEmbedding.length; i++) {
-          const video = videosNeedingEmbedding[i];
-
-          try {
-            // Mark as processing
-            updateVideoEmbeddingStatus(video.videoId, null, 'processing');
-
-            // Generate embedding
-            const embeddingResult = await generateEmbedding(video.transcript!);
-
-            // Store in ChromaDB
-            const chromaClient = await getChromaClient();
-            const embeddingId = `video_${video.videoId}`;
-
-            await chromaClient.addDocuments('channel_content', {
-              ids: [embeddingId],
-              embeddings: [embeddingResult.embedding],
-              documents: [video.transcript!],
-              metadatas: [{
-                channelId: channel.channelId,
-                videoId: video.videoId,
-                title: video.title,
-                publishedAt: video.publishedAt || '',
-                type: 'video_transcript'
-              }]
-            });
-
-            // Update database
-            updateVideoEmbeddingStatus(video.videoId, embeddingId, 'embedded');
-            result.embeddingsGenerated++;
-
-          } catch (error) {
-            updateVideoEmbeddingStatus(video.videoId, null, 'error');
-            result.errors.push({
-              videoId: video.videoId,
-              error: 'EMBEDDING_ERROR',
-              message: error instanceof Error ? error.message : String(error)
-            });
-          }
-
-          // Progress update
-          const progress = 65 + ((i + 1) / videosNeedingEmbedding.length) * 30;
+        if (!chromaAvailable) {
           onProgress({
             stage: 'generating_embeddings',
-            percent: Math.round(progress),
-            message: `Generated ${result.embeddingsGenerated} embeddings`,
-            embeddingsGenerated: result.embeddingsGenerated
+            percent: 95,
+            message: 'ChromaDB unavailable - skipping embeddings (transcripts still saved)'
           });
+          // Mark that embeddings were skipped
+          result.errors.push({
+            videoId: '',
+            error: 'EMBEDDING_ERROR' as const,
+            message: 'ChromaDB not available - embeddings skipped. Start ChromaDB and re-sync to generate embeddings.'
+          });
+        } else {
+          // Get videos with transcripts but no embeddings
+          const videosNeedingEmbedding = getVideosNeedingEmbedding(channel.channelId, maxVideos);
+
+          for (let i = 0; i < videosNeedingEmbedding.length; i++) {
+            const video = videosNeedingEmbedding[i];
+
+            try {
+              // Mark as processing
+              updateVideoEmbeddingStatus(video.videoId, null, 'processing');
+
+              // Generate embedding
+              const embeddingResult = await generateEmbedding(video.transcript!);
+
+              // Store in ChromaDB
+              const chromaClient = await getChromaClient();
+              const embeddingId = `video_${video.videoId}`;
+
+              await chromaClient.addDocuments('channel_content', {
+                ids: [embeddingId],
+                embeddings: [embeddingResult.embedding],
+                documents: [video.transcript!],
+                metadatas: [{
+                  channelId: channel.channelId,
+                  videoId: video.videoId,
+                  title: video.title,
+                  publishedAt: video.publishedAt || '',
+                  type: 'video_transcript'
+                }]
+              });
+
+              // Update database
+              updateVideoEmbeddingStatus(video.videoId, embeddingId, 'embedded');
+              result.embeddingsGenerated++;
+
+            } catch (error) {
+              updateVideoEmbeddingStatus(video.videoId, null, 'error');
+              result.errors.push({
+                videoId: video.videoId,
+                error: 'EMBEDDING_ERROR',
+                message: error instanceof Error ? error.message : String(error)
+              });
+            }
+
+            // Progress update
+            const progress = 65 + ((i + 1) / videosNeedingEmbedding.length) * 30;
+            onProgress({
+              stage: 'generating_embeddings',
+              percent: Math.round(progress),
+              message: `Generated ${result.embeddingsGenerated} embeddings`,
+              embeddingsGenerated: result.embeddingsGenerated
+            });
+          }
         }
       }
 

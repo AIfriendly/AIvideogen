@@ -55,8 +55,15 @@ import json
 import sys
 import os
 import signal
+import warnings
 from pathlib import Path
 from typing import Dict, Any
+
+# Suppress ALL Python warnings to prevent them from polluting stdout
+# Some libraries (kokoro_tts) emit FutureWarning/DeprecationWarning that break JSON parsing
+warnings.filterwarnings("ignore")
+# Set PYTHONWARNINGS environment variable for subprocesses
+os.environ['PYTHONWARNINGS'] = 'ignore'
 
 # Fix Windows encoding issue: Force UTF-8 for stdout
 # This prevents UnicodeEncodeError when kokoro_tts spinner uses Braille characters

@@ -25,6 +25,7 @@ import {
   createScenes,
   markScriptGenerated,
   updateProject,
+  updateProjectDuration,
   deleteScenesByProjectId,
   getSystemPromptById,
   getDefaultSystemPrompt,
@@ -318,6 +319,18 @@ export async function POST(
     const savedScenes = createScenes(dbScenes);
 
     console.log(`[Script Generation API] Saved ${savedScenes.length} scenes successfully`);
+
+    // CRITICAL: Calculate and save total project duration from scene durations
+    // This is required for the dynamic video fetching to calculate clips needed
+    const totalDuration = savedScenes.reduce((sum, scene) => {
+      const sceneDuration = scene.duration || 0;
+      return sum + sceneDuration;
+    }, 0);
+
+    if (totalDuration > 0) {
+      console.log(`[Script Generation API] Calculated total project duration: ${totalDuration}s`);
+      updateProjectDuration(projectId, totalDuration);
+    }
 
     // Update project status: script_generated = true
     console.log(`[Script Generation API] Marking script as generated...`);

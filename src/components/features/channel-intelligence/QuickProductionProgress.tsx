@@ -17,6 +17,8 @@ import {
   AlertCircle,
   RefreshCw,
   X,
+  Rocket,
+  Shield,
 } from 'lucide-react';
 
 type PipelineStage = 'script' | 'voiceover' | 'visuals' | 'assembly' | 'complete';
@@ -30,6 +32,9 @@ interface PipelineStatus {
   overallProgress: number;
   currentMessage: string;
   error?: string;
+  // MEDIUM PRIORITY M1: Provider status tracking
+  visuals_provider?: 'youtube' | 'nasa' | 'dvids';
+  visuals_download_progress?: number;
 }
 
 interface QuickProductionProgressProps {
@@ -279,6 +284,22 @@ export function QuickProductionProgress({
               <span className="font-medium">{status.stageProgress}%</span>
             </div>
             <Progress value={status.stageProgress} className="h-1" />
+
+            {/* MEDIUM PRIORITY M1: Show provider status for visuals stage */}
+            {status.currentStage === 'visuals' && status.visuals_provider && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">
+                {status.visuals_provider === 'nasa' && <Rocket className="h-3 w-3 text-blue-400" />}
+                {status.visuals_provider === 'dvids' && <Shield className="h-3 w-3 text-green-400" />}
+                {status.visuals_provider === 'youtube' && <Film className="h-3 w-3 text-red-400" />}
+                <span>
+                  {status.visuals_provider === 'nasa' && 'Searching NASA...'}
+                  {status.visuals_provider === 'dvids' && 'Searching DVIDS...'}
+                  {status.visuals_provider === 'youtube' && 'Searching YouTube...'}
+                  {status.visuals_download_progress !== undefined &&
+                    ` (${status.visuals_download_progress}%)`}
+                </span>
+              </div>
+            )}
           </div>
         )}
 

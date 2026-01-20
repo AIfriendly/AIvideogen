@@ -123,6 +123,7 @@ export async function PATCH(
  * DELETE /api/rag/channels/[id]
  *
  * Delete a channel and all its videos.
+ * Also removes all associated embeddings from ChromaDB.
  */
 export async function DELETE(
   request: NextRequest,
@@ -139,12 +140,13 @@ export async function DELETE(
       );
     }
 
-    const deleted = deleteChannel(id);
+    // Delete channel (async - also removes ChromaDB embeddings)
+    const deleted = await deleteChannel(id);
 
     return NextResponse.json({
       success: deleted,
       message: deleted
-        ? `Channel ${channel.name} deleted successfully`
+        ? `Channel ${channel.name} deleted successfully (embeddings removed from ChromaDB)`
         : 'Channel deletion failed'
     });
 

@@ -19,6 +19,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Brain, Zap } from 'lucide-react';
 import { useProjectStore } from '@/lib/stores/project-store';
 import { NewChatButton } from './NewChatButton';
 import { ProjectListItem } from './ProjectListItem';
@@ -109,6 +111,32 @@ export function ProjectSidebar() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Settings links - fixed at bottom */}
+      <div className="p-4 border-t border-slate-700 space-y-1">
+        <Link
+          href="/settings/channel-intelligence"
+          className="
+            flex items-center gap-3 px-3 py-2 rounded-lg
+            text-slate-300 hover:text-white hover:bg-slate-800
+            transition-colors
+          "
+        >
+          <Brain className="h-5 w-5" />
+          <span className="text-sm font-medium">Channel Intelligence</span>
+        </Link>
+        <Link
+          href="/settings/quick-production"
+          className="
+            flex items-center gap-3 px-3 py-2 rounded-lg
+            text-slate-300 hover:text-white hover:bg-slate-800
+            transition-colors
+          "
+        >
+          <Zap className="h-5 w-5" />
+          <span className="text-sm font-medium">Quick Production</span>
+        </Link>
       </div>
     </aside>
   );

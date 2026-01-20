@@ -156,12 +156,12 @@ export class LocalEmbeddingsService {
         }
       });
 
-      // Timeout for initialization
+      // Timeout for initialization (120s to allow for first-time model download)
       setTimeout(() => {
         if (this.initializing && !this.ready) {
           reject(new Error('Embeddings service initialization timeout'));
         }
-      }, 60000); // 60 second timeout for model download
+      }, 120000); // 120 second timeout for model download
     });
 
     return this.initPromise;

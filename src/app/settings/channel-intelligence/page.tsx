@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, ArrowLeft, Settings } from 'lucide-react';
+import { Loader2, ArrowLeft, Settings, Trash2 } from 'lucide-react';
 import {
   SetupWizard,
   EstablishedChannelSetup,
@@ -14,6 +14,7 @@ import {
   CompetitorManagement,
   RAGHealth,
   TopicSuggestions,
+  QuickProductionForm,
 } from '@/components/features/channel-intelligence';
 import type { Channel, RAGHealthStatus } from '@/lib/rag/types';
 
@@ -59,13 +60,22 @@ export default function ChannelIntelligencePage() {
 
       setStatusData(data.data);
 
+      // Debug logging
+      console.log('[ChannelIntelligence] Status data:', data.data);
+      console.log('[ChannelIntelligence] Configured:', data.data.configured);
+      console.log('[ChannelIntelligence] Mode:', data.data.mode);
+      console.log('[ChannelIntelligence] User Channel:', data.data.userChannel);
+
       // Determine step based on configuration
       if (data.data.configured) {
+        console.log('[ChannelIntelligence] Setting step to: configured');
         setStep('configured');
       } else {
+        console.log('[ChannelIntelligence] Setting step to: wizard');
         setStep('wizard');
       }
     } catch (err) {
+      console.error('[ChannelIntelligence] Error:', err);
       setError(err instanceof Error ? err.message : 'Failed to load status');
     } finally {
       setLoading(false);
@@ -222,6 +232,36 @@ export default function ChannelIntelligencePage() {
     await fetchStatus();
   };
 
+  // Remove user channel
+  const handleRemoveUserChannel = async () => {
+    if (!statusData?.userChannel) return;
+
+    // Confirm deletion
+    if (!confirm(
+      `Are you sure you want to remove your channel "${statusData.userChannel.name}"?\n\n` +
+      `This will:\n` +
+      `• Delete all ${statusData.userChannel.videoCount} indexed videos from this channel\n` +
+      `• Remove all associated embeddings from RAG\n` +
+      `• Allow you to add a different channel\n\n` +
+      `This action cannot be undone.`
+    )) {
+      return;
+    }
+
+    const response = await fetch(`/api/rag/channels/${statusData.userChannel.id}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to remove channel');
+    }
+
+    // Reset to wizard mode
+    setStep('wizard');
+    await fetchStatus();
+  };
+
   // Sync single channel
   const handleSyncChannel = async (channelId: string) => {
     const response = await fetch(`/api/rag/channels/${channelId}/sync`, {
@@ -281,6 +321,29 @@ export default function ChannelIntelligencePage() {
         </Alert>
       )}
 
+      {/* DEBUG: Always show sync button if user has a channel */}
+      {statusData && statusData.userChannel && step !== 'configured' && (
+        <Alert>
+          <AlertDescription>
+            <div className="flex items-center justify-between">
+              <span>
+                <strong>Debug:</strong> You have a channel configured but step is "{step}". <br />
+                Configured: {statusData.configured.toString()}, Mode: {statusData.mode}
+              </span>
+              <Button
+                size="sm"
+                onClick={() => {
+                  console.log('[ChannelIntelligence] Force setting step to configured');
+                  setStep('configured');
+                }}
+              >
+                Show Sync UI
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Setup Wizard */}
       {step === 'wizard' && (
         <SetupWizard onSelectMode={handleSelectMode} />
@@ -305,6 +368,9 @@ export default function ChannelIntelligencePage() {
       {/* Configured View */}
       {step === 'configured' && statusData && (
         <div className="space-y-6">
+          {/* Quick Production Form */}
+          <QuickProductionForm />
+
           {/* Sync Status */}
           <SyncStatus
             data={{
@@ -322,11 +388,22 @@ export default function ChannelIntelligencePage() {
           {/* User Channel Card (if established mode) */}
           {statusData.userChannel && (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Your Channel</CardTitle>
-                <CardDescription>
-                  Content synced from your YouTube channel
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                  <CardTitle className="text-lg">Your Channel</CardTitle>
+                  <CardDescription>
+                    Content synced from your YouTube channel
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRemoveUserChannel}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Remove
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-4">

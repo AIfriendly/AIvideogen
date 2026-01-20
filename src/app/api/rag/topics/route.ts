@@ -237,17 +237,106 @@ function parseTopicsResponse(response: string): Array<{
 }
 
 /**
+ * Get niche-specific context for topic generation
+ * This helps the LLM understand what kind of content to generate even without RAG data
+ */
+function getNicheContext(niche: string): string {
+  const nicheLower = niche.toLowerCase();
+
+  // Blackpill / Doomer / Red Pill dating content
+  if (nicheLower.includes('blackpill') || nicheLower.includes('black pill') ||
+      nicheLower.includes('doomer') || nicheLower.includes('red pill')) {
+    return `## Context for ${niche} Content
+
+This niche focuses on:
+- Dating dynamics from a pessimistic/realist perspective
+- Male-female relationship dynamics and modern dating market realities
+- Self-improvement for men in the dating market
+- Analyzing modern dating trends, statistics, and harsh truths
+- "Blackpill" awareness: understanding dating market value, hypergamy, and lookism
+- Content should be analytical, data-driven, and unapologetically honest
+- Target audience: Men seeking honest dating advice and market awareness
+
+Common themes:
+- Dating app statistics and success rates
+- Physical appearance and its impact on dating
+- Online vs offline dating dynamics
+- Income and status in dating markets
+- Age gaps and dating market value over time
+- Personality vs looks debates`;
+  }
+
+  // Gaming niche
+  if (nicheLower.includes('gaming') || nicheLower.includes('games')) {
+    return `## Context for Gaming Content
+
+This niche focuses on:
+- Game reviews, gameplay analysis, and industry commentary
+- Gaming news, updates, and trending topics
+- Esports, competitive gaming, and streaming culture
+- Game guides, tips, and strategies`;
+  }
+
+  // Tech niche
+  if (nicheLower.includes('tech') || nicheLower.includes('technology')) {
+    return `## Context for Tech Content
+
+This niche focuses on:
+- Tech news, product reviews, and industry analysis
+- Programming, software development, and tutorials
+- Gadgets, hardware, and consumer tech`;
+  }
+
+  // Default generic context
+  return `## Context for this Channel
+
+Focus on creating content that:
+- Provides value to your target audience
+- Addresses current trends or timeless problems
+- Showcases your unique perspective and expertise`;
+}
+
+/**
+ * Get system prompt tailored to the niche
+ */
+function getSystemPromptForNiche(niche: string): string {
+  const nicheLower = niche.toLowerCase();
+
+  if (nicheLower.includes('blackpill') || nicheLower.includes('black pill') ||
+      nicheLower.includes('doomer') || nicheLower.includes('red pill')) {
+    return `You are a content strategist for a YouTube channel creating content about dating dynamics from a realist/pessimist perspective (often called "blackpill" or "doomer" content).
+
+Your role is to generate video topics that:
+- Analyze dating market dynamics honestly and directly
+- Use statistics, data, and observable reality
+- Address men's dating challenges without sugarcoating
+- Cover topics like online dating, appearance, status, and relationship dynamics
+- Are engaging and click-worthy while remaining truthful to the niche's perspective
+
+Generate topics that would resonate with men seeking honest dating advice and market awareness.`;
+  }
+
+  return 'You are a content strategist for YouTube creators. Generate topic suggestions in JSON format.';
+}
+
+/**
  * Generate fallback topics without RAG
  */
 async function generateFallbackTopics(niche: string | undefined, count: number) {
   const effectiveNiche = niche || 'general';
 
+  // Enhanced prompt with niche-specific context
+  const nicheContext = getNicheContext(effectiveNiche);
+
   const prompt = `Generate ${count} creative video topic ideas for a YouTube channel in the "${effectiveNiche}" niche.
+
+${nicheContext}
 
 Each topic should be:
 - Specific and actionable
 - Engaging and click-worthy
 - Different from each other
+- Aligned with the niche's tone and audience expectations
 
 Return as a JSON array:
 [
@@ -260,11 +349,13 @@ Return as a JSON array:
 
 Only return the JSON array.`;
 
+  const systemPrompt = getSystemPromptForNiche(effectiveNiche);
+
   try {
     const provider = createLLMProvider();
     const response = await provider.chat(
       [{ role: 'user', content: prompt }],
-      'You are a content strategist for YouTube creators. Generate topic suggestions in JSON format.'
+      systemPrompt
     );
 
     const topics = parseTopicsResponse(response);

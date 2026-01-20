@@ -89,6 +89,7 @@ export async function GET() {
  * {
  *   default_voice_id?: string | null,
  *   default_persona_id?: string | null,
+ *   default_duration?: number,
  *   quick_production_enabled?: boolean
  * }
  *
@@ -138,6 +139,21 @@ export async function PUT(request: NextRequest) {
 
     if (body.default_persona_id !== undefined) {
       updateData.default_persona_id = body.default_persona_id;
+    }
+
+    if (body.default_duration !== undefined) {
+      // Validate duration (1-20 minutes)
+      const duration = Number(body.default_duration);
+      if (isNaN(duration) || duration < 1 || duration > 20) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Invalid duration: must be between 1 and 20 minutes',
+          },
+          { status: 400 }
+        );
+      }
+      updateData.default_duration = duration;
     }
 
     if (body.quick_production_enabled !== undefined) {

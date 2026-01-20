@@ -14,14 +14,14 @@
  * @module tests/integration/tts/tts-provider.test
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { spawn, ChildProcess } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { getTTSProvider } from '@/lib/tts/factory';
 import { TTSProvider, AudioResult } from '@/lib/tts/provider';
 import { KokoroProvider } from '@/lib/tts/kokoro-provider';
-import { TTSErrorCode } from '@/lib/utils/error-handler';
+import { TTSErrorCode } from '@/lib/tts/provider';
 import { createMockVoiceProfile } from '../../factories/voice.factory';
 
 describe('TTS Provider Integration Tests', () => {
@@ -179,7 +179,7 @@ describe('TTS Provider Integration Tests', () => {
 
         // Then: Path should be relative from project root
         expect(path.isAbsolute(result.filePath)).toBe(false);
-        expect(result.filePath).toStartWith('.cache/audio/');
+        expect(result.filePath).toMatch(/^\.cache\/audio\//);
 
         // Verify file exists at path
         const absolutePath = path.resolve(process.cwd(), result.filePath);
@@ -402,7 +402,7 @@ describe('TTS Provider Integration Tests', () => {
 
     it('should handle missing KokoroTTS with TTS_NOT_INSTALLED error', async () => {
       // Given: KokoroTTS not installed (mock)
-      jest.spyOn(provider as any, 'ensureServiceRunning')
+      vi.spyOn(provider as any, 'ensureServiceRunning')
         .mockRejectedValueOnce(new Error('ModuleNotFoundError: kokoro_tts'));
 
       // When: Attempting to generate audio
@@ -413,7 +413,7 @@ describe('TTS Provider Integration Tests', () => {
 
     it('should handle model not found with TTS_MODEL_NOT_FOUND error', async () => {
       // Given: Model file missing (mock)
-      jest.spyOn(provider as any, 'ensureServiceRunning')
+      vi.spyOn(provider as any, 'ensureServiceRunning')
         .mockRejectedValueOnce(new Error('Model file not found'));
 
       // When: Attempting to generate audio
@@ -427,7 +427,7 @@ describe('TTS Provider Integration Tests', () => {
       const veryLongText = 'Lorem ipsum '.repeat(1000);
 
       // Mock timeout by delaying service response
-      jest.spyOn(provider as any, 'sendRequest')
+      vi.spyOn(provider as any, 'sendRequest')
         .mockImplementation(() => new Promise((_, reject) => {
           setTimeout(() => reject(new Error('Timeout')), 100);
         }));
@@ -484,7 +484,7 @@ describe('TTS Provider Integration Tests', () => {
       ];
 
       for (const scenario of errorScenarios) {
-        jest.spyOn(provider as any, 'ensureServiceRunning')
+        vi.spyOn(provider as any, 'ensureServiceRunning')
           .mockRejectedValueOnce(new Error(scenario.mockError));
 
         try {
@@ -510,7 +510,7 @@ describe('TTS Provider Integration Tests', () => {
 
     it('should communicate via JSON protocol over stdin/stdout', async () => {
       // Given: Spy on process communication
-      const stdinSpy = jest.spyOn(provider as any, 'sendRequest');
+      const stdinSpy = vi.spyOn(provider as any, 'sendRequest');
 
       // When: Making TTS request
       await provider.generateAudio('Test communication', 'sarah');
