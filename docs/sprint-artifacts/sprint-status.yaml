@@ -88,6 +88,7 @@ development_status:
 
   # Epic 6: Channel Intelligence & Content Research (RAG-Powered + Quick Production Flow)
   epic-6: done
+  1-3b-rate-limiting-llm-providers: done
   6-1-rag-infrastructure-setup: done
   6-2-background-job-queue-cron-scheduler: done
   6-3-youtube-channel-sync-caption-scraping: done

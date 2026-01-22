@@ -2,8 +2,8 @@
 
 *This document outlines the requirements for the AI Video Generator. It is a living document and will be updated as the project progresses.*
 
-**Last Updated:** 2026-01-16
-**Version:** 3.4
+**Last Updated:** 2026-01-22
+**Version:** 3.5
 **Repository:** <https://github.com/AIfriendly/AIvideogen>
 
 **Project Type:** Web Application
@@ -11,7 +11,13 @@
 **Complexity:** Level 2 (BMad Method)
 **Status:** Core Features Complete - Enhancement Phase
 
-**Recent Changes (v3.4 - 2026-01-16):**
+**Recent Changes (v3.5 - 2026-01-22):**
+- **FEATURE 1.9 ENHANCEMENT:** Added rate limiting for LLM providers (FR-1.9.09)
+- Configurable rate limits via environment variables (GEMINI_RATE_LIMIT_ENABLED, GEMINI_RATE_LIMIT_REQUESTS_PER_MINUTE)
+- Proactive rate limiting to prevent API quota exhaustion and control costs
+- Default: 1 request/minute for Gemini, no limit for local Ollama
+
+**Previous Changes (v3.4 - 2026-01-16):**
 - **EPIC RESTRUCTURE:** Split Channel Intelligence (Epic 6) from Automated Video Production (Epic 7)
 - Moved Quick Production Flow from Feature 2.7 to new Feature 2.9 (Automated Video Production Pipeline)
 - Epic 6 now focuses exclusively on RAG-powered Channel Intelligence & Content Research
@@ -540,6 +546,14 @@ The following measurable criteria define product success:
     *   **FR-1.9.06:** Selected persona must be linked to project via `projects.system_prompt_id` foreign key.
     *   **FR-1.9.07:** Script generation must use the selected persona's system prompt when generating content.
     *   **FR-1.9.08:** The system must support both local (Ollama) and cloud (Gemini) LLM providers via configuration.
+    *   **FR-1.9.09:** The system must implement configurable rate limiting for cloud LLM providers (Gemini) to proactively control API usage and prevent quota exhaustion.
+        *   **Rate Limit Configuration:** Environment variables for enabling/disabling rate limits per provider and setting requests-per-minute limits:
+            *   `GEMINI_RATE_LIMIT_ENABLED`: true/false (default: true)
+            *   `GEMINI_RATE_LIMIT_REQUESTS_PER_MINUTE`: integer (default: 1)
+            *   `OLLAMA_RATE_LIMIT_ENABLED`: true/false (default: false - no limit for local)
+        *   **Rate Limiting Behavior:** When rate limit is reached, the system queues requests and waits until the next available time slot before proceeding.
+        *   **User Feedback:** If rate limit wait time exceeds 60 seconds, provide user feedback about the delay.
+        *   **Logging:** Log rate limit events (hit, wait, proceed) for monitoring and debugging.
 
 *   **Acceptance Criteria:**
     *   **AC1: Persona Selection**
