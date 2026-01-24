@@ -30,6 +30,10 @@ import * as migration_018 from './migrations/018_add_video_embedding_status_valu
 import * as migration_019 from './migrations/019_visual_suggestions_provider';
 import * as migration_020 from './migrations/020_user_preferences_default_provider';
 import * as migration_021 from './migrations/021_add_source_url';
+import * as migration_022 from './migrations/022_add_rag_enabled';
+import * as migration_023 from './migrations/023_add_target_duration';
+import * as migration_024 from './migrations/024_add_default_llm_provider';
+import * as migration_025 from './migrations/025_add_provider_progress';
 import type Database from 'better-sqlite3';
 
 /**
@@ -105,6 +109,10 @@ const MIGRATIONS = [
   { name: '019_visual_suggestions_provider', module: migration_019 },
   { name: '020_user_preferences_default_provider', module: migration_020 },
   { name: '021_add_source_url', module: migration_021 },
+  { name: '022_add_rag_enabled', module: migration_022 },
+  { name: '023_add_target_duration', module: migration_023 },
+  { name: '024_add_default_llm_provider', module: migration_024 },
+  { name: '025_add_provider_progress', module: migration_025 },
 ];
 
 /**

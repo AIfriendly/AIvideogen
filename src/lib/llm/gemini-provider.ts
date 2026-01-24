@@ -1,16 +1,22 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { LLMProvider, Message } from './provider';
+import { rateLimiter, parseRateLimitConfig, type RateLimitConfig } from './rate-limiter';
 
 /**
  * GeminiProvider implements the LLMProvider interface for Google Gemini integration
  *
  * This provider uses the @google/generative-ai package to communicate with
- * Google's Gemini API. It supports both free and paid tiers with generous
- * rate limits (1500 requests/day free).
+ * Google's Gemini API. It supports both free and paid tiers with configurable
+ * rate limiting to prevent quota exhaustion.
+ *
+ * Rate Limiting:
+ * - Default: 1 request per minute for Gemini text models
+ * - Configurable via GEMINI_RATE_LIMIT_ENABLED and GEMINI_RATE_LIMIT_REQUESTS_PER_MINUTE
+ * - Rate limiting occurs BEFORE API calls (proactive) vs retry logic (reactive)
  *
  * @example
  * ```typescript
- * const provider = new GeminiProvider('your-api-key', 'gemini-1.5-flash-latest');
+ * const provider = new GeminiProvider('your-api-key', 'gemini-2.5-flash');
  * const response = await provider.chat(
  *   [{ role: 'user', content: 'Hello!' }],
  *   'You are a helpful assistant.'
@@ -20,6 +26,7 @@ import type { LLMProvider, Message } from './provider';
 export class GeminiProvider implements LLMProvider {
   private genAI: GoogleGenerativeAI;
   private modelName: string;
+  private rateLimitConfig: RateLimitConfig;
 
   // Retry configuration for handling temporary API overload (503 errors)
   // 5 retries with exponential backoff: 1s, 2s, 4s, 8s, 16s (total: 31s max wait)
@@ -45,16 +52,35 @@ export class GeminiProvider implements LLMProvider {
 
     this.genAI = new GoogleGenerativeAI(apiKey);
     this.modelName = model;
+
+    // Load rate limit configuration from environment variables
+    this.rateLimitConfig = parseRateLimitConfig(
+      'GEMINI_RATE_LIMIT_ENABLED',
+      'GEMINI_RATE_LIMIT_REQUESTS_PER_MINUTE',
+      true,  // Default: enabled
+      1      // Default: 1 request per minute
+    );
+
+    if (this.rateLimitConfig.enabled) {
+      console.log(
+        `[Gemini RateLimit] Rate limiting enabled: ${this.rateLimitConfig.requestsPerMinute} req/min`
+      );
+    } else {
+      console.log('[Gemini RateLimit] Rate limiting disabled');
+    }
   }
 
   /**
    * Send a chat message to Gemini and receive a response
    *
-   * This method converts our Message format to Gemini's format and handles
-   * system prompts by prepending them to the user's first message (Gemini
-   * doesn't have a separate system role).
+   * This method:
+   * 1. Applies rate limiting BEFORE the API call (proactive)
+   * 2. Converts our Message format to Gemini's format
+   * 3. Handles system prompts by prepending them to the user's first message
+   * 4. Implements exponential backoff retry for 503 errors (reactive)
    *
-   * Implements exponential backoff retry for 503 errors (API overload).
+   * Rate Limiting: Occurs BEFORE the retry loop to prevent counting
+   * failed retries against the rate limit.
    *
    * @param messages - Array of conversation messages
    * @param systemPrompt - Optional system prompt to prepend
@@ -62,6 +88,15 @@ export class GeminiProvider implements LLMProvider {
    * @throws Error with actionable guidance for API key, quota, or network issues
    */
   async chat(messages: Message[], systemPrompt?: string): Promise<string> {
+    // Apply rate limiting BEFORE API call (proactive)
+    // This is separate from retry logic (reactive) and prevents failed retries
+    // from counting against the rate limit
+    await rateLimiter.wait(
+      'gemini',
+      this.rateLimitConfig.requestsPerMinute,
+      this.rateLimitConfig.enabled
+    );
+
     let lastError: any;
 
     // Retry loop with exponential backoff
@@ -159,7 +194,7 @@ export class GeminiProvider implements LLMProvider {
     // NOT retryable:
     // - 401/403 (auth issues - won't fix with retry)
     // - 400/422 (bad request - won't fix with retry)
-    // - 429 (rate limit - needs longer backoff, handled separately)
+    // - 429 (rate limit - needs longer backoff, handled separately by rate limiter)
     return false;
   }
 
@@ -231,7 +266,8 @@ export class GeminiProvider implements LLMProvider {
       return new Error(
         'Gemini API quota exceeded.\n\n' +
         'Free tier limits: 15 requests/minute, 1500 requests/day\n' +
-        'Wait a minute and try again, or upgrade to paid tier for higher limits'
+        'Wait a minute and try again, or upgrade to paid tier for higher limits.\n' +
+        'You can adjust rate limiting via GEMINI_RATE_LIMIT_REQUESTS_PER_MINUTE environment variable.'
       );
     }
 

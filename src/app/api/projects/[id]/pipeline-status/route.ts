@@ -31,6 +31,9 @@ interface PipelineStatus {
   overallProgress: number; // 0-100 overall
   currentMessage: string;
   error?: string;
+  // Provider progress fields (AC-6.11.3)
+  visuals_provider?: 'youtube' | 'nasa' | 'dvids';
+  visuals_download_progress?: number;
 }
 
 interface ProjectRow {
@@ -42,6 +45,8 @@ interface ProjectRow {
   voice_selected: number;
   visuals_generated: number;
   video_path: string | null;
+  visuals_provider: string | null;
+  visuals_download_progress: number | null;
 }
 
 interface SceneRow {
@@ -162,22 +167,51 @@ export async function GET(
   try {
     const { id: projectId } = await params;
 
+    console.log(`[pipeline-status] Fetching status for project: ${projectId}`);
+
+    // Validate projectId
+    if (!projectId || typeof projectId !== 'string') {
+      console.error(`[pipeline-status] Invalid projectId:`, projectId);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid project ID',
+        },
+        { status: 400 }
+      );
+    }
+
     // Get project data
-    const project = db.prepare(`
-      SELECT
-        id,
-        name,
-        topic,
-        current_step,
-        script_generated,
-        voice_selected,
-        visuals_generated,
-        video_path
-      FROM projects
-      WHERE id = ?
-    `).get(projectId) as ProjectRow | undefined;
+    let project;
+    try {
+      project = db.prepare(`
+        SELECT
+          id,
+          name,
+          topic,
+          current_step,
+          script_generated,
+          voice_selected,
+          visuals_generated,
+          video_path,
+          visuals_provider,
+          visuals_download_progress
+        FROM projects
+        WHERE id = ?
+      `).get(projectId) as ProjectRow | undefined;
+    } catch (dbError) {
+      console.error(`[pipeline-status] Database error:`, dbError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Database error',
+        },
+        { status: 500 }
+      );
+    }
 
     if (!project) {
+      console.warn(`[pipeline-status] Project not found: ${projectId}`);
       return NextResponse.json(
         {
           success: false,
@@ -188,32 +222,51 @@ export async function GET(
     }
 
     // Get scene statistics for voiceover progress
-    const sceneStats = db.prepare(`
-      SELECT
-        COUNT(*) as total,
-        SUM(CASE WHEN audio_file_path IS NOT NULL THEN 1 ELSE 0 END) as with_audio
-      FROM scenes
-      WHERE project_id = ?
-    `).get(projectId) as SceneRow | undefined;
+    let sceneStats;
+    try {
+      sceneStats = db.prepare(`
+        SELECT
+          COUNT(*) as total,
+          SUM(CASE WHEN audio_file_path IS NOT NULL THEN 1 ELSE 0 END) as with_audio
+        FROM scenes
+        WHERE project_id = ?
+      `).get(projectId) as SceneRow | undefined;
+    } catch (dbError) {
+      console.warn(`[pipeline-status] Error fetching scene stats:`, dbError);
+      sceneStats = undefined;
+    }
 
     // Get visual suggestion statistics for visual progress
-    const suggestionStats = db.prepare(`
-      SELECT
-        COUNT(*) as total,
-        SUM(CASE WHEN download_status = 'complete' THEN 1 ELSE 0 END) as complete
-      FROM visual_suggestions vs
-      JOIN scenes s ON vs.scene_id = s.id
-      WHERE s.project_id = ?
-    `).get(projectId) as SuggestionRow | undefined;
+    // Count distinct scenes that have visual suggestions, not total suggestion rows
+    let suggestionStats;
+    try {
+      suggestionStats = db.prepare(`
+        SELECT
+          COUNT(DISTINCT s.id) as total,
+          COUNT(DISTINCT CASE WHEN vs.download_status = 'complete' THEN s.id END) as complete
+        FROM visual_suggestions vs
+        JOIN scenes s ON vs.scene_id = s.id
+        WHERE s.project_id = ?
+      `).get(projectId) as SuggestionRow | undefined;
+    } catch (dbError) {
+      console.warn(`[pipeline-status] Error fetching suggestion stats:`, dbError);
+      suggestionStats = undefined;
+    }
 
     // Get assembly job status if in assembly stage
-    const assemblyJob = db.prepare(`
-      SELECT status, progress
-      FROM assembly_jobs
-      WHERE project_id = ?
-      ORDER BY created_at DESC
-      LIMIT 1
-    `).get(projectId) as AssemblyJobRow | undefined;
+    let assemblyJob;
+    try {
+      assemblyJob = db.prepare(`
+        SELECT status, progress
+        FROM assembly_jobs
+        WHERE project_id = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `).get(projectId) as AssemblyJobRow | undefined;
+    } catch (dbError) {
+      console.warn(`[pipeline-status] Error fetching assembly job:`, dbError);
+      assemblyJob = undefined;
+    }
 
     // Determine current stage
     const scriptGenerated = project.script_generated === 1;
@@ -272,6 +325,8 @@ export async function GET(
       stageProgress,
       overallProgress,
       currentMessage,
+      visuals_provider: (project.visuals_provider as 'youtube' | 'nasa' | 'dvids' | undefined) || undefined,
+      visuals_download_progress: project.visuals_download_progress ?? undefined,
     };
 
     // Check for errors
@@ -284,7 +339,11 @@ export async function GET(
       data: status,
     });
   } catch (error) {
-    console.error('[pipeline-status] Error:', error);
+    console.error('[pipeline-status] Unexpected error:', error);
+    console.error('[pipeline-status] Error type:', error?.constructor?.name);
+    console.error('[pipeline-status] Error message:', error instanceof Error ? error.message : String(error));
+    console.error('[pipeline-status] Stack trace:', error instanceof Error ? error.stack : 'N/A');
+
     return NextResponse.json(
       {
         success: false,
