@@ -425,3 +425,45 @@ src/
 - Computer vision quality assessment
 - User feedback learning
 - Batch processing (multiple videos from topic suggestions)
+
+---
+
+## Post-Implementation Bug Fixes (2026-01-22)
+
+### Bug Fix: Stop Word Filtering Issue in Keyword Extractor
+
+**Component:** Scene Text Analysis & Search Query Generation
+**Related Story:** Story 3.2 (Scene Text Analysis & Search Query Generation)
+**Files Affected:**
+- `src/lib/youtube/keyword-extractor.ts:66`
+- `ai-video-generator/tests/unit/youtube/keyword-extractor.test.ts`
+
+**Problem:**
+The keyword extractor was incorrectly filtering out the word "amazing" as a stop word, causing test failures:
+- `expected 'wonderful' to be 'amazing' // Object.is equality`
+- `expected undefined to be 'amazing' // Object.is equality`
+
+**Root Cause:**
+"Amazing" was included in the STOP_WORDS set at line 66, but it's actually a useful visual descriptor for video content (e.g., "amazing footage", "amazing view"). Stop words are intended to filter out narrative filler words like "very", "really", etc., not descriptive adjectives.
+
+**Fix Applied:**
+Removed "amazing" from STOP_WORDS set:
+
+```typescript
+// Before (line 66):
+'amazing', 'immense', 'vast', 'huge', 'great',
+
+// After (line 66):
+'immense', 'vast', 'huge', 'great',
+```
+
+**Impact:**
+- Keyword extractor now preserves "amazing" as a meaningful search term
+- Tests pass: 3/3 keyword-extractor tests now passing
+- Visual content sourcing benefits from better keyword extraction
+- "Amazing" is now correctly identified as a valuable descriptor for video search queries
+
+**Architecture Note:**
+This fix highlights the importance of distinguishing between narrative filler words (which should be filtered) and visual descriptors (which should be preserved) in the keyword extraction pipeline. The STOP_WORDS list should be reviewed periodically to ensure it only filters words that don't contribute to visual content discovery.
+
+---

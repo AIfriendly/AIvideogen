@@ -400,44 +400,61 @@ transcript = YouTubeTranscriptApi.get_transcript(video_id)
 
 ---
 
-### ADR-013: MCP Protocol for Video Provider Servers (Feature 2.9 - Deferred)
+### ADR-013: Playwright Headless Browser for MCP Video Provider Servers
 
-**Status:** Proposed (Deferred to Future Epic)
-**Date:** 2025-12-03
+**Status:** Accepted (Revised 2026-01-24)
+**Date:** 2025-12-03 (Updated 2026-01-24)
 
 **Context:**
 Feature 2.9 requires domain-specific video content from sources like DVIDS (military) and NASA (space). These sources lack official APIs, so web scraping is needed. The system needs an extensible architecture for adding new content providers without modifying core application code.
 
+After a week of development effort (Story 6.10), the HTTP scraping approach using `httpx` + `BeautifulSoup` failed on DVIDS because the website uses JavaScript rendering to load video download codes. Static HTML scraping cannot access the dynamically loaded content.
+
 **Decision:**
-Use the Model Context Protocol (MCP) as the communication layer between the video generator application and video provider servers. MCP servers will run as local stdio processes, exposing tools for video search, download, and metadata retrieval.
+Use Playwright headless browser automation for MCP Video Provider servers. The MCP protocol (decided in ADR-013 v1) remains the communication layer, but servers use Playwright instead of HTTP scraping for content extraction.
+
+**Technical Stack:**
+- **Playwright (Python):** Headless browser automation for JavaScript rendering
+- **playwright-stealth:** Anti-detection plugin to avoid bot blocking
+- **MCP Protocol:** Communication layer (unchanged from v1)
+- **Chromium:** Browser binary (installed via `playwright install chromium`)
 
 **Consequences:**
-- ✅ **Language-agnostic:** Python MCP servers for web scraping, Node.js client for application
-- ✅ **Extensibility:** New providers added via config changes, no code modifications required
-- ✅ **Local-first:** All scraping happens locally, no cloud dependencies
-- ✅ **Isolation:** Scraping logic isolated in separate processes, crashes don't affect main app
-- ✅ **Standard protocol:** Open-source MCP protocol with existing SDK and tooling
-- ✅ **Graceful degradation:** Provider failures don't block the entire pipeline
-- ⚠️ **Process management:** Need to spawn and manage stdio processes for each provider
-- ⚠️ **Complexity:** Additional layer vs direct HTTP calls
-- ⚠️ **Deferred implementation:** Stories 6.9-6.11 deferred to future epic
+- ✅ **JavaScript rendering:** Can access dynamically loaded content that HTTP scraping misses
+- ✅ **Network interception:** Can capture API calls and extract download URLs directly
+- ✅ **Form interaction:** Can handle complex navigation flows and form submissions
+- ✅ **Anti-detection:** playwright-stealth reduces bot detection risk
+- ✅ **Language-agnostic:** Python MCP servers, Node.js client (unchanged)
+- ✅ **Extensibility:** New providers via config (unchanged)
+- ✅ **Isolation:** Browser logic isolated in separate processes (unchanged)
+- ⚠️ **Higher resource usage:** ~200MB RAM per browser instance vs ~20MB for HTTP scraping
+- ⚠️ **Slower startup:** Browser launch adds ~2-3 seconds per request
+- ⚠️ **Browser installation:** Requires `playwright install chromium` (~300MB download)
+- ⚠️ **Complexity:** Browser automation is more complex than HTTP scraping
+- ⚠️ **Maintenance:** Browser updates may break selectors/scripts
 
 **Alternatives Considered:**
-- **Direct HTTP scraping in Node.js:** Simpler but couples scraping logic to app code, less extensible
-- **gRPC/protobuf:** Overkill for local communication, more complex setup
-- **REST API servers:** Requires HTTP stack, more overhead than stdio
-- **Python subprocess with JSON:** Custom protocol, no standard tooling
+- **HTTP scraping (httpx + BeautifulSoup):** Failed on DVIDS - cannot access JavaScript-rendered content
+- **Selenium:** Older API, less reliable than Playwright, slower
+- **Puppeteer:** Node.js-first, less Python integration than Playwright
+- **Custom API reverse-engineering:** Brittle, breaks when website changes
 
-**Architecture Pattern:**
+**Architecture Pattern (Updated for Playwright):**
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    MCP Video Provider Architecture              │
+│            MCP Video Provider Architecture (Playwright)         │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
-│  │  DVIDS MCP   │    │  NASA MCP    │    │ Future MCP   │       │
+│  │  DVIDS MCP   │    │  NASA MCP    │    │  Future MCP   │       │
 │  │  Server      │    │  Server      │    │  Providers   │       │
 │  │  (Python)    │    │  (Python)    │    │  (Any Lang)  │       │
+│  │              │    │              │    │              │       │
+│  │  ┌────────┐  │    │  ┌────────┐  │    │  ┌────────┐  │       │
+│  │  │Playwright│ │    │  │Playwright│ │    │  │Playwright│ │       │
+│  │  │Chromium │  │    │  │Chromium │  │    │  │Chromium │  │       │
+│  │  │Headless │  │    │  │Headless │  │    │  │Headless │  │       │
+│  │  └────────┘  │    │  └────────┘  │    │  └────────┘  │       │
 │  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘       │
 │         │                   │                   │                │
 │         └───────────────────┼───────────────────┘                │
@@ -447,7 +464,7 @@ Use the Model Context Protocol (MCP) as the communication layer between the vide
 │  │         VideoProviderClient (Node.js)                │        │
 │  │  - MCP client library connection                     │        │
 │  │  - Provider registry from config                     │        │
-│  │  - Fallback logic across providers                   │        │
+│  │  - Rate limiting (30s for DVIDS)                     │        │
 │  └──────────────────────┬──────────────────────────────┘        │
 │                         │                                        │
 │                         ▼                                        │
@@ -459,6 +476,34 @@ Use the Model Context Protocol (MCP) as the communication layer between the vide
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+**Playwright Architecture for DVIDS Provider:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              DVIDS MCP Server (Playwright Implementation)       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. MCP Tool: search_videos(query, duration)                   │
+│     │                                                            │
+│     ├─► Launch Playwright headless browser                     │
+│     ├─► Navigate to DVIDS search page                          │
+│     ├─► Fill search form with query                            │
+│     ├─► Wait for JavaScript-rendered results                   │
+│     ├─► Extract video metadata (title, duration, thumbnail)    │
+│     └─► Return results via MCP protocol                       │
+│                                                                  │
+│  2. MCP Tool: download_video(video_id)                         │
+│     │                                                            │
+│     ├─► Launch Playwright headless browser                     │
+│     ├─► Navigate to video page                                 │
+│     ├─► Wait for JavaScript to load download button/code       │
+│     ├─► Interact with download button (if needed)              │
+│     ├─► Intercept network response to get actual video URL     │
+│     ├─► Download video to local cache                          │
+│     └─► Return file path via MCP protocol                     │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 **Provider Configuration (config/mcp_servers.json):**
 ```json
 {
@@ -466,26 +511,74 @@ Use the Model Context Protocol (MCP) as the communication layer between the vide
     {
       "name": "dvids",
       "command": "python",
-      "args": ["-m", "mcp_servers.dvids_scraping_server"],
+      "args": ["-m", "mcp_servers.dvids_playwright_server"],
       "priority": 1,
       "rateLimitMs": 30000,
-      "enabled": true
+      "enabled": true,
+      "browser": {
+        "headless": true,
+        "stealth": true,
+        "userAgent": "Mozilla/5.0 ...",
+        "viewport": { "width": 1920, "height": 1080 }
+      }
     },
     {
       "name": "nasa",
       "command": "python",
-      "args": ["-m", "mcp_servers.nasa_scraping_server"],
+      "args": ["-m", "mcp_servers.nasa_playwright_server"],
       "priority": 2,
       "rateLimitMs": 10000,
-      "enabled": true
+      "enabled": true,
+      "browser": {
+        "headless": true,
+        "stealth": true
+      }
     }
   ]
 }
 ```
 
+**Technical Considerations:**
+
+**Browser Installation:**
+```bash
+# Required one-time setup
+playwright install chromium
+# Downloads ~300MB browser binary to:
+# ~/.cache/ms-playwright/ (Linux/Mac)
+# C:\Users\<user>\AppData\Local\ms-playwright\ (Windows)
+```
+
+**Resource Requirements:**
+- **Memory:** ~200MB per browser instance
+- **Disk:** ~300MB for Chromium binary
+- **Startup time:** ~2-3 seconds per browser launch
+- **Concurrency:** One browser per request (sequential processing recommended)
+
+**Rate Limiting:**
+- DVIDS: 30 seconds between requests (unchanged)
+- NASA: 10 seconds between requests
+- Rate limiting enforced at MCP client layer
+
+**Anti-Detection:**
+```python
+from playwright_stealth import stealth_sync
+
+async with playwright.chromium.launch(headless=True) as browser:
+    page = await browser.new_page()
+    await stealth_sync(page)  # Apply anti-detection
+    # Proceed with scraping
+```
+
+**Error Handling:**
+- Browser crashes: Restart browser, retry request once
+- Timeout: Increase wait timeout, fail gracefully
+- Blocked access: Log error, return structured error via MCP
+- Network issues: Retry with exponential backoff
+
 **MCP Tool Interface:**
 ```python
-# Each MCP server exposes these tools:
+# Each MCP server exposes these tools (unchanged):
 {
   "tools": [
     {
@@ -525,14 +618,167 @@ Use the Model Context Protocol (MCP) as the communication layer between the vide
 
 **Implementation Timeline:**
 - **Epic 6 (Current):** RAG infrastructure, Quick Production Flow with YouTube API
-- **Future Epic:** MCP Video Provider Architecture (Stories 6.9-6.11)
+- **Story 6.10 (Pivot):** DVIDS Playwright MCP server (replacing HTTP scraping)
+- **Future Epic:** MCP Video Provider Architecture (Stories 6.9, 6.11)
   - Story 6.9: VideoProviderClient architecture and configuration
-  - Story 6.10: DVIDS scraping MCP server
-  - Story 6.11: NASA scraping MCP server + pipeline integration
+  - Story 6.11: NASA Playwright MCP server + pipeline integration
 
 **References:**
 - Stories 6.9-6.11 in `_bmad-output/planning-artifacts/epics.md`
 - MCP Protocol: https://modelcontextprotocol.io/
+- Playwright Python: https://playwright.dev/python/
+- playwright-stealth: https://github.com/AtuboD/playwright_stealth_python
+
+---
+
+### ADR-009: Pluggable LLM Provider Interface (Feature 1.9 v3.6)
+
+**Status:** Accepted
+**Date:** 2026-01-22
+
+**Context:**
+PRD v3.6 requires adding Groq as a third LLM provider alongside Ollama and Gemini, with:
+- Runtime provider switching via UI (Settings → AI Configuration)
+- No code changes required when switching providers
+- Unified error handling and response format across all providers
+- Configurable rate limiting per provider
+
+The existing v1 architecture had basic provider abstraction but lacked:
+- Standardized `generate_script()` method signature (FR-1.9.14)
+- Per-user provider preferences stored in database
+- HTTP header monitoring for proactive rate limit management
+- Groq provider implementation
+
+**Decision:**
+Implement **Strategy Pattern + Factory Pattern** with strict interface compliance:
+
+1. **LLMProvider Interface:** All providers implement `chat(messages, systemPrompt)` method
+2. **Provider Factory:** `createLLMProvider(userPreference)` instantiates correct provider
+3. **Database Persistence:** `user_preferences.default_llm_provider` stores user's selection
+4. **Rate Limiting:** Per-provider sliding window rate limiter with HTTP header monitoring
+5. **Zero-Code Switching:** UI changes provider preference, factory respects it
+
+**Architecture:**
+```
+UI (Settings → AI Configuration)
+  ↓
+user_preferences.default_llm_provider
+  ↓
+createLLMProvider(userPreference)
+  ↓
+LLMProvider.chat() ← Unified interface
+  ↓
+OllamaProvider | GeminiProvider | GroqProvider
+```
+
+**Consequences:**
+- ✅ Runtime provider switching without restart (FR-1.9.11)
+- ✅ Zero code changes when switching providers (FR-1.9.13)
+- ✅ Standardized `chat()` method across all providers (FR-1.9.14)
+- ✅ Configurable rate limiting per provider (FR-1.9.09)
+- ✅ HTTP header monitoring for Groq (x-ratelimit-remaining-*, retry-after)
+- ✅ Easy to add new providers (implement interface, add to factory)
+- ✅ Testable (mock LLMProvider interface)
+- ⚠️ Abstraction layer adds slight complexity
+- ⚠️ Must maintain interface consistency across providers
+
+**Alternatives Considered:**
+- Direct provider calls in each feature: Code duplication, hard to switch
+- Base class inheritance: Less flexible than interface
+- Configuration-based code generation: Over-engineering for 3 providers
+
+**Implementation:**
+- **Ollama:** No rate limit (local), llama3.2 model
+- **Gemini:** 1 RPM (conservative), 15 RPM actual limit, gemini-2.5-flash
+- **Groq:** 2 RPM (1 req/30s), 30 RPM actual limit, llama-3.3-70b-versatile
+
+**References:**
+- PRD v3.6: Feature 1.9 Enhancement (Groq integration)
+- FR-1.9.09: Configurable rate limiting
+- FR-1.9.11: UI-based provider switching
+- FR-1.9.13: Pluggable provider interface
+- FR-1.9.14: Standardized `generate_script()` method
+- Architecture Document: `llm-provider-abstraction-v2.md`
+
+---
+
+### ADR-010: Proactive Rate Limiting for Cloud LLM Providers
+
+**Status:** Accepted
+**Date:** 2026-01-22
+
+**Context:**
+Cloud providers (Gemini, Groq) have strict rate limits:
+- **Gemini:** 15 requests/minute, 1,500 requests/day (free tier)
+- **Groq:** 30 requests/minute, 1,000 requests/day (free tier)
+
+Exceeding these limits causes:
+- HTTP 429 errors (rate limit exceeded)
+- Service disruption for users
+- Poor UX (surprise failures)
+
+**Reactive-only approach** (handle 429s when they occur) is insufficient:
+- Unpredictable behavior
+- User sees errors after waiting
+- Difficult to recover without refresh
+
+**Decision:**
+Implement **proactive rate limiting** using sliding window algorithm:
+
+1. **Local Enforcement:** Enforce conservative local limits (2 RPM for Groq, 1 RPM for Gemini)
+2. **Sliding Window:** Track request timestamps in 60-second rolling window
+3. **Wait Strategy:** If limit hit, wait until oldest timestamp expires
+4. **HTTP Header Monitoring:** Parse `x-ratelimit-remaining-*`, `retry-after` headers for reactive adjustments
+5. **Configurable:** Environment variables for enabling/disabling and setting limits
+
+**Algorithm:**
+```typescript
+// Sliding window rate limiting
+const timestamps = [t1, t2, t3, ...]; // Request times in last 60s
+if (timestamps.length >= limit) {
+  const waitMs = timestamps[0] + 60000 - now;
+  await sleep(waitMs);
+}
+```
+
+**Configuration:**
+```bash
+# Gemini: Conservative 1 RPM (actual limit 15 RPM)
+GEMINI_RATE_LIMIT_ENABLED=true
+GEMINI_RATE_LIMIT_REQUESTS_PER_MINUTE=1
+
+# Groq: Conservative 2 RPM (actual limit 30 RPM)
+GROQ_RATE_LIMIT_ENABLED=true
+GROQ_RATE_LIMIT_REQUESTS_PER_MINUTE=2
+GROQ_RATE_LIMIT_SECONDS_PER_REQUEST=30
+```
+
+**Consequences:**
+- ✅ Prevents API quota exhaustion
+- ✅ Predictable behavior (no surprise 429s)
+- ✅ Graceful degradation (automatic wait)
+- ✅ Configurable per provider
+- ✅ User feedback for long waits (>60s)
+- ⚠️ Conservative limits may underutilize free tier
+- ⚠️ Adds ~30s delay between Groq requests
+
+**Alternatives Considered:**
+- Reactive only (handle 429s): Unpredictable, poor UX
+- No rate limiting: Risk of quota exhaustion, service disruption
+- External service (Redis): Over-engineering for single-user app
+- Token bucket algorithm: More complex, sliding window sufficient
+
+**Monitoring & Logging:**
+```typescript
+console.log(`[RateLimiter] groq rate limit check passed (1/2 used)`);
+console.log(`[RateLimiter] gemini rate limit hit, waiting 45.2s`);
+console.log(`[GroqProvider] Rate limit: 998/1000 requests remaining`);
+```
+
+**References:**
+- FR-1.9.09: Configurable rate limiting for cloud providers
+- Rate Limiter Implementation: `src/lib/llm/rate-limiter.ts`
+- Provider Implementations: `*-provider.ts`
 
 ---
 

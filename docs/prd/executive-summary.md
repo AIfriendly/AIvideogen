@@ -1,0 +1,10 @@
+# Executive Summary
+
+**Product Vision:** The AI Video Generator transforms video content creation from a multi-hour, multi-tool process into a streamlined 20-minute workflow. Content creators currently face a complex pipeline requiring scriptwriting skills, voiceover recording equipment, hours of B-roll footage searching, and professional video editing software. This system eliminates those barriers by providing an end-to-end AI-powered solution that takes a simple topic idea and produces a complete, share-ready video with professional narration, relevant visuals, and an eye-catching thumbnail.
+
+**Target Users:** This product serves content creators across YouTube, educational platforms, and social media who need to produce high-quality informational videos efficiently. Our primary users include gaming analysts creating strategy guides, educators producing tutorial content, historical content creators, and technical explainers. These creators value production speed and quality but lack the time, budget, or technical skills for traditional video production workflows. The system is designed for solo creators who need to maintain consistent content output without hiring scriptwriters, voice actors, or video editors.
+
+**Key Value Proposition:** The AI Video Generator delivers complete video production automation with a unique local-first, privacy-focused architecture. Unlike cloud-dependent solutions, our system runs primarily on the creator's own hardware using free and open-source (FOSS) technologies—Ollama for local LLM script generation, open-source TTS for voiceover, and YouTube's free API for visual sourcing. Creators who want enhanced quality can optionally leverage cloud services (Google Gemini, Google Cloud Vision API) with generous free tiers, maintaining a hybrid local+cloud approach with zero mandatory subscription costs. This "FOSS-first, cloud-enhanced" philosophy ensures creators maintain privacy, avoid vendor lock-in, and control their entire production pipeline while optionally accessing cutting-edge AI capabilities when needed.
+
+---
+

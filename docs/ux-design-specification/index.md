@@ -1,0 +1,33 @@
+# AI Video Generator UX Design Specification
+
+## Table of Contents
+
+- [AI Video Generator UX Design Specification](#table-of-contents)
+  - [Executive Summary](#executive-summary)
+  - [1. Design System Foundation](#1-design-system-foundation)
+  - [2. Application Architecture & Layout](#2-application-architecture-layout)
+  - [3. Visual Foundation](#3-visual-foundation)
+  - [3.5 Accessibility Standards](#35-accessibility-standards)
+  - [4. Application Workflows Overview](#4-application-workflows-overview)
+  - [5. Project Management UI (Story 1.6)](#5-project-management-ui-story-16)
+  - [6. Chat Interface (Epic 1)](#6-chat-interface-epic-1)
+  - [6.5. Voice Selection UI (Epic 2, Story 2.3)](#65-voice-selection-ui-epic-2-story-23)
+  - [6.6. Script Generation UI (Epic 2, Story 2.4)](#66-script-generation-ui-epic-2-story-24)
+  - [6.7. Script & Voiceover Preview UI (Epic 2, Story 2.6)](#67-script-voiceover-preview-ui-epic-2-story-26)
+  - [6.8. Visual Sourcing Loading UI (Epic 3, Story 3.5)](#68-visual-sourcing-loading-ui-epic-3-story-35)
+    - **Updated 2026-01-24:** Added browser-based provider loading patterns (Playwright/DVIDS/NASA) with extended startup times, browser lifecycle stages, and provider-specific error handling
+  - [7. Visual Curation UI (Epic 4)](#7-visual-curation-ui-epic-4)
+  - [7.6. Video Assembly Progress UI (Epic 5, Stories 5.1-5.4)](#76-video-assembly-progress-ui-epic-5-stories-51-54)
+  - [7.7. Export Page UI (Epic 5, Story 5.5)](#77-export-page-ui-epic-5-story-55)
+  - [7.8. Channel Intelligence UI (Feature 2.7)](#78-channel-intelligence-ui-feature-27)
+  - [7.9. Topic Suggestions UI (Feature 2.7)](#79-topic-suggestions-ui-feature-27)
+  - [7.10. Quick Production Settings UI](#710-quick-production-settings-ui)
+  - [7.11. Quick Production Progress UI](#711-quick-production-progress-ui)
+  - [7.12. Navigation Updates for Quick Production](#712-navigation-updates-for-quick-production)
+  - [8. Component Library](#8-component-library)
+  - [9. User Journey Flows](#9-user-journey-flows)
+  - [10. UX Pattern Decisions](#10-ux-pattern-decisions)
+  - [11. Responsive Design & Accessibility](#11-responsive-design-accessibility)
+  - [12. Implementation Guidance](#12-implementation-guidance)
+    - **Updated 2026-01-24:** Added browser-based provider implementation guidance (Feature 2.9)
+  - [Appendix](#appendix)

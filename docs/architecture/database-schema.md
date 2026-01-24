@@ -14,6 +14,19 @@ CREATE TABLE system_prompts (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
+-- User preferences table (Epic 6 Story 6.8a, Feature 1.9 v3.6)
+CREATE TABLE IF NOT EXISTS user_preferences (
+  id TEXT PRIMARY KEY DEFAULT 'default',
+  default_voice_id TEXT,
+  default_persona_id TEXT,
+  default_llm_provider TEXT DEFAULT 'ollama',
+  quick_production_enabled INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (default_persona_id) REFERENCES system_prompts(id) ON DELETE SET NULL,
+  CHECK(default_llm_provider IN ('ollama', 'gemini', 'groq'))
+);
+
 -- Projects table
 CREATE TABLE projects (
   id TEXT PRIMARY KEY,

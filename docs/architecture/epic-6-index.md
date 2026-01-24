@@ -48,7 +48,7 @@ Epic 6 implements a VidIQ-style intelligence system that syncs with YouTube chan
 | ADR-010 | all-MiniLM-L6-v2 for Local Embeddings | ✅ Accepted |
 | ADR-011 | SQLite-Backed Job Queue | ✅ Accepted |
 | ADR-012 | youtube-transcript-api for Caption Scraping | ✅ Accepted |
-| ADR-013 | MCP Protocol for Video Provider Servers | ⚠️ Proposed (Deferred) |
+| ADR-013 | Playwright for MCP Video Provider Servers | ⚠️ Accepted (Revised 2026-01-24) |
 
 ---
 
@@ -197,23 +197,34 @@ JOB_DEFAULT_MAX_ATTEMPTS=3
 
 ```json
 // config/mcp_servers.json (Stories 6.9-6.11)
+// Updated 2026-01-24: Playwright-based servers (not HTTP scraping)
 {
   "providers": [
     {
       "name": "dvids",
       "command": "python",
-      "args": ["-m", "mcp_servers.dvids_scraping_server"],
+      "args": ["-m", "mcp_servers.dvids_playwright_server"],
       "priority": 1,
       "rateLimitMs": 30000,
-      "enabled": true
+      "enabled": true,
+      "browser": {
+        "headless": true,
+        "stealth": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "viewport": { "width": 1920, "height": 1080 }
+      }
     },
     {
       "name": "nasa",
       "command": "python",
-      "args": ["-m", "mcp_servers.nasa_scraping_server"],
+      "args": ["-m", "mcp_servers.nasa_playwright_server"],
       "priority": 2,
       "rateLimitMs": 10000,
-      "enabled": true
+      "enabled": true,
+      "browser": {
+        "headless": true,
+        "stealth": true
+      }
     }
   ]
 }
@@ -248,15 +259,18 @@ await triggerAutomatedPipeline(project.id);
 
 ### Stories 6.9-6.11: MCP Video Provider Architecture
 
-**Status:** ⚠️ Deferred to future epic
+**Status:** ⚠️ Deferred to future epic (with technology pivot 2026-01-24)
 
-These stories implement web scraping MCP servers for domain-specific video content:
+These stories implement Playwright-based web scraping MCP servers for domain-specific video content:
 
 | Story | Description | Domain |
 |-------|-------------|--------|
 | 6.9 | MCP Video Provider Client Architecture | Client infrastructure |
-| 6.10 | DVIDS Web Scraping MCP Server | Military videos |
-| 6.11 | NASA Web Scraping MCP Server | Space videos |
+| 6.10 | DVIDS Playwright MCP Server | Military videos |
+| 6.11 | NASA Playwright MCP Server | Space videos |
+
+**Technology Pivot (2026-01-24):**
+HTTP scraping (`httpx` + `BeautifulSoup`) failed on DVIDS because the website uses JavaScript rendering. Now using **Playwright headless browser automation** instead.
 
 **Rationale for Deferral:**
 - Epic 6 focus: RAG infrastructure and Quick Production Flow
@@ -265,7 +279,7 @@ These stories implement web scraping MCP servers for domain-specific video conte
 - Allows for proper architectural planning for extensible provider system
 
 **See Also:**
-- [ADR-013: MCP Protocol for Video Provider Servers](architecture-decision-records.md#adr-013-mcp-protocol-for-video-provider-servers-feature-29---deferred)
+- [ADR-013: Playwright for MCP Video Provider Servers](architecture-decision-records.md#adr-013-playwright-headless-browser-for-mcp-video-provider-servers)
 - [_bmad-output/planning-artifacts/epics.md](../../_bmad-output/planning-artifacts/epics.md) (Stories 6.9-6.11)
 
 ---
@@ -307,5 +321,5 @@ These stories implement web scraping MCP servers for domain-specific video conte
 
 ---
 
-**Last Updated:** 2025-12-03
+**Last Updated:** 2026-01-24 (Playwright pivot)
 **Next Review:** Upon completion of Stories 6.9-6.11 (Future Epic)

@@ -16,7 +16,8 @@
 - **Database:** SQLite 3.x via better-sqlite3 12.4.1
 - **LLM (Primary):** Ollama (local server) with Llama 3.2 (3B instruct)
 - **LLM (Optional):** Google Gemini 2.5 Flash/Pro (cloud, free tier)
-- **LLM SDK:** ollama 0.6.2, @google/generative-ai 0.21.0
+- **LLM (Optional):** Groq (ultra-fast cloud) with Llama 3.3 70B Versatile
+- **LLM SDK:** ollama 0.6.2, @google/generative-ai 0.21.0, groq-sdk
 - **TTS:** KokoroTTS (82M parameter model)
 - **Video Download:** yt-dlp 2025.10.22 (Python)
 - **Video Processing:** FFmpeg 7.1.2 (binary)
@@ -25,6 +26,7 @@
 - **YouTube Data API:** v3 (for B-roll search and metadata)
 - **Ollama Server:** http://localhost:11434 (local LLM runtime, primary)
 - **Google Gemini API:** generativelanguage.googleapis.com (cloud LLM, optional)
+- **Groq API:** api.groq.com (ultra-fast cloud LLM, optional)
 - **Google Cloud Vision API:** vision.googleapis.com (content analysis for B-roll filtering, 1,000 units/month free tier)
 
 ### Development Tools

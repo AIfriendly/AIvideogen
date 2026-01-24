@@ -1,0 +1,317 @@
+<story-context id="story-7.3-context" v="1.0">
+  <metadata>
+    <epicId>7</epicId>
+    <storyId>7.3</storyId>
+    <title>UI Provider Selector</title>
+    <status>done</status>
+    <generatedAt>2026-01-23</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/stories-epic-7/story-7.3.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>content creator</asA>
+    <iWant>to select my preferred LLM provider (Ollama, Gemini, or Groq) through a Settings UI</iWant>
+    <soThat>I can switch between providers without editing configuration files or restarting the application</soThat>
+    <tasks>
+      <task id="1">Create database migration: `user_preferences` table with `default_llm_provider` column</task>
+      <task id="2">Create API endpoint: `GET /api/user/preferences` and `PUT /api/user/preferences`</task>
+      <task id="3">Create UI component: `AIConfiguration` settings panel</task>
+      <task id="4">Add provider dropdown: Ollama, Gemini, Groq</task>
+      <task id="5">Implement per-user preference persistence</task>
+      <task id="6">Add provider indicator badge in UI ("Powered by {provider}")</task>
+      <task id="7">Update script generation to read user preference</task>
+      <task id="8">Add E2E tests for provider switching workflow</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-7.3.1" title="Database Schema Migration">
+      <description>Add default_llm_provider column to user_preferences table</description>
+      <details>
+        - Create migration file: src/lib/db/migrations/020_user_preferences_default_provider.ts
+        - Add column: default_llm_provider TEXT DEFAULT 'ollama'
+        - Add CHECK constraint: CHECK(default_llm_provider IN ('ollama', 'gemini', 'groq'))
+        - Run migration automatically on application startup via runMigrations()
+        - Default to 'ollama' if not set (fallback to local provider)
+        - Log migration completion
+      </details>
+    </criterion>
+    <criterion id="AC-7.3.2" title="Database Query Functions">
+      <description>Implement getUserLLMProvider() and updateUserLLMProvider() functions</description>
+      <details>
+        - Add getUserLLMProvider(): string in src/lib/db/queries.ts
+        - Return 'ollama' if no row exists (safe default)
+        - Add updateUserLLMProvider(provider: string): void
+        - Validate provider value (ollama, gemini, groq) before update
+        - Update updated_at timestamp on every change
+      </details>
+    </criterion>
+    <criterion id="AC-7.3.3" title="API Endpoints">
+      <description>Create GET and PUT /api/user/preferences endpoints</description>
+      <details>
+        - GET returns JSON: { default_llm_provider: 'ollama' }
+        - PUT accepts JSON: { default_llm_provider: 'groq' }
+        - Validate provider value (400 if invalid)
+        - Return 200 OK on success
+      </details>
+    </criterion>
+    <criterion id="AC-7.3.4" title="AI Configuration UI Component">
+      <description>Create settings panel with provider dropdown</description>
+      <details>
+        - Provider dropdown with three options:
+          - Ollama (Local) - Free, Unlimited, Privacy-Focused
+          - Gemini (Cloud) - 1,500 requests/day free, Google AI
+          - Groq (Cloud) - 1,000 requests/day free, Ultra-Fast
+        - Display provider description below selector
+        - Show "Powered by {Provider}" indicator badge
+        - Persist selection immediately on change (debounce 500ms)
+        - Show success toast on change
+      </details>
+    </criterion>
+    <criterion id="AC-7.3.5" title="Provider Selection Persistence">
+      <description>Save and restore provider selection from database</description>
+      <details>
+        - Call PUT /api/user/preferences with selected provider
+        - Update user_preferences.default_llm_provider column
+        - Persist across page reloads (read from database on mount)
+        - Validate provider value before saving (CHECK constraint)
+      </details>
+    </criterion>
+    <criterion id="AC-7.3.6" title="Script Generation Integration">
+      <description>Use user's selected provider for script generation</description>
+      <details>
+        - Read user preference from database via getUserLLMProvider()
+        - Pass provider to createLLMProvider(userPreference) factory call
+        - Log provider used: "Using {provider} provider for script generation"
+        - Fall back to 'ollama' if database read fails
+      </details>
+    </criterion>
+    <criterion id="AC-7.3.7" title="Provider Indicator Badge">
+      <description>Display current provider in UI</description>
+      <details>
+        - Display "Powered by {Provider}" badge in header or sidebar
+        - Update badge when provider changes via Settings
+        - Style badge with provider-specific color (Ollama: green, Gemini: blue, Groq: purple)
+      </details>
+    </criterion>
+    <criterion id="AC-7.3.8" title="E2E Tests">
+      <description>Test full provider switching workflow</description>
+      <details>
+        - User opens Settings → AI Configuration page
+        - User switches provider from Ollama to Groq
+        - Selection persists to database (verify via API)
+        - Page reload preserves Groq selection
+        - Script generation uses Groq provider after selection
+        - Provider badge updates when selection changes
+      </details>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/architecture/llm-provider-abstraction-v2.md</path>
+        <title>LLM Provider Abstraction Layer (v2.0)</title>
+        <section>UI-Based Provider Switching</section>
+        <snippet>Settings → AI Configuration Page component at components/features/settings/ai-configuration.tsx with dropdown selector for LLM provider, real-time validation, visual feedback, and persistence to database.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture/llm-provider-abstraction-v2.md</path>
+        <title>LLM Provider Abstraction Layer (v2.0)</title>
+        <section>Database Schema: User Preferences</section>
+        <snippet>user_preferences table with default_llm_provider column (TEXT DEFAULT 'ollama'). Query functions: getUserLLMProvider() returns provider or 'ollama' default, updateUserLLMProvider() updates with validation.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture/llm-provider-abstraction-v2.md</path>
+        <title>LLM Provider Abstraction Layer (v2.0)</title>
+        <section>Provider Factory</section>
+        <snippet>createLLMProvider(userPreference?: string): LLMProvider accepts user preference parameter, reads from environment as fallback, defaults to 'ollama'. Supports 'ollama', 'gemini', 'groq' providers.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture/GROQ_ARCHITECTURE_QUICK_REFERENCE.md</path>
+        <title>Groq LLM Provider Integration - Quick Reference</title>
+        <section>Database Schema</section>
+        <snippet>user_preferences table with default_llm_provider TEXT DEFAULT 'ollama' and CHECK constraint for valid values.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture/database-schema.md</path>
+        <title>Database Schema</title>
+        <section>User Preferences Table</section>
+        <snippet>user_preferences table (Epic 6 Story 6.8a) includes default_llm_provider TEXT DEFAULT 'ollama' column with CHECK constraint validating values in ('ollama', 'gemini', 'groq').</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics/epic-7-llm-provider-enhancement-groq-integration.md</path>
+        <title>Epic 7: LLM Provider Enhancement</title>
+        <section>Story 7.3: UI Provider Selector</section>
+        <snippet>Goal: Implement Settings → AI Configuration UI for runtime LLM provider switching with database persistence. Tasks include database migration, API endpoints, UI component, provider indicator badge, and E2E tests.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>ai-video-generator/src/lib/llm/factory.ts</path>
+        <kind>factory</kind>
+        <symbol>createLLMProvider</symbol>
+        <signature>createLLMProvider(userPreference?: string): LLMProvider</signature>
+        <reason>Factory function that instantiates the correct LLM provider based on user preference. Already supports userPreference parameter (line 66). This story adds UI to set this preference.</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/llm/provider.ts</path>
+        <kind>interface</kind>
+        <symbol>LLMProvider</symbol>
+        <signature>interface LLMProvider { chat(messages: Message[], systemPrompt?: string): Promise<string> }</signature>
+        <reason>Core interface that all providers implement. UI selector works with this abstraction - any provider implementing this interface can be selected.</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/llm/providers/groq-provider.ts</path>
+        <kind>class</kind>
+        <symbol>GroqProvider</symbol>
+        <lines>38-270</lines>
+        <reason>Story 7.2 implementation. GroqProvider implements LLMProvider interface with rate limiting (2 RPM default), HTTP header monitoring, and comprehensive error handling.</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/db/migrations/020_user_preferences_default_provider.ts</path>
+        <kind>migration</kind>
+        <symbol>up</symbol>
+        <lines>23-50</lines>
+        <reason>Existing migration for default_video_provider (Story 6.11). This story needs similar migration for default_llm_provider column. Note: Migration 020 exists for video provider, need migration 024 for LLM provider.</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/db/queries.ts</path>
+        <kind>module</kind>
+        <symbol>database-queries</symbol>
+        <reason>Contains all database query functions. Story 7.3 adds getUserLLMProvider() and updateUserLLMProvider() functions. Note: User preferences queries exist in separate file (queries-user-preferences.ts).</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/app/api/user-preferences/route.ts</path>
+        <kind>api-route</kind>
+        <symbol>GET,PUT</symbol>
+        <lines>47-213</lines>
+        <reason>Existing API endpoint for user preferences (Story 6.8a). Handles default_voice_id, default_persona_id, default_duration, quick_production_enabled, rag_enabled. This story adds default_llm_provider field.</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/app/api/projects/[id]/generate-script/route.ts</path>
+        <kind>api-route</kind>
+        <symbol>POST</symbol>
+        <lines>104-400</lines>
+        <reason>Script generation endpoint that needs to read user's LLM provider preference and pass to factory. Currently uses environment variable only (line 273 in generateScriptWithRetry).</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/llm/script-generator.ts</path>
+        <kind>module</kind>
+        <symbol>generateScriptWithRetry</symbol>
+        <reason>Business logic for script generation. Needs modification to accept userPreference parameter and pass to createLLMProvider().</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/lib/llm/errors.ts</path>
+        <kind>enum</kind>
+        <symbol>LLMProviderErrorCode</symbol>
+        <lines>17-32</lines>
+        <reason>Error codes for consistent error handling. RATE_LIMIT_EXCEEDED, AUTHENTICATION_FAILED, NETWORK_ERROR codes used by all providers including new Groq provider.</reason>
+      </artifact>
+      <artifact>
+        <path>ai-video-generator/src/app/settings/quick-production/page.tsx</path>
+        <kind>page</kind>
+        <symbol>QuickProductionSettings</symbol>
+        <reason>Example settings page implementation. Similar pattern needed for AI Configuration settings page with provider dropdown.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <package>groq-sdk</package>
+        <version>latest</version>
+        <purpose>Groq API client for ultra-fast LLM inference</purpose>
+      </node>
+      <package>@google/generative-ai</package>
+      <version>^0.24.1</version>
+      <purpose>Google Gemini API client</purpose>
+      <node>
+        <package>better-sqlite3</package>
+        <version>latest</version>
+        <purpose>SQLite database for storing user preferences</purpose>
+      </node>
+      <package>next</package>
+      <version>15.x</version>
+      <purpose>App Router for API routes (src/app/api/)</purpose>
+      <node>
+        <package>sonner</package>
+        <version>latest</version>
+        <purpose>Toast notifications for provider switch feedback</purpose>
+      </node>
+      <package>@radix-ui/react-select</package>
+      <version>latest</version>
+      <purpose>UI dropdown component for provider selector</purpose>
+      <node>
+        <package>@playwright/test</package>
+        <version>latest</version>
+        <purpose>E2E testing framework for provider switching tests</purpose>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="database">SQLite limitation: Cannot add CHECK constraint to existing columns with ALTER TABLE. Validation must happen at application level in updateUserLLMProvider().</constraint>
+    <constraint type="api">Must maintain backward compatibility with existing LLM_PROVIDER environment variable. User preference overrides env var when set.</constraint>
+    <constraint type="ui">Provider selector must use existing /api/user/preferences endpoint pattern (Story 6.8a). Add default_llm_provider field to existing endpoint rather than create new route.</constraint>
+    <constraint type="migration">Migration numbers are sequential. Migration 020 exists for default_video_provider. Need migration 024 for default_llm_provider.</constraint>
+    <constraint type="error-handling">Must validate API keys before allowing provider selection. Show error if user selects Gemini/Groq without API key configured.</constraint>
+    <constraint type="testing">E2E tests must verify full workflow: UI selection → database update → page reload → script generation uses selected provider.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>getUserLLMProvider</name>
+      <kind>function</kind>
+      <signature>getUserLLMProvider(): string</signature>
+      <path>src/lib/db/queries.ts (to be added)</path>
+    </interface>
+    <interface>
+      <name>updateUserLLMProvider</name>
+      <kind>function</kind>
+      <signature>updateUserLLMProvider(provider: string): void</signature>
+      <path>src/lib/db/queries.ts (to be added)</path>
+    </interface>
+    <interface>
+      <name>GET /api/user/preferences</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /api/user/preferences → { success: true, data: { default_llm_provider: string, ... } }</signature>
+      <path>src/app/api/user-preferences/route.ts (modify existing)</path>
+    </interface>
+    <interface>
+      <name>PUT /api/user/preferences</name>
+      <kind>REST endpoint</kind>
+      <signature>PUT /api/user/preferences { default_llm_provider: string } → { success: true }</signature>
+      <path>src/app/api/user-preferences/route.ts (modify existing)</path>
+    </interface>
+    <interface>
+      <name>AIConfigurationSettings</name>
+      <kind>React component</kind>
+      <signature>export function AIConfigurationSettings(): JSX.Element</signature>
+      <path>components/features/settings/ai-configuration.tsx (to be created)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Jest with 80%+ coverage requirement. E2E tests use Playwright following existing patterns in tests/e2e/channel-intelligence/. Database migrations must be tested for idempotency. API endpoints require integration tests with mocked database. UI components require React Testing Library tests for user interactions.
+    </standards>
+    <locations>
+      <location>tests/unit/llm/story-7.3/ - Unit tests for getUserLLMProvider, updateUserLLMProvider</location>
+      <location>tests/integration/api/user-preferences.test.ts - Integration tests for API endpoints</location>
+      <location>tests/e2e/provider-switching.spec.ts - E2E tests for full workflow</location>
+      <location>tests/unit/components/settings/ai-configuration.test.tsx - React component tests</location>
+    </locations>
+    <ideas>
+      <test ac="AC-7.3.1">Test migration adds column with default 'ollama'. Test migration is idempotent (can run twice).</test>
+      <test ac="AC-7.3.2">Test getUserLLMProvider returns 'ollama' when table empty. Test updateUserLLMProvider validates provider value. Test invalid provider throws error.</test>
+      <test ac="AC-7.3.3">Test GET endpoint returns default_llm_provider. Test PUT endpoint accepts valid provider. Test PUT rejects invalid provider with 400.</test>
+      <test ac="AC-7.3.4">Test component renders with current selection. Test dropdown shows all three providers. Test selection calls API and shows toast.</test>
+      <test ac="AC-7.3.5">Test selection persists across page reloads. Test database row is updated. Test updated_at timestamp changes.</test>
+      <test ac="AC-7.3.6">Test script generation reads user preference. Test factory receives correct provider. Test fallback to 'ollama' on database error.</test>
+      <test ac="AC-7.3.7">Test badge displays correct provider. Test badge updates on selection change. Test badge colors are correct.</test>
+      <test ac="AC-7.3.8">E2E: User switches Ollama → Groq → verify in database. E2E: Page reload preserves Groq. E2E: Script generation uses Groq. E2E: Invalid provider shows error.</test>
+    </ideas>
+  </tests>
+</story-context>

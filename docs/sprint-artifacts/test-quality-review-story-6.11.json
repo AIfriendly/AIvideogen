@@ -1,0 +1,64 @@
+{
+  "quality_score": 78,
+  "grade": "C",
+  "tests_reviewed": 75,
+  "issues_found": [
+    {
+      "test_file": "tests/mcp_servers/test_nasa_edge_cases.py",
+      "line": 149,
+      "issue": "Hard wait detected: asyncio.sleep(0.1)",
+      "severity": "high",
+      "fixed": true
+    },
+    {
+      "test_file": "tests/mcp_servers/test_nasa_server.py",
+      "line": 1,
+      "issue": "File exceeds 300-line limit (1302 lines)",
+      "severity": "high",
+      "fixed": false
+    },
+    {
+      "test_file": "tests/mcp_servers/test_nasa_edge_cases.py",
+      "line": 1,
+      "issue": "File exceeds 300-line limit (1139 lines)",
+      "severity": "high",
+      "fixed": false
+    },
+    {
+      "test_file": "tests/mcp_servers/test_nasa_server.py",
+      "line": "all",
+      "issue": "Missing priority markers on 38 tests",
+      "severity": "medium",
+      "fixed": false
+    },
+    {
+      "test_file": "tests/mcp_servers/test_nasa_server.py",
+      "line": 73,
+      "issue": "Non-deterministic assertion: assert len(results) > 0",
+      "severity": "medium",
+      "fixed": false
+    },
+    {
+      "test_file": "tests/mcp_servers/test_nasa_server.py",
+      "line": 449,
+      "issue": "Non-deterministic assertion: assert attempt_count > 0",
+      "severity": "medium",
+      "fixed": false
+    }
+  ],
+  "by_category": {
+    "structure": 22,
+    "reliability": 25,
+    "maintainability": 18,
+    "coverage": 13
+  },
+  "recommendations": [
+    "Split test_nasa_server.py (1302 lines) into 4 modules: search, download, cache, mcp",
+    "Split test_nasa_edge_cases.py (1139 lines) into 3 modules: error_handling, edge_cases, integration",
+    "Add @pytest.mark.P0/P1/P2 decorators to all tests (currently 51% missing)",
+    "Replace 'assert len(results) > 0' with exact counts for determinism"
+  ],
+  "status": "reviewed",
+  "gate_decision": "conditional_pass",
+  "phase": "test_review_complete"
+}

@@ -1,12 +1,13 @@
 # Story 6.11: NASA Web Scraping MCP Server & Pipeline Integration
 
 **Epic:** 6 - Channel Intelligence & Content Research (RAG-Powered)
-**Status:** done
+**Status:** done (updated 2026-01-24 - Phase 8 traceability complete - 100% AC coverage, 75 tests passing)
 **Priority:** P2 (Medium - Deferred Feature)
 **Points:** 8
-**Dependencies:** Story 6.9 (MCP Video Provider Client), Story 6.10 (DVIDS Scraping Server)
+**Dependencies:** Story 6.9 (MCP Video Provider Client), Story 6.10 (DVIDS Playwright Server)
 **Created:** 2026-01-17
-**Developer:** TBD
+**Updated:** 2026-01-24 (Phase 8 traceability complete - Gate: CONDITIONAL PASS - All tests passing, documented tech debt for file refactoring)
+**Developer:** Amelia (DEV Agent)
 
 ---
 
@@ -17,6 +18,41 @@ Build a NASA (National Aeronautics and Space Administration) web scraping MCP (M
 **User Value:** Content creators in any niche (especially space/tech) can automatically source authentic NASA content for their videos, enhancing content authenticity without needing API credentials.
 
 **Note:** This story is part of **Feature 2.9 (Domain-Specific Content APIs)** and implements the NASA scraping server plus pipeline integration. The shared caching module (VideoCache) is reused from Story 6.10.
+
+---
+
+## Technology Pivot (2026-01-24)
+
+**Previous Approach:** HTTP web scraping with `httpx` + `BeautifulSoup`
+
+**Proactive Change Based on DVIDS Findings:**
+After Story 6.10 (DVIDS) encountered JavaScript-rendered content issues, we are proactively updating Story 6.11 to use Playwright from the start. The NASA Image and Video Library (images.nasa.gov) also uses dynamic content loading, which would cause the same HTTP scraping failures.
+
+**New Approach:** Playwright Headless Browser Automation
+
+**Technology Changes:**
+| Component | Old Approach | New Approach |
+|-----------|--------------|--------------|
+| Page Rendering | Static HTML only | Full JavaScript rendering |
+| HTTP Client | `httpx` | Playwright browser (Chromium) |
+| HTML Parsing | `BeautifulSoup` | Playwright page.evaluate() |
+| Video URL Extraction | Not possible (would fail) | Network interception + `<video>` src extraction |
+| Anti-Detection | None | `playwright-stealth` plugin |
+
+**Impact:**
+- All Acceptance Criteria remain valid
+- Module: `nasa_playwright_server` (following renamed DVIDS pattern)
+- Shared dependencies: `playwright` + `playwright-stealth` (already added for Story 6.10)
+- Resource requirements: Same as DVIDS (~200MB RAM per browser)
+- No additional setup: `playwright install chromium` already required for Story 6.10
+
+**Benefits of Proactive Change:**
+- Avoids discovering the same issue after development begins
+- Consistent architecture across DVIDS and NASA servers
+- Shared base class (`BasePlaywrightVideoProvider`) can be used by both
+- Developer learning from Story 6.10 applies directly to Story 6.11
+
+**Reference:** See `docs/sprint-artifacts/sprint-change-proposal-2026-01-24-dvids-playwright-pivot.md` for full technical details.
 
 ---
 
@@ -36,20 +72,21 @@ Build a NASA (National Aeronautics and Space Administration) web scraping MCP (M
 
 ### AC-6.11.1: NASA Scraping MCP Server Implementation
 
-**Given** the DVIDS scraping MCP Server is implemented (Story 6.10)
-**When** the NASA scraping MCP server is built
+**Given** the DVIDS Playwright MCP Server is implemented (Story 6.10)
+**When** the NASA Playwright MCP server is built
 **Then** the system shall:
-- Implement `NASAScrapingMCPServer` class using the MCP Python SDK with stdio transport
+- Implement `NASAPlaywrightMCPServer` class using the MCP Python SDK with stdio transport
 - Expose MCP tool: `search_videos(query, duration)` that searches NASA website and returns results
 - Expose MCP tool: `download_video(video_id)` that downloads video from NASA to local cache
 - Expose MCP tool: `get_video_details(video_id)` that retrieves video metadata from NASA
-- Scrape NASA Image and Video Library website (images.nasa.gov) using HTTP requests and HTML parsing
+- Use Playwright headless browser (Chromium) to render JavaScript and extract video data from images.nasa.gov
 - Extract video metadata: title, description, duration, format, resolution, center, date, download URL
 - Implement rate limiting (1 request per 10 seconds) to respect NASA server load
-- Detect HTTP 429/503 responses and implement exponential backoff: `base_backoff × 2^attempt` (capped at 60s)
+- Implement browser lifecycle management: launch on first use, reuse across requests, cleanup on shutdown
+- Use `playwright-stealth` to avoid bot detection
 - NOT use NASA API key (public content, no authentication required)
-- Be runnable via: `python -m mcp_servers.nasa_scraping_server`
-- Log all scrape operations and errors for monitoring
+- Be runnable via: `python -m mcp_servers.nasa_playwright_server`
+- Log all browser operations and errors for monitoring
 
 ### AC-6.11.2: Video Caching Integration
 

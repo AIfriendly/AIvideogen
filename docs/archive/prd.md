@@ -2,8 +2,8 @@
 
 *This document outlines the requirements for the AI Video Generator. It is a living document and will be updated as the project progresses.*
 
-**Last Updated:** 2026-01-22
-**Version:** 3.5
+**Last Updated:** 2026-01-24
+**Version:** 3.7
 **Repository:** <https://github.com/AIfriendly/AIvideogen>
 
 **Project Type:** Web Application
@@ -11,7 +11,22 @@
 **Complexity:** Level 2 (BMad Method)
 **Status:** Core Features Complete - Enhancement Phase
 
-**Recent Changes (v3.5 - 2026-01-22):**
+**Recent Changes (v3.7 - 2026-01-24):**
+- **FEATURE 2.9 TECHNICAL PIVOT:** Changed web scraping technology from HTTP scraping (httpx + BeautifulSoup) to Playwright headless browser automation
+- Playwright enables JavaScript rendering, network request interception, and streaming video URL extraction for DVIDS
+- Dependencies updated: playwright, playwright-stealth instead of beautifulsoup4, httpx
+- Implementation remains as MCP servers (Stories 6.9-6.11) with Playwright-based scraping
+- This pivot addresses the DVIDS website's use of JavaScript-rendered content and video streaming protocols
+
+**Previous Changes (v3.6 - 2026-01-22):**
+- **FEATURE 1.9 ENHANCEMENT:** Added Groq as third LLM provider with UI-based switching
+- Groq integration with Llama 3.3 70B Versatile model (ultra-fast inference, 1K requests/day free tier)
+- UI-based provider selector in Settings → AI Configuration (no restart required)
+- Rate limiting for Groq: 1 request per 30 seconds (2 RPM) by default, configurable
+- Pluggable provider interface architecture for future extensibility
+- HTTP header monitoring for proactive Groq rate limit management (x-ratelimit-*, retry-after)
+
+**Previous Changes (v3.5 - 2026-01-22):**
 - **FEATURE 1.9 ENHANCEMENT:** Added rate limiting for LLM providers (FR-1.9.09)
 - Configurable rate limits via environment variables (GEMINI_RATE_LIMIT_ENABLED, GEMINI_RATE_LIMIT_REQUESTS_PER_MINUTE)
 - Proactive rate limiting to prevent API quota exhaustion and control costs
@@ -24,6 +39,7 @@
 - Epic 7 (Feature 2.9): Automated Video Production Pipeline with domain-specific content APIs
 - Added DVIDS (military footage) integration via MCP server with 30-second rate limiting
 - Added extensible architecture for NASA, stock footage APIs, and other automated video sources
+- Note: Technical implementation later pivoted from HTTP scraping to Playwright headless browser (see v3.7)
 
 **Previous Changes (v3.3 - 2025-12-03):**
 - Expanded Feature 1.11 from basic metadata generation to full SEO Toolkit
@@ -514,10 +530,11 @@ The following measurable criteria define product success:
             *   **Educational Designer** (TED-Ed style, learning-focused, accessible explanations)
         *   **Custom Personas (Future):** UI for creating and saving custom system prompts with full control over tone, restrictions, and delivery style.
         *   **Per-Project Personas:** Ability to select persona on a per-project basis via project settings (e.g., use "Scientific Analyst" for gaming analysis, "Blackpill Realist" for societal critique content).
-    *   **Rationale:** Local Ollama deployment provides complete control over LLM behavior without content restrictions or censorship. Gemini offers cloud-based alternative with generous free tier (1,500 requests/day). Script personas ensure the system adapts to different ideological frameworks and content types without imposing editorial bias.
+    *   **Rationale:** Local Ollama deployment provides complete control over LLM behavior without content restrictions or censorship. Gemini offers cloud-based alternative with generous free tier (1,500 requests/day). Groq provides ultra-fast cloud inference with free tier (1,000 requests/day, 30 RPM) and excellent script quality via Llama 3.3 70B. Script personas ensure the system adapts to different ideological frameworks and content types without imposing editorial bias.
     *   **Core Implementation:**
-        *   Ollama (primary, FOSS) and Gemini (optional, cloud) providers implemented ✅
+        *   Ollama (primary, FOSS), Gemini (optional, cloud), and Groq (optional, cloud with ultra-fast inference) providers implemented ✅
         *   Provider selection via .env.local configuration ✅
+        *   **UI-based provider switching** allows runtime selection between Ollama, Gemini, and Groq without configuration changes ✅
         *   **Preset Personas:** 3-5 built-in personas optimized for script generation:
             *   Scientific Analyst (neutral informational, data-driven) ✅
             *   Blackpill Realist (brutal/harsh truths, nihilistic analysis) - **Enhanced with dystopian, lookism, economic collapse use cases**
@@ -536,6 +553,7 @@ The following measurable criteria define product success:
     1.  **As a creator,** I want to select different script personas for different content types, **so that** my videos match the appropriate ideological framework and delivery style.
     2.  **As a blackpill content creator,** I want scripts that deliver harsh truths about societal collapse, lookism, and economic dystopia without sugar-coating, **so that** my content authentically represents the blackpill worldview.
     3.  **As a creator,** I want to configure my LLM provider (local Ollama or cloud Gemini), **so that** I have control over privacy, cost, and content restrictions.
+    4.  **As a creator,** I want to switch between Gemini and Groq via the web UI, **so that** I can use alternative providers when one hits quota limits without restarting the application.
 
 *   **Functional Requirements:**
     *   **FR-1.9.01:** The system shall provide a persona selection interface in project settings.
@@ -545,15 +563,27 @@ The following measurable criteria define product success:
     *   **FR-1.9.05:** The Blackpill Realist persona must deliver scripts with: brutal honesty, nihilistic framing, elimination of false hope, focus on systemic failures and power imbalances.
     *   **FR-1.9.06:** Selected persona must be linked to project via `projects.system_prompt_id` foreign key.
     *   **FR-1.9.07:** Script generation must use the selected persona's system prompt when generating content.
-    *   **FR-1.9.08:** The system must support both local (Ollama) and cloud (Gemini) LLM providers via configuration.
-    *   **FR-1.9.09:** The system must implement configurable rate limiting for cloud LLM providers (Gemini) to proactively control API usage and prevent quota exhaustion.
+    *   **FR-1.9.08:** The system must support three LLM providers via configuration:
+        *   **Ollama** (local, FOSS) - primary provider
+        *   **Gemini** (cloud, Google) - with generous free tier (1,500 requests/day)
+        *   **Groq** (cloud) - with ultra-fast inference and free tier (1,000 requests/day, 30 RPM for Llama 3.3 70B)
+    *   **FR-1.9.09:** The system must implement configurable rate limiting for cloud LLM providers (Gemini, Groq) to proactively control API usage and prevent quota exhaustion.
         *   **Rate Limit Configuration:** Environment variables for enabling/disabling rate limits per provider and setting requests-per-minute limits:
             *   `GEMINI_RATE_LIMIT_ENABLED`: true/false (default: true)
             *   `GEMINI_RATE_LIMIT_REQUESTS_PER_MINUTE`: integer (default: 1)
+            *   `GROQ_RATE_LIMIT_ENABLED`: true/false (default: true)
+            *   `GROQ_RATE_LIMIT_REQUESTS_PER_MINUTE`: integer (default: 2)
+            *   `GROQ_RATE_LIMIT_SECONDS_PER_REQUEST`: integer (default: 30)
             *   `OLLAMA_RATE_LIMIT_ENABLED`: true/false (default: false - no limit for local)
         *   **Rate Limiting Behavior:** When rate limit is reached, the system queues requests and waits until the next available time slot before proceeding.
+        *   **HTTP Header Monitoring:** For Groq, monitor `x-ratelimit-remaining-*`, `retry-after` headers for proactive rate limit management and graceful 429 handling.
         *   **User Feedback:** If rate limit wait time exceeds 60 seconds, provide user feedback about the delay.
         *   **Logging:** Log rate limit events (hit, wait, proceed) for monitoring and debugging.
+    *   **FR-1.9.10:** The system must support Groq as a cloud LLM provider with models: Llama 3.3 70B Versatile (default), Llama 3.1 8B Instruct, Gemma 2 9B Instruct.
+    *   **FR-1.9.11:** The system must provide a UI-based provider selector in Settings → AI Configuration allowing users to switch between Ollama, Gemini, and Groq at runtime without requiring configuration file changes or application restart.
+    *   **FR-1.9.12:** Provider selection must persist per-user in the database and be applied to all script generation requests for that user.
+    *   **FR-1.9.13:** The system must implement a pluggable LLM provider interface with consistent API signature across all providers (Ollama, Gemini, Groq), ensuring provider switching requires no code changes to script generation logic.
+    *   **FR-1.9.14:** Each provider must implement a standardized `generate_script(prompt, system_prompt, model)` method with unified error handling and response format.
 
 *   **Acceptance Criteria:**
     *   **AC1: Persona Selection**
@@ -569,9 +599,20 @@ The following measurable criteria define product success:
         *   **When** scripts are generated for both projects.
         *   **Then** Project A scripts must use blackpill tone and Project B scripts must use neutral scientific tone.
     *   **AC4: LLM Provider Configuration**
-        *   **Given** the system is configured with `LLM_PROVIDER=ollama` or `LLM_PROVIDER=gemini`.
+        *   **Given** the system is configured with `LLM_PROVIDER=ollama`, `LLM_PROVIDER=gemini`, or `LLM_PROVIDER=groq`.
         *   **When** script generation is triggered.
         *   **Then** the system must use the configured provider without errors.
+    *   **AC5: Provider Switching via UI**
+        *   **Given** a user is in Settings → AI Configuration.
+        *   **When** they select "Groq" from the LLM Provider dropdown.
+        *   **Then** the system must immediately use Groq for all subsequent script generation requests.
+        *   **And** the selection must persist across page reloads.
+    *   **AC6: Groq-Specific Configuration**
+        *   **Given** the system is configured with Groq provider.
+        *   **When** script generation is triggered.
+        *   **Then** the system must use the Groq API with Llama 3.3 70B Versatile model by default.
+        *   **And** the system must respect Groq rate limits (1 request per 30 seconds by default, configurable).
+        *   **And** the system must monitor Groq HTTP response headers (`x-ratelimit-remaining-*`, `retry-after`) for proactive rate limit management.
 
 ---
 
@@ -1137,7 +1178,8 @@ The following measurable criteria define product success:
     | Component | Technology |
     |-----------|------------|
     | Pipeline Orchestration | Automate Mode (Feature 1.12) + QPF extensions |
-    | Visual Source APIs | Domain-specific APIs via MCP servers |
+    | Visual Source APIs | Domain-specific content via Playwright-based MCP servers |
+    | Web Scraping | Playwright + playwright-stealth (headless browser automation) |
     | Rate Limiting | MCP server layer (configurable per provider) |
     | Video Selection | Automatic best-match algorithm |
     | Progress Tracking | Real-time pipeline status API |
@@ -1183,7 +1225,8 @@ The following measurable criteria define product success:
         | Aspect | Details |
         |--------|---------|
         | Content | Official U.S. military footage (tanks, aircraft, ships, operations) |
-        | Access | Via MCP server (not direct API) |
+        | Access | Via MCP server using Playwright headless browser automation |
+        | Technology | Playwright + playwright-stealth (JavaScript rendering, network interception) |
         | Rate Limit | 30 seconds per request |
         | Licensing | Public domain (free to use) |
         | Use Case | Military channel automation |
@@ -1192,12 +1235,13 @@ The following measurable criteria define product success:
         | Aspect | Details |
         |--------|---------|
         | Content | Space footage, launches, astronomy imagery |
-        | Access | Via MCP server |
+        | Access | Via MCP server (official API if available, otherwise Playwright-based scraping) |
+        | Technology | Official NASA API or Playwright + playwright-stealth (headless browser) |
         | Rate Limit | 30 seconds per request |
         | Licensing | Public domain (free to use) |
         | Use Case | Space/astronomy channel automation |
         | Status | Planned for future release |
-    *   **Future Providers:** Stock footage APIs (Pexels, Pixabay, Shutterstock), sports APIs, news APIs
+    *   **Future Providers:** Stock footage APIs (Pexels, Pixabay, Shutterstock), sports APIs, news APIs - accessed via official APIs where available, or Playwright-based web scraping for sites without APIs
 *   **MCP Server Architecture:**
     *   **Purpose:** Act as API gateway between application and content sources
     *   **Responsibilities:**
@@ -1206,8 +1250,10 @@ The following measurable criteria define product success:
         - API key management (keys stay in MCP server, not app)
         - Error handling and retry logic
         - Usage monitoring and logging
+        - Headless browser automation (Playwright) for JavaScript-rendered content
     *   **Protocol:** Model Context Protocol (MCP) standard
     *   **Deployment:** Separate server process, configurable endpoint
+    *   **Technology Stack:** Playwright + playwright-stealth for web scraping, enabling JavaScript rendering and network request interception
 *   **Automatic Visual Selection:**
     *   **Algorithm:** Rank results by relevance score (keyword match, semantic similarity, duration fit)
     *   **No User Choice:** System auto-selects best match (unlike manual pipeline where user selects from 5-8 options)
@@ -1241,7 +1287,7 @@ The following measurable criteria define product success:
     | Workflow | Manual curation at each step | Fully automated |
     | Use Case | General creators want control | Niche channels want automation |
 *   **Note:** Quick Production Flow builds upon RAG infrastructure from Feature 2.7 (Channel Intelligence) to provide topic suggestions with context.
-*   **FOSS Compliance:** MCP server protocol is open-source. DVIDS and NASA content is public domain.
+*   **FOSS Compliance:** MCP server protocol is open-source. DVIDS and NASA content is public domain. Playwright is open-source (Apache 2.0 license).
 
 ---
 
@@ -1312,6 +1358,8 @@ The following items are explicitly excluded from the current scope:
 - Google Cloud Vision API Documentation
 - Ollama Documentation
 - Google Gemini API Documentation
-- [DVIDS API Documentation](https://api.dvidshub.net/) (Feature 2.0)
-- [NASA Image and Video Library API](https://api.nasa.gov/) (Future consideration)
+- [Playwright Documentation](https://playwright.dev/python/) (Feature 2.9 - Domain-Specific Content APIs)
+- [playwright-stealth Documentation](https://github.com/AtuboDad/playwright_stealth) (Feature 2.9)
+- DVIDS Website (https://www.dvidshub.net/) - Target for Playwright-based scraping (Feature 2.9)
+- [NASA Image and Video Library API](https://api.nasa.gov/) (Future consideration for Feature 2.9)
 - [Pexels API Documentation](https://www.pexels.com/api/documentation/) (Feature 2.1) 

@@ -1,12 +1,14 @@
 # Story 6.10: DVIDS Web Scraping MCP Server
 
 **Epic:** 6 - Channel Intelligence & Content Research (RAG-Powered)
-**Status:** done
+**Status:** done (completed with Playwright implementation 2026-01-24)
 **Priority:** P2 (Medium - Deferred Feature)
 **Points:** 8
 **Dependencies:** Story 6.9 (MCP Video Provider Client)
 **Created:** 2026-01-17
+**Updated:** 2026-01-24 (Completed with Playwright implementation)
 **Developer:** TBD
+**Completed:** 2026-01-24
 
 ---
 
@@ -17,6 +19,38 @@ Build a DVIDS (Defense Visual Information Distribution Service) web scraping MCP
 **User Value:** Content creators in the military niche can automatically source authentic military footage from DVIDS for their videos, enhancing content authenticity without needing API credentials.
 
 **Note:** This story is part of **Feature 2.9 (Domain-Specific Content APIs)** and implements the DVIDS scraping server. The shared caching module (VideoCache) created here will be reused by Story 6.11 (NASA server).
+
+---
+
+## Technology Pivot (2026-01-24)
+
+**Previous Approach:** HTTP web scraping with `httpx` + `BeautifulSoup`
+
+**Issue Discovered:**
+After nearly one week of development effort, the HTTP scraping approach failed because:
+- DVIDS website uses JavaScript-rendered content (video information loads after page load)
+- Video download URLs are served via streaming protocols (HLS/DASH), not static file links
+- Simple HTTP requests cannot access dynamically loaded content or intercept network requests
+
+**New Approach:** Playwright Headless Browser Automation
+
+**Technology Changes:**
+| Component | Old Approach | New Approach |
+|-----------|--------------|--------------|
+| Page Rendering | Static HTML only | Full JavaScript rendering |
+| HTTP Client | `httpx` | Playwright browser (Chromium) |
+| HTML Parsing | `BeautifulSoup` | Playwright page.evaluate() |
+| Video URL Extraction | Not possible | Network interception + `<video>` src extraction |
+| Anti-Detection | None | `playwright-stealth` plugin |
+
+**Impact:**
+- All Acceptance Criteria remain valid (the WHAT hasn't changed, only the HOW)
+- Module renamed: `dvids_scraping_server` → `dvids_playwright_server`
+- New dependency: `playwright` + `playwright-stealth` (Apache 2.0 licensed)
+- Resource increase: ~200MB RAM per browser instance (vs ~20MB for HTTP)
+- New setup step: `playwright install chromium` (~300MB browser binary)
+
+**Reference:** See `docs/sprint-artifacts/sprint-change-proposal-2026-01-24-dvids-playwright-pivot.md` for full technical details and implementation roadmap.
 
 ---
 
@@ -39,17 +73,18 @@ Build a DVIDS (Defense Visual Information Distribution Service) web scraping MCP
 **Given** the MCP Video Provider Client architecture is implemented (Story 6.9)
 **When** the DVIDS scraping MCP server is built
 **Then** the system shall:
-- Implement `DVIDSScrapingMCPServer` class using the MCP Python SDK with stdio transport
+- Implement `DVIDSPlaywrightMCPServer` class using the MCP Python SDK with stdio transport
 - Expose MCP tool: `search_videos(query, duration)` that searches DVIDS website and returns results
 - Expose MCP tool: `download_video(video_id)` that downloads video from DVIDS to local cache
 - Expose MCP tool: `get_video_details(video_id)` that retrieves video metadata from DVIDS
-- Scrape DVIDS website (dvidshub.net) using HTTP requests and HTML parsing
+- Use Playwright headless browser (Chromium) to render JavaScript and extract video data from dvidshub.net
 - Extract video metadata: title, description, duration, format, resolution, download URL, public domain confirmation
 - Implement rate limiting (1 request per 30 seconds) to respect DVIDS server load
-- Detect HTTP 429/503 responses and implement exponential backoff: `base_backoff × 2^attempt` (capped at 60s)
-- NOT use DVIDS API or require API credentials (web scraping only)
-- Be runnable via: `python -m mcp_servers.dvids_scraping_server`
-- Log all scrape operations and errors for monitoring
+- Implement browser lifecycle management: launch on first use, reuse across requests, cleanup on shutdown
+- Use `playwright-stealth` to avoid bot detection
+- NOT use DVIDS API or require API credentials (browser-based scraping only)
+- Be runnable via: `python -m mcp_servers.dvids_playwright_server`
+- Log all browser operations and errors for monitoring
 
 ### AC-6.10.2: Video Caching Integration
 
@@ -79,17 +114,18 @@ Build a DVIDS (Defense Visual Information Distribution Service) web scraping MCP
 **Given** the DVIDS scraping MCP server is implemented
 **When** tests are executed
 **Then** the tests shall validate:
-- Unit tests validate web scraping logic with mocked HTML responses
+- Unit tests validate Playwright browser automation logic with mocked browser responses
 - Unit tests validate rate limiting and backoff behavior
 - Unit tests validate cache hit/miss logic
-- Integration tests validate MCP tool calls with real DVIDS website (careful with rate limits)
+- Unit tests validate browser lifecycle (startup, reuse, cleanup)
+- Integration tests validate MCP tool calls with real DVIDS website via Playwright (careful with rate limits)
 
 **Specific Test Scenarios:**
-- Search with query "military aircraft" returns results with videoId, title, duration
-- Download with valid video_id stores file in assets/cache/dvids/ directory
+- Search with query "military aircraft" returns results with videoId, title, duration (using Playwright page rendering)
+- Download with valid video_id stores file in assets/cache/dvids/ directory (via Playwright-extracted URL)
 - Subsequent download with same video_id returns cached file (no re-download)
 - Rate limiting: two rapid searches respect 30-second delay between requests
-- HTTP 429 response triggers exponential backoff (2s, 4s, 8s delays)
+- Browser lifecycle: first request launches browser (~2-3s), subsequent requests reuse browser instance
 - Cache invalidation removes file and metadata from assets/cache/metadata.json
 
 ### AC-6.10.5: Shared Caching Module

@@ -17,8 +17,9 @@ This document outlines deferred features, future enhancements, and architectural
 ### Feature 2.9: Domain-Specific Content APIs (MCP Video Providers)
 
 **Stories:** 6.9, 6.10, 6.11
-**Status:** ⚠️ **DEFERRED** to future epic
+**Status:** ⚠️ **DEFERRED** to future epic (with technology pivot)
 **Rationale:** YouTube API provides sufficient visual sourcing for MVP; MCP servers require dedicated architectural planning.
+**Technology Pivot (2026-01-24):** HTTP scraping failed on DVIDS (JavaScript-rendered content). Now using Playwright headless browser automation instead of `httpx` + `BeautifulSoup`.
 
 #### Story 6.9: MCP Video Provider Client Architecture
 
@@ -37,33 +38,38 @@ This document outlines deferred features, future enhancements, and architectural
 
 ---
 
-#### Story 6.10: DVIDS Web Scraping MCP Server
+#### Story 6.10: DVIDS Web Scraping MCP Server (Playwright)
 
 **As a** content creator in the military niche,
 **I want** an MCP server that scrapes military videos from DVIDS website,
 **So that** I can use authentic DVIDS content in my videos without API keys.
 
 **Key Components:**
-- `DVIDSScrapingMCPServer` (Python MCP SDK, stdio transport)
+- `DVIDSPlaywrightMCPServer` (Python MCP SDK, stdio transport)
 - MCP tools: `search_videos`, `download_video`, `get_video_details`
-- Web scraping: HTTP requests + HTML parsing (dvidshub.net)
+- Web scraping: **Playwright headless browser** (not HTTP requests)
+- JavaScript rendering to access dynamic content (download codes)
+- playwright-stealth for anti-detection
 - Rate limiting: 1 request per 30 seconds
 - Exponential backoff: `base_backoff × 2^attempt` (capped at 60s)
 - Shared `VideoCache` class from `mcp_servers/cache.py`
+- Browser installation: `playwright install chromium` (~300MB)
+
+**Technical Note:** HTTP scraping (`httpx` + `BeautifulSoup`) failed because DVIDS uses JavaScript rendering to load video download codes. Playwright is required to access this dynamic content.
 
 **Legal Note:** Ensure compliance with DVIDS terms of service and robots.txt.
 
 ---
 
-#### Story 6.11: NASA Web Scraping MCP Server & Pipeline Integration
+#### Story 6.11: NASA Web Scraping MCP Server & Pipeline Integration (Playwright)
 
 **As a** content creator in any niche,
 **I want** an MCP server that scrapes space videos from NASA website,
 **So that** I can use authentic NASA content in my videos without API keys.
 
 **Key Components:**
-- `NASAScrapingMCPServer` (Python MCP SDK, stdio transport)
-- Web scraping: NASA Image and Video Library (images.nasa.gov)
+- `NASAPlaywrightMCPServer` (Python MCP SDK, stdio transport)
+- Web scraping: **Playwright headless browser** for NASA Image and Video Library (images.nasa.gov)
 - Rate limiting: 1 request per 10 seconds
 - Reuse `VideoCache` from Story 6.10
 - Pipeline integration: Update Quick Production Flow to use VideoProviderClient
@@ -80,10 +86,16 @@ When implementing Stories 6.9-6.11, follow this sequence:
 
 1. **Story 6.9 First:** Build VideoProviderClient and configuration schema
 2. **Create Shared Cache:** Implement `mcp_servers/cache.py` (VideoCache class)
-3. **Story 6.10:** Build DVIDS server using shared cache
-4. **Story 6.11:** Build NASA server + pipeline integration
+3. **Story 6.10:** Build DVIDS server using Playwright headless browser (not HTTP scraping)
+4. **Story 6.11:** Build NASA server using Playwright + pipeline integration
 
-**Architecture Reference:** ADR-013
+**Architecture Reference:** ADR-013 (Revised 2026-01-24 for Playwright)
+
+**Browser Requirements:**
+- Install Chromium: `playwright install chromium`
+- Resource requirements: ~200MB RAM per browser instance
+- playwright-stealth for anti-detection
+- Sequential processing recommended (avoid concurrent browser instances)
 
 ---
 
