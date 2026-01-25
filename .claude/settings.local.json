@@ -156,7 +156,11 @@
       "Bash(export:*)",
       "Skill(bmad:core:tools:shard-doc)",
       "Bash(npx:*)",
-      "Skill(bmad:bmm:workflows:retrospective)"
+      "Skill(bmad:bmm:workflows:retrospective)",
+      "Bash(git rm:*)",
+      "Bash(python3:*)",
+      "Bash(uv run:*)",
+      "Bash(file:*)"
     ],
     "deny": [],
     "ask": []
