@@ -274,6 +274,69 @@ Date: 2026-01-27 16:30
 - Stream Sync: 0.006s difference (essentially perfect!)
 
 ---
+
+## 📋 WinError 32 Fix (2026-01-29)
+
+### Problem
+
+DVIDS HLS downloads were failing with:
+```
+PermissionError: [WinError 32] The process cannot access the file because it is being used by another process
+```
+
+This error occurred when trying to delete temporary manifest files after FFmpeg completed downloading videos.
+
+### Root Causes
+
+1. **No process wait timeout** - FFmpeg process could hang indefinitely
+2. **No retry logic** - Single attempt to delete files, failing if Windows hadn't released handles
+3. **Redundant content reading** - Reading file twice, causing additional handle contention
+4. **Missing process cleanup** - Process not explicitly waited on before file deletion
+
+### Fix Applied
+
+**File:** `mcp_servers/dvids_scraping_server.py`
+
+**Changes:**
+1. Added 5-minute timeout to `process.communicate()` with explicit `process.kill()` on timeout
+2. Added retry logic with exponential backoff for file deletion (5 attempts: 0.5s, 1s, 2s, 4s, 8s)
+3. Removed redundant `temp_path.read_bytes()` - `_download_hls_video` already returns content
+4. Added `process.wait()` to ensure process fully exits before cleanup
+
+**Code Snippet:**
+```python
+# Timeout handling
+try:
+    stdout, stderr = await asyncio.wait_for(
+        process.communicate(),
+        timeout=300.0  # 5 minute timeout
+    )
+except asyncio.TimeoutError:
+    process.kill()
+    await process.wait()
+    raise DVIDSNetworkError("FFmpeg download timed out after 5 minutes")
+
+# Retry logic for file deletion
+max_retries = 5
+retry_delay = 0.5
+for attempt in range(max_retries):
+    try:
+        manifest_path.unlink(missing_ok=True)
+        break
+    except PermissionError:
+        if attempt < max_retries - 1:
+            await asyncio.sleep(retry_delay)
+            retry_delay *= 2  # Exponential backoff
+```
+
+### Status
+
+- **Git Commit:** `d0d8e511` - "fix: Resolve WinError 32 file locking in DVIDS HLS downloads"
+- **Implementation:** Complete
+- **Testing:** Ready for validation with full pipeline run
+
+---
+
 use uv only
 
 ## 🏗️ Architecture Validation
