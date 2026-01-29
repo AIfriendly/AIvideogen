@@ -2661,4 +2661,155 @@ src/
 - Shared progress tracking and status APIs
 
 ---
+
+### Epic 8: DVIDS API Integration
+
+**Goal:** Migrate DVIDS video provider from Playwright web scraping to official DVIDS Search API with HLS download support, connection pooling, and cross-scene diversity enforcement.
+
+**Architecture Pattern:** API Integration with HLS Video Download
+
+**Key Components:**
+- `mcp_servers/dvids_scraping_server.py` - Complete API-based implementation (renamed from `dvids_playwright_server.py`)
+- `src/lib/mcp/video-provider-client.ts` - Client integration
+- `src/lib/pipeline/visual-generation.ts` - Diversity enforcement
+
+**Backend (Python MCP Server):**
+- **API Endpoint:** `https://api.dvidshub.net/search`
+- **Authentication:** API key via `DVIDS_API_KEY` environment variable (required)
+- **Search Parameters:**
+  - `query`: search terms (q parameter)
+  - `type`: "video" (filter for videos only)
+  - `branch`: military branch (army, navy, airforce, marines, etc.)
+  - `category`: content category (news, imagery, etc.)
+  - `max_duration`: maximum video duration in seconds
+  - `page`: page number (default: 1)
+  - `max_results`: results per page (1-50, default/max: 50)
+- **Response Fields:**
+  - `video_id`: unique identifier
+  - `title`: video title
+  - `description`: video description
+  - `duration`: video duration in seconds
+  - `thumbnails`: array of thumbnail URLs
+  - `hls_url`: HLS manifest URL (.m3u8)
+  - `date`: publication date
+- **Video Download:** FFmpeg-based HLS (`.m3u8`) manifest download with API key injection
+- **Connection Pooling:** MCP server maintains connections across requests
+- **Cross-Scene Diversity:** Tracks selected video IDs, prefers unused videos
+
+**Database:**
+- No new schema changes (uses existing `visual_suggestions` table)
+- Provider tracking via `provider` column (added in Epic 6)
+
+**Key Flow:**
+1. User selects DVIDS as video provider
+2. MCP server connects to DVIDS Search API with API key
+3. Search videos with filters (branch, category, duration)
+4. Parse API response JSON for video metadata
+5. Download HLS videos via FFmpeg with API key injection
+6. Enforce cross-scene diversity (no repeated footage)
+7. Cache videos in `assets/cache/dvids/{video_id}.mp4`
+
+**Error Handling:**
+- 401 Unauthorized: Invalid API key
+- 429 Too Many Requests: Rate limit exceeded (exponential backoff: 2s, 4s, 8s)
+- 500 Internal Server Error: API error (graceful degradation)
+- FFmpeg errors: Logged with actionable error messages
+- Missing FFmpeg: Warning logged, continues (non-HLS only)
+
+**Infrastructure Created (Reusable by Epic 9):**
+- Connection pooling: `Map<string, MCPClient> connections` with `ensureConnection()` and `disconnectAll()`
+- Diversity tracking: `Set<string> selectedVideoIds` with selection algorithm
+- Filename sanitization: `sanitize_video_id()` function for cross-platform compatibility
+
+**Stories:**
+- Story 8.1: DVIDS Search API Integration (5 points)
+- Story 8.2: HLS Video Download with FFmpeg (5 points)
+- Story 8.3: Video Selection Diversity Across Scenes (4 points)
+- Story 8.4: Connection Pooling for MCP Providers (3 points)
+- Story 8.5: Windows Filename Compatibility (2 points)
+
+**Total Points:** 19 points
+
+---
+
+### Epic 9: NASA API Integration
+
+**Goal:** Migrate NASA video provider from Playwright web scraping to official NASA Image and Video Library API with direct MP4 download handling, reusing Epic 8 infrastructure.
+
+**Architecture Pattern:** API Integration with Direct MP4 Download (Infrastructure Reuse)
+
+**Key Components:**
+- `mcp_servers/nasa_api_server.py` - Complete API-based implementation (renamed from `nasa_playwright_server.py`)
+- `src/lib/mcp/video-provider-client.ts` - Client integration (reuses Epic 8 infrastructure)
+- `src/lib/pipeline/visual-generation.ts` - Diversity enforcement (reuses Epic 8 infrastructure)
+
+**Backend (Python MCP Server):**
+- **API Endpoint:** `https://images-api.nasa.gov/search`
+- **Authentication:** API key via `NASA_API_KEY` environment variable (optional for public content)
+- **Search Parameters:**
+  - `q`: search terms (query)
+  - `media_type`: "video" (filter for videos only)
+  - `center`: NASA center (GSFC, JSC, KSC, etc.)
+  - `year_start`: start year filter
+  - `year_end`: end year filter
+  - `keywords`: comma-separated keywords
+- **Response Fields (NASA API format):**
+  - `data[0].nasa_id`: unique identifier (use as video_id)
+  - `data[0].title`: video title
+  - `data[0].description`: video description
+  - `links[0].href`: download URL (direct MP4 link)
+  - `data[0].date_created`: publication date
+  - `data[0].center`: NASA center
+- **Video Download:** Direct MP4 URLs via httpx (no FFmpeg required)
+- **Connection Pooling:** Reuses Epic 8 infrastructure (`connections` map, `ensureConnection()`, `disconnectAll()`)
+- **Cross-Scene Diversity:** Reuses Epic 8 infrastructure (`selectedVideoIds` set, selection algorithm)
+- **Filename Sanitization:** Reuses Epic 8 infrastructure (`sanitize_video_id()` function)
+
+**Database:**
+- No new schema changes (uses existing `visual_suggestions` table)
+- Provider tracking via `provider` column (added in Epic 6)
+
+**Key Flow:**
+1. User selects NASA as video provider
+2. MCP server connects to NASA Image and Video Library API (API key optional)
+3. Search videos with filters (center, year, keywords)
+4. Parse API response JSON for video metadata
+5. Download direct MP4 videos via httpx (no FFmpeg required)
+6. Enforce cross-scene diversity using Epic 8 infrastructure (no repeated footage)
+7. Cache videos in `assets/cache/nasa/{nasa_id}.mp4`
+
+**Error Handling:**
+- 400 Bad Request: Invalid parameters
+- 404 Not Found: Resource not found
+- 429 Too Many Requests: Rate limit exceeded (NASA API: 1000 requests per hour)
+- 500 Internal Server Error: API error (graceful degradation)
+- Network errors: Logged with actionable error messages
+
+**Infrastructure Reused from Epic 8:**
+- Connection pooling: `Map<string, MCPClient> connections` (already implemented)
+- Diversity tracking: `Set<string> selectedVideoIds` (already implemented)
+- Filename sanitization: `sanitize_video_id()` function (already implemented)
+
+**Stories:**
+- Story 9.1: NASA Image and Video Library API Integration (5 points)
+- Story 9.2: Direct MP4 Video Download (3 points) - Simpler than Epic 8 (no FFmpeg)
+- Story 9.3: Video Selection Diversity Across Scenes (4 points) - Reuses Epic 8 infrastructure
+- Story 9.4: Connection Pooling for MCP Providers (2 points) - Reuses Epic 8 infrastructure
+- Story 9.5: Cross-Platform Filename Compatibility (2 points) - Reuses Epic 8 infrastructure
+
+**Total Points:** 16 points (reduced from Epic 8's 19 points due to simpler video download and infrastructure reuse)
+
+**Key Differences from Epic 8:**
+| Aspect | Epic 8 (DVIDS) | Epic 9 (NASA) |
+|--------|---------------|---------------|
+| **Video Download** | HLS manifests require FFmpeg | Direct MP4 URLs (simpler) |
+| **Story 9.2 Points** | 5 points | 3 points |
+| **Authentication** | Required API key | Optional API key (public content) |
+| **Duration in Results** | Yes (in API response) | No (requires additional fetch) |
+| **Connection Pooling** | New implementation (3 points) | Reuse Epic 8 (2 points) |
+| **Diversity Tracking** | New implementation (4 points) | Reuse Epic 8 (4 points, verification) |
+| **Filename Handling** | New implementation (2 points) | Reuse Epic 8 (2 points, verification) |
+| **Total Points** | 19 points | 16 points |
+
+---
 

@@ -781,4 +781,132 @@ console.log(`[GroqProvider] Rate limit: 998/1000 requests remaining`);
 - Provider Implementations: `*-provider.ts`
 
 ---
+
+### ADR-015: NASA Image and Video Library API Integration (Epic 9)
+
+**Status:** Accepted
+**Date:** 2026-01-25
+
+**Context:**
+Story 6.11 implemented NASA video provider using Playwright web scraping, following the same pattern as Story 6.10 (DVIDS). However, Epic 8 successfully migrated DVIDS from web scraping to the official DVIDS Search API, providing:
+- More reliable video metadata retrieval
+- Better error handling with proper HTTP status codes
+- Rate limiting based on API documentation
+- Cleaner implementation without browser automation overhead
+
+NASA provides an official Image and Video Library API (`https://images-api.nasa.gov/search`) that can replace the Playwright web scraping approach with similar benefits.
+
+**Decision:**
+Migrate NASA video provider from Playwright web scraping to official NASA Image and Video Library API, following the Epic 8 (DVIDS) pattern:
+
+1. **API Integration:** Use `https://images-api.nasa.gov/search` endpoint
+2. **Authentication:** API key via `NASA_API_KEY` environment variable (optional for public content)
+3. **Video Download:** Direct MP4 URLs via httpx (no FFmpeg required - simpler than DVIDS)
+4. **Infrastructure Reuse:** Maximize reuse of Epic 8 infrastructure:
+   - Connection pooling (Story 8.4)
+   - Diversity tracking (Story 8.3)
+   - Filename sanitization (Story 8.5)
+
+**Consequences:**
+- ✅ More reliable than web scraping (no JavaScript rendering issues)
+- ✅ Better error handling (HTTP status codes vs browser detection)
+- ✅ Simpler implementation than DVIDS (direct MP4 URLs, no HLS/FFmpeg)
+- ✅ Faster performance (no browser overhead)
+- ✅ Reuses Epic 8 infrastructure (reduces development effort)
+- ✅ Consistent architecture across DVIDS and NASA providers
+- ⚠️ API doesn't provide duration in search results (requires additional fetch)
+- ⚠️ Rate limiting is self-imposed (NASA doesn't enforce strict limits)
+- ✅ Optional API key (public content accessible without authentication)
+
+**Key Differences from DVIDS (Epic 8):**
+
+| Aspect | DVIDS (Epic 8) | NASA (Epic 9) |
+|--------|---------------|---------------|
+| **Video Download** | HLS manifests require FFmpeg | Direct MP4 URLs (simpler) |
+| **Story 9.2 Points** | 5 points | 3 points |
+| **Authentication** | Required API key | Optional API key (public content) |
+| **Duration in Results** | Yes (in API response) | No (requires additional fetch) |
+| **Infrastructure** | New implementation | Reuse Epic 8 (3 stories) |
+| **Total Points** | 19 points | 16 points |
+
+**Technical Implementation:**
+
+**API Endpoint:** `https://images-api.nasa.gov/search`
+
+**Search Parameters:**
+- `q`: search terms (query)
+- `media_type`: "video" (filter for videos only)
+- `center`: NASA center (GSFC, JSC, KSC, etc.)
+- `year_start`: start year filter
+- `year_end`: end year filter
+- `keywords`: comma-separated keywords
+
+**Response Fields (NASA API format):**
+```json
+{
+  "collection": {
+    "items": [
+      {
+        "data": [{
+          "nasa_id": "12345",           // Use as video_id
+          "title": "Space Shuttle Launch",
+          "description": "HD footage of...",
+          "date_created": "2020-01-01",
+          "center": "KSC"
+        }],
+        "links": [{
+          "href": "https://images-assets.nasa.gov/video/xxx/xxx.mp4"  // Direct MP4 URL
+        }]
+      }
+    ]
+  }
+}
+```
+
+**Video Download:**
+- Direct MP4 URLs via httpx (no FFmpeg required)
+- Simpler than DVIDS (no HLS manifest parsing)
+- Progress tracking for download percentage
+- Error handling for network failures
+
+**Infrastructure Reuse from Epic 8:**
+
+1. **Connection Pooling** (Story 9.4 - 2 points):
+   - Reuses `Map<string, MCPClient> connections`
+   - Reuses `ensureConnection(providerId)` function
+   - Reuses `disconnectAll()` function
+   - Only verification testing required
+
+2. **Diversity Tracking** (Story 9.3 - 4 points):
+   - Reuses `Set<string> selectedVideoIds`
+   - Reuses selection algorithm (prioritize unused videos)
+   - Only verification testing required
+
+3. **Filename Sanitization** (Story 9.5 - 2 points):
+   - Reuses `sanitize_video_id()` function
+   - Handles NASA `nasa_id` format
+   - Only verification testing required
+
+**Stories:**
+- Story 9.1: NASA API Integration (5 points)
+- Story 9.2: Direct MP4 Video Download (3 points) - Simpler than Epic 8
+- Story 9.3: Video Selection Diversity (4 points) - Reuse Epic 8
+- Story 9.4: Connection Pooling (2 points) - Reuse Epic 8
+- Story 9.5: Filename Compatibility (2 points) - Reuse Epic 8
+
+**Total Points:** 16 points (vs 19 for Epic 8)
+
+**Alternatives Considered:**
+- **Keep Playwright scraping:** More complex, browser overhead, less reliable
+- **Use NASA APOD API:** Limited to one image per day, not suitable for video sourcing
+- **Use NASA RSS feeds:** No video metadata, limited search capabilities
+
+**References:**
+- Epic 8: DVIDS API Integration (pattern to follow)
+- Story 6.11: Original NASA web scraping implementation (being replaced)
+- NASA API Documentation: https://api.nasa.gov/
+- NASA Image and Video Library API: https://images-api.nasa.gov/
+- Epic 9 Documentation: `docs/epics/epic-9-nasa-api-integration.md`
+
+---
 

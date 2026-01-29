@@ -19,11 +19,18 @@
 - **LLM (Optional):** Groq (ultra-fast cloud) with Llama 3.3 70B Versatile
 - **LLM SDK:** ollama 0.6.2, @google/generative-ai 0.21.0, groq-sdk
 - **TTS:** KokoroTTS (82M parameter model)
-- **Video Download:** yt-dlp 2025.10.22 (Python)
-- **Video Processing:** FFmpeg 7.1.2 (binary)
+- **YouTube Download:** yt-dlp 2025.10.22 (Python) for YouTube videos
+- **Video Processing:** FFmpeg 8.0.1 (binary) for HLS (.m3u8) video download
+
+### Video Providers (MCP)
+- **DVIDS Search API:** https://api.dvidshub.net/search (official military video API)
+- **MCP SDK:** @modelcontextprotocol/sdk (Python) for video provider communication
+- **Provider Registry:** Multi-provider pattern with priority-based fallback
 
 ### External Services
 - **YouTube Data API:** v3 (for B-roll search and metadata)
+- **DVIDS Search API:** api.dvidshub.net (military video search and download)
+- **DVIDS CloudFront CDN:** d34w7g4gy10iej.cloudfront.net (HLS video streams)
 - **Ollama Server:** http://localhost:11434 (local LLM runtime, primary)
 - **Google Gemini API:** generativelanguage.googleapis.com (cloud LLM, optional)
 - **Groq API:** api.groq.com (ultra-fast cloud LLM, optional)

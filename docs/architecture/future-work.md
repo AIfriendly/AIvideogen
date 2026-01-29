@@ -1,8 +1,8 @@
 # Future Work & Roadmap
 
 **Project:** BMAD Video Generator
-**Last Updated:** 2025-12-03
-**Status:** Epic 6 Complete (Stories 6.1-6.8b) | Stories 6.9-6.11 Deferred
+**Last Updated:** 2026-01-25
+**Status:** Epic 8 Complete (DVIDS API Migration) | Epic 9 Planned (NASA API Migration) | Stories 6.9-6.11 Partially Complete
 
 ---
 
@@ -12,13 +12,67 @@ This document outlines deferred features, future enhancements, and architectural
 
 ---
 
-## Immediate Deferred Work
+## Completed Work
+
+### Epic 8: DVIDS API Integration (Completed 2026-01-25)
+
+**Status:** ✅ **COMPLETE**
+**Stories:** 8.1-8.5 (5 stories, 19 points)
+**Achievement:** Migrated DVIDS from Playwright web scraping to official DVIDS Search API with HLS download support.
+
+**Key Accomplishments:**
+- API-based video metadata retrieval (more reliable than web scraping)
+- FFmpeg-based HLS video download with API key injection
+- Connection pooling infrastructure (reusable by future providers)
+- Cross-scene diversity enforcement (tracks selected video IDs)
+- Cross-platform filename compatibility (Windows/Unix)
+
+**Infrastructure Created (Reusable):**
+- Connection pooling: `Map<string, MCPClient> connections`
+- Diversity tracking: `Set<string> selectedVideoIds`
+- Filename sanitization: `sanitize_video_id()` function
+
+**Documentation:**
+- Epic Definition: `docs/epics/epic-8-dvids-api-integration.md`
+- ADR-014: DVIDS API Integration Decision Record
+
+---
+
+## Planned Work
+
+### Epic 9: NASA API Integration (Planned)
+
+**Status:** 📋 **PLANNED**
+**Stories:** 9.1-9.5 (5 stories, 16 points)
+**Dependencies:** Epic 8 (DVIDS API Integration) - for infrastructure reuse
+**Rationale:** Apply Epic 8's successful API migration pattern to NASA provider.
+
+**Key Differences from Epic 8:**
+- Direct MP4 URLs (no FFmpeg required - simpler than DVIDS)
+- Optional API key (public content accessible without authentication)
+- Infrastructure reuse from Epic 8 (reduces development effort)
+- 16 points vs 19 points (simpler download + infrastructure reuse)
+
+**Stories:**
+- Story 9.1: NASA API Integration (5 points)
+- Story 9.2: Direct MP4 Video Download (3 points) - Simpler than Epic 8
+- Story 9.3: Video Selection Diversity (4 points) - Reuse Epic 8
+- Story 9.4: Connection Pooling (2 points) - Reuse Epic 8
+- Story 9.5: Filename Compatibility (2 points) - Reuse Epic 8
+
+**Documentation:**
+- Epic Definition: `docs/epics/epic-9-nasa-api-integration.md`
+- ADR-015: NASA API Integration Decision Record
+
+---
+
+## Historical Deferred Work
 
 ### Feature 2.9: Domain-Specific Content APIs (MCP Video Providers)
 
 **Stories:** 6.9, 6.10, 6.11
-**Status:** ⚠️ **DEFERRED** to future epic (with technology pivot)
-**Rationale:** YouTube API provides sufficient visual sourcing for MVP; MCP servers require dedicated architectural planning.
+**Status:** ⚠️ **PARTIALLY COMPLETE** (Epic 8 complete, Epic 9 planned)
+**Original Rationale:** YouTube API provides sufficient visual sourcing for MVP; MCP servers require dedicated architectural planning.
 **Technology Pivot (2026-01-24):** HTTP scraping failed on DVIDS (JavaScript-rendered content). Now using Playwright headless browser automation instead of `httpx` + `BeautifulSoup`.
 
 #### Story 6.9: MCP Video Provider Client Architecture

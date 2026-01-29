@@ -56,3 +56,8 @@ kokoro-v1.0.onnx
 voices-v1.0.bin
 nul
 .aider*
+
+# bmad-assist artifacts (auto-generated, never commit)
+.bmad-assist/cache/
+*.meta.yaml
+*.tpl.xml

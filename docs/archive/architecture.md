@@ -5,10 +5,18 @@
 **Type:** Level 2 Greenfield Software Project
 **Author:** Winston (BMAD Architect Agent)
 **Date:** 2025-11-12
-**Version:** 2.1
-**Last Updated:** 2025-12-03
+**Version:** 2.2
+**Last Updated:** 2026-01-25
 
-**Recent Changes (v2.1 - 2025-12-03):**
+**Recent Changes (v2.2 - 2026-01-25):**
+- Added DVIDS API Integration architecture (Story 6.10)
+- Migrated DVIDS MCP server from web scraping to official DVIDS Search API
+- Implemented FFmpeg-based HLS (.m3u8) video download with API key authentication
+- Added video provider registry pattern with connection pooling and automatic fallback
+- Documented MCP server architecture for video provider extensibility
+- Added configuration schema for API keys and FFmpeg detection
+
+**Previous Changes (v2.1 - 2025-12-03):**
 - Added Quick Production Flow architecture (Feature 2.7 extension)
 - Added user_preferences database schema for default voice/persona
 - Added API endpoints: /api/projects/quick-create, /api/user-preferences
@@ -48,17 +56,19 @@ The primary technology stack is FOSS (Free and Open-Source Software) compliant p
 8. [State Management Architecture](#state-management-architecture)
 9. [Database Schema](#database-schema)
 10. [Video Processing Pipeline](#video-processing-pipeline)
-11. [API Design](#api-design)
-12. [Implementation Patterns](#implementation-patterns)
-13. [Security & Privacy](#security--privacy)
-14. [Performance Considerations](#performance-considerations)
-15. [Development Environment](#development-environment)
-16. [Deployment Architecture](#deployment-architecture)
-17. [Cloud Migration Path](#cloud-migration-path)
-18. [Cross-Epic Integration Architecture](#cross-epic-integration-architecture)
-19. [Feature 2.7: Channel Intelligence & RAG Architecture](#feature-27-channel-intelligence--rag-architecture)
-20. [Background Job Queue Architecture](#background-job-queue-architecture)
-21. [Architecture Decision Records](#architecture-decision-records)
+11. [DVIDS API Integration](#dvids-api-integration)
+12. [Video Provider Architecture](#video-provider-architecture)
+13. [API Design](#api-design)
+14. [Implementation Patterns](#implementation-patterns)
+15. [Security & Privacy](#security--privacy)
+16. [Performance Considerations](#performance-considerations)
+17. [Development Environment](#development-environment)
+18. [Deployment Architecture](#deployment-architecture)
+19. [Cloud Migration Path](#cloud-migration-path)
+20. [Cross-Epic Integration Architecture](#cross-epic-integration-architecture)
+21. [Feature 2.7: Channel Intelligence & RAG Architecture](#feature-27-channel-intelligence--rag-architecture)
+22. [Background Job Queue Architecture](#background-job-queue-architecture)
+23. [Architecture Decision Records](#architecture-decision-records)
 
 ---
 
@@ -102,7 +112,7 @@ This establishes the base architecture with:
 
 ## Decision Summary
 
-**Version Verification Date:** 2025-11-29
+**Version Verification Date:** 2026-01-25
 
 | Category | Decision | Version | Verified | FOSS | Affects | Rationale |
 |----------|----------|---------|----------|------|---------|-----------|
@@ -120,8 +130,11 @@ This establishes the base architecture with:
 | **LLM SDK (Gemini)** | @google/generative-ai | 0.21.0 | 2025-11-29 | ✅ Free | Epic 1, 2 | Official JavaScript SDK |
 | **Text-to-Speech** | KokoroTTS | 82M | 2025-11-29 | ✅ | Epic 2 | 48+ voices, high quality |
 | **YouTube Downloader** | yt-dlp | 2025.10.22 | 2025-11-29 | ✅ | Epic 3 | Industry standard, robust |
+| **DVIDS API** | DVIDS Search API | v1 | 2026-01-25 | ✅ | Story 6.10 | Official military video API |
+| **DVIDS MCP Server** | Python MCP SDK | Latest | 2026-01-25 | ✅ | Story 6.10 | stdio transport, tool protocol |
+| **Video Provider Registry** | ProviderRegistry | 1.0 | 2026-01-25 | ✅ | Story 6.9 | Multi-provider with fallback |
 | **Caption Scraping** | youtube-transcript-api | 0.6.x | 2025-11-29 | ✅ | Feature 2.7 | Python, auto-captions |
-| **Video Processing** | FFmpeg | 7.1.2 | 2025-11-29 | ✅ | Epic 5 | Full control, future-proof |
+| **Video Processing** | FFmpeg | 7.1.2 | 2026-01-25 | ✅ | Epic 5, Story 6.10 | Full control, HLS download |
 | **Video Player** | Plyr | 3.7.8 | 2025-11-29 | ✅ | Epic 4 | Lightweight, accessible |
 | **Job Scheduler** | node-cron | 3.0.x | 2025-11-29 | ✅ | Feature 2.7 | Simple cron-like scheduling |
 | **API Layer** | Next.js API Routes | 15.5 | 2025-11-29 | ✅ | All | Built-in, REST-style |
@@ -154,6 +167,8 @@ This establishes the base architecture with:
 - **Video Processing:** FFmpeg 7.1.2 (binary)
 
 ### External Services
+- **DVIDS Search API:** api.dvidshub.net (military video search and download, Story 6.10)
+- **DVIDS CloudFront CDN:** HLS (.m3u8) video streams with API key authentication
 - **YouTube Data API:** v3 (for B-roll search and metadata)
 - **Ollama Server:** http://localhost:11434 (local LLM runtime, primary)
 - **Google Gemini API:** generativelanguage.googleapis.com (cloud LLM, optional)
@@ -4599,6 +4614,1148 @@ export async function assembleVideo(
   await generateThumbnail(finalOutputPath, thumbnailPath);
 
   return finalOutputPath;
+}
+```
+
+---
+
+## DVIDS API Integration
+
+**Story:** 6.10 - DVIDS MCP Server Implementation
+**Goal:** Provide military video content from DVIDS (Defense Visual Information Distribution Service) via official API integration.
+
+### Overview
+
+The DVIDS integration has been completely rewritten from a web scraping approach to use the official DVIDS Search API. This provides more reliable access to military videos with proper authentication and rate limiting support.
+
+### Architecture Components
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         DVIDS API Integration Layer                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  TypeScript Client Layer                                                    │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ VideoProviderClient (src/lib/mcp/video-provider-client.ts)           │  │
+│  │  - MCP stdio transport connection                                     │  │
+│  │  - JSON-RPC protocol communication                                     │  │
+│  │  - Automatic retry on connection failure                              │  │
+│  │  - Timeout management (60s default, 10min for downloads)              │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                      ↓                                       │
+│  Provider Registry Layer                                                   │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ ProviderRegistry (src/lib/mcp/provider-registry.ts)                  │  │
+│  │  - Multi-provider management with priority-based fallback             │  │
+│  │  - Connection pooling (keep connections alive for reuse)              │  │
+│  │  - Configuration loading from mcp_servers.json                        │  │
+│  │  - Automatic cleanup with disconnectAll()                             │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                      ↓                                       │
+│  Python MCP Server Layer (stdio transport)                                 │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ dvids_scraping_server.py (mcp_servers/dvids_scraping_server.py)     │  │
+│  │                                                                       │  │
+│  │ MCP Tools:                                                            │  │
+│  │  ├─ ping()           - Health check, FFmpeg status, cache info        │  │
+│  │  ├─ search_videos()  - Query DVIDS API with filters                  │  │
+│  │  ├─ download_video() - HLS download with API key injection            │  │
+│  │  └─ get_video_details() - Get metadata from DVIDS                    │  │
+│  │                                                                       │  │
+│  │ Core Components:                                                      │  │
+│  │  ├─ DVIDSScrapingMCPServer - Main server class                        │  │
+│  │  ├─ _fetch_with_backoff() - Exponential backoff retry logic          │  │
+│  │  ├─ _download_hls_video() - FFmpeg HLS processing                    │  │
+│  │  ├─ _parse_api_response() - JSON response validation                 │  │
+│  │  └─ VideoCache - TTL-based caching (30 days default)                 │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                      ↓                                       │
+│  External API Layer                                                        │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ DVIDS Search API (https://api.dvidshub.net/search)                   │  │
+│  │                                                                       │  │
+│  │ Endpoints:                                                            │  │
+│  │  - /search  - Video search with query parameters                     │  │
+│  │  - CloudFront CDN - HLS (.m3u8) video streams                       │  │
+│  │                                                                       │  │
+│  │ Authentication:                                                       │  │
+│  │  - API key via DVIDS_API_KEY environment variable                    │  │
+│  │  - Bearer token + X-API-Key header                                   │  │
+│  │  - API key injected into HLS segment URLs                            │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### API-Based Search Implementation
+
+**Migration from Web Scraping:**
+
+The original implementation used BeautifulSoup to scrape DVIDS HTML pages. This approach had several limitations:
+- Fragile to HTML structure changes
+- No authentication support
+- Limited filtering capabilities
+- Difficult to maintain
+
+**Current API Implementation:**
+
+```python
+# DVIDS API endpoints
+DVIDS_API_BASE_URL = "https://api.dvidshub.net"
+DVIDS_API_SEARCH_ENDPOINT = "/search"
+DVIDS_SEARCH_URL = f"{DVIDS_API_BASE_URL}{DVIDS_API_SEARCH_ENDPOINT}"
+
+# Search parameters
+api_params = {
+    'q': encoded_query,           # URL-encoded search query
+    'page': page + 1,              # Pagination (1-3 pages)
+    'limit': RESULTS_PER_PAGE,     # 20 results per page
+    'type': 'video',               # CRITICAL: Only videos
+    'branch': random.choice(['Army', 'Marines', 'Navy', 'Air Force']),
+    'category': random.choice(['B-Roll', 'Combat Operations']),
+    'api_key': self.api_key        # Optional API key
+}
+```
+
+**Search Flow:**
+
+```
+1. User enters query (e.g., "military aircraft")
+         ↓
+2. Query is URL-encoded (e.g., "military%20aircraft")
+         ↓
+3. API request with filters (type=video, branch=Army, category=B-Roll)
+         ↓
+4. JSON response parsing with error handling
+         ↓
+5. Extract video metadata (title, duration, hls_url, thumbnail)
+         ↓
+6. Cache HLS URLs for later download
+         ↓
+7. Return results (max 50 videos across 3 pages)
+```
+
+**Response Structure:**
+
+```json
+{
+  "results": [
+    {
+      "id": "video:919891",
+      "title": "F-22 Raptor Combat Operations",
+      "description": "Air Force F-22 Raptors conduct...",
+      "duration": 127,
+      "thumbnail": "https://.../poster.jpg",
+      "hls_url": "https://dvidshub.net/.../playlist.m3u8?api_key=...",
+      "published_at": "2025-01-15T10:30:00Z",
+      "format": "MP4",
+      "resolution": "1920x1080",
+      "public_domain": true
+    }
+  ]
+}
+```
+
+### HLS Video Downloads with FFmpeg
+
+**Challenge:** DVIDS videos are delivered as HLS (.m3u8) streams with CloudFront CDN authentication.
+
+**Solution:** FFmpeg-based download with API key injection into segment URLs.
+
+```python
+async def _download_hls_video(
+    self,
+    hls_url: str,
+    output_path: Path,
+    client: httpx.AsyncClient
+) -> bytes:
+    """
+    Download HLS (.m3u8) video using FFmpeg.
+
+    Handles DVIDS authentication by injecting API key into all segment URLs.
+    """
+
+    # Step 1: Extract API key from HLS URL
+    api_key_param = ''
+    if '?api_key=' in hls_url:
+        parsed = urlparse(hls_url)
+        api_key = parse_qs(parsed.query).get('api_key', [self.api_key])[0]
+        if api_key:
+            api_key_param = f'?api_key={api_key}'
+
+    # Step 2: Download HLS manifest
+    response = await self._fetch_with_backoff(hls_url, client)
+    manifest_content = response.text
+
+    # Step 3: Modify manifest to add API key to all segment URLs
+    lines = manifest_content.split('\n')
+    modified_lines = []
+    for line in lines:
+        if line.strip().startswith('http'):
+            # This is a segment URL - add API key parameter
+            separator = '&' if '?' in line else '?'
+            if 'api_key=' not in line:
+                modified_line = line + separator + api_key_param.lstrip('?')
+                modified_lines.append(modified_line)
+            else:
+                modified_lines.append(line)
+        else:
+            modified_lines.append(line)
+
+    modified_manifest = '\n'.join(modified_lines)
+
+    # Step 4: Save modified manifest to temp file
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.m3u8', delete=False) as f:
+        f.write(modified_manifest)
+        manifest_path = Path(f.name)
+
+    # Step 5: Use FFmpeg to download from modified manifest
+    cmd = [
+        FFMPEG_PATH or 'ffmpeg',
+        '-y',                           # Overwrite output file
+        '-i', str(manifest_path),       # Input: modified manifest
+        '-c', 'copy',                   # Copy streams (no re-encoding)
+        '-f', 'mp4',                    # Output format
+        str(output_path)                # Output file
+    ]
+
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+
+    stdout, stderr = await process.communicate()
+
+    # Step 6: Verify download success
+    if process.returncode != 0:
+        raise DVIDSNetworkError(f"FFmpeg failed with code {process.returncode}")
+
+    if not output_path.exists():
+        raise DVIDSNetworkError(f"Output file not created: {output_path}")
+
+    file_size = output_path.stat().st_size
+    if file_size < 1000:
+        raise DVIDSNetworkError(f"Output too small: {file_size} bytes")
+
+    # Step 7: Clean up manifest file
+    manifest_path.unlink(missing_ok=True)
+
+    return output_path.read_bytes()
+```
+
+**FFmpeg Requirements:**
+
+- **Detection:** `shutil.which('ffmpeg')` at module initialization
+- **Status Logging:** Warns if FFmpeg not available at startup
+- **Version Detection:** Logs FFmpeg version for debugging
+- **Error Handling:** Captures stderr for failed downloads
+
+### API Authentication Mechanism
+
+**Authentication Methods:**
+
+```python
+# Method 1: Bearer token
+headers = {
+    'Authorization': f'Bearer {self.api_key}',
+    'X-API-Key': self.api_key
+}
+
+# Method 2: Query parameter
+api_params = {
+    'q': query,
+    'api_key': self.api_key
+}
+
+# Method 3: HLS segment injection
+# API key is added to each segment URL in the manifest
+segment_url = segment_url + f'?api_key={self.api_key}'
+```
+
+**Configuration:**
+
+```json
+{
+  "providers": [
+    {
+      "id": "dvids",
+      "name": "DVIDS Military Videos",
+      "priority": 1,
+      "enabled": true,
+      "command": "python",
+      "args": ["-m", "mcp_servers.dvids_scraping_server"],
+      "env": {
+        "PYTHONPATH": ".",
+        "DVIDS_CACHE_DIR": "./assets/cache/dvids",
+        "DVIDS_RATE_LIMIT": "2",
+        "DVIDS_API_KEY": "d2a9ec807b033bc531ab9d1f8a3332cb1e0b81f4"
+      }
+    }
+  ]
+}
+```
+
+**Environment Variables:**
+
+- `DVIDS_API_KEY`: API key for authenticated requests (optional but recommended)
+- `DVIDS_CACHE_DIR`: Directory for cached videos (default: `./assets/cache/dvids`)
+- `DVIDS_RATE_LIMIT`: Seconds between API requests (default: 2)
+
+### Error Handling & Retry Logic
+
+**Exponential Backoff Implementation:**
+
+```python
+# Retry configuration
+MAX_RETRIES = 5
+BASE_BACKOFF_SECONDS = 2
+MAX_BACKOFF_SECONDS = 60
+
+# HTTP Status Code Handling:
+# - 403 (Forbidden)        → Fatal error, no retry
+# - 429 (Rate Limit)       → Retry with exponential backoff
+# - 503 (Service Unavailable) → Retry with exponential backoff
+# - Timeout/Network Error  → Retry with exponential backoff
+
+# Backoff calculation:
+backoff = min(BASE_BACKOFF_SECONDS * (2 ** attempt), MAX_BACKOFF_SECONDS)
+# Attempt 1: 2s
+# Attempt 2: 4s
+# Attempt 3: 8s
+# Attempt 4: 16s
+# Attempt 5: 32s (capped at MAX_BACKOFF_SECONDS)
+```
+
+**Custom Exception Hierarchy:**
+
+```python
+class DVIDSAPIError(Exception):
+    """Base exception for DVIDS API errors."""
+
+class DVIDSAuthenticationError(DVIDSAPIError):
+    """Invalid API key or access denied (HTTP 403)."""
+
+class DVIDSRateLimitError(DVIDSAPIError):
+    """Rate limit exceeded (HTTP 429)."""
+
+class DVIDSServiceUnavailableError(DVIDSAPIError):
+    """Service temporarily unavailable (HTTP 503)."""
+
+class DVIDSResponseError(DVIDSAPIError):
+    """Malformed API response or missing required fields."""
+
+class DVIDSNetworkError(DVIDSAPIError):
+    """Network timeout or connection error."""
+```
+
+### Video Caching Strategy
+
+**Cache Implementation:**
+
+```python
+# VideoCache class (mcp_servers/cache.py)
+cache = VideoCache(
+    provider_name="dvids",
+    cache_dir=cache_dir,
+    default_ttl_days=30
+)
+
+# Cache check before download
+if self.cache.is_cached(safe_video_id):
+    logger.info(f"Video {video_id} found in cache")
+    await self._respect_rate_limit(is_cached=True)  # Faster rate limit
+    return cached_video_path
+
+# Cache after successful download
+self.cache._metadata["videos"][safe_video_id] = {
+    "provider": "dvids",
+    "cached_date": datetime.now().isoformat(),
+    "ttl": 30,
+    "file_path": str(cache_file),
+    "title": video_details.get('title'),
+    "duration": video_details.get('duration'),
+    "hls_url": hls_url  # Cached for later downloads
+}
+```
+
+**Cache Benefits:**
+
+- Reduces API load (check cache before API call)
+- Faster response for previously downloaded videos
+- Lower rate limit wait time (0.5s vs 2s)
+- Preserves HLS URLs for retry downloads
+
+### Rate Limiting
+
+**Multi-Tier Rate Limiting:**
+
+```python
+# Configuration
+RATE_LIMIT_SECONDS = 2            # Normal API requests
+RATE_LIMIT_CACHED_SECONDS = 0.5   # Cached content (faster)
+
+async def _respect_rate_limit(self, is_cached: bool = False):
+    """Enforce rate limiting between API requests."""
+    if self._last_request_time is not None:
+        loop_time = asyncio.get_event_loop().time()
+        elapsed = loop_time - self._last_request_time
+
+        # Use shorter wait time for cached videos
+        limit_seconds = RATE_LIMIT_CACHED_SECONDS if is_cached else RATE_LIMIT_SECONDS
+
+        if elapsed < limit_seconds:
+            wait_time = limit_seconds - elapsed
+            if wait_time > 0.1:  # Only log if wait is significant
+                logger.info(f"Rate limit: waiting {wait_time:.1f}s before next API request")
+            await asyncio.sleep(wait_time)
+```
+
+### MCP Server Protocol
+
+**Tool Registration:**
+
+```python
+@server.list_tools()
+async def list_tools() -> List[Tool]:
+    return [
+        Tool(
+            name="ping",
+            description="Health check - verify server is responsive and get status information",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        ),
+        Tool(
+            name="search_videos",
+            description="Search DVIDS API for military videos by query",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query string (e.g., 'military aircraft')"
+                    },
+                    "max_duration": {
+                        "type": "number",
+                        "description": "Maximum video duration in seconds (optional)"
+                    }
+                },
+                "required": ["query"]
+            }
+        ),
+        Tool(
+            name="download_video",
+            description="Download a video from DVIDS API and cache it locally",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "video_id": {
+                        "type": "string",
+                        "description": "DVIDS video identifier"
+                    }
+                },
+                "required": ["video_id"]
+            }
+        ),
+        Tool(
+            name="get_video_details",
+            description="Get detailed metadata for a DVIDS video from API",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "video_id": {
+                        "type": "string",
+                        "description": "DVIDS video identifier"
+                    }
+                },
+                "required": ["video_id"]
+            }
+        )
+    ]
+```
+
+### Key Implementation Details
+
+**1. Search Parameters:**
+
+- `type=video`: Filters to only return videos (not images or news)
+- `branch`: Military branch filter (Army/Marines/Navy/Air Force)
+- `category`: Content type filter (B-Roll/Combat Operations)
+- `max_duration`: Optional filter for short clips
+
+**2. Pagination Strategy:**
+
+```python
+MAX_PAGES_PER_QUERY = 3   # Fetch up to 3 pages per query
+RESULTS_PER_PAGE = 20     # Target results per page
+MAX_TOTAL_RESULTS = 50    # Maximum total results to return
+
+# Result randomization for diversity
+random.seed(query)
+random.shuffle(all_results)
+```
+
+**3. HLS Manifest Processing:**
+
+- Download original `.m3u8` manifest
+- Inject API key into all segment URLs
+- Save modified manifest to temp file
+- Use FFmpeg to download with authentication
+- Clean up temp manifest after download
+
+**4. Windows Path Compatibility:**
+
+```python
+# Remove type prefix from video_id for Windows compatibility
+# "video:919891" -> "919891"
+# "image:123456" -> "123456"
+# "news:31146" -> "31146"
+safe_video_id = video_id.replace('video:', '').replace('image:', '').replace('news:', '')
+```
+
+### Testing Strategy
+
+**Unit Tests:**
+
+- `test_dvids_server.py`: MCP server protocol tests
+- `test_dvids_edge_cases.py`: Special characters, empty results, network errors
+- `test_dvids_integration.py`: End-to-end API integration tests
+
+**Integration Tests:**
+
+- `story-6.10-dvids-client-integration.test.ts`: TypeScript client integration
+- Tests MCP stdio transport, JSON-RPC communication, error handling
+
+**Test Fixtures:**
+
+- `fixtures/dvids_search_response.html`: Sample API response
+- `fixtures/dvids_video_page.html`: Video metadata page
+
+### Performance Characteristics
+
+**API Response Times:**
+
+- Search: 2-5 seconds (with rate limiting)
+- Video details: 1-3 seconds
+- Download (cached): <1 second
+- Download (HLS): 30-120 seconds (depending on video size)
+
+**Cache Efficiency:**
+
+- Cache hit rate: ~60-80% for repeated queries
+- Cache storage: ~50-200 MB per 100 videos
+- TTL: 30 days (configurable)
+
+**Rate Limit Impact:**
+
+- Unauthenticated: 2 seconds between requests
+- Authenticated: Higher limits (API key required)
+- Cached content: 0.5 seconds between requests
+
+---
+
+## Video Provider Architecture
+
+**Story:** 6.9 - MCP Video Provider Client Architecture
+**Goal:** Enable multiple video provider integrations with unified client interface and automatic fallback.
+
+### Architecture Overview
+
+The video provider architecture implements a registry pattern for managing multiple MCP (Model Context Protocol) servers that provide video search and download capabilities. This design allows for:
+
+- **Multi-provider support**: DVIDS, YouTube, NASA, etc.
+- **Priority-based fallback**: Try providers in order, fall back on failure
+- **Connection pooling**: Keep connections alive for reuse across multiple searches
+- **Automatic retry**: Reconnect on connection failure with exponential backoff
+- **Unified interface**: Single API for video operations regardless of provider
+
+### Provider Registry Pattern
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                          Application Layer                                    │
+│                    (Visual Sourcing, Curation UI)                            │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                      ↓
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         Provider Registry                                     │
+│                     (src/lib/mcp/provider-registry.ts)                       │
+│                                                                              │
+│  - Load configuration from config/mcp_servers.json                           │
+│  - Manage multiple provider instances (Map<string, VideoProviderClient>)     │
+│  - Priority-based fallback logic                                             │
+│  - Connection pooling (keep connections alive)                               │
+│  - Cleanup with disconnectAll()                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                      ↓
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                      Video Provider Clients                                   │
+│                  (src/lib/mcp/video-provider-client.ts)                      │
+│                                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                         │
+│  │   DVIDS     │  │   YouTube   │  │    NASA     │                         │
+│  │  (Python)   │  │  (Python)   │  │  (Python)   │                         │
+│  │  Priority 1 │  │  Priority 2 │  │  Priority 3 │                         │
+│  └─────────────┘  └─────────────┘  └─────────────┘                         │
+│         ↓                ↓                ↓                                  │
+│  Each client wraps MCP stdio transport + JSON-RPC protocol                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                      ↓
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         MCP Server Processes                                  │
+│                          (Python via stdio)                                  │
+│                                                                              │
+│  ┌──────────────────────┐  ┌──────────────────────┐                        │
+│  │ dvids_scraping_server│  │  youtube_server       │                        │
+│  │  - search_videos()   │  │  - search_videos()    │                        │
+│  │  - download_video()  │  │  - download_video()   │                        │
+│  │  - get_video_details()│ │  - get_video_details() │                        │
+│  │  - ping()            │  │  - ping()             │                        │
+│  └──────────────────────┘  └──────────────────────┘                        │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Configuration Schema
+
+**mcp_servers.json:**
+
+```json
+{
+  "providers": [
+    {
+      "id": "dvids",
+      "name": "DVIDS Military Videos",
+      "priority": 1,
+      "enabled": true,
+      "command": "python",
+      "args": ["-m", "mcp_servers.dvids_scraping_server"],
+      "env": {
+        "PYTHONPATH": ".",
+        "DVIDS_CACHE_DIR": "./assets/cache/dvids",
+        "DVIDS_RATE_LIMIT": "2",
+        "DVIDS_API_KEY": "your_api_key_here"
+      },
+      "notes": "Uses DVIDS API for video search. API key recommended for higher rate limits."
+    },
+    {
+      "id": "youtube",
+      "name": "YouTube Videos",
+      "priority": 2,
+      "enabled": false,
+      "command": "python",
+      "args": ["-m", "mcp_servers.youtube"],
+      "env": {
+        "PYTHONPATH": "./ai-video-generator",
+        "YOUTUBE_CACHE_DIR": "./assets/cache/youtube",
+        "YOUTUBE_RATE_LIMIT": "10"
+      },
+      "notes": "YouTube MCP server not implemented yet - disabled until available"
+    },
+    {
+      "id": "nasa",
+      "name": "NASA Space Videos",
+      "priority": 3,
+      "enabled": false,
+      "command": "python",
+      "args": ["-m", "mcp_servers.nasa_scraping_server"],
+      "env": {
+        "PYTHONPATH": "./ai-video-generator",
+        "NASA_CACHE_DIR": "./assets/cache/nasa",
+        "NASA_RATE_LIMIT": "10"
+      },
+      "notes": "DISABLED: NASA website is JavaScript-heavy, scraping doesn't work."
+    }
+  ]
+}
+```
+
+**Configuration Fields:**
+
+- `id`: Unique provider identifier (used for caching and logging)
+- `name`: Human-readable provider name
+- `priority`: Integer for fallback order (lower = higher priority)
+- `enabled`: Boolean to enable/disable provider
+- `command`: Command to start MCP server (e.g., "python")
+- `args`: Command arguments (e.g., ["-m", "mcp_servers.dvids_scraping_server"])
+- `env`: Environment variables for the server process
+- `notes`: Documentation for developers
+
+### VideoProviderClient Class
+
+**Core Responsibilities:**
+
+```typescript
+export class VideoProviderClient {
+  private _client: Client | null = null;           // MCP client instance
+  private _transport: StdioClientTransport | null = null;  // stdio transport
+  public readonly serverConfig: ProviderConfig;    // Server configuration
+
+  // Connect to MCP server via stdio transport
+  async connect(): Promise<void>
+
+  // Search for videos with automatic retry on connection failure
+  async searchVideos(query: string, maxDuration?: number): Promise<VideoSearchResult[]>
+
+  // Download video with extended timeout (10 minutes)
+  async downloadVideo(videoId: string, outputPath?: string): Promise<string>
+
+  // Get video metadata
+  async getVideoDetails(videoId: string): Promise<VideoDetails>
+
+  // Disconnect and cleanup resources
+  async disconnect(): Promise<void>
+}
+```
+
+**Connection Management:**
+
+```typescript
+async connect(): Promise<void> {
+  // If already connected, skip (no-op)
+  if (this._client && this._transport) {
+    console.log(`[${this.serverConfig.name}] Already connected, skipping...`);
+    return;
+  }
+
+  // Resolve "python" to actual path (e.g., .venv/Scripts/python.exe on Windows)
+  const resolvedCommand = (this.serverConfig.command === 'python')
+    ? getPythonPath()
+    : this.serverConfig.command;
+
+  // Create stdio transport with stderr capture
+  this._transport = new StdioClientTransport({
+    command: resolvedCommand,
+    args: this.serverConfig.args,
+    env: this.serverConfig.env,
+    stderr: 'inherit',  // Inherit stderr to see Python server logs
+  });
+
+  // Create MCP client instance
+  this._client = new Client(
+    {
+      name: `video-provider-${this.serverConfig.id}`,
+      version: '1.0.0',
+    },
+    {
+      capabilities: {},
+    }
+  );
+
+  // Connect to server
+  await this._client.connect(this._transport);
+  console.log(`[${this.serverConfig.name}] Successfully connected to MCP server`);
+}
+```
+
+**Automatic Retry on Connection Failure:**
+
+```typescript
+// Retry configuration
+export const MCP_MAX_RETRIES = 3;
+export const MCP_RETRY_DELAY = 1000;
+
+private async executeWithRetry<T>(
+  operation: () => Promise<T>,
+  operationName: string
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= MCP_MAX_RETRIES; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Check if this is a connection closed error (MCP error -32000)
+      if (this.isConnectionClosedError(error)) {
+        console.warn(
+          `[${this.serverConfig.name}] Connection closed during ${operationName} ` +
+          `(attempt ${attempt}/${MCP_MAX_RETRIES}). Reconnecting...`
+        );
+
+        // Reconnect to the MCP server
+        await this.disconnect();
+        await this.connect();
+
+        // Add delay before retry (except on last attempt)
+        if (attempt < MCP_MAX_RETRIES) {
+          await this.delay(MCP_RETRY_DELAY);
+        }
+      } else {
+        // Not a connection error, throw immediately
+        throw lastError;
+      }
+    }
+  }
+
+  // All retries failed
+  throw new MCPConnectionError(
+    `${this.serverConfig.name}: ${operationName} failed after ${MCP_MAX_RETRIES} attempts`
+  );
+}
+```
+
+### ProviderRegistry Class
+
+**Core Responsibilities:**
+
+```typescript
+export class ProviderRegistry {
+  private providers: Map<string, VideoProviderClient> = new Map();
+  private config: MCPServersConfig;
+  private configPath: string;
+
+  // Load configuration from JSON file
+  constructor(configPath: string)
+
+  // Search all providers in priority order
+  async searchAllProviders(query: string, maxDuration?: number): Promise<VideoSearchResult[]>
+
+  // Download from specific provider or try all providers
+  async downloadFromAnyProvider(videoId: string, providerId?: string): Promise<string>
+
+  // Disconnect all providers (cleanup)
+  async disconnectAll(): Promise<void>
+
+  // Get specific provider by ID (creates and caches if not exists)
+  async getProvider(id: string): Promise<VideoProviderClient>
+}
+```
+
+**Priority-Based Fallback:**
+
+```typescript
+async searchAllProviders(
+  query: string,
+  maxDuration?: number
+): Promise<VideoSearchResult[]> {
+  // Get enabled providers sorted by priority
+  const enabledProviders = this.config.providers
+    .filter((p) => p.enabled)
+    .sort((a, b) => a.priority - b.priority);
+
+  // Try each provider in priority order
+  for (const providerConfig of enabledProviders) {
+    try {
+      const provider = await this.getProvider(providerConfig.id);
+      await provider.connect();  // Now checks if already connected (no-op)
+      const results = await provider.searchVideos(query, maxDuration);
+
+      // Return first successful result (keep connection alive for reuse)
+      if (results.length > 0) {
+        return results;
+      }
+
+      // If no results, try next provider
+      // Note: We don't disconnect here to allow reuse
+    } catch (error) {
+      // Log error and try next provider
+      console.warn(`Provider ${providerConfig.id} failed:`, error);
+      // Continue to next provider
+    }
+  }
+
+  // All providers failed or returned no results
+  return [];
+}
+```
+
+**Connection Pooling:**
+
+```typescript
+// Connection is kept alive for reuse across multiple searches
+// Provider instances are cached in Map<string, VideoProviderClient>
+
+async getProvider(id: string): Promise<VideoProviderClient> {
+  // Check cache for existing instance
+  if (this.providers.has(id)) {
+    return this.providers.get(id)!;
+  }
+
+  // Create new provider instance
+  const provider = new VideoProviderClient(providerConfig);
+  this.providers.set(id, provider);
+  return provider;
+}
+
+// Cleanup should be called when done with all searches
+async disconnectAll(): Promise<void> {
+  for (const [id, provider] of this.providers) {
+    try {
+      await provider.disconnect();
+      console.log(`[ProviderRegistry] Disconnected provider: ${id}`);
+    } catch (error) {
+      console.warn(`[ProviderRegistry] Failed to disconnect provider ${id}:`, error);
+    }
+  }
+  this.providers.clear();
+}
+```
+
+### MCP Communication Protocol
+
+**JSON-RPC over stdio:**
+
+```typescript
+// Request format (TypeScript → Python)
+const request = {
+  jsonrpc: '2.0',
+  id: 1,
+  method: 'tools/call',
+  params: {
+    name: 'search_videos',
+    arguments: {
+      query: 'military aircraft',
+      max_duration: 120
+    }
+  }
+};
+
+// Response format (Python → TypeScript)
+const response = {
+  jsonrpc: '2.0',
+  id: 1,
+  result: {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify([
+          {
+            videoId: 'video:919891',
+            title: 'F-22 Raptor Combat Operations',
+            duration: 127,
+            thumbnailUrl: 'https://.../poster.jpg',
+            sourceUrl: 'https://.../playlist.m3u8?api_key=...',
+            providerId: 'dvids'
+          }
+        ])
+      }
+    ]
+  }
+};
+```
+
+**Timeout Configuration:**
+
+```typescript
+export const MCP_TIMEOUTS = {
+  /** Default timeout for most MCP operations (60s) */
+  DEFAULT: 60000,
+  /** Timeout for video downloads - 10 minutes for large files */
+  DOWNLOAD: 600000,
+  /** Timeout for video search operations (30s) */
+  SEARCH: 30000,
+  /** Timeout for getting video details (30s) */
+  DETAILS: 30000,
+} as const;
+```
+
+### Error Handling
+
+**Custom Exception Hierarchy:**
+
+```typescript
+export class MCPConnectionError extends Error {
+  constructor(message: string, public cause?: Error) {
+    super(message);
+    this.name = 'MCPConnectionError';
+  }
+}
+
+export class MCPTimeoutError extends MCPConnectionError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MCPTimeoutError';
+  }
+}
+
+export class MCPServerError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MCPServerError';
+  }
+}
+
+export class ConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConfigurationError';
+  }
+}
+
+export class ProviderError extends Error {
+  constructor(message: string, public providerId: string) {
+    super(message);
+    this.name = 'ProviderError';
+  }
+}
+```
+
+**Security Validation:**
+
+```typescript
+private validateCommandSecurity(): void {
+  const isWindows = process.platform === 'win32';
+  const suspiciousPatterns = [
+    /[;&|`$()]/,  // Shell metacharacters
+    /\.\./,       // Directory traversal
+    /\/\//,       // Double slashes (potential bypass)
+    ...(isWindows ? [] : [/\\/]),  // Only check backslashes on Unix
+  ];
+
+  // Check command
+  for (const pattern of suspiciousPatterns) {
+    if (pattern.test(this.serverConfig.command)) {
+      throw new MCPConnectionError(
+        `Invalid command: contains suspicious characters. ` +
+        `Command: ${this.serverConfig.command}`
+      );
+    }
+  }
+
+  // Check each arg
+  for (const arg of this.serverConfig.args) {
+    for (const pattern of suspiciousPatterns) {
+      if (pattern.test(arg)) {
+        throw new MCPConnectionError(
+          `Invalid argument: contains suspicious characters. Arg: ${arg}`
+        );
+      }
+    }
+  }
+}
+```
+
+### Integration Example
+
+**Usage in Visual Sourcing:**
+
+```typescript
+// Import provider registry
+import { ProviderRegistry } from '@/lib/mcp/provider-registry';
+
+// Initialize registry with configuration
+const registry = new ProviderRegistry('./config/mcp_servers.json');
+
+// Search videos (tries DVIDS first, falls back to YouTube if DVIDS fails)
+const results = await registry.searchAllProviders('military aircraft', 120);
+
+// Display results in UI
+results.forEach(video => {
+  console.log(`${video.title} (${video.duration}s) from ${video.providerId}`);
+});
+
+// Download video from specific provider
+const filePath = await registry.downloadFromAnyProvider(
+  'video:919891',
+  'dvids'  // Optional: try all providers if not specified
+);
+
+// Cleanup when done
+await registry.disconnectAll();
+```
+
+### Extensibility
+
+**Adding a New Provider:**
+
+1. **Create MCP Server** (Python):
+   ```python
+   # mcp_servers/new_provider_server.py
+   server = Server("new-provider-server")
+
+   @server.list_tools()
+   async def list_tools() -> List[Tool]:
+       return [
+           Tool(name="search_videos", ...),
+           Tool(name="download_video", ...),
+           Tool(name="get_video_details", ...),
+           Tool(name="ping", ...)
+       ]
+
+   @server.call_tool()
+   async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
+       # Implement tool logic
+       pass
+   ```
+
+2. **Add Configuration** (mcp_servers.json):
+   ```json
+   {
+     "id": "new_provider",
+     "name": "New Provider Videos",
+     "priority": 2,
+     "enabled": true,
+     "command": "python",
+     "args": ["-m", "mcp_servers.new_provider_server"],
+     "env": {
+       "PYTHONPATH": ".",
+       "PROVIDER_API_KEY": "your_key_here"
+     }
+   }
+   ```
+
+3. **No TypeScript Changes Required:**
+   - VideoProviderClient works with any MCP server
+   - ProviderRegistry automatically loads new providers
+   - Fallback logic applies automatically
+
+### Performance Considerations
+
+**Connection Pooling Benefits:**
+
+- Avoids process startup overhead (Python interpreter initialization)
+- Reduces latency for repeated searches
+- Enables efficient batch operations
+
+**Memory Management:**
+
+- Provider instances cached in Map
+- Cleanup required via `disconnectAll()` when done
+- Prevents memory leaks from lingering Python processes
+
+**Rate Limiting:**
+
+- Each provider manages its own rate limiting
+- Faster fallback when provider fails
+- Cached content has lower rate limit (0.5s vs 2s)
+
+### Testing Strategy
+
+**Unit Tests:**
+
+- Test VideoProviderClient connection management
+- Test retry logic with mock connection failures
+- Test ProviderRegistry fallback behavior
+- Test configuration validation
+
+**Integration Tests:**
+
+- Test real MCP server communication
+- Test DVIDS API integration
+- Test error propagation from Python to TypeScript
+
+**Test Utilities:**
+
+```typescript
+// Mock MCP server for testing
+export class MockMCPClient {
+  async searchVideos(query: string): Promise<VideoSearchResult[]> {
+    return [
+      {
+        videoId: 'mock-video-1',
+        title: `Mock Video for "${query}"`,
+        duration: 60,
+        thumbnailUrl: 'https://mock.com/thumb.jpg',
+        sourceUrl: 'https://mock.com/video.mp4',
+        providerId: 'mock'
+      }
+    ];
+  }
 }
 ```
 

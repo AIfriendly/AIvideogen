@@ -355,4 +355,76 @@ useEffect(() => {
 ```
 
 ---
+
+## Internal MCP Protocol (Video Providers)
+
+The application uses Model Context Protocol (MCP) for video provider communication via Python subprocesses.
+
+### MCP Server: DVIDS Scraping Server
+
+**Location:** `mcp_servers/dvids_scraping_server.py`
+
+**Transport:** stdio (standard input/output)
+
+**Protocol:** JSON-RPC 2.0
+
+**Available Tools:**
+
+1. **ping()** - Server health check
+   Returns: { status: "alive", server: "dvids-api-server", ffmpeg: {...}, ... }
+
+2. **search_videos()** - Search for videos
+   Parameters: { query: string, max_duration?: number }
+   Returns: [{ videoId, title, duration, downloadUrl, ... }]
+
+3. **download_video()** - Download video to cache
+   Parameters: { video_id: string }
+   Returns: { video_id: string, file_path: string, cached: boolean }
+
+4. **get_video_details()** - Get video metadata
+   Parameters: { video_id: string }
+   Returns: { videoId, title, description, duration, ... }
+
+## External API Integrations
+
+### DVIDS Search API
+
+**Base URL:** https://api.dvidshub.net/search
+
+**Authentication:** API key via query parameter or Bearer token
+
+**Request Parameters:**
+- `q` (string, required): Search query
+- `type` (string): "video", "image", "audio", "publication_issue", "webcast", "graphics"
+- `branch` (string): "Army", "Navy", "Air Force", "Marines", "Coast Guard", "Joint", "Civilian"
+- `category` (string): "B-Roll", "Combat Operations", "Interviews", "Briefings", etc.
+- `max_duration` (integer): Video length in seconds
+- `page` (integer): Page number (default: 1)
+- `max_results` (integer): Results per page (1-50, default/max: 50)
+- `api_key` (string): Authentication key
+
+**Response Format:**
+```json
+{
+  "page_info": {
+    "total_results": 1000,
+    "results_per_page": 20
+  },
+  "results": [
+    {
+      "id": "video:123456",
+      "title": "Army Training Exercise",
+      "type": "video",
+      "branch": "Army",
+      "duration": 75,
+      "hls_url": "https://api.dvidshub.net/hls/video/123456.m3u8?api_key=xxx",
+      "url": "https://www.dvidshub.net/video/123456",
+      "thumbnail": "https://d1ldvf68ux039x.cloudfront.net/thumb.jpg",
+      "keywords": "training, exercise, army"
+    }
+  ]
+}
+```
+
+---
 

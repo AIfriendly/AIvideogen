@@ -1,0 +1,229 @@
+bmad_assist_version: 0.4.6
+snapshot_timestamp: '2026-01-28T17:08:29.056036'
+project_name: BMAD video generator
+config:
+  providers:
+    master:
+      provider: claude-subprocess
+      model: opus
+      model_name: glm-4.7
+      settings: '***REDACTED***'
+    multi:
+    - provider: gemini
+      model: gemini-3-pro-preview
+      model_name: null
+      settings: '***REDACTED***'
+    - provider: gemini
+      model: gemini-3-flash-preview
+      model_name: null
+      settings: '***REDACTED***'
+    - provider: gemini
+      model: gemini-2.5-flash
+      model_name: null
+      settings: '***REDACTED***'
+    - provider: gemini
+      model: gemini-2.5-flash-lite
+      model_name: null
+      settings: '***REDACTED***'
+    - provider: gemini
+      model: gemini-2.5-flash-lite
+      model_name: null
+      settings: '***REDACTED***'
+    - provider: claude-subprocess
+      model: sonnet
+      model_name: glm-4.7
+      settings: '***REDACTED***'
+    - provider: claude-subprocess
+      model: sonnet
+      model_name: glm-4.7
+      settings: '***REDACTED***'
+    helper:
+      provider: claude-subprocess
+      model: haiku
+      model_name: glm-4.5-air
+      settings: '***REDACTED***'
+  phase_models:
+    create_story:
+      provider: claude-subprocess
+      model: opus
+      model_name: glm-4.7
+      settings: ~/.claude/glm.json
+    validate_story_synthesis:
+      provider: claude-subprocess
+      model: opus
+      model_name: glm-4.7
+      settings: ~/.claude/glm.json
+    dev_story:
+      provider: claude-subprocess
+      model: opus
+      model_name: glm-4.7
+      settings: ~/.claude/glm.json
+    code_review_synthesis:
+      provider: claude-subprocess
+      model: opus
+      model_name: glm-4.7
+      settings: ~/.claude/glm.json
+    retrospective:
+      provider: claude-subprocess
+      model: opus
+      model_name: glm-4.7
+      settings: ~/.claude/glm.json
+    validate_story:
+    - provider: gemini
+      model: gemini-3-pro-preview
+      model_name: null
+      settings: null
+    - provider: gemini
+      model: gemini-3-flash-preview
+      model_name: null
+      settings: null
+    - provider: gemini
+      model: gemini-2.5-flash
+      model_name: null
+      settings: null
+    - provider: gemini
+      model: gemini-2.5-flash-lite
+      model_name: null
+      settings: null
+    - provider: gemini
+      model: gemini-2.5-flash-lite
+      model_name: null
+      settings: null
+    - provider: claude-subprocess
+      model: sonnet
+      model_name: glm-4.7
+      settings: ~/.claude/glm.json
+    - provider: claude-subprocess
+      model: sonnet
+      model_name: glm-4.7
+      settings: ~/.claude/glm.json
+    code_review:
+    - provider: gemini
+      model: gemini-3-pro-preview
+      model_name: null
+      settings: null
+    - provider: gemini
+      model: gemini-3-flash-preview
+      model_name: null
+      settings: null
+    - provider: gemini
+      model: gemini-2.5-flash
+      model_name: null
+      settings: null
+    - provider: gemini
+      model: gemini-2.5-flash-lite
+      model_name: null
+      settings: null
+    - provider: gemini
+      model: gemini-2.5-flash-lite
+      model_name: null
+      settings: null
+    - provider: claude-subprocess
+      model: sonnet
+      model_name: glm-4.7
+      settings: ~/.claude/glm.json
+    - provider: claude-subprocess
+      model: sonnet
+      model_name: glm-4.7
+      settings: ~/.claude/glm.json
+  power_prompts:
+    set_name: null
+    variables: {}
+  state_path: '***REDACTED***'
+  timeout: 300
+  timeouts:
+    default: 600
+    create_story: 900
+    validate_story: null
+    validate_story_synthesis: null
+    dev_story: 3600
+    code_review: 900
+    code_review_synthesis: 900
+    retrospective: 900
+  bmad_paths:
+    prd: '***REDACTED***'
+    architecture: '***REDACTED***'
+    epics: '***REDACTED***'
+    stories: '***REDACTED***'
+  paths:
+    output_folder: '***REDACTED***'
+    planning_artifacts: '***REDACTED***'
+    implementation_artifacts: '***REDACTED***'
+    project_knowledge: '***REDACTED***'
+  compiler:
+    patch_path: '***REDACTED***'
+    source_context:
+      budgets:
+        code_review: 15000
+        code_review_synthesis: 15000
+        create_story: 20000
+        dev_story: 15000
+        validate_story: 10000
+        validate_story_synthesis: 10000
+        default: 20000
+      scoring:
+        in_file_list: 50
+        in_git_diff: 50
+        is_test_file: -10
+        is_config_file: -5
+        change_lines_factor: 1
+        change_lines_cap: 50
+      extraction:
+        adaptive_threshold: 0.25
+        hunk_context_lines: 20
+        hunk_context_scale: 0.3
+        max_files: 15
+    strategic_context:
+      budget: 8000
+      defaults:
+        include:
+        - project-context
+        - architecture
+        main_only: true
+      create_story:
+        include:
+        - project-context
+        - architecture
+        - ux
+        - prd
+        main_only: null
+      validate_story:
+        include:
+        - project-context
+        - architecture
+        - ux
+        - prd
+        main_only: null
+      validate_story_synthesis:
+        include:
+        - project-context
+        main_only: null
+  benchmarking:
+    enabled: true
+    extraction_provider: claude
+    extraction_model: haiku
+  antipatterns:
+    enabled: true
+  notifications:
+    enabled: true
+    providers:
+    - type: telegram
+      bot_token: '***REDACTED***'
+      chat_id: ''
+      webhook_url: '***REDACTED***'
+    - type: discord
+      bot_token: '***REDACTED***'
+      chat_id: null
+      webhook_url: '***REDACTED***'
+    events:
+    - story_started
+    - story_completed
+    - phase_completed
+    - error_occurred
+    - anomaly_detected
+  testarch: null
+  sprint: null
+  qa: null
+  loop: null
+  warnings: null
+  workflow_variant: default
