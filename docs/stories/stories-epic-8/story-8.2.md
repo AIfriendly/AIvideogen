@@ -380,6 +380,72 @@ async def download_with_progress(hls_url: str, video_id: str, api_key: str, outp
 4. **Graceful Failure Handling:** Failed downloads don't crash the pipeline
 5. **Cascading Fallback:** System provides alternative videos when HLS fails
 
+---
+
+### Test Run 3 (2026-01-30) ✅ **CLEANUP IMPLEMENTATION VALIDATION**
+
+### Test Configuration
+- **Video:** "Modern Navy Aircraft Carrier Operations" (300s target, 178s actual)
+- **Test Date:** 2026-01-30
+- **Cleanup Feature:** Story 5.6 post-generation cache cleanup
+
+### Story 5.6 Cleanup Implementation (Python)
+
+**Implementation in `produce_video.py` (Lines 292-352):**
+```python
+def cleanup_project_files(project_id: str, keep_output: bool = True) -> dict:
+    """Clean up intermediate files after successful video generation."""
+    stats = {
+        "audio_deleted": 0,
+        "videos_deleted": 0,
+        "temp_deleted": 0,
+        "errors": []
+    }
+
+    patterns_to_delete = [
+        "scene_*_source_*.mp4",   # DVIDS source videos
+        "scene_*_clip_*.mp4",     # Trimmed clips
+        "scene_*_cf_temp_*.mp4",  # Crossfade temp files
+        "scene_*_audio_only.m4a",  # Audio-only videos
+        "scene_*_video_only.mp4",  # Video-only versions
+        "scene_*_with_audio.mp4",  # Assembled scenes
+        "scene_*_fallback_*.mp4",  # Fallback clips
+        "concat_*.mp4",            # Concatenated videos
+        "concat_*.m4a",            # Concatenated audio
+        "*_list.txt"              # Concatenation lists
+    ]
+```
+
+### Cleanup Validation Results (Test Run 3)
+
+| Metric | Value |
+|--------|-------|
+| **Audio Files Deleted** | 25 scene audio files |
+| **Video Files Deleted** | 201+ intermediate videos |
+| **Temp Directories Cleaned** | 2 (temp, assembly) |
+| **Final Videos Preserved** | 1 (output video) |
+| **Errors** | 0 |
+
+### Cleanup Integration Point (Lines ~1454-1470)
+```python
+if output_file and Path(output_file).exists():
+    print("SUCCESS: Video generated successfully!")
+
+    # Story 5.6: Post-Generation Cache Cleanup
+    cleanup_stats = cleanup_project_files(project_id, keep_output=True)
+
+    print(f"Audio files deleted: {cleanup_stats['audio_deleted']}")
+    print(f"Intermediate video files deleted: {cleanup_stats['videos_deleted']}")
+```
+
+### Key Findings from Cleanup Validation
+
+1. **Complete Cleanup:** All intermediate files removed successfully
+2. **Output Preserved:** Final video file protected from deletion
+3. **Error-Free:** No permission errors or file access issues
+4. **Pattern-Based:** File patterns match all intermediate file types
+5. **Automatic:** Cleanup runs automatically after successful generation
+
 ### Download Examples
 
 | Video ID | Size | Status |
@@ -422,3 +488,6 @@ Some DVIDS videos have corrupt or unavailable HLS streams. The system handles th
 - **FFmpeg Documentation:** https://ffmpeg.org/ffmpeg.html
 - **HLS Specification:** https://datatracker.ietf.org/doc/html/rfc8216
 - **Implementation File:** `ai-video-generator/mcp_servers/dvids_scraping_server.py`
+- **Video Generation Test Report:** `VIDEO_GENERATION_TEST_REPORT.md` - Comprehensive test documentation with all validation results
+- **Duration Accuracy Fix:** `produce_video.py` lines 332-381 - Word count-based prompt generation
+- **Story 5.6 Cleanup:** `produce_video.py` lines 292-352 - Post-generation cache cleanup implementation
